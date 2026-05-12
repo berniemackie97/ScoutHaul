@@ -1,0 +1,52 @@
+import Constants from 'expo-constants';
+import { Platform } from 'react-native';
+
+export type Environment = 'development' | 'preview' | 'production';
+
+export interface AppConfig {
+  env: Environment;
+  apiBaseUrl: string;
+  organizationId: string;
+  userId: string;
+  isStubAuth: boolean;
+}
+
+function resolveEnvironment(): Environment {
+  const profile = Constants.expoConfig?.extra?.eas?.buildProfile;
+  if (profile === 'production') return 'production';
+  if (profile === 'preview') return 'preview';
+  return 'development';
+}
+
+function resolveApiBaseUrl(): string {
+  const extra = Constants.expoConfig?.extra;
+  const configured = (extra?.apiBaseUrl as string) ?? 'http://localhost:5080';
+  const port = (extra?.apiPort as number) ?? 5080;
+
+  if (__DEV__ && Platform.OS !== 'web') {
+    const hostUri = Constants.expoConfig?.hostUri ?? '';
+    const lanIp = hostUri.split(':')[0];
+    if (lanIp && lanIp !== 'localhost' && lanIp !== '127.0.0.1') {
+      return `http://${lanIp}:${port}`;
+    }
+  }
+
+  return configured.replace(/\/+$/, '');
+}
+
+function buildConfig(): AppConfig {
+  const extra = Constants.expoConfig?.extra;
+  const env = resolveEnvironment();
+  const orgId = (extra?.organizationId as string) ?? '';
+  const userId = (extra?.userId as string) ?? '';
+
+  return {
+    env,
+    apiBaseUrl: resolveApiBaseUrl(),
+    organizationId: orgId,
+    userId: userId,
+    isStubAuth: env === 'development' && !!orgId && !!userId,
+  };
+}
+
+export const appConfig = buildConfig();

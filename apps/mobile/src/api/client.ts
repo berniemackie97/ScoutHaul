@@ -1,5 +1,5 @@
-import Constants from 'expo-constants';
-import { Platform } from 'react-native';
+import { appConfig } from '../config';
+import { authStore } from '../services/auth';
 import type {
   BudgetSummary,
   DashboardSummary,
@@ -14,38 +14,34 @@ import type {
   SourcingTripSummary,
 } from '../domain/types';
 
-function resolveApiBaseUrl(): string {
-  if (process.env.EXPO_PUBLIC_API_BASE_URL) {
-    return process.env.EXPO_PUBLIC_API_BASE_URL.replace(/\/+$/, '');
-  }
-  if (__DEV__) {
-    const debuggerHost = Constants.expoConfig?.hostUri ?? Constants.experienceUrl ?? '';
-    const lanHost = debuggerHost.split(':')[0];
-    if (lanHost && Platform.OS !== 'web') {
-      return `http://${lanHost}:5080`;
-    }
-  }
-  return 'http://localhost:5080';
-}
-
-const API_BASE_URL = resolveApiBaseUrl();
-const DEFAULT_ORGANIZATION_ID = process.env.EXPO_PUBLIC_SCOUTHAUL_ORG_ID ?? '9d3c0c44-218b-49d9-90bf-07b748610001';
-const DEFAULT_USER_ID = process.env.EXPO_PUBLIC_SCOUTHAUL_USER_ID ?? '9d3c0c44-218b-49d9-90bf-07b748610002';
-
 type RequestOptions = {
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   body?: unknown;
 };
 
+function buildHeaders(): Record<string, string> {
+  const headers: Record<string, string> = {
+    Accept: 'application/json',
+    'Content-Type': 'application/json',
+  };
+
+  if (appConfig.isStubAuth) {
+    headers['X-ScoutHaul-Organization-Id'] = appConfig.organizationId;
+    headers['X-ScoutHaul-User-Id'] = appConfig.userId;
+  } else {
+    const token = authStore.getToken();
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+  }
+
+  return headers;
+}
+
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const response = await fetch(`${appConfig.apiBaseUrl}${path}`, {
     method: options.method ?? 'GET',
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-      'X-ScoutHaul-Organization-Id': DEFAULT_ORGANIZATION_ID,
-      'X-ScoutHaul-User-Id': DEFAULT_USER_ID,
-    },
+    headers: buildHeaders(),
     body: options.body === undefined ? undefined : JSON.stringify(options.body),
   });
 
@@ -76,7 +72,6 @@ function parseErrorMessage(text: string): string {
 }
 
 export const api = {
-  baseUrl: API_BASE_URL,
   dashboard: () => apiRequest<DashboardSummary>('/api/dashboard/summary'),
   inventory: () => apiRequest<InventoryItem[]>('/api/inventory'),
   inventoryItem: (id: string) => apiRequest<InventoryItem>(`/api/inventory/${id}`),

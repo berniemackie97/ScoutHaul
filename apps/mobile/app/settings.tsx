@@ -3,6 +3,7 @@ import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { api } from '../src/api/client';
+import { appConfig } from '../src/config';
 import { Button } from '../src/components/Button';
 import { Card } from '../src/components/Card';
 import { Divider } from '../src/components/Divider';
@@ -84,7 +85,7 @@ export default function SettingsScreen() {
           />
           <Text variant="bodyBold">{connectivity.label}</Text>
         </View>
-        <Text variant="caption" selectable>API: {api.baseUrl}</Text>
+        <Text variant="caption" selectable>API: {appConfig.apiBaseUrl}</Text>
       </Card>
 
       <SectionHeader title="Sync Queue" />
