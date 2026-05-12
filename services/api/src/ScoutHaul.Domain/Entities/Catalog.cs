@@ -43,6 +43,8 @@ public sealed class InventoryItem : EntityBase, IOrganizationScoped
     public SourceLocation? SourceLocation { get; set; }
     public Guid? SourcingTripId { get; set; }
     public SourcingTrip? SourcingTrip { get; set; }
+    public Guid? SourcingTripStopId { get; set; }
+    public SourcingTripStop? SourcingTripStop { get; set; }
     public required string Title { get; set; }
     public string? Description { get; set; }
     public string? Condition { get; set; }

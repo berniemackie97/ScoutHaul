@@ -237,10 +237,15 @@ namespace ScoutHaul.Infrastructure.Persistence.Migrations
                     b.Property<Guid?>("SourcingTripId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("SourcingTripStopId")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("SourcingTripStopId");
 
                     b.HasIndex("OrganizationId", "OccurredAt");
 
@@ -309,6 +314,9 @@ namespace ScoutHaul.Infrastructure.Persistence.Migrations
                     b.Property<Guid?>("SourcingTripId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("SourcingTripStopId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(40)
@@ -329,6 +337,8 @@ namespace ScoutHaul.Infrastructure.Persistence.Migrations
                     b.HasIndex("SourceLocationId");
 
                     b.HasIndex("SourcingTripId");
+
+                    b.HasIndex("SourcingTripStopId");
 
                     b.HasIndex("OrganizationId", "IsArchived");
 
@@ -872,10 +882,57 @@ namespace ScoutHaul.Infrastructure.Persistence.Migrations
                     b.ToTable("SourceLocations", (string)null);
                 });
 
+            modelBuilder.Entity("ScoutHaul.Domain.Entities.SourcingStopChecklistItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsCompleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsRequired")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("SourcingTripStopId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasMaxLength(240)
+                        .HasColumnType("character varying(240)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SourcingTripStopId");
+
+                    b.HasIndex("OrganizationId", "SourcingTripStopId", "SortOrder");
+
+                    b.ToTable("SourcingStopChecklistItems", (string)null);
+                });
+
             modelBuilder.Entity("ScoutHaul.Domain.Entities.SourcingTrip", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("AssignedToUserId")
                         .HasColumnType("uuid");
 
                     b.Property<decimal?>("CashBudget")
@@ -899,17 +956,138 @@ namespace ScoutHaul.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("OrganizationId")
                         .HasColumnType("uuid");
 
+                    b.Property<DateTimeOffset?>("PlannedEndAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("PlannedStartAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateOnly?>("RouteDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("RouteType")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
                     b.Property<DateTimeOffset>("StartedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
 
+                    b.HasIndex("AssignedToUserId");
+
+                    b.HasIndex("OrganizationId", "RouteDate");
+
                     b.HasIndex("OrganizationId", "StartedAt");
 
+                    b.HasIndex("OrganizationId", "Status");
+
                     b.ToTable("SourcingTrips", (string)null);
+                });
+
+            modelBuilder.Entity("ScoutHaul.Domain.Entities.SourcingTripStop", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("ActualArrivalAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("ActualDepartureAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Address")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<decimal?>("BudgetCap")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
+
+                    b.Property<bool>("CanBeSkipped")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("EstimatedDurationMinutes")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("IsTimeSensitive")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Phone")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<DateTimeOffset?>("PlannedArrivalAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("PlannedOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Priority")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)");
+
+                    b.Property<string>("SourceType")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<Guid>("SourcingTripId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<DateTimeOffset?>("TimeWindowEndAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("TimeWindowStartAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Url")
+                        .HasMaxLength(1500)
+                        .HasColumnType("character varying(1500)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SourcingTripId");
+
+                    b.HasIndex("OrganizationId", "Status");
+
+                    b.HasIndex("OrganizationId", "SourcingTripId", "PlannedOrder");
+
+                    b.ToTable("SourcingTripStops", (string)null);
                 });
 
             modelBuilder.Entity("ScoutHaul.Domain.Entities.Budget", b =>
@@ -931,6 +1109,14 @@ namespace ScoutHaul.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("MarketAnalysis");
+                });
+
+            modelBuilder.Entity("ScoutHaul.Domain.Entities.Expense", b =>
+                {
+                    b.HasOne("ScoutHaul.Domain.Entities.SourcingTripStop", null)
+                        .WithMany()
+                        .HasForeignKey("SourcingTripStopId")
+                        .OnDelete(DeleteBehavior.SetNull);
                 });
 
             modelBuilder.Entity("ScoutHaul.Domain.Entities.InventoryItem", b =>
@@ -956,6 +1142,11 @@ namespace ScoutHaul.Infrastructure.Persistence.Migrations
                         .HasForeignKey("SourcingTripId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("ScoutHaul.Domain.Entities.SourcingTripStop", "SourcingTripStop")
+                        .WithMany("Items")
+                        .HasForeignKey("SourcingTripStopId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.Navigation("Organization");
 
                     b.Navigation("ProductIdentity");
@@ -963,6 +1154,8 @@ namespace ScoutHaul.Infrastructure.Persistence.Migrations
                     b.Navigation("SourceLocation");
 
                     b.Navigation("SourcingTrip");
+
+                    b.Navigation("SourcingTripStop");
                 });
 
             modelBuilder.Entity("ScoutHaul.Domain.Entities.Listing", b =>
@@ -1088,15 +1281,44 @@ namespace ScoutHaul.Infrastructure.Persistence.Migrations
                     b.Navigation("Organization");
                 });
 
+            modelBuilder.Entity("ScoutHaul.Domain.Entities.SourcingStopChecklistItem", b =>
+                {
+                    b.HasOne("ScoutHaul.Domain.Entities.SourcingTripStop", "SourcingTripStop")
+                        .WithMany("ChecklistItems")
+                        .HasForeignKey("SourcingTripStopId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("SourcingTripStop");
+                });
+
             modelBuilder.Entity("ScoutHaul.Domain.Entities.SourcingTrip", b =>
                 {
+                    b.HasOne("ScoutHaul.Domain.Entities.AppUser", "AssignedToUser")
+                        .WithMany()
+                        .HasForeignKey("AssignedToUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("ScoutHaul.Domain.Entities.Organization", "Organization")
                         .WithMany()
                         .HasForeignKey("OrganizationId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.Navigation("AssignedToUser");
+
                     b.Navigation("Organization");
+                });
+
+            modelBuilder.Entity("ScoutHaul.Domain.Entities.SourcingTripStop", b =>
+                {
+                    b.HasOne("ScoutHaul.Domain.Entities.SourcingTrip", "SourcingTrip")
+                        .WithMany("Stops")
+                        .HasForeignKey("SourcingTripId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("SourcingTrip");
                 });
 
             modelBuilder.Entity("ScoutHaul.Domain.Entities.AppUser", b =>
@@ -1127,6 +1349,15 @@ namespace ScoutHaul.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("ScoutHaul.Domain.Entities.SourcingTrip", b =>
                 {
+                    b.Navigation("Items");
+
+                    b.Navigation("Stops");
+                });
+
+            modelBuilder.Entity("ScoutHaul.Domain.Entities.SourcingTripStop", b =>
+                {
+                    b.Navigation("ChecklistItems");
+
                     b.Navigation("Items");
                 });
 #pragma warning restore 612, 618

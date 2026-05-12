@@ -81,6 +81,7 @@ public sealed class BudgetsController(ScoutHaulDbContext db, ICurrentUserContext
             OrganizationId = currentUser.OrganizationId,
             InventoryItemId = request.InventoryItemId,
             SourcingTripId = request.SourcingTripId,
+            SourcingTripStopId = request.SourcingTripStopId,
             Category = request.Category,
             Description = request.Description.Trim(),
             Amount = request.Amount,

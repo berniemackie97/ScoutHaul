@@ -34,6 +34,7 @@ public static class DtoMapping
         item.Id,
         item.ProductIdentityId,
         item.SourcingTripId,
+        item.SourcingTripStopId,
         item.SourceLocationId,
         item.Title,
         item.Description,
@@ -67,13 +68,55 @@ public static class DtoMapping
 
     public static SourcingTripDto ToDto(this SourcingTrip item) => new(
         item.Id,
+        item.AssignedToUserId,
         item.Name,
         item.StartedAt,
         item.EndedAt,
+        item.RouteDate,
+        item.PlannedStartAt,
+        item.PlannedEndAt,
+        item.RouteType,
+        item.Status,
         item.CashBudget,
         item.Notes,
         item.Items.Count,
+        item.Stops.Count,
         item.CreatedAt);
+
+    public static SourcingTripStopDto ToDto(this SourcingTripStop item) => new(
+        item.Id,
+        item.SourcingTripId,
+        item.Name,
+        item.SourceType,
+        item.Address,
+        item.Phone,
+        item.Url,
+        item.Notes,
+        item.PlannedOrder,
+        item.PlannedArrivalAt,
+        item.EstimatedDurationMinutes,
+        item.Priority,
+        item.IsTimeSensitive,
+        item.TimeWindowStartAt,
+        item.TimeWindowEndAt,
+        item.CanBeSkipped,
+        item.BudgetCap,
+        item.Status,
+        item.ActualArrivalAt,
+        item.ActualDepartureAt,
+        item.Items.Sum(inventoryItem => inventoryItem.PurchasePrice ?? 0),
+        item.Items.Count(inventoryItem => inventoryItem.PurchasePrice.HasValue),
+        item.ChecklistItems.OrderBy(checklistItem => checklistItem.SortOrder).Select(checklistItem => checklistItem.ToDto()).ToList(),
+        item.CreatedAt);
+
+    public static SourcingStopChecklistItemDto ToDto(this SourcingStopChecklistItem item) => new(
+        item.Id,
+        item.SourcingTripStopId,
+        item.Text,
+        item.SortOrder,
+        item.IsRequired,
+        item.IsCompleted,
+        item.CompletedAt);
 
     public static BudgetDto ToDto(this Budget item) => new(
         item.Id,
@@ -88,6 +131,7 @@ public static class DtoMapping
         item.Id,
         item.InventoryItemId,
         item.SourcingTripId,
+        item.SourcingTripStopId,
         item.Category,
         item.Description,
         item.Amount,

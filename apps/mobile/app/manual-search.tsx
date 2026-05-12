@@ -26,6 +26,8 @@ export default function ManualSearchScreen() {
     barcode?: string;
     productName?: string;
     avgPrice?: string;
+    sourcingTripId?: string;
+    sourcingTripStopId?: string;
   }>();
 
   const [query, setQuery] = useState(params.query ?? params.barcode ?? '');
@@ -114,6 +116,8 @@ export default function ManualSearchScreen() {
               params: {
                 title: params.productName ?? query,
                 barcode,
+                ...(params.sourcingTripId ? { sourcingTripId: params.sourcingTripId } : {}),
+                ...(params.sourcingTripStopId ? { sourcingTripStopId: params.sourcingTripStopId } : {}),
                 ...(marketAvg != null ? { estimatedSalePrice: String(marketAvg) } : {}),
               },
             })
@@ -163,7 +167,12 @@ export default function ManualSearchScreen() {
           onAction={() =>
             router.push({
               pathname: '/inventory/edit',
-              params: { title: params.productName ?? query, barcode },
+              params: {
+                title: params.productName ?? query,
+                barcode,
+                ...(params.sourcingTripId ? { sourcingTripId: params.sourcingTripId } : {}),
+                ...(params.sourcingTripStopId ? { sourcingTripStopId: params.sourcingTripStopId } : {}),
+              },
             })
           }
         />
@@ -244,6 +253,8 @@ export default function ManualSearchScreen() {
                         title: product.title,
                         productIdentityId: product.id,
                         barcode: product.upc ?? product.ean ?? barcode,
+                        ...(params.sourcingTripId ? { sourcingTripId: params.sourcingTripId } : {}),
+                        ...(params.sourcingTripStopId ? { sourcingTripStopId: params.sourcingTripStopId } : {}),
                       },
                     })
                   }

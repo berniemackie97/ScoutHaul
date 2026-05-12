@@ -84,6 +84,60 @@ public enum WorkTaskStatus
     Cancelled
 }
 
+public enum SourcingRouteStatus
+{
+    Draft,
+    Planned,
+    Active,
+    Paused,
+    Completed,
+    Cancelled
+}
+
+public enum SourcingRouteType
+{
+    General,
+    GarageSales,
+    ThriftRun,
+    PickupRun,
+    AuctionPickup,
+    Liquidation,
+    Mixed
+}
+
+public enum SourcingStopSourceType
+{
+    GarageSale,
+    EstateSale,
+    ThriftStore,
+    Goodwill,
+    FacebookPickup,
+    Auction,
+    Liquidation,
+    FleaMarket,
+    Other
+}
+
+public enum SourcingStopPriority
+{
+    Low,
+    Medium,
+    High,
+    Critical
+}
+
+public enum SourcingStopStatus
+{
+    Planned,
+    Navigating,
+    Arrived,
+    InProgress,
+    Completed,
+    Skipped,
+    Cancelled,
+    AtRisk
+}
+
 public enum ExpenseCategory
 {
     InventoryPurchase,

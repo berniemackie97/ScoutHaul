@@ -17,6 +17,8 @@ public sealed class ScoutHaulDbContext(DbContextOptions<ScoutHaulDbContext> opti
     public DbSet<MarketAnalysis> MarketAnalyses => Set<MarketAnalysis>();
     public DbSet<BuyRecommendation> BuyRecommendations => Set<BuyRecommendation>();
     public DbSet<SourcingTrip> SourcingTrips => Set<SourcingTrip>();
+    public DbSet<SourcingTripStop> SourcingTripStops => Set<SourcingTripStop>();
+    public DbSet<SourcingStopChecklistItem> SourcingStopChecklistItems => Set<SourcingStopChecklistItem>();
     public DbSet<SourceLocation> SourceLocations => Set<SourceLocation>();
     public DbSet<Listing> Listings => Set<Listing>();
     public DbSet<Sale> Sales => Set<Sale>();
@@ -109,6 +111,7 @@ public sealed class ScoutHaulDbContext(DbContextOptions<ScoutHaulDbContext> opti
             entity.HasOne(item => item.ProductIdentity).WithMany(item => item.InventoryItems).HasForeignKey(item => item.ProductIdentityId).OnDelete(DeleteBehavior.SetNull);
             entity.HasOne(item => item.SourceLocation).WithMany().HasForeignKey(item => item.SourceLocationId).OnDelete(DeleteBehavior.SetNull);
             entity.HasOne(item => item.SourcingTrip).WithMany(item => item.Items).HasForeignKey(item => item.SourcingTripId).OnDelete(DeleteBehavior.SetNull);
+            entity.HasOne(item => item.SourcingTripStop).WithMany(item => item.Items).HasForeignKey(item => item.SourcingTripStopId).OnDelete(DeleteBehavior.SetNull);
         });
 
         modelBuilder.Entity<MarketObservation>(entity =>
@@ -159,9 +162,38 @@ public sealed class ScoutHaulDbContext(DbContextOptions<ScoutHaulDbContext> opti
         {
             entity.ToTable("SourcingTrips");
             entity.Property(item => item.Name).HasMaxLength(200).IsRequired();
+            entity.Property(item => item.RouteType).HasConversion<string>().HasMaxLength(40);
+            entity.Property(item => item.Status).HasConversion<string>().HasMaxLength(40);
             ConfigureMoney(entity.Property(item => item.CashBudget));
             entity.HasIndex(item => new { item.OrganizationId, item.StartedAt });
+            entity.HasIndex(item => new { item.OrganizationId, item.RouteDate });
+            entity.HasIndex(item => new { item.OrganizationId, item.Status });
             entity.HasOne(item => item.Organization).WithMany().HasForeignKey(item => item.OrganizationId);
+            entity.HasOne(item => item.AssignedToUser).WithMany().HasForeignKey(item => item.AssignedToUserId).OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<SourcingTripStop>(entity =>
+        {
+            entity.ToTable("SourcingTripStops");
+            entity.Property(item => item.Name).HasMaxLength(200).IsRequired();
+            entity.Property(item => item.SourceType).HasConversion<string>().HasMaxLength(40);
+            entity.Property(item => item.Address).HasMaxLength(500).IsRequired();
+            entity.Property(item => item.Phone).HasMaxLength(80);
+            entity.Property(item => item.Url).HasMaxLength(1500);
+            entity.Property(item => item.Priority).HasConversion<string>().HasMaxLength(24);
+            entity.Property(item => item.Status).HasConversion<string>().HasMaxLength(32);
+            ConfigureMoney(entity.Property(item => item.BudgetCap));
+            entity.HasIndex(item => new { item.OrganizationId, item.SourcingTripId, item.PlannedOrder });
+            entity.HasIndex(item => new { item.OrganizationId, item.Status });
+            entity.HasOne(item => item.SourcingTrip).WithMany(item => item.Stops).HasForeignKey(item => item.SourcingTripId);
+        });
+
+        modelBuilder.Entity<SourcingStopChecklistItem>(entity =>
+        {
+            entity.ToTable("SourcingStopChecklistItems");
+            entity.Property(item => item.Text).HasMaxLength(240).IsRequired();
+            entity.HasIndex(item => new { item.OrganizationId, item.SourcingTripStopId, item.SortOrder });
+            entity.HasOne(item => item.SourcingTripStop).WithMany(item => item.ChecklistItems).HasForeignKey(item => item.SourcingTripStopId);
         });
 
         modelBuilder.Entity<Listing>(entity =>
@@ -208,6 +240,7 @@ public sealed class ScoutHaulDbContext(DbContextOptions<ScoutHaulDbContext> opti
             entity.Property(item => item.Description).HasMaxLength(300).IsRequired();
             ConfigureMoney(entity.Property(item => item.Amount));
             entity.HasIndex(item => new { item.OrganizationId, item.OccurredAt });
+            entity.HasOne<SourcingTripStop>().WithMany().HasForeignKey(item => item.SourcingTripStopId).OnDelete(DeleteBehavior.SetNull);
         });
 
         modelBuilder.Entity<Budget>(entity =>

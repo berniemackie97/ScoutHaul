@@ -32,6 +32,8 @@ export default function EditInventoryScreen() {
     productIdentityId?: string;
     estimatedSalePrice?: string;
     condition?: string;
+    sourcingTripId?: string;
+    sourcingTripStopId?: string;
   }>();
 
   const isEdit = !!params.id;
@@ -138,7 +140,8 @@ export default function EditInventoryScreen() {
       notes: notes || null,
       description: description || null,
       productIdentityId: params.productIdentityId ?? null,
-      sourcingTripId: null,
+      sourcingTripId: params.sourcingTripId ?? null,
+      sourcingTripStopId: params.sourcingTripStopId ?? null,
       sourceLocationId: null,
       sellerAskingPrice: null,
     };
@@ -153,7 +156,11 @@ export default function EditInventoryScreen() {
         item = await api.createInventory(body);
       }
       // TODO: Upload photos to server when photo API exists
-      router.replace(`/inventory/${item.id}`);
+      if (params.sourcingTripId) {
+        router.replace({ pathname: '/active-route', params: { tripId: params.sourcingTripId } });
+      } else {
+        router.replace(`/inventory/${item.id}`);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unable to save item.');
     } finally {

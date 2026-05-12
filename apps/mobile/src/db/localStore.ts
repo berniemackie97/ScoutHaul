@@ -1,6 +1,6 @@
 import * as SQLite from 'expo-sqlite';
 import { apiRequest } from '../api/client';
-import type { LocalItemDraft } from '../domain/types';
+import type { LocalItemDraft, SourcingRouteDetail } from '../domain/types';
 import { createLocalId } from '../utils/id';
 
 type SyncQueueRow = {
@@ -79,6 +79,12 @@ export async function initializeLocalDatabase(): Promise<void> {
       bodyJson text not null,
       syncStatus text not null default 'local',
       createdAt text not null
+    );
+
+    create table if not exists route_snapshots (
+      tripId text primary key not null,
+      bodyJson text not null,
+      updatedAt text not null
     );
   `);
 }
@@ -184,6 +190,40 @@ export async function enqueueOperation(
       values (?, ?, ?, ?, ?, 'pending', ?, null)`,
     [createLocalId('sync'), operationType, endpoint, method, JSON.stringify(body), new Date().toISOString()],
   );
+}
+
+export async function saveRouteSnapshot(route: SourcingRouteDetail): Promise<void> {
+  const db = await getDatabase();
+  await db.runAsync(
+    `insert into route_snapshots (tripId, bodyJson, updatedAt) values (?, ?, ?)
+    on conflict(tripId) do update set
+      bodyJson = excluded.bodyJson,
+      updatedAt = excluded.updatedAt`,
+    [route.trip.id, JSON.stringify(route), new Date().toISOString()],
+  );
+}
+
+export async function getRouteSnapshot(tripId: string): Promise<SourcingRouteDetail | null> {
+  const db = await getDatabase();
+  const row = await db.getFirstAsync<{ bodyJson: string }>(
+    `select bodyJson from route_snapshots where tripId = ?`,
+    [tripId],
+  );
+  return row ? JSON.parse(row.bodyJson) as SourcingRouteDetail : null;
+}
+
+export async function updateRouteSnapshot(
+  tripId: string,
+  updater: (route: SourcingRouteDetail) => SourcingRouteDetail,
+): Promise<SourcingRouteDetail | null> {
+  const current = await getRouteSnapshot(tripId);
+  if (!current) {
+    return null;
+  }
+
+  const next = updater(current);
+  await saveRouteSnapshot(next);
+  return next;
 }
 
 export async function getPendingSyncCount(): Promise<number> {

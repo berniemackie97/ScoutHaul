@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Image } from 'expo-image';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { api } from '../src/api/client';
@@ -52,6 +52,7 @@ function resolveProductImage(state: Extract<ScanState, { phase: 'done' }>): stri
 
 export default function BarcodeScannerScreen() {
   const { colors: c } = useAppTheme();
+  const routeParams = useLocalSearchParams<{ sourcingTripId?: string; sourcingTripStopId?: string }>();
   const [permission, requestPermission] = useCameraPermissions();
   const [state, setState] = useState<ScanState>({ phase: 'scanning' });
   const scanLine = useRef(new Animated.Value(0)).current;
@@ -115,6 +116,8 @@ export default function BarcodeScannerScreen() {
         barcode: state.barcode,
         ...(productName ? { productName } : {}),
         ...(state.avgPrice != null ? { avgPrice: String(state.avgPrice) } : {}),
+        ...(routeParams.sourcingTripId ? { sourcingTripId: routeParams.sourcingTripId } : {}),
+        ...(routeParams.sourcingTripStopId ? { sourcingTripStopId: routeParams.sourcingTripStopId } : {}),
       },
     });
   }
@@ -127,6 +130,8 @@ export default function BarcodeScannerScreen() {
     if (productName) params.title = productName;
     if (state.avgPrice != null) params.estimatedSalePrice = String(state.avgPrice);
     if (firstListing?.condition) params.condition = firstListing.condition;
+    if (routeParams.sourcingTripId) params.sourcingTripId = routeParams.sourcingTripId;
+    if (routeParams.sourcingTripStopId) params.sourcingTripStopId = routeParams.sourcingTripStopId;
     router.push({ pathname: '/inventory/edit', params });
   }
 

@@ -22,6 +22,11 @@ public sealed class InventoryController(ScoutHaulDbContext db, ICurrentUserConte
             return BadRequest(validation);
         }
 
+        if (!await ReferencesBelongToOrganization(request, cancellationToken))
+        {
+            return BadRequest("One or more inventory references do not belong to this organization.");
+        }
+
         var item = new InventoryItem
         {
             OrganizationId = currentUser.OrganizationId,
@@ -50,6 +55,11 @@ public sealed class InventoryController(ScoutHaulDbContext db, ICurrentUserConte
         if (validation is not null)
         {
             return BadRequest(validation);
+        }
+
+        if (!await ReferencesBelongToOrganization(request, cancellationToken))
+        {
+            return BadRequest("One or more inventory references do not belong to this organization.");
         }
 
         Apply(request, item);
@@ -130,6 +140,41 @@ public sealed class InventoryController(ScoutHaulDbContext db, ICurrentUserConte
             item => item.Id == id && item.OrganizationId == currentUser.OrganizationId,
             cancellationToken);
 
+    private async Task<bool> ReferencesBelongToOrganization(UpsertInventoryItemRequest request, CancellationToken cancellationToken)
+    {
+        if (request.SourcingTripStopId.HasValue)
+        {
+            var stop = await db.SourcingTripStops
+                .Where(item => item.Id == request.SourcingTripStopId.Value && item.OrganizationId == currentUser.OrganizationId)
+                .Select(item => new { item.SourcingTripId })
+                .SingleOrDefaultAsync(cancellationToken);
+
+            if (stop is null)
+            {
+                return false;
+            }
+
+            if (request.SourcingTripId.HasValue && stop.SourcingTripId != request.SourcingTripId.Value)
+            {
+                return false;
+            }
+        }
+
+        if (request.SourcingTripId.HasValue)
+        {
+            bool tripExists = await db.SourcingTrips.AnyAsync(
+                item => item.Id == request.SourcingTripId.Value && item.OrganizationId == currentUser.OrganizationId,
+                cancellationToken);
+
+            if (!tripExists)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     private static string? Validate(UpsertInventoryItemRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.Title))
@@ -149,6 +194,7 @@ public sealed class InventoryController(ScoutHaulDbContext db, ICurrentUserConte
     {
         item.ProductIdentityId = request.ProductIdentityId;
         item.SourcingTripId = request.SourcingTripId;
+        item.SourcingTripStopId = request.SourcingTripStopId;
         item.SourceLocationId = request.SourceLocationId;
         item.Title = request.Title.Trim();
         item.Description = TrimToNull(request.Description);
