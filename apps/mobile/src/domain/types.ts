@@ -216,6 +216,22 @@ export type MarketplaceLookupResult = {
   lowestPrice?: number | null;
   highestPrice?: number | null;
   totalResults: number;
+  /** Product identity from UPCitemdb (barcode lookups only) */
+  productTitle?: string | null;
+  productBrand?: string | null;
+  productImageUrl?: string | null;
+  productCategory?: string | null;
+};
+
+export type BarcodeLookupResult = {
+  barcode: string;
+  title?: string | null;
+  brand?: string | null;
+  description?: string | null;
+  category?: string | null;
+  imageUrl?: string | null;
+  upc?: string | null;
+  ean?: string | null;
 };
 
 export type LocalItemDraft = {

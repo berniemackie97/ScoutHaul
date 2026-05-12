@@ -136,6 +136,20 @@ export default function ManualSearchScreen() {
         />
       </View>
 
+      {/* Marketplace deep links — search eBay, Google, FB, Amazon, Mercari etc. */}
+      <Button
+        label="Search Marketplaces"
+        icon="open-outline"
+        variant="secondary"
+        fullWidth
+        onPress={() =>
+          router.push({
+            pathname: '/marketplace-links',
+            params: { query: params.productName ?? query },
+          })
+        }
+      />
+
       {error ? <ErrorBanner message={error} /> : null}
 
       {isSearching ? (

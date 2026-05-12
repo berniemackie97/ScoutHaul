@@ -27,17 +27,27 @@ type ScanState =
       highPrice: number | null;
       totalResults: number;
       error: string | null;
+      /** Product identity from UPCitemdb */
+      productTitle: string | null;
+      productBrand: string | null;
+      productImageUrl: string | null;
+      productCategory: string | null;
     };
 
-/** Extract a clean product name from eBay listing titles */
-function resolveProductName(listings: MarketplaceListing[]): string | null {
-  if (listings.length === 0) return null;
-  // Use first listing title, strip common eBay suffixes
-  const raw = listings[0].title;
+/** Get best product name — prefer UPCitemdb, fall back to eBay listing title */
+function resolveProductName(state: Extract<ScanState, { phase: 'done' }>): string | null {
+  if (state.productTitle) return state.productTitle;
+  if (state.listings.length === 0) return null;
+  const raw = state.listings[0].title;
   return raw
     .replace(/\s*-\s*(New|Used|Open Box|Sealed|Free Shipping|Fast Ship|US Seller|Brand New).*/i, '')
     .replace(/\s*\(.*\)\s*$/, '')
     .trim() || raw;
+}
+
+/** Get best product image — prefer UPCitemdb, fall back to first eBay listing */
+function resolveProductImage(state: Extract<ScanState, { phase: 'done' }>): string | null {
+  return state.productImageUrl ?? state.listings[0]?.imageUrl ?? null;
 }
 
 export default function BarcodeScannerScreen() {
@@ -72,6 +82,10 @@ export default function BarcodeScannerScreen() {
         highPrice: result.highestPrice ?? null,
         totalResults: result.totalResults,
         error: null,
+        productTitle: result.productTitle ?? null,
+        productBrand: result.productBrand ?? null,
+        productImageUrl: result.productImageUrl ?? null,
+        productCategory: result.productCategory ?? null,
       });
     } catch (e) {
       setState({
@@ -83,13 +97,17 @@ export default function BarcodeScannerScreen() {
         highPrice: null,
         totalResults: 0,
         error: e instanceof Error ? e.message : 'Lookup failed',
+        productTitle: null,
+        productBrand: null,
+        productImageUrl: null,
+        productCategory: null,
       });
     }
   }
 
   function continueToSearch() {
     if (state.phase !== 'done') return;
-    const productName = resolveProductName(state.listings);
+    const productName = resolveProductName(state);
     router.push({
       pathname: '/manual-search',
       params: {
@@ -103,7 +121,7 @@ export default function BarcodeScannerScreen() {
 
   function addToInventory() {
     if (state.phase !== 'done') return;
-    const productName = resolveProductName(state.listings);
+    const productName = resolveProductName(state);
     const firstListing = state.listings[0];
     const params: Record<string, string> = { barcode: state.barcode };
     if (productName) params.title = productName;
@@ -132,10 +150,10 @@ export default function BarcodeScannerScreen() {
   }
 
   const scanLineY = scanLine.interpolate({ inputRange: [0, 1], outputRange: [0, 120] });
-  const hasResults = state.phase === 'done' && state.listings.length > 0;
+  const hasResults = state.phase === 'done' && (state.listings.length > 0 || state.productTitle != null);
   const cornerColor = hasResults ? c.success : state.phase === 'done' ? c.warning : c.primary;
-  const productName = state.phase === 'done' ? resolveProductName(state.listings) : null;
-  const heroImage = state.phase === 'done' && state.listings.length > 0 ? state.listings[0].imageUrl : null;
+  const productName = state.phase === 'done' ? resolveProductName(state) : null;
+  const heroImage = state.phase === 'done' ? resolveProductImage(state) : null;
 
   return (
     <Screen scroll={false} edges={['bottom']}>
@@ -204,11 +222,20 @@ export default function BarcodeScannerScreen() {
                     )}
                     <View style={styles.heroInfo}>
                       <Text variant="bodyBold" numberOfLines={2}>{productName}</Text>
+                      {state.productBrand || state.productCategory ? (
+                        <Text variant="caption" color={c.textSecondary} numberOfLines={1}>
+                          {[state.productBrand, state.productCategory].filter(Boolean).join(' · ')}
+                        </Text>
+                      ) : null}
                       <View style={styles.barcodeRow}>
                         <Ionicons name="barcode-outline" size={14} color={c.textMuted} />
                         <Text variant="label" style={styles.mono} color={c.textMuted}>{state.barcode}</Text>
                       </View>
-                      <StatusPill label={`${state.totalResults} found`} tone="success" size="sm" />
+                      {state.totalResults > 0 ? (
+                        <StatusPill label={`${state.totalResults} listed`} tone="success" size="sm" />
+                      ) : (
+                        <StatusPill label="Product found" tone="info" size="sm" />
+                      )}
                     </View>
                   </View>
                 ) : (

@@ -160,6 +160,16 @@ public sealed record MarketAnalysisResponse(
     ConfidenceScoreResult Confidence,
     DealAnalysisResult Recommendation);
 
+public sealed record BarcodeLookupResult(
+    string Barcode,
+    string? Title,
+    string? Brand,
+    string? Description,
+    string? Category,
+    string? ImageUrl,
+    string? Upc,
+    string? Ean);
+
 public sealed record MarketplaceSearchLinkDto(string Provider, string Label, string Url);
 public sealed record MarketplaceSearchLinksDto(string Query, IReadOnlyList<MarketplaceSearchLinkDto> Links);
 
@@ -180,7 +190,11 @@ public sealed record MarketplaceLookupResult(
     decimal? AverageSoldPrice,
     decimal? LowestPrice,
     decimal? HighestPrice,
-    int TotalResults);
+    int TotalResults,
+    string? ProductTitle = null,
+    string? ProductBrand = null,
+    string? ProductImageUrl = null,
+    string? ProductCategory = null);
 
 public sealed record CreateSourcingTripRequest(string Name, DateTimeOffset? StartedAt, decimal? CashBudget, string? Notes);
 public sealed record UpdateSourcingTripRequest(string Name, DateTimeOffset? StartedAt, DateTimeOffset? EndedAt, decimal? CashBudget, string? Notes);
