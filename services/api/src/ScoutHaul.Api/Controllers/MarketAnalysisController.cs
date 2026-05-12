@@ -21,11 +21,6 @@ public sealed class MarketAnalysisController(
     [HttpPost("calculate")]
     public async Task<ActionResult<MarketAnalysisResponse>> Calculate(MarketAnalysisRequest request, CancellationToken cancellationToken)
     {
-        if (request.ProductIdentityId is null && request.InventoryItemId is null)
-        {
-            return BadRequest("Product identity or inventory item is required.");
-        }
-
         ProductIdentity? product = null;
         if (request.ProductIdentityId.HasValue)
         {
@@ -57,7 +52,9 @@ public sealed class MarketAnalysisController(
             }
         }
 
-        var observations = await LoadRelevantObservations(request, item, cancellationToken);
+        var observations = request.ProductIdentityId.HasValue || request.InventoryItemId.HasValue
+            ? await LoadRelevantObservations(request, item, cancellationToken)
+            : new List<MarketObservation>();
         MarketValuationResult valuation = MarketValuation.Estimate(
             request.ExpectedSalePrice,
             item?.EstimatedSalePrice,

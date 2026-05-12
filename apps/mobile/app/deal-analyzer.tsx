@@ -36,11 +36,14 @@ export default function DealAnalyzerScreen() {
     inventoryItemId?: string;
     productIdentityId?: string;
     askingPrice?: string;
+    expectedSalePrice?: string;
+    query?: string;
+    barcode?: string;
   }>();
   const c = useColors();
   const connectivity = useConnectivity();
 
-  const [expectedSalePrice, setExpectedSalePrice] = useState('');
+  const [expectedSalePrice, setExpectedSalePrice] = useState(params.expectedSalePrice ?? '');
   const [askingPrice, setAskingPrice] = useState(params.askingPrice ?? '');
   const [platformFeePercent, setPlatformFeePercent] = useState('13');
   const [paymentFeePercent, setPaymentFeePercent] = useState('3');
@@ -56,14 +59,12 @@ export default function DealAnalyzerScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
 
+  const itemContext = params.query || params.barcode;
+
   async function analyze() {
     const salePrice = parseOptionalNumber(expectedSalePrice);
-    if (!params.productIdentityId && !params.inventoryItemId && salePrice === null) {
+    if (salePrice === null && !params.productIdentityId && !params.inventoryItemId) {
       setError('Enter an expected sale price to run analysis.');
-      return;
-    }
-    if (!connectivity.isOnline && salePrice === null) {
-      setError('Offline analysis needs a user-entered expected sale price.');
       return;
     }
 
@@ -103,6 +104,19 @@ export default function DealAnalyzerScreen() {
         <OfflineBanner message="Offline. Enter expected sale price for manual analysis." />
       ) : null}
 
+      {/* Item context from scanner/search */}
+      {itemContext ? (
+        <View style={[styles.contextBar, { backgroundColor: c.primaryLight }]}>
+          <Ionicons name="analytics-outline" size={18} color={c.primary} />
+          <View style={styles.contextText}>
+            <Text variant="bodyBold" numberOfLines={1}>{params.query ?? 'Deal Check'}</Text>
+            {params.barcode ? (
+              <Text variant="label" color={c.textMuted}>{params.barcode}</Text>
+            ) : null}
+          </View>
+        </View>
+      ) : null}
+
       <Card>
         <TextField
           label="Expected sale price"
@@ -111,7 +125,7 @@ export default function DealAnalyzerScreen() {
           keyboardType="decimal-pad"
           prefix="$"
           placeholder="0.00"
-          hint="What you expect to sell this item for"
+          hint={params.expectedSalePrice ? 'Pre-filled from marketplace avg' : 'What you expect to sell this item for'}
         />
         <TextField
           label="Seller asking price"
@@ -120,21 +134,15 @@ export default function DealAnalyzerScreen() {
           keyboardType="decimal-pad"
           prefix="$"
           placeholder="0.00"
+          hint="What the seller wants for this item"
         />
       </Card>
 
-      <Pressable
-        onPress={() => setShowAdvanced(!showAdvanced)}
-        style={styles.advancedToggle}
-      >
+      <Pressable onPress={() => setShowAdvanced(!showAdvanced)} style={styles.advancedToggle}>
         <Text variant="caption" color={c.primary}>
           {showAdvanced ? 'Hide fee details' : 'Adjust fees & costs'}
         </Text>
-        <Ionicons
-          name={showAdvanced ? 'chevron-up' : 'chevron-down'}
-          size={16}
-          color={c.primary}
-        />
+        <Ionicons name={showAdvanced ? 'chevron-up' : 'chevron-down'} size={16} color={c.primary} />
       </Pressable>
 
       {showAdvanced ? (
@@ -283,6 +291,18 @@ export default function DealAnalyzerScreen() {
 }
 
 const styles = StyleSheet.create({
+  contextBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    borderRadius: radius.lg,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+  },
+  contextText: {
+    flex: 1,
+    gap: spacing.xxs,
+  },
   row: {
     flexDirection: 'row',
     gap: spacing.md,

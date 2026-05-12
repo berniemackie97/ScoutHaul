@@ -29,6 +29,17 @@ type ScanState =
       error: string | null;
     };
 
+/** Extract a clean product name from eBay listing titles */
+function resolveProductName(listings: MarketplaceListing[]): string | null {
+  if (listings.length === 0) return null;
+  // Use first listing title, strip common eBay suffixes
+  const raw = listings[0].title;
+  return raw
+    .replace(/\s*-\s*(New|Used|Open Box|Sealed|Free Shipping|Fast Ship|US Seller|Brand New).*/i, '')
+    .replace(/\s*\(.*\)\s*$/, '')
+    .trim() || raw;
+}
+
 export default function BarcodeScannerScreen() {
   const { colors: c } = useAppTheme();
   const [permission, requestPermission] = useCameraPermissions();
@@ -78,16 +89,26 @@ export default function BarcodeScannerScreen() {
 
   function continueToSearch() {
     if (state.phase !== 'done') return;
-    router.push({ pathname: '/manual-search', params: { query: state.barcode, barcode: state.barcode } });
+    const productName = resolveProductName(state.listings);
+    router.push({
+      pathname: '/manual-search',
+      params: {
+        query: productName ?? state.barcode,
+        barcode: state.barcode,
+        ...(productName ? { productName } : {}),
+        ...(state.avgPrice != null ? { avgPrice: String(state.avgPrice) } : {}),
+      },
+    });
   }
 
   function addToInventory() {
     if (state.phase !== 'done') return;
+    const productName = resolveProductName(state.listings);
     const firstListing = state.listings[0];
     const params: Record<string, string> = { barcode: state.barcode };
-    if (firstListing) {
-      params.title = firstListing.title;
-    }
+    if (productName) params.title = productName;
+    if (state.avgPrice != null) params.estimatedSalePrice = String(state.avgPrice);
+    if (firstListing?.condition) params.condition = firstListing.condition;
     router.push({ pathname: '/inventory/edit', params });
   }
 
@@ -113,6 +134,8 @@ export default function BarcodeScannerScreen() {
   const scanLineY = scanLine.interpolate({ inputRange: [0, 1], outputRange: [0, 120] });
   const hasResults = state.phase === 'done' && state.listings.length > 0;
   const cornerColor = hasResults ? c.success : state.phase === 'done' ? c.warning : c.primary;
+  const productName = state.phase === 'done' ? resolveProductName(state.listings) : null;
+  const heroImage = state.phase === 'done' && state.listings.length > 0 ? state.listings[0].imageUrl : null;
 
   return (
     <Screen scroll={false} edges={['bottom']}>
@@ -169,18 +192,31 @@ export default function BarcodeScannerScreen() {
           ) : (
             <ScrollView style={styles.panelScroll} showsVerticalScrollIndicator={false} bounces={false}>
               <View style={styles.panelInner}>
-                {/* Barcode + price summary */}
-                <View style={styles.barcodeRow}>
-                  <Ionicons
-                    name={hasResults ? 'checkmark-circle' : 'barcode-outline'}
-                    size={18}
-                    color={hasResults ? c.success : c.warning}
-                  />
-                  <Text variant="caption" style={styles.mono} color={c.textMuted}>{state.barcode}</Text>
-                  {hasResults ? (
-                    <StatusPill label={`${state.totalResults} found`} tone="success" size="sm" />
-                  ) : null}
-                </View>
+                {/* Product identity — hero image + resolved name */}
+                {hasResults ? (
+                  <View style={styles.productHero}>
+                    {heroImage ? (
+                      <Image source={{ uri: heroImage }} style={styles.heroImage} contentFit="cover" />
+                    ) : (
+                      <View style={[styles.heroImage, styles.heroPlaceholder, { backgroundColor: c.borderLight }]}>
+                        <Ionicons name="image-outline" size={32} color={c.textMuted} />
+                      </View>
+                    )}
+                    <View style={styles.heroInfo}>
+                      <Text variant="bodyBold" numberOfLines={2}>{productName}</Text>
+                      <View style={styles.barcodeRow}>
+                        <Ionicons name="barcode-outline" size={14} color={c.textMuted} />
+                        <Text variant="label" style={styles.mono} color={c.textMuted}>{state.barcode}</Text>
+                      </View>
+                      <StatusPill label={`${state.totalResults} found`} tone="success" size="sm" />
+                    </View>
+                  </View>
+                ) : (
+                  <View style={styles.barcodeRow}>
+                    <Ionicons name="barcode-outline" size={18} color={c.warning} />
+                    <Text variant="caption" style={styles.mono} color={c.textMuted}>{state.barcode}</Text>
+                  </View>
+                )}
 
                 {/* Price summary bar */}
                 {state.avgPrice != null ? (
@@ -280,6 +316,10 @@ const styles = StyleSheet.create({
   panel: { borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, maxHeight: '55%' },
   panelScroll: { paddingHorizontal: spacing.lg, paddingTop: spacing.lg },
   panelInner: { gap: spacing.md, paddingBottom: spacing.xl },
+  productHero: { flexDirection: 'row', gap: spacing.md, alignItems: 'center' },
+  heroImage: { width: 72, height: 72, borderRadius: radius.md },
+  heroPlaceholder: { alignItems: 'center', justifyContent: 'center' },
+  heroInfo: { flex: 1, gap: spacing.xs },
   barcodeRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   searchingRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   mono: { fontVariant: ['tabular-nums'], letterSpacing: 0.5 },

@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Linking, Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { api } from '../src/api/client';
 import { Button } from '../src/components/Button';
 import { Card } from '../src/components/Card';
@@ -9,19 +10,32 @@ import { EmptyState } from '../src/components/EmptyState';
 import { ErrorBanner } from '../src/components/ErrorBanner';
 import { LoadingState } from '../src/components/LoadingState';
 import { Screen } from '../src/components/Screen';
+import { SectionHeader } from '../src/components/SectionHeader';
 import { StatusPill } from '../src/components/StatusPill';
 import { Text } from '../src/components/Text';
 import { TextField } from '../src/components/TextField';
 import { radius, spacing } from '../src/components/theme';
 import { useAppTheme } from '../src/context/ThemeContext';
-import type { ProductIdentity } from '../src/domain/types';
+import type { MarketplaceListing, ProductIdentity } from '../src/domain/types';
+import { formatMoney } from '../src/utils/money';
 
 export default function ManualSearchScreen() {
   const { colors: c, shadows: s } = useAppTheme();
-  const params = useLocalSearchParams<{ query?: string; barcode?: string }>();
+  const params = useLocalSearchParams<{
+    query?: string;
+    barcode?: string;
+    productName?: string;
+    avgPrice?: string;
+  }>();
+
   const [query, setQuery] = useState(params.query ?? params.barcode ?? '');
   const [barcode] = useState(params.barcode ?? '');
   const [products, setProducts] = useState<ProductIdentity[]>([]);
+  const [marketResults, setMarketResults] = useState<MarketplaceListing[]>([]);
+  const [marketAvg, setMarketAvg] = useState<number | null>(
+    params.avgPrice ? Number(params.avgPrice) : null,
+  );
+  const [marketTotal, setMarketTotal] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
@@ -33,56 +47,92 @@ export default function ManualSearchScreen() {
   }, []);
 
   async function search() {
-    if (!query.trim()) {
+    const q = query.trim();
+    if (!q) {
       setError('Enter search terms or a barcode.');
       return;
     }
     try {
       setIsSearching(true);
       setError(null);
-      setProducts(await api.searchProducts(query));
+
+      // Search internal DB and eBay marketplace in parallel
+      const [dbResults, ebayResults] = await Promise.allSettled([
+        api.searchProducts(q),
+        api.lookupSearch(q),
+      ]);
+
+      if (dbResults.status === 'fulfilled') {
+        setProducts(dbResults.value);
+      }
+
+      if (ebayResults.status === 'fulfilled') {
+        setMarketResults(ebayResults.value.listings);
+        setMarketAvg(ebayResults.value.averageSoldPrice ?? null);
+        setMarketTotal(ebayResults.value.totalResults);
+      }
+
       setHasSearched(true);
     } catch (e) {
       setProducts([]);
+      setMarketResults([]);
       setError(e instanceof Error ? e.message : 'Search unavailable.');
     } finally {
       setIsSearching(false);
     }
   }
 
+  const noResults = hasSearched && products.length === 0 && marketResults.length === 0;
+
   return (
     <Screen>
       <Card>
         <TextField
-          label="Search products"
+          label="Search products & marketplaces"
           value={query}
           onChangeText={setQuery}
           placeholder="Brand, model, SKU, barcode..."
-          hint="Search your product database"
+          hint="Searches your database + eBay marketplace"
         />
-        <View style={styles.actions}>
-          <Button
-            label={isSearching ? 'Searching...' : 'Search'}
-            icon="search-outline"
-            fullWidth
-            disabled={isSearching}
-            onPress={() => void search()}
-          />
-        </View>
+        <Button
+          label={isSearching ? 'Searching...' : 'Search'}
+          icon="search-outline"
+          fullWidth
+          disabled={isSearching}
+          onPress={() => void search()}
+        />
       </Card>
 
-      <View style={styles.secondaryActions}>
+      <View style={styles.quickActions}>
         <Button
           label="Add to Inventory"
           icon="add-circle-outline"
           variant="secondary"
-          onPress={() => router.push({ pathname: '/inventory/edit', params: { title: query, barcode } })}
+          onPress={() =>
+            router.push({
+              pathname: '/inventory/edit',
+              params: {
+                title: params.productName ?? query,
+                barcode,
+                ...(marketAvg != null ? { estimatedSalePrice: String(marketAvg) } : {}),
+              },
+            })
+          }
         />
         <Button
-          label="Marketplace Links"
-          icon="open-outline"
+          label="Deal Check"
+          icon="calculator-outline"
           variant="secondary"
-          onPress={() => router.push({ pathname: '/marketplace-links', params: { query } })}
+          onPress={() =>
+            router.push({
+              pathname: '/deal-analyzer',
+              params: {
+                query: params.productName ?? query,
+                barcode,
+                ...(marketAvg != null ? { expectedSalePrice: String(marketAvg) } : {}),
+              },
+            })
+          }
         />
       </View>
 
@@ -90,68 +140,158 @@ export default function ManualSearchScreen() {
 
       {isSearching ? (
         <LoadingState compact message="Searching..." />
-      ) : hasSearched && products.length === 0 ? (
+      ) : noResults ? (
         <EmptyState
           icon="search-outline"
           title="No results"
           message="No matching products found. Try different terms or add manually."
           actionLabel="Add to Inventory"
-          onAction={() => router.push({ pathname: '/inventory/edit', params: { title: query, barcode } })}
+          onAction={() =>
+            router.push({
+              pathname: '/inventory/edit',
+              params: { title: params.productName ?? query, barcode },
+            })
+          }
         />
       ) : (
-        products.map((product) => (
-          <Pressable
-            key={product.id}
-            onPress={() => router.push({
-              pathname: '/inventory/edit',
-              params: { title: product.title, productIdentityId: product.id, barcode: product.upc ?? product.ean ?? barcode },
-            })}
-            accessibilityRole="button"
-            style={({ pressed }) => [
-              styles.productCard,
-              { backgroundColor: c.surface, borderColor: c.borderLight, ...s.sm },
-              pressed && { backgroundColor: c.surfaceAlt, opacity: 0.9 },
-            ]}
-          >
-            <Text variant="bodyBold" numberOfLines={2}>
-              {product.title}
-            </Text>
-            <Text variant="caption">
-              {[product.brand, product.model, product.category].filter(Boolean).join(' · ') || 'No additional details'}
-            </Text>
-            <View style={styles.productActions}>
-              <StatusPill label="Add to Inventory" tone="primary" size="sm" />
-              <Pressable
-                onPress={() => void Linking.openURL(`https://www.google.com/search?q=${encodeURIComponent(product.searchQuery ?? product.title)}`)}
-                hitSlop={8}
+        <>
+          {/* eBay marketplace results */}
+          {marketResults.length > 0 ? (
+            <>
+              <SectionHeader title="Marketplace Results" />
+              {marketAvg != null ? (
+                <View style={[styles.avgBar, { backgroundColor: c.primaryLight }]}>
+                  <Text variant="caption" color={c.textSecondary}>Avg sold price</Text>
+                  <Text variant="metricSmall" color={c.primary}>{formatMoney(marketAvg)}</Text>
+                  <Text variant="label" color={c.textMuted}>{marketTotal} results</Text>
+                </View>
+              ) : null}
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.marketScroll}
               >
-                <Ionicons name="globe-outline" size={20} color={c.textSecondary} />
-              </Pressable>
-            </View>
-          </Pressable>
-        ))
+                {marketResults.slice(0, 12).map((listing, i) => (
+                  <Pressable
+                    key={i}
+                    onPress={() =>
+                      router.push({
+                        pathname: '/comp-capture',
+                        params: {
+                          title: listing.title,
+                          price: String(listing.price),
+                          condition: listing.condition,
+                          source: listing.source,
+                          sourceUrl: listing.itemUrl ?? '',
+                        },
+                      })
+                    }
+                    style={[
+                      styles.marketCard,
+                      { backgroundColor: c.surface, borderColor: c.borderLight, ...s.sm },
+                    ]}
+                  >
+                    {listing.imageUrl ? (
+                      <Image source={{ uri: listing.imageUrl }} style={styles.marketImage} contentFit="cover" />
+                    ) : (
+                      <View style={[styles.marketImage, styles.noImage, { backgroundColor: c.borderLight }]}>
+                        <Ionicons name="image-outline" size={24} color={c.textMuted} />
+                      </View>
+                    )}
+                    <View style={styles.marketInfo}>
+                      <Text variant="caption" numberOfLines={2} style={styles.marketTitle}>
+                        {listing.title}
+                      </Text>
+                      <View style={styles.marketPriceRow}>
+                        <Text variant="bodyBold" color={c.primary}>{formatMoney(listing.price)}</Text>
+                        {listing.isSold ? (
+                          <StatusPill label="Sold" tone="success" size="sm" />
+                        ) : null}
+                      </View>
+                      <Text variant="label" color={c.textMuted}>{listing.condition}</Text>
+                    </View>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </>
+          ) : null}
+
+          {/* Internal DB results */}
+          {products.length > 0 ? (
+            <>
+              <SectionHeader title="Your Products" />
+              {products.map((product) => (
+                <Pressable
+                  key={product.id}
+                  onPress={() =>
+                    router.push({
+                      pathname: '/inventory/edit',
+                      params: {
+                        title: product.title,
+                        productIdentityId: product.id,
+                        barcode: product.upc ?? product.ean ?? barcode,
+                      },
+                    })
+                  }
+                  accessibilityRole="button"
+                  style={({ pressed }) => [
+                    styles.productCard,
+                    { backgroundColor: c.surface, borderColor: c.borderLight, ...s.sm },
+                    pressed && { backgroundColor: c.surfaceAlt },
+                  ]}
+                >
+                  <Text variant="bodyBold" numberOfLines={2}>{product.title}</Text>
+                  <Text variant="caption" color={c.textSecondary}>
+                    {[product.brand, product.model, product.category].filter(Boolean).join(' · ') ||
+                      'No additional details'}
+                  </Text>
+                  <StatusPill label="Add to Inventory" tone="primary" size="sm" />
+                </Pressable>
+              ))}
+            </>
+          ) : null}
+        </>
       )}
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  actions: {
-    gap: spacing.sm,
-  },
-  secondaryActions: {
+  quickActions: {
     flexDirection: 'row',
     gap: spacing.md,
+  },
+  avgBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderRadius: radius.lg,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.lg,
+  },
+  marketScroll: {
+    gap: spacing.sm,
+    paddingBottom: spacing.sm,
+  },
+  marketCard: {
+    width: 160,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  marketImage: { width: '100%', height: 110 },
+  noImage: { alignItems: 'center', justifyContent: 'center' },
+  marketInfo: { padding: spacing.sm, gap: spacing.xxs },
+  marketTitle: { lineHeight: 16 },
+  marketPriceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   productCard: {
     borderRadius: radius.lg,
     padding: spacing.lg,
     gap: spacing.sm,
     borderWidth: 1,
-  },
-  productActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
   },
 });
