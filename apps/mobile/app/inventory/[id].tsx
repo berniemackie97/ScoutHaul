@@ -142,17 +142,33 @@ export default function InventoryDetailScreen() {
 
       <View style={styles.actionRow}>
         <Button
+          label="Edit"
+          icon="create-outline"
+          variant="secondary"
+          fullWidth
+          onPress={() => router.push({ pathname: '/inventory/edit', params: { id: item.id } })}
+        />
+        <Button
           label="Analyze"
           icon="calculator-outline"
           fullWidth
           onPress={() => router.push({ pathname: '/deal-analyzer', params: { inventoryItemId: item.id } })}
         />
+      </View>
+      <View style={styles.actionRow}>
         <Button
           label="Add Comp"
           icon="add-circle-outline"
           variant="secondary"
           fullWidth
           onPress={() => router.push({ pathname: '/comp-capture', params: { inventoryItemId: item.id, title: item.title } })}
+        />
+        <Button
+          label="Marketplace"
+          icon="open-outline"
+          variant="secondary"
+          fullWidth
+          onPress={() => router.push({ pathname: '/marketplace-links', params: { query: item.title } })}
         />
       </View>
 

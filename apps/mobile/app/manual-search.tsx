@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
-import { useState } from 'react';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useEffect, useState } from 'react';
 import { Linking, Pressable, StyleSheet, View } from 'react-native';
 import { api } from '../src/api/client';
 import { Button } from '../src/components/Button';
@@ -18,11 +18,19 @@ import type { ProductIdentity } from '../src/domain/types';
 
 export default function ManualSearchScreen() {
   const { colors: c, shadows: s } = useAppTheme();
-  const [query, setQuery] = useState('');
+  const params = useLocalSearchParams<{ query?: string; barcode?: string }>();
+  const [query, setQuery] = useState(params.query ?? params.barcode ?? '');
+  const [barcode] = useState(params.barcode ?? '');
   const [products, setProducts] = useState<ProductIdentity[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+
+  useEffect(() => {
+    if (params.query || params.barcode) {
+      void search();
+    }
+  }, []);
 
   async function search() {
     if (!query.trim()) {
@@ -65,10 +73,10 @@ export default function ManualSearchScreen() {
 
       <View style={styles.secondaryActions}>
         <Button
-          label="Start Draft"
-          icon="document-outline"
+          label="Add to Inventory"
+          icon="add-circle-outline"
           variant="secondary"
-          onPress={() => router.push({ pathname: '/(tabs)/scout', params: { query } })}
+          onPress={() => router.push({ pathname: '/inventory/edit', params: { title: query, barcode } })}
         />
         <Button
           label="Marketplace Links"
@@ -86,15 +94,18 @@ export default function ManualSearchScreen() {
         <EmptyState
           icon="search-outline"
           title="No results"
-          message="No matching products found. Try different search terms or create a draft directly."
-          actionLabel="Create Draft"
-          onAction={() => router.push({ pathname: '/(tabs)/scout', params: { query } })}
+          message="No matching products found. Try different terms or add manually."
+          actionLabel="Add to Inventory"
+          onAction={() => router.push({ pathname: '/inventory/edit', params: { title: query, barcode } })}
         />
       ) : (
         products.map((product) => (
           <Pressable
             key={product.id}
-            onPress={() => router.push({ pathname: '/(tabs)/scout', params: { query: product.searchQuery ?? product.title } })}
+            onPress={() => router.push({
+              pathname: '/inventory/edit',
+              params: { title: product.title, productIdentityId: product.id, barcode: product.upc ?? product.ean ?? barcode },
+            })}
             accessibilityRole="button"
             style={({ pressed }) => [
               styles.productCard,
@@ -109,7 +120,7 @@ export default function ManualSearchScreen() {
               {[product.brand, product.model, product.category].filter(Boolean).join(' · ') || 'No additional details'}
             </Text>
             <View style={styles.productActions}>
-              <StatusPill label="Scout" tone="primary" size="sm" />
+              <StatusPill label="Add to Inventory" tone="primary" size="sm" />
               <Pressable
                 onPress={() => void Linking.openURL(`https://www.google.com/search?q=${encodeURIComponent(product.searchQuery ?? product.title)}`)}
                 hitSlop={8}

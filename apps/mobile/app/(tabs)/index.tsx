@@ -16,7 +16,7 @@ import { StatusPill } from '../../src/components/StatusPill';
 import { Text } from '../../src/components/Text';
 import { spacing } from '../../src/components/theme';
 import { useColors } from '../../src/context/ThemeContext';
-import { getPendingSyncCount, listItemDrafts } from '../../src/db/localStore';
+import { getPendingSyncCount } from '../../src/db/localStore';
 import type { DashboardSummary } from '../../src/domain/types';
 import { useConnectivity } from '../../src/hooks/useConnectivity';
 import { formatMoney } from '../../src/utils/money';
@@ -25,7 +25,6 @@ export default function DashboardScreen() {
   const c = useColors();
   const connectivity = useConnectivity();
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
-  const [draftCount, setDraftCount] = useState(0);
   const [pendingSync, setPendingSync] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -34,8 +33,7 @@ export default function DashboardScreen() {
   const refresh = useCallback(async (showRefreshing = false) => {
     if (showRefreshing) setRefreshing(true);
     try {
-      const [drafts, syncCount] = await Promise.all([listItemDrafts(), getPendingSyncCount()]);
-      setDraftCount(drafts.length);
+      const syncCount = await getPendingSyncCount();
       setPendingSync(syncCount);
 
       if (connectivity.isOnline) {
@@ -146,17 +144,7 @@ export default function DashboardScreen() {
             />
           ) : null}
 
-          {draftCount > 0 ? (
-            <ActionCard
-              icon="document-text-outline"
-              title={`${draftCount} draft${draftCount > 1 ? 's' : ''} in progress`}
-              subtitle="Continue scouting items you started"
-              tone="neutral"
-              onPress={() => router.push('/(tabs)/scout')}
-            />
-          ) : null}
-
-          {unlisted === 0 && stale === 0 && pendingSync === 0 && draftCount === 0 ? (
+          {unlisted === 0 && stale === 0 && pendingSync === 0 ? (
             <Card>
               <View style={styles.allClear}>
                 <Ionicons name="checkmark-circle" size={24} color={c.success} />
@@ -172,10 +160,10 @@ export default function DashboardScreen() {
 
           <ActionCard
             icon="scan-outline"
-            title="Scout Item"
-            subtitle="Scan, search, or evaluate an item"
+            title="Scan Barcode"
+            subtitle="Scan a barcode for instant marketplace pricing"
             tone="primary"
-            onPress={() => router.push('/(tabs)/scout')}
+            onPress={() => router.push('/scanner')}
           />
           <ActionCard
             icon="checkbox-outline"

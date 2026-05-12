@@ -1,27 +1,23 @@
 import { Ionicons } from '@expo/vector-icons';
-import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { api } from '../../src/api/client';
-import { Button } from '../../src/components/Button';
 import { Card } from '../../src/components/Card';
-import { ErrorBanner } from '../../src/components/ErrorBanner';
-import { OfflineBanner } from '../../src/components/OfflineBanner';
 import { Screen } from '../../src/components/Screen';
-import { SectionHeader } from '../../src/components/SectionHeader';
+import { SearchBar } from '../../src/components/SearchBar';
 import { StatusPill } from '../../src/components/StatusPill';
 import { Text } from '../../src/components/Text';
-import { TextField } from '../../src/components/TextField';
 import { radius, spacing } from '../../src/components/theme';
 import { useAppTheme } from '../../src/context/ThemeContext';
-import { enqueueCreateInventoryFromDraft, saveItemDraft } from '../../src/db/localStore';
-import type { LocalItemDraft } from '../../src/domain/types';
+import type { InventoryItem } from '../../src/domain/types';
 import { useConnectivity } from '../../src/hooks/useConnectivity';
-import { parseOptionalNumber } from '../../src/utils/money';
+import { formatMoney } from '../../src/utils/money';
 
-type QuickAction = {
+type ActionTile = {
   icon: keyof typeof Ionicons.glyphMap;
   label: string;
+  sub: string;
   color: string;
   bg: string;
   onPress: () => void;
@@ -29,257 +25,197 @@ type QuickAction = {
 
 export default function ScoutScreen() {
   const { colors: c, shadows: s } = useAppTheme();
-  const params = useLocalSearchParams<{ barcode?: string; query?: string }>();
   const connectivity = useConnectivity();
-  const [title, setTitle] = useState(params.query ?? '');
-  const [barcode, setBarcode] = useState(params.barcode ?? '');
-  const [askingPrice, setAskingPrice] = useState('');
-  const [condition, setCondition] = useState('');
-  const [sourceName, setSourceName] = useState('');
-  const [notes, setNotes] = useState('');
-  const [savedDraft, setSavedDraft] = useState<LocalItemDraft | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
-  const [showDetails, setShowDetails] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [recentItems, setRecentItems] = useState<InventoryItem[]>([]);
 
-  useEffect(() => {
-    if (params.barcode) {
-      setBarcode(params.barcode);
-      if (!title) setTitle(`Barcode ${params.barcode}`);
-      setShowDetails(true);
-    }
-    if (params.query) {
-      setTitle(params.query);
-      setShowDetails(true);
-    }
-  }, [params.barcode, params.query]);
+  useFocusEffect(
+    useCallback(() => {
+      if (!connectivity.isOnline) return;
+      api
+        .inventory()
+        .then((items) => setRecentItems(items.slice(0, 5)))
+        .catch(() => {});
+    }, [connectivity.isOnline]),
+  );
 
-  const quickActions: QuickAction[] = [
-    {
-      icon: 'barcode-outline',
-      label: 'Scan\nBarcode',
-      color: c.primary,
-      bg: c.primaryLight,
-      onPress: () => router.push('/scanner'),
-    },
+  function handleSearch() {
+    if (!searchQuery.trim()) return;
+    router.push({ pathname: '/manual-search', params: { query: searchQuery.trim() } });
+    setSearchQuery('');
+  }
+
+  const actions: ActionTile[] = [
     {
       icon: 'search-outline',
-      label: 'Search\nItem',
+      label: 'Search',
+      sub: 'Find by name',
       color: c.info,
       bg: c.infoLight,
       onPress: () => router.push('/manual-search'),
     },
     {
-      icon: 'open-outline',
-      label: 'Market\nSearch',
+      icon: 'calculator-outline',
+      label: 'Deal Check',
+      sub: 'Run analysis',
       color: c.accent,
       bg: c.accentLight,
-      onPress: () =>
-        router.push({
-          pathname: '/marketplace-links',
-          params: { query: title || barcode },
-        }),
+      onPress: () => router.push('/deal-analyzer'),
     },
     {
-      icon: 'add-circle-outline',
-      label: 'Add\nComp',
+      icon: 'analytics-outline',
+      label: 'Add Comp',
+      sub: 'Log a price',
       color: c.success,
       bg: c.successLight,
-      onPress: () =>
-        router.push({
-          pathname: '/comp-capture',
-          params: { title, barcode },
-        }),
+      onPress: () => router.push('/comp-capture'),
+    },
+    {
+      icon: 'cube-outline',
+      label: 'Add Item',
+      sub: 'To inventory',
+      color: c.primary,
+      bg: c.primaryLight,
+      onPress: () => router.push('/inventory/edit'),
     },
   ];
 
-  async function saveDraft(needsResearch = true) {
-    const draft = await saveItemDraft({
-      id: savedDraft?.id,
-      title: title || (barcode ? `Barcode ${barcode}` : 'Untitled draft'),
-      barcode: barcode || null,
-      sellerAskingPrice: parseOptionalNumber(askingPrice),
-      condition: condition || null,
-      sourceName: sourceName || null,
-      notes: notes || null,
-      needsResearch,
-      syncStatus: 'local',
-    });
-    setSavedDraft(draft);
-    setMessage('Draft saved locally.');
-    return draft;
-  }
-
-  async function addToInventory() {
-    const draft = await saveDraft(false);
-    if (!connectivity.isOnline) {
-      await enqueueCreateInventoryFromDraft(draft);
-      setMessage('Queued for sync when online.');
-      return;
-    }
-
-    try {
-      const item = await api.createInventory({
-        title: draft.title,
-        barcode: draft.barcode,
-        sellerAskingPrice: draft.sellerAskingPrice,
-        condition: draft.condition,
-        notes: draft.notes,
-      });
-      setMessage('Added to inventory.');
-      router.push(`/inventory/${item.id}`);
-    } catch (err) {
-      await enqueueCreateInventoryFromDraft(draft);
-      setMessage(
-        err instanceof Error
-          ? `Queued for sync: ${err.message}`
-          : 'Queued for sync.',
-      );
-    }
-  }
-
-  function runAnalysis() {
-    void saveDraft(true);
-    router.push({
-      pathname: '/deal-analyzer',
-      params: { query: title, barcode, askingPrice },
-    });
-  }
-
   return (
     <Screen edges={['top', 'left', 'right']}>
+      {/* Header */}
       <View style={styles.header}>
         <Text variant="title">Scout</Text>
-        <StatusPill
-          label={connectivity.label}
-          tone={connectivity.isOnline ? 'success' : 'warning'}
-        />
+        <StatusPill label={connectivity.label} tone={connectivity.isOnline ? 'success' : 'warning'} />
       </View>
 
-      {!connectivity.isOnline ? (
-        <OfflineBanner message="Offline. Drafts save locally. Live pricing unavailable." />
-      ) : null}
+      {/* Hero scan button */}
+      <Pressable
+        onPress={() => router.push('/scanner')}
+        style={({ pressed }) => [
+          styles.scanHero,
+          { backgroundColor: c.primary, ...s.lg },
+          pressed && { backgroundColor: c.primaryPressed, transform: [{ scale: 0.98 }] },
+        ]}
+        accessibilityRole="button"
+        accessibilityLabel="Scan barcode"
+      >
+        <View style={styles.scanContent}>
+          <View style={[styles.scanIconRing, { borderColor: 'rgba(255,255,255,0.25)' }]}>
+            <Ionicons name="scan" size={36} color={c.textInverse} />
+          </View>
+          <View style={styles.scanText}>
+            <Text variant="subtitle" color={c.textInverse}>Scan Barcode</Text>
+            <Text variant="caption" color="rgba(255,255,255,0.7)">
+              UPC, EAN, ISBN, QR — instant pricing
+            </Text>
+          </View>
+        </View>
+        <Ionicons name="arrow-forward" size={24} color="rgba(255,255,255,0.6)" />
+      </Pressable>
 
-      <View style={styles.quickGrid}>
-        {quickActions.map((action) => (
+      {/* Quick search */}
+      <SearchBar
+        value={searchQuery}
+        onChangeText={setSearchQuery}
+        placeholder="Search marketplaces..."
+        onSubmit={handleSearch}
+      />
+
+      {/* Action grid */}
+      <View style={styles.actionGrid}>
+        {actions.map((action) => (
           <Pressable
             key={action.label}
             onPress={action.onPress}
             accessibilityRole="button"
-            accessibilityLabel={action.label.replace('\n', ' ')}
+            accessibilityLabel={`${action.label}: ${action.sub}`}
             style={({ pressed }) => [
-              styles.quickTile,
+              styles.actionTile,
               { backgroundColor: c.surface, borderColor: c.borderLight, ...s.sm },
               pressed && { opacity: 0.8, backgroundColor: c.surfaceAlt },
             ]}
           >
-            <View style={[styles.quickIconWrap, { backgroundColor: action.bg }]} accessibilityElementsHidden>
-              <Ionicons name={action.icon} size={28} color={action.color} />
+            <View style={[styles.actionIcon, { backgroundColor: action.bg }]}>
+              <Ionicons name={action.icon} size={22} color={action.color} />
             </View>
-            <Text variant="caption" style={styles.quickLabel}>
-              {action.label}
-            </Text>
+            <Text variant="bodyBold" numberOfLines={1}>{action.label}</Text>
+            <Text variant="label" color={c.textMuted} numberOfLines={1}>{action.sub}</Text>
           </Pressable>
         ))}
       </View>
 
-      <SectionHeader title="Item Draft" />
-
-      <Card>
-        <TextField
-          label="Item name or search terms"
-          value={title}
-          onChangeText={(v) => {
-            setTitle(v);
-            if (!showDetails && v.length > 0) setShowDetails(true);
-          }}
-          placeholder="Sony WH-1000XM4 headphones"
-        />
-        <TextField
-          label="Barcode"
-          value={barcode}
-          onChangeText={setBarcode}
-          placeholder="UPC, EAN, ISBN"
-          keyboardType="number-pad"
-        />
-        <TextField
-          label="Seller asking price"
-          value={askingPrice}
-          onChangeText={setAskingPrice}
-          placeholder="0.00"
-          prefix="$"
-          keyboardType="decimal-pad"
-        />
-
-        {!showDetails ? (
-          <Pressable onPress={() => setShowDetails(true)} accessibilityRole="button" accessibilityLabel="Show optional fields" style={styles.expandRow}>
-            <Text variant="caption" color={c.primary}>
-              Add condition, source, notes
-            </Text>
-            <Ionicons name="chevron-down" size={16} color={c.primary} />
-          </Pressable>
-        ) : (
-          <>
-            <TextField
-              label="Condition"
-              value={condition}
-              onChangeText={setCondition}
-              placeholder="Used - good"
-            />
-            <TextField
-              label="Source / location"
-              value={sourceName}
-              onChangeText={setSourceName}
-              placeholder="Goodwill, estate sale, yard sale"
-            />
-            <TextField
-              label="Notes"
-              value={notes}
-              onChangeText={setNotes}
-              placeholder="Accessories, damage, shelf location"
-              multiline
-            />
-          </>
-        )}
-      </Card>
-
-      {message ? (
-        <Card variant="flat">
-          <View style={styles.messageRow}>
-            <Ionicons name="checkmark-circle" size={18} color={c.success} />
-            <Text variant="caption" color={c.successDark}>
-              {message}
-            </Text>
+      {/* Recent inventory */}
+      {recentItems.length > 0 ? (
+        <>
+          <View style={styles.sectionRow}>
+            <Text variant="bodyBold" color={c.textSecondary}>Recent Items</Text>
+            <Pressable onPress={() => router.push('/(tabs)/inventory')} hitSlop={8}>
+              <Text variant="caption" color={c.primary}>See All</Text>
+            </Pressable>
           </View>
-        </Card>
+          <Card>
+            {recentItems.map((item, i) => (
+              <Pressable
+                key={item.id}
+                onPress={() => router.push(`/inventory/${item.id}`)}
+                style={({ pressed }) => [
+                  styles.recentItem,
+                  i < recentItems.length - 1 && { borderBottomWidth: 1, borderBottomColor: c.borderLight },
+                  pressed && { backgroundColor: c.surfaceAlt },
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel={item.title}
+              >
+                <View style={styles.recentInfo}>
+                  <Text variant="bodyBold" numberOfLines={1}>{item.title}</Text>
+                  <View style={styles.recentMeta}>
+                    {item.barcode ? (
+                      <View style={styles.metaChip}>
+                        <Ionicons name="barcode-outline" size={12} color={c.textMuted} />
+                        <Text variant="label" color={c.textMuted}>{item.barcode}</Text>
+                      </View>
+                    ) : null}
+                    <StatusPill label={item.status} tone={statusTone(item.status)} size="sm" />
+                  </View>
+                </View>
+                <View style={styles.recentPrice}>
+                  {item.estimatedSalePrice ? (
+                    <Text variant="bodyBold" color={c.primary}>{formatMoney(item.estimatedSalePrice)}</Text>
+                  ) : item.purchasePrice ? (
+                    <Text variant="caption" color={c.textMuted}>{formatMoney(item.purchasePrice)}</Text>
+                  ) : null}
+                  <Ionicons name="chevron-forward" size={16} color={c.textMuted} />
+                </View>
+              </Pressable>
+            ))}
+          </Card>
+        </>
       ) : null}
-
-      <View style={styles.primaryActions}>
-        <Button
-          label="Save Draft"
-          icon="bookmark-outline"
-          variant="secondary"
-          size="lg"
-          fullWidth
-          onPress={() => void saveDraft(true)}
-        />
-        <Button
-          label="Run Deal Check"
-          icon="calculator-outline"
-          size="lg"
-          fullWidth
-          onPress={runAnalysis}
-        />
-      </View>
-
-      <Button
-        label="Add to Inventory"
-        icon="cube-outline"
-        variant="secondary"
-        fullWidth
-        onPress={() => void addToInventory()}
-      />
     </Screen>
   );
+}
+
+function statusTone(status: string): 'success' | 'warning' | 'danger' | 'info' | 'neutral' | 'primary' {
+  switch (status) {
+    case 'Listed':
+    case 'Sold':
+    case 'Shipped':
+    case 'Delivered':
+      return 'success';
+    case 'Researching':
+    case 'NeedsCleaning':
+    case 'NeedsTesting':
+    case 'NeedsPhotos':
+      return 'warning';
+    case 'ReadyToList':
+    case 'Purchased':
+      return 'info';
+    case 'Returned':
+    case 'Disposed':
+      return 'danger';
+    default:
+      return 'neutral';
+  }
 }
 
 const styles = StyleSheet.create({
@@ -289,43 +225,82 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.md,
   },
-  quickGrid: {
+  scanHero: {
     flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderRadius: radius.xl,
+    padding: spacing.lg,
     gap: spacing.md,
   },
-  quickTile: {
+  scanContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.lg,
+    flex: 1,
+  },
+  scanIconRing: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  scanText: {
+    flex: 1,
+    gap: spacing.xxs,
+  },
+  actionGrid: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  actionTile: {
     flex: 1,
     alignItems: 'center',
     borderRadius: radius.lg,
-    paddingVertical: spacing.lg,
-    paddingHorizontal: spacing.sm,
-    gap: spacing.sm,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xs,
+    gap: spacing.xs,
     borderWidth: 1,
   },
-  quickIconWrap: {
-    width: 48,
-    height: 48,
+  actionIcon: {
+    width: 40,
+    height: 40,
     borderRadius: radius.md,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  quickLabel: {
-    textAlign: 'center',
-    fontWeight: '600',
-    lineHeight: 16,
+  sectionRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: spacing.sm,
   },
-  expandRow: {
+  recentItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: spacing.md,
+    gap: spacing.sm,
+  },
+  recentInfo: {
+    flex: 1,
+    gap: spacing.xs,
+  },
+  recentMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  metaChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xxs,
+  },
+  recentPrice: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
-    paddingVertical: spacing.xs,
-  },
-  messageRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  primaryActions: {
-    gap: spacing.sm,
   },
 });

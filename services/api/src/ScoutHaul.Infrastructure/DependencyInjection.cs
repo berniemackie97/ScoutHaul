@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using ScoutHaul.Application.Services;
+using ScoutHaul.Infrastructure.Marketplace;
 using ScoutHaul.Infrastructure.Persistence;
 
 namespace ScoutHaul.Infrastructure;
@@ -16,6 +18,20 @@ public static class DependencyInjection
         }
 
         services.AddDbContext<ScoutHaulDbContext>(options => options.UseNpgsql(connectionString));
+
+        // eBay marketplace lookup (only registered when credentials are configured)
+        if (!string.IsNullOrWhiteSpace(configuration["Ebay:ClientId"]))
+        {
+            services.AddHttpClient<IMarketplaceLookupService, EbayMarketplaceLookupService>(client =>
+            {
+                client.Timeout = TimeSpan.FromSeconds(10);
+                client.DefaultRequestHeaders.Add("Accept", "application/json");
+            });
+        }
+        else
+        {
+            services.AddSingleton<IMarketplaceLookupService, NoopMarketplaceLookupService>();
+        }
 
         return services;
     }

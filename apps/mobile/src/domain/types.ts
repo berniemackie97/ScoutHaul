@@ -197,6 +197,27 @@ export type ResaleTask = {
   createdAt: string;
 };
 
+export type MarketplaceListing = {
+  title: string;
+  price: number;
+  shippingCost?: number | null;
+  imageUrl?: string | null;
+  itemUrl?: string | null;
+  condition: string;
+  source: string;
+  isSold: boolean;
+  soldDate?: string | null;
+};
+
+export type MarketplaceLookupResult = {
+  query: string;
+  listings: MarketplaceListing[];
+  averageSoldPrice?: number | null;
+  lowestPrice?: number | null;
+  highestPrice?: number | null;
+  totalResults: number;
+};
+
 export type LocalItemDraft = {
   id: string;
   title: string;

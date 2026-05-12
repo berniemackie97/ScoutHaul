@@ -6,6 +6,7 @@ import type {
   InventoryItem,
   Listing,
   MarketAnalysisResponse,
+  MarketplaceLookupResult,
   MarketObservation,
   MarketplaceSearchLinks,
   ProductIdentity,
@@ -83,6 +84,10 @@ export const api = {
     apiRequest<ProductIdentity[]>(`/api/product-identities?search=${encodeURIComponent(search)}`),
   marketplaceLinks: (query: string) =>
     apiRequest<MarketplaceSearchLinks>(`/api/marketplace-links?query=${encodeURIComponent(query)}`),
+  lookupBarcode: (barcode: string) =>
+    apiRequest<MarketplaceLookupResult>(`/api/marketplace-lookup/barcode/${encodeURIComponent(barcode)}`),
+  lookupSearch: (query: string) =>
+    apiRequest<MarketplaceLookupResult>(`/api/marketplace-lookup/search?q=${encodeURIComponent(query)}`),
   addComp: (body: unknown) => apiRequest<MarketObservation>('/api/market-observations', { method: 'POST', body }),
   comps: (params: string) => apiRequest<MarketObservation[]>(`/api/market-observations?${params}`),
   analyze: (body: unknown) => apiRequest<MarketAnalysisResponse>('/api/market-analysis/calculate', { method: 'POST', body }),

@@ -163,6 +163,25 @@ public sealed record MarketAnalysisResponse(
 public sealed record MarketplaceSearchLinkDto(string Provider, string Label, string Url);
 public sealed record MarketplaceSearchLinksDto(string Query, IReadOnlyList<MarketplaceSearchLinkDto> Links);
 
+public sealed record MarketplaceListingDto(
+    string Title,
+    decimal Price,
+    decimal? ShippingCost,
+    string? ImageUrl,
+    string? ItemUrl,
+    string Condition,
+    string Source,
+    bool IsSold,
+    DateTimeOffset? SoldDate);
+
+public sealed record MarketplaceLookupResult(
+    string Query,
+    IReadOnlyList<MarketplaceListingDto> Listings,
+    decimal? AverageSoldPrice,
+    decimal? LowestPrice,
+    decimal? HighestPrice,
+    int TotalResults);
+
 public sealed record CreateSourcingTripRequest(string Name, DateTimeOffset? StartedAt, decimal? CashBudget, string? Notes);
 public sealed record UpdateSourcingTripRequest(string Name, DateTimeOffset? StartedAt, DateTimeOffset? EndedAt, decimal? CashBudget, string? Notes);
 public sealed record AddItemToTripRequest(Guid InventoryItemId);
