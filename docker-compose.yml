@@ -1,0 +1,59 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: scouthaul
+      POSTGRES_USER: scouthaul
+      POSTGRES_PASSWORD: scouthaul
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U scouthaul -d scouthaul"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  api:
+    build:
+      context: ./services/api
+      dockerfile: src/ScoutHaul.Api/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_HTTP_PORTS: 8080
+      ConnectionStrings__Postgres: Host=postgres;Port=5432;Database=scouthaul;Username=scouthaul;Password=scouthaul
+      Database__ApplyMigrationsOnStartup: "true"
+      StubAuth__DefaultOrganizationId: 9d3c0c44-218b-49d9-90bf-07b748610001
+      StubAuth__DefaultUserId: 9d3c0c44-218b-49d9-90bf-07b748610002
+    ports:
+      - "5080:8080"
+    restart: unless-stopped
+
+  db-seed:
+    image: postgres:17-alpine
+    depends_on:
+      postgres:
+        condition: service_healthy
+      api:
+        condition: service_started
+    environment:
+      PGPASSWORD: scouthaul
+    volumes:
+      - ./services/api/db/seed:/seed:ro
+    command:
+      - sh
+      - -c
+      - |
+        until psql -h postgres -U scouthaul -d scouthaul -Atc "select 1 from information_schema.tables where table_schema = 'public' and table_name = 'Organizations';" | grep -q 1; do
+          echo "Waiting for API migrations to create schema...";
+          sleep 2;
+        done;
+        psql -h postgres -U scouthaul -d scouthaul -v ON_ERROR_STOP=1 -f /seed/development.sql
+    restart: "no"
+
+volumes:
+  postgres-data:

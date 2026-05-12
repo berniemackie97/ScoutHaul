@@ -1,0 +1,23 @@
+**/bin/
+**/bin\\*
+**/obj/
+**/obj\\*
+**/node_modules/
+**/.expo/
+**/.expo-shared/
+**/dist/
+**/build/
+*.user
+*.suo
+.DS_Store
+.env
+.env.*
+!.env.example
+
+# AI agent files
+.claude/
+CLAUDE.md
+.cursorrules
+.cursor/
+.aider*
+.copilot/

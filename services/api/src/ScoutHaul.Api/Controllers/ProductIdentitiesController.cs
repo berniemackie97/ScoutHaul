@@ -1,0 +1,107 @@
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using ScoutHaul.Api.Mapping;
+using ScoutHaul.Api.Services;
+using ScoutHaul.Application.Contracts;
+using ScoutHaul.Domain.Entities;
+using ScoutHaul.Infrastructure.Persistence;
+
+namespace ScoutHaul.Api.Controllers;
+
+[ApiController]
+[Route("api/product-identities")]
+public sealed class ProductIdentitiesController(ScoutHaulDbContext db, ICurrentUserContext currentUser) : ControllerBase
+{
+    [HttpPost]
+    public async Task<ActionResult<ProductIdentityDto>> Create(UpsertProductIdentityRequest request, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(request.Title))
+        {
+            return BadRequest("Product title is required.");
+        }
+
+        var product = new ProductIdentity
+        {
+            OrganizationId = currentUser.OrganizationId,
+            Title = request.Title.Trim()
+        };
+        Apply(request, product);
+
+        db.ProductIdentities.Add(product);
+        await db.SaveChangesAsync(cancellationToken);
+
+        return CreatedAtAction(nameof(Get), new { id = product.Id }, product.ToDto());
+    }
+
+    [HttpPut("{id:guid}")]
+    public async Task<ActionResult<ProductIdentityDto>> Update(Guid id, UpsertProductIdentityRequest request, CancellationToken cancellationToken)
+    {
+        var product = await db.ProductIdentities
+            .SingleOrDefaultAsync(item => item.Id == id && item.OrganizationId == currentUser.OrganizationId, cancellationToken);
+
+        if (product is null)
+        {
+            return NotFound();
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Title))
+        {
+            return BadRequest("Product title is required.");
+        }
+
+        Apply(request, product);
+        await db.SaveChangesAsync(cancellationToken);
+
+        return product.ToDto();
+    }
+
+    [HttpGet("{id:guid}")]
+    public async Task<ActionResult<ProductIdentityDto>> Get(Guid id, CancellationToken cancellationToken)
+    {
+        var product = await db.ProductIdentities
+            .SingleOrDefaultAsync(item => item.Id == id && item.OrganizationId == currentUser.OrganizationId, cancellationToken);
+
+        return product is null ? NotFound() : product.ToDto();
+    }
+
+    [HttpGet]
+    public async Task<ActionResult<IReadOnlyList<ProductIdentityDto>>> Search([FromQuery] string? search, CancellationToken cancellationToken)
+    {
+        var query = db.ProductIdentities.Where(item => item.OrganizationId == currentUser.OrganizationId);
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var normalized = search.Trim().ToLowerInvariant();
+            query = query.Where(item =>
+                item.Title.ToLower().Contains(normalized)
+                || (item.Brand != null && item.Brand.ToLower().Contains(normalized))
+                || (item.Model != null && item.Model.ToLower().Contains(normalized))
+                || (item.Upc != null && item.Upc.ToLower().Contains(normalized))
+                || (item.SearchQuery != null && item.SearchQuery.ToLower().Contains(normalized)));
+        }
+
+        var products = await query
+            .OrderByDescending(item => item.UpdatedAt)
+            .Take(50)
+            .Select(item => item.ToDto())
+            .ToListAsync(cancellationToken);
+
+        return products;
+    }
+
+    private static void Apply(UpsertProductIdentityRequest request, ProductIdentity product)
+    {
+        product.Title = request.Title.Trim();
+        product.Brand = TrimToNull(request.Brand);
+        product.Model = TrimToNull(request.Model);
+        product.Category = TrimToNull(request.Category);
+        product.Upc = TrimToNull(request.Upc);
+        product.Ean = TrimToNull(request.Ean);
+        product.Isbn = TrimToNull(request.Isbn);
+        product.Sku = TrimToNull(request.Sku);
+        product.SearchQuery = TrimToNull(request.SearchQuery);
+        product.Notes = TrimToNull(request.Notes);
+    }
+
+    private static string? TrimToNull(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+}
