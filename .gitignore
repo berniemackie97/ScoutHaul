@@ -21,3 +21,4 @@ CLAUDE.md
 .cursor/
 .aider*
 .copilot/
+apps/mobile/.env.example
