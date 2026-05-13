@@ -10,7 +10,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
   return {
     ...config,
     name: IS_PROD ? 'HaulScout' : IS_PREVIEW ? 'HaulScout (Preview)' : 'HaulScout (Dev)',
-    slug: 'scouthaul',
+    slug: 'haulscout',
     version: '1.0.0',
     orientation: 'portrait',
     scheme: 'scouthaul',
@@ -54,13 +54,11 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL ?? '',
       supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '',
       eas: {
-        projectId: process.env.EAS_PROJECT_ID ?? '',
+        projectId: '8ca8c9a6-4988-4a8c-9656-476be071871e',
       },
     },
     updates: {
-      url: process.env.EAS_PROJECT_ID
-        ? `https://u.expo.dev/${process.env.EAS_PROJECT_ID}`
-        : undefined,
+      url: 'https://u.expo.dev/8ca8c9a6-4988-4a8c-9656-476be071871e',
     },
     runtimeVersion: {
       policy: 'appVersion',

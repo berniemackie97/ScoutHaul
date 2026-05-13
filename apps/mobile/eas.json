@@ -24,7 +24,9 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "https://staging-api.scouthaul.com"
+        "EXPO_PUBLIC_API_BASE_URL": "https://scouthaul-production.up.railway.app",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://zafexeixnmguccancpvw.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_Jo6ZrwOnguPjV1XduZ2yoA_DD55fhRN"
       },
       "channel": "preview"
     },
@@ -37,17 +39,5 @@
       "autoIncrement": true
     }
   },
-  "submit": {
-    "production": {
-      "ios": {
-        "appleId": "",
-        "ascAppId": "",
-        "appleTeamId": ""
-      },
-      "android": {
-        "serviceAccountKeyPath": "",
-        "track": "internal"
-      }
-    }
-  }
+  "submit": {}
 }
