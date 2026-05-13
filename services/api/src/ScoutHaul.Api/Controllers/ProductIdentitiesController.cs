@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using ScoutHaul.Api.Authorization;
 using ScoutHaul.Api.Mapping;
 using ScoutHaul.Api.Services;
 using ScoutHaul.Application.Contracts;
@@ -10,6 +11,7 @@ namespace ScoutHaul.Api.Controllers;
 
 [ApiController]
 [Route("api/product-identities")]
+[RequireOrganizationPermission(ScoutHaulPermissions.ManageInventory)]
 public sealed class ProductIdentitiesController(ScoutHaulDbContext db, ICurrentUserContext currentUser) : ControllerBase
 {
     [HttpPost]
@@ -87,6 +89,22 @@ public sealed class ProductIdentitiesController(ScoutHaulDbContext db, ICurrentU
             .ToListAsync(cancellationToken);
 
         return products;
+    }
+
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
+    {
+        var product = await db.ProductIdentities
+            .SingleOrDefaultAsync(item => item.Id == id && item.OrganizationId == currentUser.OrganizationId, cancellationToken);
+
+        if (product is null)
+        {
+            return NotFound();
+        }
+
+        db.ProductIdentities.Remove(product);
+        await db.SaveChangesAsync(cancellationToken);
+        return NoContent();
     }
 
     private static void Apply(UpsertProductIdentityRequest request, ProductIdentity product)

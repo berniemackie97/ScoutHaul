@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using ScoutHaul.Api.Authorization;
 using ScoutHaul.Api.Services;
 using ScoutHaul.Application.Contracts;
 using ScoutHaul.Domain;
@@ -9,6 +10,7 @@ namespace ScoutHaul.Api.Controllers;
 
 [ApiController]
 [Route("api/dashboard")]
+[RequireOrganizationPermission(ScoutHaulPermissions.ViewReports)]
 public sealed class DashboardController(ScoutHaulDbContext db, ICurrentUserContext currentUser) : ControllerBase
 {
     [HttpGet("summary")]

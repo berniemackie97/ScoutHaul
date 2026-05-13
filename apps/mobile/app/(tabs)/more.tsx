@@ -25,6 +25,12 @@ export default function MoreScreen() {
         onPress={() => router.push('/listing-queue')}
       />
       <ActionCard
+        icon="paper-plane-outline"
+        title="Sales & Shipping"
+        subtitle="Record sales, pack orders, and move shipments forward"
+        onPress={() => router.push('/sales')}
+      />
+      <ActionCard
         icon="checkbox-outline"
         title="Tasks"
         subtitle="To-do list for resale work"
@@ -32,6 +38,19 @@ export default function MoreScreen() {
       />
 
       <SectionHeader title="App" />
+      <ActionCard
+        icon="person-circle-outline"
+        title="Account & Workspace"
+        subtitle="Sign in, sign up, or keep using local mode"
+        tone="primary"
+        onPress={() => router.push('/account')}
+      />
+      <ActionCard
+        icon="business-outline"
+        title="Workspace Admin"
+        subtitle="Organizations, teams, members, roles, and permissions"
+        onPress={() => router.push('/workspace-admin')}
+      />
       <ActionCard
         icon="settings-outline"
         title="Settings"

@@ -1,7 +1,9 @@
-import { Stack } from 'expo-router';
-import { useEffect } from 'react';
-import { initializeLocalDatabase } from '../src/db/localStore';
+import { Stack, usePathname, useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { initializeLocalDatabase, hasCompletedOnboarding } from '../src/db/localStore';
 import { ThemeProvider, useColors } from '../src/context/ThemeContext';
+import { View } from 'react-native';
+import { initializeAuthSession } from '../src/services/auth';
 
 function RootStack() {
   const c = useColors();
@@ -17,6 +19,8 @@ function RootStack() {
       }}
     >
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen name="onboarding" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
+      <Stack.Screen name="account" options={{ title: 'Account' }} />
       <Stack.Screen name="scanner" options={{ title: 'Scan Barcode', presentation: 'fullScreenModal' }} />
       <Stack.Screen name="manual-search" options={{ title: 'Search' }} />
       <Stack.Screen name="marketplace-links" options={{ title: 'Marketplace Search' }} />
@@ -27,22 +31,53 @@ function RootStack() {
       <Stack.Screen name="trips/[id]" options={{ title: 'Trip Detail' }} />
       <Stack.Screen name="budget" options={{ title: 'Budget' }} />
       <Stack.Screen name="listing-queue" options={{ title: 'Listing Queue' }} />
+      <Stack.Screen name="sales" options={{ title: 'Sales & Shipping' }} />
+      <Stack.Screen name="record-sale" options={{ title: 'Record Sale' }} />
       <Stack.Screen name="tasks" options={{ title: 'Tasks' }} />
       <Stack.Screen name="settings" options={{ title: 'Settings' }} />
+      <Stack.Screen name="workspace-admin" options={{ title: 'Workspace Admin' }} />
       <Stack.Screen name="search" options={{ title: 'Search', presentation: 'modal' }} />
       <Stack.Screen name="active-route" options={{ title: 'Active Route', presentation: 'fullScreenModal' }} />
     </Stack>
   );
 }
 
-export default function RootLayout() {
+function StartupGate() {
+  const c = useColors();
+  const router = useRouter();
+  const pathname = usePathname();
+  const [isReady, setIsReady] = useState(false);
+
   useEffect(() => {
-    void initializeLocalDatabase();
+    let isMounted = true;
+    void (async () => {
+      await initializeLocalDatabase();
+      await initializeAuthSession();
+      const completed = await hasCompletedOnboarding();
+      if (!isMounted) return;
+
+      setIsReady(true);
+      if (!completed && pathname !== '/onboarding') {
+        router.replace('/onboarding');
+      }
+    })();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
+  if (!isReady) {
+    return <View style={{ flex: 1, backgroundColor: c.background }} />;
+  }
+
+  return <RootStack />;
+}
+
+export default function RootLayout() {
   return (
     <ThemeProvider>
-      <RootStack />
+      <StartupGate />
     </ThemeProvider>
   );
 }

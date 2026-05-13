@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using ScoutHaul.Api.Authorization;
 using ScoutHaul.Api.Mapping;
 using ScoutHaul.Api.Services;
 using ScoutHaul.Application.Contracts;
@@ -11,6 +12,7 @@ namespace ScoutHaul.Api.Controllers;
 
 [ApiController]
 [Route("api/listings")]
+[RequireOrganizationPermission(ScoutHaulPermissions.ManageListings)]
 public sealed class ListingsController(ScoutHaulDbContext db, ICurrentUserContext currentUser) : ControllerBase
 {
     [HttpPost]

@@ -1,5 +1,6 @@
 using ScoutHaul.Application.Contracts;
 using ScoutHaul.Domain.Entities;
+using System.Text.Json;
 
 namespace ScoutHaul.Api.Mapping;
 
@@ -13,6 +14,35 @@ public static class DtoMapping
         item.User?.Email ?? string.Empty,
         item.User?.DisplayName ?? string.Empty,
         item.Role,
+        item.RoleId,
+        item.RoleDefinition?.Name,
+        string.IsNullOrWhiteSpace(item.User?.ExternalSubject) ? "Pending" : "Active",
+        item.JoinedAt);
+
+    public static OrganizationRoleDto ToDto(this OrganizationRoleDefinition item) => new(
+        item.Id,
+        item.Name,
+        item.Description,
+        item.IsSystem,
+        item.IsOwnerRole,
+        item.Permissions.Select(permission => permission.Permission).Order().ToArray());
+
+    public static OrganizationTeamDto ToDto(this OrganizationTeam item) => new(
+        item.Id,
+        item.OrganizationId,
+        item.Name,
+        item.Description,
+        item.Members.Count,
+        item.CreatedAt);
+
+    public static OrganizationTeamMemberDto ToDto(this OrganizationTeamMember item) => new(
+        item.Id,
+        item.TeamId,
+        item.UserId,
+        item.User?.Email ?? string.Empty,
+        item.User?.DisplayName ?? string.Empty,
+        item.RoleId,
+        item.RoleDefinition?.Name,
         item.JoinedAt);
 
     public static ProductIdentityDto ToDto(this ProductIdentity item) => new(
@@ -42,12 +72,13 @@ public static class DtoMapping
         item.Status,
         item.SellerAskingPrice,
         item.PurchasePrice,
-        item.EstimatedSalePrice,
-        item.Barcode,
-        item.Notes,
-        item.IsArchived,
-        item.CreatedAt,
-        item.UpdatedAt);
+            item.EstimatedSalePrice,
+            item.Barcode,
+            item.Notes,
+            ParsePhotoUrls(item.PhotoLocalReferencesJson),
+            item.IsArchived,
+            item.CreatedAt,
+            item.UpdatedAt);
 
     public static MarketObservationDto ToDto(this MarketObservation item) => new(
         item.Id,
@@ -153,6 +184,7 @@ public static class DtoMapping
     public static SaleDto ToDto(this Sale item) => new(
         item.Id,
         item.InventoryItemId,
+        item.InventoryItem?.Title ?? string.Empty,
         item.ListingId,
         item.Platform,
         item.SoldPrice,
@@ -175,4 +207,21 @@ public static class DtoMapping
         item.Status,
         item.DueAt,
         item.CreatedAt);
+
+    private static IReadOnlyList<string> ParsePhotoUrls(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return [];
+        }
+
+        try
+        {
+            return JsonSerializer.Deserialize<string[]>(value) ?? [];
+        }
+        catch (JsonException)
+        {
+            return [];
+        }
+    }
 }

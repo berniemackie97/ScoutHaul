@@ -19,6 +19,7 @@ import { useColors } from '../../src/context/ThemeContext';
 import type { InventoryItem, InventoryStatus, MarketObservation } from '../../src/domain/types';
 import { formatMoney } from '../../src/utils/money';
 import { getPhotos, type ItemPhoto } from '../../src/utils/photos';
+import { resolvePhotoUrl } from '../../src/utils/photoUrl';
 
 type WorkflowStage = {
   status: InventoryStatus;
@@ -65,7 +66,8 @@ export default function InventoryDetailScreen() {
       ]);
       setItem(inv);
       setComps(obs);
-      setPhotos(ph);
+      const remotePhotos = inv.photoUrls.map((uri) => ({ id: uri, inventoryItemId: id, localUri: resolvePhotoUrl(uri) ?? uri, isHero: false, createdAt: inv.updatedAt }));
+      setPhotos([...remotePhotos, ...ph]);
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Item unavailable.');
@@ -189,13 +191,11 @@ export default function InventoryDetailScreen() {
           label="Edit"
           icon="create-outline"
           variant="secondary"
-          fullWidth
           onPress={() => router.push({ pathname: '/inventory/edit', params: { id: item.id } })}
         />
         <Button
           label="Analyze"
           icon="calculator-outline"
-          fullWidth
           onPress={() => router.push({ pathname: '/deal-analyzer', params: { inventoryItemId: item.id } })}
         />
       </View>
@@ -204,14 +204,12 @@ export default function InventoryDetailScreen() {
           label="Add Comp"
           icon="add-circle-outline"
           variant="secondary"
-          fullWidth
           onPress={() => router.push({ pathname: '/comp-capture', params: { inventoryItemId: item.id, title: item.title } })}
         />
         <Button
           label="Marketplace"
           icon="open-outline"
           variant="secondary"
-          fullWidth
           onPress={() => router.push({ pathname: '/marketplace-links', params: { query: item.title } })}
         />
       </View>
@@ -220,9 +218,23 @@ export default function InventoryDetailScreen() {
           label="Create Listing"
           icon="pricetag-outline"
           variant="secondary"
-          fullWidth
           onPress={() => void createDraftListing()}
         />
+        <Button
+          label="Record Sale"
+          icon="cash-outline"
+          variant="secondary"
+          onPress={() => router.push({
+            pathname: '/record-sale',
+            params: {
+              inventoryItemId: item.id,
+              title: item.title,
+              listPrice: item.estimatedSalePrice != null ? String(item.estimatedSalePrice) : undefined,
+            },
+          })}
+        />
+      </View>
+      <View style={styles.actionRow}>
         <Button
           label="Archive"
           icon="archive-outline"

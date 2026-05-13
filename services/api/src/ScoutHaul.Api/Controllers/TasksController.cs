@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using ScoutHaul.Api.Authorization;
 using ScoutHaul.Api.Mapping;
 using ScoutHaul.Api.Services;
 using ScoutHaul.Application.Contracts;
@@ -10,6 +11,7 @@ namespace ScoutHaul.Api.Controllers;
 
 [ApiController]
 [Route("api/tasks")]
+[RequireOrganizationPermission(ScoutHaulPermissions.ManageTasks)]
 public sealed class TasksController(ScoutHaulDbContext db, ICurrentUserContext currentUser) : ControllerBase
 {
     [HttpPost]
@@ -77,6 +79,20 @@ public sealed class TasksController(ScoutHaulDbContext db, ICurrentUserContext c
             .ToListAsync(cancellationToken);
 
         return tasks;
+    }
+
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
+    {
+        var task = await FindTask(id, cancellationToken);
+        if (task is null)
+        {
+            return NotFound();
+        }
+
+        db.Tasks.Remove(task);
+        await db.SaveChangesAsync(cancellationToken);
+        return NoContent();
     }
 
     private Task<ResaleTask?> FindTask(Guid id, CancellationToken cancellationToken) =>

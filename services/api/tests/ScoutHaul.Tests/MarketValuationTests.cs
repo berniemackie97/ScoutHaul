@@ -44,6 +44,26 @@ public sealed class MarketValuationTests
     }
 
     [Fact]
+    public void Estimate_UsesProviderEstimatesWhenSoldCompsAreUnavailable()
+    {
+        MarketValuationResult result = MarketValuation.Estimate(
+            explicitExpectedSalePrice: null,
+            inventoryEstimatedSalePrice: 999m,
+            explicitPricingBasis: null,
+            observations:
+            [
+                Observation(MarketObservationType.ActiveListing, 220m),
+                Observation(MarketObservationType.Estimate, 100m),
+                Observation(MarketObservationType.Estimate, 120m)
+            ]);
+
+        Assert.Equal(110m, result.EstimatedSalePrice);
+        Assert.Equal(PricingBasisType.CachedRecent, result.PricingBasis);
+        Assert.Equal(0, result.SoldCompCount);
+        Assert.Equal(1, result.ActiveListingCount);
+    }
+
+    [Fact]
     public void Estimate_ExplicitExpectedSalePriceIsManualEstimateByDefault()
     {
         MarketValuationResult result = MarketValuation.Estimate(

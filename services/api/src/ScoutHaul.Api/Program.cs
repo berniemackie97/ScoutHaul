@@ -1,8 +1,10 @@
 using System.Text.Json.Serialization;
+using System.Text;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens;
 using ScoutHaul.Api.Middleware;
 using ScoutHaul.Api.Services;
@@ -28,28 +30,54 @@ builder.Services.AddHttpContextAccessor();
 bool useStubAuth = builder.Configuration.GetSection("StubAuth").Exists()
     && !string.IsNullOrWhiteSpace(builder.Configuration["StubAuth:DefaultOrganizationId"]);
 
-if (useStubAuth)
+SupabaseAuthOptions? supabaseAuth = SupabaseAuthOptions.FromConfiguration(builder.Configuration);
+if (supabaseAuth is null && !useStubAuth)
 {
-    builder.Services.AddScoped<ICurrentUserContext, HeaderCurrentUserContext>();
+    throw new InvalidOperationException("Authentication:Supabase:Url is required when StubAuth is disabled.");
 }
-else
+
+if (supabaseAuth is not null)
 {
+    var signingKeyResolver = new SupabaseSigningKeyResolver(supabaseAuth);
+    builder.Services.AddSingleton(supabaseAuth);
+    builder.Services.AddSingleton(signingKeyResolver);
     builder.Services
         .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         .AddJwtBearer(options =>
         {
-            options.Authority = builder.Configuration["Auth:Authority"];
-            options.Audience = builder.Configuration["Auth:Audience"];
             options.TokenValidationParameters = new TokenValidationParameters
             {
                 ValidateIssuer = true,
+                ValidIssuer = supabaseAuth.Issuer,
                 ValidateAudience = true,
+                ValidAudience = supabaseAuth.Audience,
                 ValidateLifetime = true,
                 ValidateIssuerSigningKey = true,
                 ClockSkew = TimeSpan.FromSeconds(30),
+                NameClaimType = "name",
+                IssuerSigningKey = string.IsNullOrWhiteSpace(supabaseAuth.JwtSecret)
+                    ? null
+                    : new SymmetricSecurityKey(Encoding.UTF8.GetBytes(supabaseAuth.JwtSecret)),
+                IssuerSigningKeyResolver = string.IsNullOrWhiteSpace(supabaseAuth.JwtSecret)
+                    ? signingKeyResolver.ResolveSigningKeys
+                    : null
             };
         });
+}
 
+builder.Services.AddScoped<JwtCurrentUserContext>();
+builder.Services.AddScoped<OrganizationAccessService>();
+builder.Services.AddScoped<OrganizationRoleSeeder>();
+builder.Services.AddScoped<MarketplaceLookupPersistenceService>();
+builder.Services.AddScoped<InventoryPhotoStorageService>();
+builder.Services.AddHttpClient<SupabaseAdminInviteService>();
+if (useStubAuth)
+{
+    builder.Services.AddAuthorization();
+    builder.Services.AddScoped<ICurrentUserContext, HeaderOrJwtCurrentUserContext>();
+}
+else
+{
     builder.Services.AddAuthorization(options =>
     {
         options.FallbackPolicy = new AuthorizationPolicyBuilder()
@@ -115,6 +143,14 @@ if (!app.Environment.IsDevelopment())
 
 // ── Security Headers ─────────────────────────────────────────────
 app.UseSecurityHeaders();
+string webRootPath = app.Environment.WebRootPath
+    ?? Path.Combine(app.Environment.ContentRootPath, "wwwroot");
+Directory.CreateDirectory(webRootPath);
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(webRootPath),
+    RequestPath = string.Empty
+});
 
 // ── Database Migration ───────────────────────────────────────────
 if (app.Configuration.GetValue("Database:ApplyMigrationsOnStartup", false))
@@ -139,13 +175,31 @@ else
 // ── Middleware Pipeline ──────────────────────────────────────────
 app.UseRateLimiter();
 app.UseCors("Default");
-
-if (!useStubAuth)
+app.Use(async (context, next) =>
+{
+    try
+    {
+        await next();
+    }
+    catch (UnauthorizedAccessException exception) when (!context.Response.HasStarted)
+    {
+        bool isAuthenticated = context.User.Identity?.IsAuthenticated == true;
+        context.Response.StatusCode = isAuthenticated
+            ? StatusCodes.Status403Forbidden
+            : StatusCodes.Status401Unauthorized;
+        await context.Response.WriteAsJsonAsync(new
+        {
+            title = isAuthenticated ? "Forbidden" : "Unauthorized",
+            detail = exception.Message
+        });
+    }
+});
+if (supabaseAuth is not null)
 {
     app.UseAuthentication();
 }
-
 app.UseAuthorization();
+app.UseMiddleware<IdempotencyMiddleware>();
 
 app.MapHealthChecks("/health").AllowAnonymous();
 app.MapControllers();

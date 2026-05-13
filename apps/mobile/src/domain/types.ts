@@ -41,8 +41,20 @@ export type RecommendationDecisionType =
   | 'ResearchRequired'
   | 'Unavailable';
 
+export type OrganizationRole = 'Owner' | 'Admin' | 'Member' | 'Viewer';
 export type ListingStatus = 'Draft' | 'Active' | 'Ended' | 'Sold' | 'Cancelled';
+export type SaleStatus = 'Recorded' | 'Packed' | 'Shipped' | 'Delivered' | 'Returned';
 export type WorkTaskStatus = 'Open' | 'InProgress' | 'Blocked' | 'Completed' | 'Cancelled';
+export type ExpenseCategory =
+  | 'InventoryPurchase'
+  | 'Shipping'
+  | 'Supplies'
+  | 'PlatformFee'
+  | 'PaymentFee'
+  | 'Refund'
+  | 'Fuel'
+  | 'Storage'
+  | 'Other';
 export type SourcingRouteStatus = 'Draft' | 'Planned' | 'Active' | 'Paused' | 'Completed' | 'Cancelled';
 export type SourcingRouteType = 'General' | 'GarageSales' | 'ThriftRun' | 'PickupRun' | 'AuctionPickup' | 'Liquidation' | 'Mixed';
 export type SourcingStopSourceType =
@@ -73,9 +85,57 @@ export type InventoryItem = {
   estimatedSalePrice?: number | null;
   barcode?: string | null;
   notes?: string | null;
+  photoUrls: string[];
   isArchived: boolean;
   createdAt: string;
   updatedAt: string;
+};
+
+export type Organization = {
+  id: string;
+  name: string;
+  createdAt: string;
+};
+
+export type OrganizationRoleDefinition = {
+  id: string;
+  name: string;
+  description?: string | null;
+  isSystem: boolean;
+  isOwnerRole: boolean;
+  permissions: string[];
+};
+
+export type OrganizationMember = {
+  id: string;
+  userId: string;
+  email: string;
+  displayName: string;
+  role: OrganizationRole;
+  roleId?: string | null;
+  roleName?: string | null;
+  inviteStatus: 'Pending' | 'Active' | string;
+  joinedAt: string;
+};
+
+export type OrganizationTeam = {
+  id: string;
+  organizationId: string;
+  name: string;
+  description?: string | null;
+  memberCount: number;
+  createdAt: string;
+};
+
+export type OrganizationTeamMember = {
+  id: string;
+  teamId: string;
+  userId: string;
+  email: string;
+  displayName: string;
+  roleId?: string | null;
+  roleName?: string | null;
+  joinedAt: string;
 };
 
 export type ProductIdentity = {
@@ -247,6 +307,27 @@ export type BudgetSummary = {
   remainingAmount: number;
 };
 
+export type Budget = {
+  id: string;
+  name: string;
+  startingAmount: number;
+  currentAmount: number;
+  startsAt: string;
+  endsAt?: string | null;
+  isActive: boolean;
+};
+
+export type Expense = {
+  id: string;
+  inventoryItemId?: string | null;
+  sourcingTripId?: string | null;
+  sourcingTripStopId?: string | null;
+  category: ExpenseCategory;
+  description: string;
+  amount: number;
+  occurredAt: string;
+};
+
 export type Listing = {
   id: string;
   inventoryItemId: string;
@@ -258,6 +339,24 @@ export type Listing = {
   status: ListingStatus;
   listedAt?: string | null;
   endedAt?: string | null;
+  notes?: string | null;
+};
+
+export type Sale = {
+  id: string;
+  inventoryItemId: string;
+  inventoryItemTitle: string;
+  listingId?: string | null;
+  platform: string;
+  soldPrice: number;
+  platformFees: number;
+  paymentFees: number;
+  shippingCost: number;
+  suppliesCost: number;
+  otherCosts: number;
+  netProfit: number;
+  status: SaleStatus;
+  soldAt: string;
   notes?: string | null;
 };
 
@@ -291,11 +390,15 @@ export type MarketplaceLookupResult = {
   lowestPrice?: number | null;
   highestPrice?: number | null;
   totalResults: number;
-  /** Product identity from UPCitemdb (barcode lookups only) */
+  /** Product identity from the configured barcode provider chain. */
   productTitle?: string | null;
   productBrand?: string | null;
   productImageUrl?: string | null;
   productCategory?: string | null;
+  productIdentityId?: string | null;
+  savedObservationCount: number;
+  providersUsed?: string[] | null;
+  providerWarnings?: string[] | null;
 };
 
 export type BarcodeLookupResult = {

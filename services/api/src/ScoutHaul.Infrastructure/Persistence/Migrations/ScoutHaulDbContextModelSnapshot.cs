@@ -41,12 +41,19 @@ namespace ScoutHaul.Infrastructure.Persistence.Migrations
                         .HasMaxLength(320)
                         .HasColumnType("character varying(320)");
 
+                    b.Property<string>("ExternalSubject")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
 
                     b.HasIndex("Email")
+                        .IsUnique();
+
+                    b.HasIndex("ExternalSubject")
                         .IsUnique();
 
                     b.ToTable("Users", (string)null);
@@ -250,6 +257,101 @@ namespace ScoutHaul.Infrastructure.Persistence.Migrations
                     b.HasIndex("OrganizationId", "OccurredAt");
 
                     b.ToTable("Expenses", (string)null);
+                });
+
+            modelBuilder.Entity("ScoutHaul.Domain.Entities.ExternalAuthAccount", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DisplayName")
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)");
+
+                    b.Property<string>("Email")
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)");
+
+                    b.Property<DateTimeOffset>("LinkedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<string>("ProviderAccountId")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("Provider", "ProviderAccountId")
+                        .IsUnique();
+
+                    b.ToTable("ExternalAuthAccounts", (string)null);
+                });
+
+            modelBuilder.Entity("ScoutHaul.Domain.Entities.IdempotencyRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<string>("Method")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Path")
+                        .IsRequired()
+                        .HasMaxLength(1500)
+                        .HasColumnType("character varying(1500)");
+
+                    b.Property<string>("ResponseJson")
+                        .HasColumnType("jsonb");
+
+                    b.Property<int>("StatusCode")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExpiresAt");
+
+                    b.HasIndex("OrganizationId", "Key")
+                        .IsUnique();
+
+                    b.ToTable("IdempotencyRecords", (string)null);
                 });
 
             modelBuilder.Entity("ScoutHaul.Domain.Entities.InventoryItem", b =>
@@ -582,6 +684,9 @@ namespace ScoutHaul.Infrastructure.Persistence.Migrations
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)");
 
+                    b.Property<Guid?>("RoleId")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -590,12 +695,148 @@ namespace ScoutHaul.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("RoleId");
+
                     b.HasIndex("UserId");
 
                     b.HasIndex("OrganizationId", "UserId")
                         .IsUnique();
 
                     b.ToTable("OrganizationMembers", (string)null);
+                });
+
+            modelBuilder.Entity("ScoutHaul.Domain.Entities.OrganizationRoleDefinition", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<bool>("IsOwnerRole")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsSystem")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrganizationId", "Name")
+                        .IsUnique();
+
+                    b.ToTable("OrganizationRoles", (string)null);
+                });
+
+            modelBuilder.Entity("ScoutHaul.Domain.Entities.OrganizationRolePermission", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Permission")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<Guid>("RoleId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RoleId", "Permission")
+                        .IsUnique();
+
+                    b.ToTable("OrganizationRolePermissions", (string)null);
+                });
+
+            modelBuilder.Entity("ScoutHaul.Domain.Entities.OrganizationTeam", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrganizationId", "Name")
+                        .IsUnique();
+
+                    b.ToTable("OrganizationTeams", (string)null);
+                });
+
+            modelBuilder.Entity("ScoutHaul.Domain.Entities.OrganizationTeamMember", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("JoinedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("RoleId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TeamId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RoleId");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("TeamId", "UserId")
+                        .IsUnique();
+
+                    b.ToTable("OrganizationTeamMembers", (string)null);
                 });
 
             modelBuilder.Entity("ScoutHaul.Domain.Entities.ProductIdentity", b =>
@@ -1119,6 +1360,17 @@ namespace ScoutHaul.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.SetNull);
                 });
 
+            modelBuilder.Entity("ScoutHaul.Domain.Entities.ExternalAuthAccount", b =>
+                {
+                    b.HasOne("ScoutHaul.Domain.Entities.AppUser", "User")
+                        .WithMany("ExternalAccounts")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("ScoutHaul.Domain.Entities.InventoryItem", b =>
                 {
                     b.HasOne("ScoutHaul.Domain.Entities.Organization", "Organization")
@@ -1202,6 +1454,11 @@ namespace ScoutHaul.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("ScoutHaul.Domain.Entities.OrganizationRoleDefinition", "RoleDefinition")
+                        .WithMany()
+                        .HasForeignKey("RoleId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("ScoutHaul.Domain.Entities.AppUser", "User")
                         .WithMany("Memberships")
                         .HasForeignKey("UserId")
@@ -1209,6 +1466,67 @@ namespace ScoutHaul.Infrastructure.Persistence.Migrations
                         .IsRequired();
 
                     b.Navigation("Organization");
+
+                    b.Navigation("RoleDefinition");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("ScoutHaul.Domain.Entities.OrganizationRoleDefinition", b =>
+                {
+                    b.HasOne("ScoutHaul.Domain.Entities.Organization", "Organization")
+                        .WithMany("Roles")
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Organization");
+                });
+
+            modelBuilder.Entity("ScoutHaul.Domain.Entities.OrganizationRolePermission", b =>
+                {
+                    b.HasOne("ScoutHaul.Domain.Entities.OrganizationRoleDefinition", "Role")
+                        .WithMany("Permissions")
+                        .HasForeignKey("RoleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Role");
+                });
+
+            modelBuilder.Entity("ScoutHaul.Domain.Entities.OrganizationTeam", b =>
+                {
+                    b.HasOne("ScoutHaul.Domain.Entities.Organization", "Organization")
+                        .WithMany("Teams")
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Organization");
+                });
+
+            modelBuilder.Entity("ScoutHaul.Domain.Entities.OrganizationTeamMember", b =>
+                {
+                    b.HasOne("ScoutHaul.Domain.Entities.OrganizationRoleDefinition", "RoleDefinition")
+                        .WithMany()
+                        .HasForeignKey("RoleId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("ScoutHaul.Domain.Entities.OrganizationTeam", "Team")
+                        .WithMany("Members")
+                        .HasForeignKey("TeamId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ScoutHaul.Domain.Entities.AppUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("RoleDefinition");
+
+                    b.Navigation("Team");
 
                     b.Navigation("User");
                 });
@@ -1323,6 +1641,8 @@ namespace ScoutHaul.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("ScoutHaul.Domain.Entities.AppUser", b =>
                 {
+                    b.Navigation("ExternalAccounts");
+
                     b.Navigation("Memberships");
                 });
 
@@ -1336,6 +1656,20 @@ namespace ScoutHaul.Infrastructure.Persistence.Migrations
                 });
 
             modelBuilder.Entity("ScoutHaul.Domain.Entities.Organization", b =>
+                {
+                    b.Navigation("Members");
+
+                    b.Navigation("Roles");
+
+                    b.Navigation("Teams");
+                });
+
+            modelBuilder.Entity("ScoutHaul.Domain.Entities.OrganizationRoleDefinition", b =>
+                {
+                    b.Navigation("Permissions");
+                });
+
+            modelBuilder.Entity("ScoutHaul.Domain.Entities.OrganizationTeam", b =>
                 {
                     b.Navigation("Members");
                 });

@@ -16,7 +16,7 @@ import { StatusPill } from '../../src/components/StatusPill';
 import { Text } from '../../src/components/Text';
 import { spacing } from '../../src/components/theme';
 import { useColors } from '../../src/context/ThemeContext';
-import { getPendingSyncCount } from '../../src/db/localStore';
+import { getPendingSyncCount, getWorkspaceProfile, type AppWorkspaceProfile } from '../../src/db/localStore';
 import type { DashboardSummary } from '../../src/domain/types';
 import { useConnectivity } from '../../src/hooks/useConnectivity';
 import { formatMoney } from '../../src/utils/money';
@@ -26,6 +26,7 @@ export default function DashboardScreen() {
   const connectivity = useConnectivity();
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [pendingSync, setPendingSync] = useState(0);
+  const [workspaceProfile, setWorkspaceProfile] = useState<AppWorkspaceProfile | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -34,6 +35,7 @@ export default function DashboardScreen() {
     if (showRefreshing) setRefreshing(true);
     try {
       const syncCount = await getPendingSyncCount();
+      setWorkspaceProfile(await getWorkspaceProfile());
       setPendingSync(syncCount);
 
       if (connectivity.isOnline) {
@@ -65,8 +67,10 @@ export default function DashboardScreen() {
     >
       <View style={styles.header}>
         <View style={{ flex: 1 }}>
-          <Text variant="title">ScoutHaul</Text>
-          <Text variant="caption">Your resale command center</Text>
+          <Text variant="title">{workspaceProfile?.workspaceName ?? 'ScoutHaul'}</Text>
+          <Text variant="caption">
+            {workspaceProfile?.usageMode === 'team' ? 'Team resale command center' : 'Your resale command center'}
+          </Text>
         </View>
         <IconButton icon="search-outline" label="Search" onPress={() => router.push('/search')} />
         <StatusPill
@@ -113,6 +117,16 @@ export default function DashboardScreen() {
           </View>
 
           <SectionHeader title="Needs Attention" />
+
+          {workspaceProfile?.accountMode !== 'signedIn' ? (
+            <ActionCard
+              icon="person-circle-outline"
+              title="Create an account to unlock sync later"
+              subtitle="Keep using local mode, or connect auth when the provider is configured"
+              tone="primary"
+              onPress={() => router.push('/account')}
+            />
+          ) : null}
 
           {unlisted > 0 ? (
             <ActionCard

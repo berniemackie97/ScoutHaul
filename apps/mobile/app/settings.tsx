@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { api } from '../src/api/client';
@@ -13,10 +13,11 @@ import { StatusPill } from '../src/components/StatusPill';
 import { Text } from '../src/components/Text';
 import { spacing } from '../src/components/theme';
 import { useAppTheme } from '../src/context/ThemeContext';
-import { getPendingSyncCount, listItemDrafts, processSyncQueue } from '../src/db/localStore';
+import { getPendingSyncCount, getWorkspaceProfile, listItemDrafts, processSyncQueue, saveWorkspaceProfile, type AppWorkspaceProfile } from '../src/db/localStore';
 import type { LocalItemDraft } from '../src/domain/types';
 import { useConnectivity } from '../src/hooks/useConnectivity';
 import { formatMoney } from '../src/utils/money';
+import { signOut } from '../src/services/auth';
 
 type ThemeMode = 'system' | 'light' | 'dark';
 const themeModes: { value: ThemeMode; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
@@ -32,8 +33,10 @@ export default function SettingsScreen() {
   const [pendingSync, setPendingSync] = useState(0);
   const [message, setMessage] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [workspaceProfile, setWorkspaceProfile] = useState<AppWorkspaceProfile | null>(null);
 
   async function load() {
+    setWorkspaceProfile(await getWorkspaceProfile());
     setDrafts(await listItemDrafts());
     setPendingSync(await getPendingSyncCount());
   }
@@ -52,8 +55,57 @@ export default function SettingsScreen() {
     await load();
   }
 
+  async function disconnectAccount() {
+    await signOut();
+    await saveWorkspaceProfile({ accountMode: 'local', accountEmail: null, displayName: null });
+    await load();
+  }
+
   return (
     <Screen>
+      <SectionHeader title="Workspace" />
+      <Card>
+        <View style={styles.rowBetween}>
+          <View style={styles.flex}>
+            <Text variant="bodyBold">{workspaceProfile?.workspaceName ?? 'My resale workspace'}</Text>
+            <Text variant="caption">
+              {workspaceProfile?.usageMode === 'team' ? 'Team workspace' : 'Solo workspace'} · {workspaceProfile?.role ?? 'owner'}
+            </Text>
+          </View>
+          <StatusPill label={workspaceProfile?.planIntent ?? 'starter'} tone="primary" size="sm" />
+        </View>
+        <Button
+          label="Run Setup Again"
+          icon="trail-sign-outline"
+          variant="secondary"
+          fullWidth
+          onPress={() => router.push('/onboarding')}
+        />
+      </Card>
+
+      <SectionHeader title="Account" />
+      <Card>
+        <View style={styles.rowBetween}>
+          <View style={styles.flex}>
+            <Text variant="bodyBold">
+              {workspaceProfile?.accountMode === 'signedIn' ? workspaceProfile.accountEmail ?? 'Signed in' : 'Local workspace'}
+            </Text>
+            <Text variant="caption">
+              {workspaceProfile?.accountMode === 'signedIn'
+                ? 'Cloud auth token is stored securely on this device.'
+                : 'No account is connected. Local/offline workflows stay available.'}
+            </Text>
+          </View>
+          <StatusPill label={workspaceProfile?.accountMode ?? 'local'} tone={workspaceProfile?.accountMode === 'signedIn' ? 'success' : 'neutral'} size="sm" />
+        </View>
+        <View style={styles.buttonRow}>
+          <Button label="Sign In / Up" icon="person-circle-outline" variant="secondary" onPress={() => router.push('/account')} />
+          {workspaceProfile?.accountMode === 'signedIn' ? (
+            <Button label="Sign Out" icon="log-out-outline" variant="danger" onPress={() => void disconnectAccount()} />
+          ) : null}
+        </View>
+      </Card>
+
       <SectionHeader title="Appearance" />
       <Card>
         <View style={styles.themeRow}>
@@ -134,7 +186,7 @@ export default function SettingsScreen() {
       <SectionHeader title="About" />
       <Card>
         <Text variant="caption">
-          ScoutHaul MVP. Authentication is stubbed via headers for local development. Marketplace integrations use external search launchers and manual comp capture.
+          ScoutHaul MVP. Supabase handles cloud identity when configured; local and stub-auth workflows remain available for offline-first development and demos.
         </Text>
         <Divider />
         <Text variant="caption">
@@ -149,6 +201,12 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: spacing.sm,
+  },
+  rowBetween: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     gap: spacing.sm,
   },
   draftRow: {
@@ -172,5 +230,10 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     borderWidth: 1.5,
     borderColor: 'transparent',
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
   },
 });

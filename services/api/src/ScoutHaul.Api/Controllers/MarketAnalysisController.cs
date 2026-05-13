@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using ScoutHaul.Api.Authorization;
 using ScoutHaul.Api.Services;
 using ScoutHaul.Application.Contracts;
 using ScoutHaul.Application.Services;
@@ -12,6 +13,7 @@ namespace ScoutHaul.Api.Controllers;
 
 [ApiController]
 [Route("api/market-analysis")]
+[RequireOrganizationPermission(ScoutHaulPermissions.ViewReports)]
 public sealed class MarketAnalysisController(
     ScoutHaulDbContext db,
     ICurrentUserContext currentUser,
@@ -84,6 +86,11 @@ public sealed class MarketAnalysisController(
         if (valuation.ActiveListingCount > 0 && valuation.SoldCompCount == 0 && request.ExpectedSalePrice is null && item?.EstimatedSalePrice is null)
         {
             combinedWarnings.Add("Only active listings were found. Active listing prices are not sold prices and were not used for valuation.");
+        }
+
+        if (valuation.PricingBasis == PricingBasisType.CachedRecent && valuation.SoldCompCount == 0)
+        {
+            combinedWarnings.Add("No sold comps were found. Provider estimates were used for valuation.");
         }
 
         var analysis = new MarketAnalysis

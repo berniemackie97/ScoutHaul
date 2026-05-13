@@ -1,4 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
+using ScoutHaul.Api.Authorization;
+using ScoutHaul.Api.Services;
 using ScoutHaul.Application.Contracts;
 using ScoutHaul.Application.Services;
 
@@ -6,12 +8,14 @@ namespace ScoutHaul.Api.Controllers;
 
 [ApiController]
 [Route("api/marketplace-lookup")]
+[RequireOrganizationPermission(ScoutHaulPermissions.ManageInventory)]
 public sealed class MarketplaceLookupController(
     IMarketplaceLookupService lookupService,
-    IBarcodeLookupService barcodeLookupService) : ControllerBase
+    IBarcodeLookupService barcodeLookupService,
+    MarketplaceLookupPersistenceService persistenceService) : ControllerBase
 {
     /// <summary>
-    /// Lookup barcode: returns product identity (UPCitemdb) + marketplace pricing (eBay) combined.
+    /// Lookup barcode: runs product identification, pricing providers, and saves reusable comp observations.
     /// </summary>
     [HttpGet("barcode/{barcode}")]
     public async Task<ActionResult<MarketplaceLookupResult>> LookupBarcode(string barcode, CancellationToken cancellationToken)
@@ -21,28 +25,8 @@ public sealed class MarketplaceLookupController(
             return BadRequest("Barcode is required.");
         }
 
-        // Run product identification and marketplace pricing in parallel
-        var productTask = barcodeLookupService.LookupAsync(barcode, cancellationToken);
-        var marketplaceTask = lookupService.SearchByBarcodeAsync(barcode, cancellationToken);
-
-        await Task.WhenAll(productTask, marketplaceTask);
-
-        var product = await productTask;
-        var marketplace = await marketplaceTask;
-
-        // If marketplace has no results but product lookup succeeded, enrich with product data
-        if (product is not null)
-        {
-            marketplace = marketplace with
-            {
-                ProductTitle = product.Title,
-                ProductBrand = product.Brand,
-                ProductImageUrl = product.ImageUrl,
-                ProductCategory = product.Category,
-            };
-        }
-
-        return marketplace;
+        MarketplaceLookupResult marketplace = await lookupService.SearchByBarcodeAsync(barcode, cancellationToken);
+        return await persistenceService.PersistBarcodeLookupAsync(barcode, marketplace, cancellationToken);
     }
 
     [HttpGet("search")]
@@ -57,7 +41,7 @@ public sealed class MarketplaceLookupController(
     }
 
     /// <summary>
-    /// Product identification only (no pricing). Uses UPCitemdb.
+    /// Product identification only (no pricing). Uses the configured barcode provider chain.
     /// </summary>
     [HttpGet("product/{barcode}")]
     public async Task<ActionResult<BarcodeLookupResult>> LookupProduct(string barcode, CancellationToken cancellationToken)

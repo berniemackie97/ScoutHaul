@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, View } from 'react-native';
 import { api } from '../src/api/client';
 import { Button } from '../src/components/Button';
 import { Card } from '../src/components/Card';
@@ -95,6 +95,23 @@ export default function TasksScreen() {
     }
   }
 
+  async function deleteTask(task: ResaleTask) {
+    try {
+      await api.deleteTask(task.id);
+      setTasks((current) => current.filter((item) => item.id !== task.id));
+      setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Unable to delete task.');
+    }
+  }
+
+  function confirmDeleteTask(task: ResaleTask) {
+    Alert.alert('Delete task?', task.title, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: () => void deleteTask(task) },
+    ]);
+  }
+
   return (
     <Screen refreshing={refreshing} onRefresh={() => void load(true)}>
       {error ? <ErrorBanner message={error} /> : null}
@@ -153,14 +170,24 @@ export default function TasksScreen() {
                     ) : null}
                   </View>
                 </View>
-                <Pressable
-                  onPress={() => void updateStatus(task.id, action.status)}
-                  accessibilityRole="button"
-                  accessibilityLabel={action.label}
-                  style={[styles.quickAction, { backgroundColor: c.primaryLight }]}
-                >
-                  <Ionicons name={action.icon} size={22} color={c.primary} />
-                </Pressable>
+                <View style={styles.taskActions}>
+                  <Pressable
+                    onPress={() => void updateStatus(task.id, action.status)}
+                    accessibilityRole="button"
+                    accessibilityLabel={action.label}
+                    style={[styles.quickAction, { backgroundColor: c.primaryLight }]}
+                  >
+                    <Ionicons name={action.icon} size={22} color={c.primary} />
+                  </Pressable>
+                  <Pressable
+                    onPress={() => confirmDeleteTask(task)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Delete ${task.title}`}
+                    style={[styles.quickAction, { backgroundColor: c.dangerLight }]}
+                  >
+                    <Ionicons name="trash-outline" size={20} color={c.danger} />
+                  </Pressable>
+                </View>
               </View>
             </Card>
           );
@@ -205,5 +232,10 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  taskActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
   },
 });

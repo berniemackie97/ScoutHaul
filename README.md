@@ -101,7 +101,21 @@ Type check:
 npm run typecheck
 ```
 
-The mobile API base URL is read from `EXPO_PUBLIC_API_BASE_URL`. The API client strips trailing slashes and sends the MVP stub auth headers from `EXPO_PUBLIC_SCOUTHAUL_ORG_ID` and `EXPO_PUBLIC_SCOUTHAUL_USER_ID`.
+Build a local Android APK for closed beta device testing:
+
+```bash
+cd /Volumes/EnderChest/Development/Repos/DotNet/Apps/ScoutHaul/apps/mobile
+npm install
+npx eas login
+npx eas build:configure
+npx eas build -p android --profile preview
+```
+
+The `preview` EAS profile is configured for an APK, so the resulting artifact can be installed directly on a test Android phone without publishing to Google Play. Use a LAN-accessible or hosted API URL in `EXPO_PUBLIC_API_BASE_URL`; `localhost` from a phone points at the phone, not your development machine.
+
+For EAS cloud builds, set `EXPO_PUBLIC_API_BASE_URL`, `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`, and `EAS_PROJECT_ID` in the matching EAS environment. EAS does not read your local `.env` file while resolving app config in cloud builds.
+
+The mobile API base URL is read from `EXPO_PUBLIC_API_BASE_URL`. The API client strips trailing slashes, sends a real `Authorization: Bearer` token when a user is signed in, and only falls back to the MVP stub auth headers from `EXPO_PUBLIC_SCOUTHAUL_ORG_ID` and `EXPO_PUBLIC_SCOUTHAUL_USER_ID` when no session exists.
 
 ## CI/CD
 
@@ -117,14 +131,30 @@ ghcr.io/<owner>/<repo>/scouthaul-api
 
 The Docker image includes the `org.opencontainers.image.source` label so GHCR can link the package back to the repository. Package visibility and access are controlled by GitHub package settings; keep the repository private and inherited package permissions enabled for private-by-default access.
 
-## MVP Auth
+## Auth
 
-Authentication is stubbed for the MVP. The mobile app sends:
+Development still supports stub auth for local smoke tests:
 
 - `X-ScoutHaul-Organization-Id`
 - `X-ScoutHaul-User-Id`
 
-The API isolates this in `ICurrentUserContext` so real authentication can replace it without rewriting controllers.
+Real sign-in uses Supabase Auth for cross-platform mobile/web sessions. Configure the mobile app with your Supabase project values:
+
+```bash
+EXPO_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+EXPO_PUBLIC_SUPABASE_ANON_KEY=your-publishable-or-anon-key
+```
+
+Configure the API to validate the same Supabase project:
+
+```bash
+Authentication__Supabase__Url=https://your-project.supabase.co
+Authentication__Supabase__Audience=authenticated
+# Optional only for legacy HS256 Supabase projects:
+# Authentication__Supabase__JwtSecret=your-supabase-jwt-secret
+```
+
+Supabase owns authentication sessions. ScoutHaul owns organizations, teams, roles, permissions, inventory, routes, budgets, and billing state. When `StubAuth__DefaultOrganizationId` is present, development requests can still fall back to stub headers, but a valid Supabase bearer token takes precedence.
 
 ## Offline Rules
 
@@ -139,9 +169,9 @@ Offline mode does not create live market recommendations. A deal analysis requir
 
 ## Marketplace Rules
 
-Marketplace scraping is not part of the MVP. ScoutHaul generates external search links for eBay, Facebook Marketplace, Google, Google Shopping, Amazon, Whatnot, Mercari, and Craigslist.
+ScoutHaul does not embed marketplace scraping or navigation flows in the app. Barcode scans run through configured product identity providers, then optional pricing providers such as PriceCharting, Keepa, SerpApi Google Shopping, and eBay Browse. When provider data is unavailable, ScoutHaul still generates external search links for eBay, Facebook Marketplace, Google, Google Shopping, Amazon, Whatnot, Mercari, and Craigslist so the user can capture manual comps.
 
-Active listing prices are never treated as sold prices. Every comp has a type such as `Sold`, `ActiveListing`, `ManualSold`, `ManualActive`, `InternalSale`, `Estimate`, or `Unknown`. Recommendations expose a pricing basis such as `LiveValidated`, `CachedRecent`, `CachedStale`, `ManualEstimate`, `InternalHistory`, or `Unavailable`.
+Active listing prices are never treated as sold prices. Provider estimates are saved as `Estimate` observations and can be used as a cached fallback only when sold comps are unavailable. Every comp has a type such as `Sold`, `ActiveListing`, `ManualSold`, `ManualActive`, `InternalSale`, `Estimate`, or `Unknown`. Recommendations expose a pricing basis such as `LiveValidated`, `CachedRecent`, `CachedStale`, `ManualEstimate`, `InternalHistory`, or `Unavailable`.
 
 ## Manual QA Checklist
 
@@ -151,7 +181,9 @@ Active listing prices are never treated as sold prices. Every comp has a type su
 - Scout an item, save a local draft, add it to inventory, capture a manual sold comp from the inventory detail screen, and run deal analysis.
 - Verify deal analysis shows explicit pricing basis/confidence warnings and does not value an item from active listings only.
 - Toggle offline mode or disconnect network, save a draft, queue sync, reconnect, and run Sync Now from Settings.
-- Record a listing and sale from API/Swagger until the mobile sale flow is built out, then confirm dashboard totals update.
+- Upload inventory photos, reload the item, and confirm remote photos render on another device signed into the same workspace.
+- Record a listing, record a sale from inventory/listing queue, then pack, ship, and deliver it from Sales & Shipping.
+- Delete routes/stops/listings/tasks/budget expenses from the mobile UI and confirm the list updates without stale rows.
 
 ## Current Verification
 
@@ -163,8 +195,9 @@ cd services/api && dotnet test ScoutHaul.slnx
 cd services/api && dotnet format ScoutHaul.slnx --verify-no-changes --verbosity minimal
 cd services/api && dotnet list ScoutHaul.slnx package --vulnerable --include-transitive
 cd apps/mobile && npm run typecheck
-cd apps/mobile && npx expo install --check
+cd apps/mobile && npx expo-doctor@latest
 cd apps/mobile && npm audit --audit-level=high
+docker build -f services/api/src/ScoutHaul.Api/Dockerfile services/api
 docker compose config
 docker compose up -d --build
 curl -fsS http://localhost:5080/health

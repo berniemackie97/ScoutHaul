@@ -249,6 +249,23 @@ export default function ListingQueueScreen() {
                       {listing.status === 'Active' ? (
                         <QueueAction icon="stop-circle-outline" label="End" color={c.warning} onPress={() => void endListing(listing)} />
                       ) : null}
+                      {listing.status === 'Active' || listing.status === 'Draft' ? (
+                        <QueueAction
+                          icon="cash-outline"
+                          label="Sold"
+                          color={c.success}
+                          onPress={() => router.push({
+                            pathname: '/record-sale',
+                            params: {
+                              inventoryItemId: listing.inventoryItemId,
+                              listingId: listing.id,
+                              title: listing.inventoryItemTitle,
+                              platform: listing.platform,
+                              listPrice: String(listing.listPrice),
+                            },
+                          })}
+                        />
+                      ) : null}
                       <QueueAction icon="trash-outline" label="Delete" color={c.danger} onPress={() => confirmDeleteListing(listing)} />
                     </View>
                   </Card>

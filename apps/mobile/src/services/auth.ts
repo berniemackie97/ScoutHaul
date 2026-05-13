@@ -1,31 +1,41 @@
-/**
- * Auth service abstraction.
- *
- * In development, StubAuth bypasses this entirely — the API client sends
- * hardcoded org/user IDs via headers instead of JWT tokens.
- *
- * For production, integrate your auth provider here:
- *   - Auth0: expo-auth-session + Auth0 SDK
- *   - Supabase: @supabase/supabase-js
- *   - Firebase: @react-native-firebase/auth
- *   - Custom: expo-secure-store for token persistence
- *
- * The authStore below is a minimal token holder. Replace with your
- * provider's session management when ready.
- */
+import type { Session, User } from '@supabase/supabase-js';
+import { getSupabaseClient } from './supabaseClient';
 
 type AuthListener = (isAuthenticated: boolean) => void;
 
+export type AuthSession = {
+  accessToken: string;
+  refreshToken?: string | null;
+  expiresAt?: number | null;
+};
+
+export type AuthAccount = {
+  email: string | null;
+  displayName: string | null;
+};
+
 class AuthStore {
   private token: string | null = null;
+  private session: AuthSession | null = null;
+  private account: AuthAccount | null = null;
   private listeners: Set<AuthListener> = new Set();
 
   getToken(): string | null {
     return this.token;
   }
 
-  setToken(token: string | null): void {
-    this.token = token;
+  getSession(): AuthSession | null {
+    return this.session;
+  }
+
+  getAccount(): AuthAccount | null {
+    return this.account;
+  }
+
+  setSession(session: AuthSession | null, account: AuthAccount | null = this.account): void {
+    this.session = session;
+    this.token = session?.accessToken ?? null;
+    this.account = account;
     this.notify();
   }
 
@@ -46,8 +56,97 @@ class AuthStore {
 
   clear(): void {
     this.token = null;
+    this.session = null;
+    this.account = null;
     this.notify();
   }
 }
 
 export const authStore = new AuthStore();
+
+let didRegisterAuthListener = false;
+
+export async function initializeAuthSession(): Promise<void> {
+  const supabase = getSupabaseClient();
+  if (!supabase) {
+    authStore.clear();
+    return;
+  }
+
+  const { data } = await supabase.auth.getSession();
+  syncSession(data.session);
+
+  if (!didRegisterAuthListener) {
+    didRegisterAuthListener = true;
+    supabase.auth.onAuthStateChange((_event, session) => {
+      syncSession(session);
+    });
+  }
+}
+
+export async function signInWithPassword(email: string, password: string): Promise<Session | null> {
+  const supabase = requireSupabaseClient();
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) throw new Error(error.message);
+  syncSession(data.session);
+  return data.session;
+}
+
+export async function signUpWithPassword(email: string, password: string): Promise<Session | null> {
+  const supabase = requireSupabaseClient();
+  const { data, error } = await supabase.auth.signUp({ email, password });
+  if (error) throw new Error(error.message);
+  syncSession(data.session);
+  return data.session;
+}
+
+export async function signOut(): Promise<void> {
+  const supabase = getSupabaseClient();
+  if (supabase) {
+    await supabase.auth.signOut();
+  }
+
+  authStore.clear();
+}
+
+function requireSupabaseClient() {
+  const supabase = getSupabaseClient();
+  if (!supabase) {
+    throw new Error('Supabase is not configured.');
+  }
+
+  return supabase;
+}
+
+function syncSession(session: Session | null): void {
+  if (!session) {
+    authStore.clear();
+    return;
+  }
+
+  authStore.setSession(
+    {
+      accessToken: session.access_token,
+      refreshToken: session.refresh_token,
+      expiresAt: session.expires_at ? session.expires_at * 1000 : null,
+    },
+    buildAccount(session.user),
+  );
+}
+
+function buildAccount(user: User | null): AuthAccount | null {
+  if (!user) {
+    return null;
+  }
+
+  const displayName = typeof user.user_metadata?.name === 'string'
+    ? user.user_metadata.name
+    : typeof user.user_metadata?.full_name === 'string'
+      ? user.user_metadata.full_name
+      : null;
+
+  return {
+    email: user.email ?? null,
+    displayName,
+  };
+}

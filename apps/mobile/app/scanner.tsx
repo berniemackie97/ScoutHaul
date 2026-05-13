@@ -27,11 +27,14 @@ type ScanState =
       highPrice: number | null;
       totalResults: number;
       error: string | null;
-      /** Product identity from UPCitemdb */
       productTitle: string | null;
       productBrand: string | null;
       productImageUrl: string | null;
       productCategory: string | null;
+      productIdentityId: string | null;
+      savedObservationCount: number;
+      providersUsed: string[];
+      providerWarnings: string[];
     };
 
 /** Get best product name — prefer UPCitemdb, fall back to eBay listing title */
@@ -87,6 +90,10 @@ export default function BarcodeScannerScreen() {
         productBrand: result.productBrand ?? null,
         productImageUrl: result.productImageUrl ?? null,
         productCategory: result.productCategory ?? null,
+        productIdentityId: result.productIdentityId ?? null,
+        savedObservationCount: result.savedObservationCount ?? 0,
+        providersUsed: result.providersUsed ?? [],
+        providerWarnings: result.providerWarnings ?? [],
       });
     } catch (e) {
       setState({
@@ -102,6 +109,10 @@ export default function BarcodeScannerScreen() {
         productBrand: null,
         productImageUrl: null,
         productCategory: null,
+        productIdentityId: null,
+        savedObservationCount: 0,
+        providersUsed: [],
+        providerWarnings: [],
       });
     }
   }
@@ -116,6 +127,7 @@ export default function BarcodeScannerScreen() {
         barcode: state.barcode,
         ...(productName ? { productName } : {}),
         ...(state.avgPrice != null ? { avgPrice: String(state.avgPrice) } : {}),
+        ...(state.productIdentityId ? { productIdentityId: state.productIdentityId } : {}),
         ...(routeParams.sourcingTripId ? { sourcingTripId: routeParams.sourcingTripId } : {}),
         ...(routeParams.sourcingTripStopId ? { sourcingTripStopId: routeParams.sourcingTripStopId } : {}),
       },
@@ -129,6 +141,7 @@ export default function BarcodeScannerScreen() {
     const params: Record<string, string> = { barcode: state.barcode };
     if (productName) params.title = productName;
     if (state.avgPrice != null) params.estimatedSalePrice = String(state.avgPrice);
+    if (state.productIdentityId) params.productIdentityId = state.productIdentityId;
     if (firstListing?.condition) params.condition = firstListing.condition;
     if (routeParams.sourcingTripId) params.sourcingTripId = routeParams.sourcingTripId;
     if (routeParams.sourcingTripStopId) params.sourcingTripStopId = routeParams.sourcingTripStopId;
@@ -209,7 +222,7 @@ export default function BarcodeScannerScreen() {
               </View>
               <View style={styles.searchingRow}>
                 <Ionicons name="search-outline" size={16} color={c.info} />
-                <Text variant="caption" color={c.info}>Searching eBay...</Text>
+                <Text variant="caption" color={c.info}>Checking pricing sources...</Text>
               </View>
             </View>
           ) : (
@@ -237,10 +250,21 @@ export default function BarcodeScannerScreen() {
                         <Text variant="label" style={styles.mono} color={c.textMuted}>{state.barcode}</Text>
                       </View>
                       {state.totalResults > 0 ? (
-                        <StatusPill label={`${state.totalResults} listed`} tone="success" size="sm" />
+                        <StatusPill label={`${state.totalResults} signals`} tone="success" size="sm" />
                       ) : (
                         <StatusPill label="Product found" tone="info" size="sm" />
                       )}
+                      {state.providersUsed.length > 0 ? (
+                        <Text variant="label" color={c.textMuted} numberOfLines={2}>
+                          {state.providersUsed.join(' · ')}
+                          {state.savedObservationCount > 0 ? ` · ${state.savedObservationCount} saved` : ''}
+                        </Text>
+                      ) : null}
+                      {state.providerWarnings.length > 0 ? (
+                        <Text variant="label" color={c.warning} numberOfLines={2}>
+                          {state.providerWarnings[0]}
+                        </Text>
+                      ) : null}
                     </View>
                   </View>
                 ) : (

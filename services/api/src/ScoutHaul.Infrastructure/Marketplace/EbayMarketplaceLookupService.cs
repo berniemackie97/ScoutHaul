@@ -10,7 +10,7 @@ using ScoutHaul.Application.Services;
 
 namespace ScoutHaul.Infrastructure.Marketplace;
 
-public sealed class EbayMarketplaceLookupService : IMarketplaceLookupService
+internal sealed class EbayMarketplaceLookupService : IMarketplacePricingProvider
 {
     private readonly HttpClient _httpClient;
     private readonly IConfiguration _configuration;
@@ -32,10 +32,16 @@ public sealed class EbayMarketplaceLookupService : IMarketplaceLookupService
         _logger = logger;
     }
 
-    public async Task<MarketplaceLookupResult> SearchByBarcodeAsync(string barcode, CancellationToken cancellationToken = default)
+    public string Name => "eBay";
+    public bool IsConfigured => !string.IsNullOrWhiteSpace(_configuration["Ebay:ClientId"])
+        && !string.IsNullOrWhiteSpace(_configuration["Ebay:ClientSecret"]);
+
+    public async Task<IReadOnlyList<MarketplaceListingDto>> SearchByBarcodeAsync(
+        MarketplacePricingRequest request,
+        CancellationToken cancellationToken)
     {
         string token = await GetAccessTokenAsync(cancellationToken);
-        string cleanBarcode = barcode.Trim();
+        string cleanBarcode = request.Barcode?.Trim() ?? request.Query.Trim();
 
         // Search active listings by GTIN (UPC/EAN)
         var activeTask = SearchBrowseApiAsync(token, $"gtin={cleanBarcode}", cancellationToken);
@@ -53,14 +59,15 @@ public sealed class EbayMarketplaceLookupService : IMarketplaceLookupService
             allListings.AddRange(await keywordTask);
         }
 
-        return BuildResult(cleanBarcode, allListings);
+        return allListings;
     }
 
-    public async Task<MarketplaceLookupResult> SearchByKeywordAsync(string keyword, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<MarketplaceListingDto>> SearchByKeywordAsync(
+        MarketplacePricingRequest request,
+        CancellationToken cancellationToken)
     {
         string token = await GetAccessTokenAsync(cancellationToken);
-        var listings = await SearchBrowseApiAsync(token, $"q={Uri.EscapeDataString(keyword.Trim())}", cancellationToken);
-        return BuildResult(keyword.Trim(), listings);
+        return await SearchBrowseApiAsync(token, $"q={Uri.EscapeDataString(request.Query.Trim())}", cancellationToken);
     }
 
     private async Task<List<MarketplaceListingDto>> SearchBrowseApiAsync(string token, string queryParam, CancellationToken cancellationToken)
@@ -168,18 +175,6 @@ public sealed class EbayMarketplaceLookupService : IMarketplaceLookupService
     {
         if (price?.Value is null) return 0;
         return decimal.TryParse(price.Value, out decimal result) ? result : 0;
-    }
-
-    private static MarketplaceLookupResult BuildResult(string query, List<MarketplaceListingDto> listings)
-    {
-        decimal[] prices = listings.Where(l => l.Price > 0).Select(l => l.Price).ToArray();
-        return new MarketplaceLookupResult(
-            Query: query,
-            Listings: listings,
-            AverageSoldPrice: prices.Length > 0 ? Math.Round(prices.Average(), 2) : null,
-            LowestPrice: prices.Length > 0 ? prices.Min() : null,
-            HighestPrice: prices.Length > 0 ? prices.Max() : null,
-            TotalResults: listings.Count);
     }
 
     // eBay API response models

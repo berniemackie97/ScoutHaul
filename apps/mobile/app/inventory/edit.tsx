@@ -18,10 +18,12 @@ import { useAppTheme } from '../../src/context/ThemeContext';
 import { enqueueOperation } from '../../src/db/localStore';
 import type { InventoryItem } from '../../src/domain/types';
 import { parseOptionalNumber } from '../../src/utils/money';
+import { resolvePhotoUrl } from '../../src/utils/photoUrl';
 
 type LocalPhoto = {
   uri: string;
   isHero: boolean;
+  isRemote?: boolean;
 };
 
 export default function EditInventoryScreen() {
@@ -47,6 +49,7 @@ export default function EditInventoryScreen() {
   const [notes, setNotes] = useState('');
   const [description, setDescription] = useState('');
   const [photos, setPhotos] = useState<LocalPhoto[]>([]);
+  const [originalRemotePhotoUrls, setOriginalRemotePhotoUrls] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -68,6 +71,9 @@ export default function EditInventoryScreen() {
       setBarcode(item.barcode ?? '');
       setNotes(item.notes ?? '');
       setDescription(item.description ?? '');
+      const remotePhotos = item.photoUrls ?? [];
+      setOriginalRemotePhotoUrls(remotePhotos);
+      setPhotos(remotePhotos.map((uri, index) => ({ uri, isHero: index === 0, isRemote: true })));
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unable to load item.');
@@ -156,7 +162,7 @@ export default function EditInventoryScreen() {
       } else {
         item = await api.createInventory(body);
       }
-      // TODO: Upload photos to server when photo API exists
+      await persistPhotoChanges(item.id);
       if (params.sourcingTripId) {
         router.replace({ pathname: '/active-route', params: { tripId: params.sourcingTripId } });
       } else {
@@ -172,6 +178,24 @@ export default function EditInventoryScreen() {
       setError(e instanceof Error ? e.message : 'Unable to save item.');
     } finally {
       setIsSaving(false);
+    }
+  }
+
+  async function persistPhotoChanges(itemId: string) {
+    const currentRemotePhotoUrls = photos.filter((photo) => photo.isRemote).map((photo) => photo.uri);
+    const removedRemotePhotoUrls = originalRemotePhotoUrls.filter((uri) => !currentRemotePhotoUrls.includes(uri));
+
+    for (const uri of removedRemotePhotoUrls) {
+      await api.deleteInventoryPhoto(itemId, uri);
+    }
+
+    const remoteHero = photos.find((photo) => photo.isHero && photo.isRemote);
+    if (remoteHero && originalRemotePhotoUrls[0] !== remoteHero.uri) {
+      await api.setInventoryHeroPhoto(itemId, remoteHero.uri);
+    }
+
+    for (const photo of photos.filter((candidate) => !candidate.isRemote)) {
+      await api.uploadInventoryPhoto(itemId, photo.uri, photo.isHero);
     }
   }
 
@@ -198,7 +222,7 @@ export default function EditInventoryScreen() {
           {photos.map((photo, i) => (
             <View key={photo.uri} style={styles.photoWrapper}>
               <Pressable onPress={() => setHero(i)} style={styles.photoTouch}>
-                <Image source={{ uri: photo.uri }} style={styles.photoThumb} contentFit="cover" />
+                <Image source={{ uri: resolvePhotoUrl(photo.uri) ?? photo.uri }} style={styles.photoThumb} contentFit="cover" />
                 {photo.isHero ? (
                   <View style={[styles.heroBadge, { backgroundColor: c.primary }]}>
                     <Ionicons name="star" size={10} color={c.textInverse} />

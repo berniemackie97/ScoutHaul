@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using ScoutHaul.Api.Authorization;
 using ScoutHaul.Api.Mapping;
 using ScoutHaul.Api.Services;
 using ScoutHaul.Application.Contracts;
@@ -11,6 +12,7 @@ namespace ScoutHaul.Api.Controllers;
 
 [ApiController]
 [Route("api/budgets")]
+[RequireOrganizationPermission(ScoutHaulPermissions.ManageBudgets)]
 public sealed class BudgetsController(ScoutHaulDbContext db, ICurrentUserContext currentUser) : ControllerBase
 {
     [HttpPost]
@@ -61,6 +63,23 @@ public sealed class BudgetsController(ScoutHaulDbContext db, ICurrentUserContext
             .FirstOrDefaultAsync(cancellationToken);
 
         return budget is null ? NotFound() : budget.ToDto();
+    }
+
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> DeleteBudget(Guid id, CancellationToken cancellationToken)
+    {
+        var budget = await db.Budgets.SingleOrDefaultAsync(
+            item => item.Id == id && item.OrganizationId == currentUser.OrganizationId,
+            cancellationToken);
+
+        if (budget is null)
+        {
+            return NotFound();
+        }
+
+        db.Budgets.Remove(budget);
+        await db.SaveChangesAsync(cancellationToken);
+        return NoContent();
     }
 
     [HttpPost("expenses")]
@@ -115,6 +134,35 @@ public sealed class BudgetsController(ScoutHaulDbContext db, ICurrentUserContext
             .ToListAsync(cancellationToken);
 
         return expenses;
+    }
+
+    [HttpDelete("expenses/{id:guid}")]
+    public async Task<IActionResult> DeleteExpense(Guid id, CancellationToken cancellationToken)
+    {
+        var expense = await db.Expenses.SingleOrDefaultAsync(
+            item => item.Id == id && item.OrganizationId == currentUser.OrganizationId,
+            cancellationToken);
+
+        if (expense is null)
+        {
+            return NotFound();
+        }
+
+        var budget = await db.Budgets
+            .Where(item => item.OrganizationId == currentUser.OrganizationId && item.IsActive)
+            .OrderByDescending(item => item.StartsAt)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (budget is not null
+            && expense.OccurredAt >= budget.StartsAt
+            && (!budget.EndsAt.HasValue || expense.OccurredAt <= budget.EndsAt.Value))
+        {
+            budget.CurrentAmount += expense.Amount;
+        }
+
+        db.Expenses.Remove(expense);
+        await db.SaveChangesAsync(cancellationToken);
+        return NoContent();
     }
 
     [HttpGet("summary")]

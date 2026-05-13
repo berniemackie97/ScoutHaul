@@ -20,6 +20,7 @@ import { useAppTheme } from '../../src/context/ThemeContext';
 import type { InventoryItem, InventoryStatus } from '../../src/domain/types';
 import { formatMoney } from '../../src/utils/money';
 import { getHeroPhoto } from '../../src/utils/photos';
+import { resolvePhotoUrl } from '../../src/utils/photoUrl';
 
 type StatusFilter = 'All' | 'Active' | 'NeedsWork' | 'Listed' | 'Sold';
 
@@ -53,9 +54,17 @@ function formatStatus(status: InventoryStatus): string {
   return map[status] ?? status;
 }
 
-function useHeroUri(itemId: string) {
+function useHeroUri(item: InventoryItem) {
   const [uri, setUri] = useState<string | null>(null);
-  useEffect(() => { void getHeroPhoto(itemId).then(setUri); }, [itemId]);
+  useEffect(() => {
+    const remoteHero = resolvePhotoUrl(item.photoUrls?.[0]);
+    if (remoteHero) {
+      setUri(remoteHero);
+      return;
+    }
+
+    void getHeroPhoto(item.id).then(setUri);
+  }, [item.id, item.photoUrls]);
   return uri;
 }
 
@@ -73,7 +82,7 @@ function ItemCard({
   onArchive: () => void;
 }) {
   const { colors: c, shadows: s } = useAppTheme();
-  const heroUri = useHeroUri(item.id);
+  const heroUri = useHeroUri(item);
   return (
     <View style={[styles.itemCard, { backgroundColor: c.surface, borderColor: c.borderLight, ...s.sm }]}>
       <Pressable

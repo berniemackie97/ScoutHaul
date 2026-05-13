@@ -9,6 +9,9 @@ export interface AppConfig {
   organizationId: string;
   userId: string;
   isStubAuth: boolean;
+  supabaseUrl: string;
+  supabaseAnonKey: string;
+  isSupabaseConfigured: boolean;
 }
 
 function resolveEnvironment(): Environment {
@@ -39,6 +42,8 @@ function buildConfig(): AppConfig {
   const env = resolveEnvironment();
   const orgId = (extra?.organizationId as string) ?? '';
   const userId = (extra?.userId as string) ?? '';
+  const supabaseUrl = ((extra?.supabaseUrl as string) ?? '').replace(/\/+$/, '');
+  const supabaseAnonKey = (extra?.supabaseAnonKey as string) ?? '';
 
   return {
     env,
@@ -46,6 +51,9 @@ function buildConfig(): AppConfig {
     organizationId: orgId,
     userId: userId,
     isStubAuth: env === 'development' && !!orgId && !!userId,
+    supabaseUrl,
+    supabaseAnonKey,
+    isSupabaseConfigured: !!supabaseUrl && !!supabaseAnonKey,
   };
 }
 

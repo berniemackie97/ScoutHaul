@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { api } from '../src/api/client';
 import { Button } from '../src/components/Button';
 import { Card } from '../src/components/Card';
@@ -82,6 +82,23 @@ export default function ManualSearchScreen() {
     } finally {
       setIsSearching(false);
     }
+  }
+
+  async function deleteProductIdentity(product: ProductIdentity) {
+    try {
+      await api.deleteProductIdentity(product.id);
+      setProducts((current) => current.filter((item) => item.id !== product.id));
+      setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Unable to delete product identity.');
+    }
+  }
+
+  function confirmDeleteProductIdentity(product: ProductIdentity) {
+    Alert.alert('Delete product identity?', product.title, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: () => void deleteProductIdentity(product) },
+    ]);
   }
 
   const noResults = hasSearched && products.length === 0 && marketResults.length === 0;
@@ -270,7 +287,17 @@ export default function ManualSearchScreen() {
                     {[product.brand, product.model, product.category].filter(Boolean).join(' · ') ||
                       'No additional details'}
                   </Text>
-                  <StatusPill label="Add to Inventory" tone="primary" size="sm" />
+                  <View style={styles.productActions}>
+                    <StatusPill label="Add to Inventory" tone="primary" size="sm" />
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`Delete ${product.title}`}
+                      hitSlop={8}
+                      onPress={() => confirmDeleteProductIdentity(product)}
+                    >
+                      <Ionicons name="trash-outline" size={18} color={c.danger} />
+                    </Pressable>
+                  </View>
                 </Pressable>
               ))}
             </>
@@ -318,5 +345,11 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     gap: spacing.sm,
     borderWidth: 1,
+  },
+  productActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.md,
   },
 });

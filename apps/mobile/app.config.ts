@@ -45,12 +45,14 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     web: {
       favicon: './assets/favicon.png',
     },
-    plugins: ['expo-router', 'expo-sqlite', 'expo-camera'],
+    plugins: ['expo-router', 'expo-sqlite', 'expo-camera', 'expo-web-browser', 'expo-secure-store', 'expo-font'],
     extra: {
       apiBaseUrl,
       apiPort: Number(apiPort),
       organizationId: process.env.EXPO_PUBLIC_SCOUTHAUL_ORG_ID ?? '',
       userId: process.env.EXPO_PUBLIC_SCOUTHAUL_USER_ID ?? '',
+      supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL ?? '',
+      supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '',
       eas: {
         projectId: process.env.EAS_PROJECT_ID ?? '',
       },

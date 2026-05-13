@@ -10,7 +10,12 @@ public sealed class ScoutHaulDbContext(DbContextOptions<ScoutHaulDbContext> opti
 {
     public DbSet<Organization> Organizations => Set<Organization>();
     public DbSet<AppUser> Users => Set<AppUser>();
+    public DbSet<ExternalAuthAccount> ExternalAuthAccounts => Set<ExternalAuthAccount>();
     public DbSet<OrganizationMember> OrganizationMembers => Set<OrganizationMember>();
+    public DbSet<OrganizationRoleDefinition> OrganizationRoles => Set<OrganizationRoleDefinition>();
+    public DbSet<OrganizationRolePermission> OrganizationRolePermissions => Set<OrganizationRolePermission>();
+    public DbSet<OrganizationTeam> OrganizationTeams => Set<OrganizationTeam>();
+    public DbSet<OrganizationTeamMember> OrganizationTeamMembers => Set<OrganizationTeamMember>();
     public DbSet<ProductIdentity> ProductIdentities => Set<ProductIdentity>();
     public DbSet<InventoryItem> InventoryItems => Set<InventoryItem>();
     public DbSet<MarketObservation> MarketObservations => Set<MarketObservation>();
@@ -27,6 +32,7 @@ public sealed class ScoutHaulDbContext(DbContextOptions<ScoutHaulDbContext> opti
     public DbSet<Budget> Budgets => Set<Budget>();
     public DbSet<ResaleTask> Tasks => Set<ResaleTask>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    public DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
@@ -52,9 +58,23 @@ public sealed class ScoutHaulDbContext(DbContextOptions<ScoutHaulDbContext> opti
         modelBuilder.Entity<AppUser>(entity =>
         {
             entity.ToTable("Users");
+            entity.Property(item => item.ExternalSubject).HasMaxLength(256);
             entity.Property(item => item.Email).HasMaxLength(320).IsRequired();
             entity.Property(item => item.DisplayName).HasMaxLength(160).IsRequired();
+            entity.HasIndex(item => item.ExternalSubject).IsUnique();
             entity.HasIndex(item => item.Email).IsUnique();
+        });
+
+        modelBuilder.Entity<ExternalAuthAccount>(entity =>
+        {
+            entity.ToTable("ExternalAuthAccounts");
+            entity.Property(item => item.Provider).HasMaxLength(80).IsRequired();
+            entity.Property(item => item.ProviderAccountId).HasMaxLength(256).IsRequired();
+            entity.Property(item => item.Email).HasMaxLength(320);
+            entity.Property(item => item.DisplayName).HasMaxLength(160);
+            entity.HasIndex(item => new { item.Provider, item.ProviderAccountId }).IsUnique();
+            entity.HasIndex(item => item.UserId);
+            entity.HasOne(item => item.User).WithMany(item => item.ExternalAccounts).HasForeignKey(item => item.UserId);
         });
 
         modelBuilder.Entity<OrganizationMember>(entity =>
@@ -64,6 +84,42 @@ public sealed class ScoutHaulDbContext(DbContextOptions<ScoutHaulDbContext> opti
             entity.HasIndex(item => new { item.OrganizationId, item.UserId }).IsUnique();
             entity.HasOne(item => item.Organization).WithMany(item => item.Members).HasForeignKey(item => item.OrganizationId);
             entity.HasOne(item => item.User).WithMany(item => item.Memberships).HasForeignKey(item => item.UserId);
+            entity.HasOne(item => item.RoleDefinition).WithMany().HasForeignKey(item => item.RoleId).OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<OrganizationRoleDefinition>(entity =>
+        {
+            entity.ToTable("OrganizationRoles");
+            entity.Property(item => item.Name).HasMaxLength(120).IsRequired();
+            entity.Property(item => item.Description).HasMaxLength(500);
+            entity.HasIndex(item => new { item.OrganizationId, item.Name }).IsUnique();
+            entity.HasOne(item => item.Organization).WithMany(item => item.Roles).HasForeignKey(item => item.OrganizationId);
+        });
+
+        modelBuilder.Entity<OrganizationRolePermission>(entity =>
+        {
+            entity.ToTable("OrganizationRolePermissions");
+            entity.Property(item => item.Permission).HasMaxLength(120).IsRequired();
+            entity.HasIndex(item => new { item.RoleId, item.Permission }).IsUnique();
+            entity.HasOne(item => item.Role).WithMany(item => item.Permissions).HasForeignKey(item => item.RoleId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<OrganizationTeam>(entity =>
+        {
+            entity.ToTable("OrganizationTeams");
+            entity.Property(item => item.Name).HasMaxLength(120).IsRequired();
+            entity.Property(item => item.Description).HasMaxLength(500);
+            entity.HasIndex(item => new { item.OrganizationId, item.Name }).IsUnique();
+            entity.HasOne(item => item.Organization).WithMany(item => item.Teams).HasForeignKey(item => item.OrganizationId);
+        });
+
+        modelBuilder.Entity<OrganizationTeamMember>(entity =>
+        {
+            entity.ToTable("OrganizationTeamMembers");
+            entity.HasIndex(item => new { item.TeamId, item.UserId }).IsUnique();
+            entity.HasOne(item => item.Team).WithMany(item => item.Members).HasForeignKey(item => item.TeamId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(item => item.User).WithMany().HasForeignKey(item => item.UserId);
+            entity.HasOne(item => item.RoleDefinition).WithMany().HasForeignKey(item => item.RoleId).OnDelete(DeleteBehavior.SetNull);
         });
 
         modelBuilder.Entity<ProductIdentity>(entity =>
@@ -270,6 +326,17 @@ public sealed class ScoutHaulDbContext(DbContextOptions<ScoutHaulDbContext> opti
             entity.Property(item => item.Action).HasMaxLength(80).IsRequired();
             entity.Property(item => item.DetailsJson).HasColumnType("jsonb");
             entity.HasIndex(item => new { item.OrganizationId, item.CreatedAt });
+        });
+
+        modelBuilder.Entity<IdempotencyRecord>(entity =>
+        {
+            entity.ToTable("IdempotencyRecords");
+            entity.Property(item => item.Key).HasMaxLength(120).IsRequired();
+            entity.Property(item => item.Method).HasMaxLength(16).IsRequired();
+            entity.Property(item => item.Path).HasMaxLength(1500).IsRequired();
+            entity.Property(item => item.ResponseJson).HasColumnType("jsonb");
+            entity.HasIndex(item => new { item.OrganizationId, item.Key }).IsUnique();
+            entity.HasIndex(item => item.ExpiresAt);
         });
     }
 

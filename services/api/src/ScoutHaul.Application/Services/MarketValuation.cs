@@ -30,13 +30,18 @@ public static class MarketValuation
         decimal? soldCompMedian = MedianOrNull(soldComps
             .Select(comp => comp.TotalPrice)
             .Where(price => price > 0));
+        decimal? estimateMedian = MedianOrNull(activeObservations
+            .Where(observation => observation.ObservationType == MarketObservationType.Estimate)
+            .Select(comp => comp.TotalPrice)
+            .Where(price => price > 0));
 
         decimal? estimatedSalePrice = explicitExpectedSalePrice
             ?? soldCompMedian
+            ?? estimateMedian
             ?? inventoryEstimatedSalePrice;
 
         PricingBasisType pricingBasis = explicitPricingBasis
-            ?? DerivePricingBasis(explicitExpectedSalePrice, soldCompMedian, inventoryEstimatedSalePrice, soldComps);
+            ?? DerivePricingBasis(explicitExpectedSalePrice, soldCompMedian, estimateMedian, inventoryEstimatedSalePrice, soldComps);
 
         return new MarketValuationResult(
             estimatedSalePrice,
@@ -58,6 +63,7 @@ public static class MarketValuation
     private static PricingBasisType DerivePricingBasis(
         decimal? explicitExpectedSalePrice,
         decimal? soldCompMedian,
+        decimal? estimateMedian,
         decimal? inventoryEstimatedSalePrice,
         IReadOnlyCollection<MarketObservation> soldComps)
     {
@@ -79,6 +85,11 @@ public static class MarketValuation
             }
 
             return PricingBasisType.ManualEstimate;
+        }
+
+        if (estimateMedian.HasValue)
+        {
+            return PricingBasisType.CachedRecent;
         }
 
         return inventoryEstimatedSalePrice.HasValue

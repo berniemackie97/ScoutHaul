@@ -19,28 +19,25 @@ public static class DependencyInjection
 
         services.AddDbContext<ScoutHaulDbContext>(options => options.UseNpgsql(connectionString));
 
-        // eBay marketplace lookup — pricing data (only when credentials configured)
-        if (!string.IsNullOrWhiteSpace(configuration["Ebay:ClientId"]))
-        {
-            services.AddHttpClient<IMarketplaceLookupService, EbayMarketplaceLookupService>(client =>
-            {
-                client.Timeout = TimeSpan.FromSeconds(10);
-                client.DefaultRequestHeaders.Add("Accept", "application/json");
-            });
-        }
-        else
-        {
-            services.AddSingleton<IMarketplaceLookupService, NoopMarketplaceLookupService>();
-        }
+        services.AddScoped<IBarcodeLookupService, CompositeBarcodeLookupService>();
+        services.AddHttpClient<IBarcodeLookupProvider, EanDbBarcodeLookupProvider>(ConfigureJsonClient);
+        services.AddHttpClient<IBarcodeLookupProvider, BarcodeLookupProvider>(ConfigureJsonClient);
+        services.AddHttpClient<IBarcodeLookupProvider, UpcDevLookupProvider>(ConfigureJsonClient);
+        services.AddHttpClient<IBarcodeLookupProvider, UpcItemDbLookupService>(ConfigureJsonClient);
 
-        // UPCitemdb — product identification from barcodes (free trial, no key needed)
-        services.AddHttpClient<IBarcodeLookupService, UpcItemDbLookupService>(client =>
-        {
-            client.Timeout = TimeSpan.FromSeconds(8);
-            client.DefaultRequestHeaders.Add("Accept", "application/json");
-            client.DefaultRequestHeaders.Add("User-Agent", "ScoutHaul/1.0");
-        });
+        services.AddScoped<IMarketplaceLookupService, CompositeMarketplaceLookupService>();
+        services.AddHttpClient<IMarketplacePricingProvider, PriceChartingMarketplaceProvider>(ConfigureJsonClient);
+        services.AddHttpClient<IMarketplacePricingProvider, KeepaMarketplaceProvider>(ConfigureJsonClient);
+        services.AddHttpClient<IMarketplacePricingProvider, SerpApiGoogleShoppingProvider>(ConfigureJsonClient);
+        services.AddHttpClient<IMarketplacePricingProvider, EbayMarketplaceLookupService>(ConfigureJsonClient);
 
         return services;
+    }
+
+    private static void ConfigureJsonClient(HttpClient client)
+    {
+        client.Timeout = TimeSpan.FromSeconds(10);
+        client.DefaultRequestHeaders.Add("Accept", "application/json");
+        client.DefaultRequestHeaders.Add("User-Agent", "ScoutHaul/1.0");
     }
 }

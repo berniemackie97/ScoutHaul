@@ -29,6 +29,8 @@ services:
       Database__ApplyMigrationsOnStartup: "true"
       StubAuth__DefaultOrganizationId: 9d3c0c44-218b-49d9-90bf-07b748610001
       StubAuth__DefaultUserId: 9d3c0c44-218b-49d9-90bf-07b748610002
+    volumes:
+      - api-uploads:/app/wwwroot
     ports:
       - "5080:8080"
     restart: unless-stopped
@@ -57,3 +59,4 @@ services:
 
 volumes:
   postgres-data:
+  api-uploads:

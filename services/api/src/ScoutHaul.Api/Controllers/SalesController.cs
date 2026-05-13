@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using ScoutHaul.Api.Authorization;
 using ScoutHaul.Api.Mapping;
 using ScoutHaul.Api.Services;
 using ScoutHaul.Application.Contracts;
@@ -12,8 +13,32 @@ namespace ScoutHaul.Api.Controllers;
 
 [ApiController]
 [Route("api/sales")]
+[RequireOrganizationPermission(ScoutHaulPermissions.ManageListings)]
 public sealed class SalesController(ScoutHaulDbContext db, ICurrentUserContext currentUser) : ControllerBase
 {
+    [HttpGet]
+    public async Task<ActionResult<IReadOnlyList<SaleDto>>> List(
+        [FromQuery] SaleStatus? status,
+        CancellationToken cancellationToken)
+    {
+        var query = db.Sales
+            .Include(item => item.InventoryItem)
+            .Where(item => item.OrganizationId == currentUser.OrganizationId);
+
+        if (status.HasValue)
+        {
+            query = query.Where(item => item.Status == status.Value);
+        }
+
+        var sales = await query
+            .OrderByDescending(item => item.SoldAt)
+            .Take(200)
+            .Select(item => item.ToDto())
+            .ToListAsync(cancellationToken);
+
+        return sales;
+    }
+
     [HttpPost]
     public async Task<ActionResult<SaleDto>> Record(RecordSaleRequest request, CancellationToken cancellationToken)
     {
@@ -101,6 +126,7 @@ public sealed class SalesController(ScoutHaulDbContext db, ICurrentUserContext c
         }
 
         db.Sales.Add(sale);
+        sale.InventoryItem = item;
         db.MarketObservations.Add(new MarketObservation
         {
             OrganizationId = currentUser.OrganizationId,

@@ -3,9 +3,17 @@ using ScoutHaul.Domain;
 namespace ScoutHaul.Application.Contracts;
 
 public sealed record CreateOrganizationRequest(string Name);
-public sealed record AddOrganizationMemberRequest(string Email, string DisplayName, OrganizationRole Role);
+public sealed record AddOrganizationMemberRequest(string Email, string DisplayName, OrganizationRole Role, Guid? RoleId = null);
 public sealed record OrganizationDto(Guid Id, string Name, DateTimeOffset CreatedAt);
-public sealed record OrganizationMemberDto(Guid Id, Guid UserId, string Email, string DisplayName, OrganizationRole Role, DateTimeOffset JoinedAt);
+public sealed record OrganizationMemberDto(Guid Id, Guid UserId, string Email, string DisplayName, OrganizationRole Role, Guid? RoleId, string? RoleName, string InviteStatus, DateTimeOffset JoinedAt);
+public sealed record PermissionCatalogDto(IReadOnlyList<string> Permissions);
+public sealed record UpsertOrganizationRoleRequest(string Name, string? Description, IReadOnlyList<string> Permissions, bool GrantsOwnerAccess);
+public sealed record OrganizationRoleDto(Guid Id, string Name, string? Description, bool IsSystem, bool IsOwnerRole, IReadOnlyList<string> Permissions);
+public sealed record UpdateOrganizationMemberRoleRequest(Guid? RoleId, OrganizationRole? LegacyRole);
+public sealed record UpsertOrganizationTeamRequest(string Name, string? Description);
+public sealed record OrganizationTeamDto(Guid Id, Guid OrganizationId, string Name, string? Description, int MemberCount, DateTimeOffset CreatedAt);
+public sealed record AddTeamMemberRequest(Guid UserId, Guid? RoleId);
+public sealed record OrganizationTeamMemberDto(Guid Id, Guid TeamId, Guid UserId, string Email, string DisplayName, Guid? RoleId, string? RoleName, DateTimeOffset JoinedAt);
 
 public sealed record UpsertProductIdentityRequest(
     string Title,
@@ -65,9 +73,12 @@ public sealed record InventoryItemDto(
     decimal? EstimatedSalePrice,
     string? Barcode,
     string? Notes,
+    IReadOnlyList<string> PhotoUrls,
     bool IsArchived,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);
+
+public sealed record InventoryPhotoUploadResultDto(Guid InventoryItemId, IReadOnlyList<string> PhotoUrls, string? UploadedUrl);
 
 public sealed record UpsertMarketObservationRequest(
     Guid? ProductIdentityId,
@@ -196,7 +207,11 @@ public sealed record MarketplaceLookupResult(
     string? ProductTitle = null,
     string? ProductBrand = null,
     string? ProductImageUrl = null,
-    string? ProductCategory = null);
+    string? ProductCategory = null,
+    Guid? ProductIdentityId = null,
+    int SavedObservationCount = 0,
+    IReadOnlyList<string>? ProvidersUsed = null,
+    IReadOnlyList<string>? ProviderWarnings = null);
 
 public sealed record CreateSourcingTripRequest(
     string Name,
@@ -343,7 +358,7 @@ public sealed record ListingDto(
     DateTimeOffset? EndedAt,
     string? Notes);
 public sealed record RecordSaleRequest(Guid InventoryItemId, Guid? ListingId, string Platform, decimal SoldPrice, decimal PlatformFees, decimal PaymentFees, decimal ShippingCost, decimal SuppliesCost, decimal OtherCosts, DateTimeOffset? SoldAt, string? Notes);
-public sealed record SaleDto(Guid Id, Guid InventoryItemId, Guid? ListingId, string Platform, decimal SoldPrice, decimal PlatformFees, decimal PaymentFees, decimal ShippingCost, decimal SuppliesCost, decimal OtherCosts, decimal NetProfit, SaleStatus Status, DateTimeOffset SoldAt, string? Notes);
+public sealed record SaleDto(Guid Id, Guid InventoryItemId, string InventoryItemTitle, Guid? ListingId, string Platform, decimal SoldPrice, decimal PlatformFees, decimal PaymentFees, decimal ShippingCost, decimal SuppliesCost, decimal OtherCosts, decimal NetProfit, SaleStatus Status, DateTimeOffset SoldAt, string? Notes);
 public sealed record RealizedProfitDto(Guid SaleId, decimal SoldPrice, decimal PurchaseCost, decimal TotalFeesAndCosts, decimal NetProfit, decimal RoiPercent, decimal MarginPercent);
 
 public sealed record CreateTaskRequest(Guid? InventoryItemId, Guid? AssignedToUserId, string Title, string? Description, DateTimeOffset? DueAt);

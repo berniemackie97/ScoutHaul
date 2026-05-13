@@ -6,12 +6,7 @@ using ScoutHaul.Application.Services;
 
 namespace ScoutHaul.Infrastructure.Marketplace;
 
-/// <summary>
-/// Product identification via UPCitemdb.com API.
-/// Free tier: 100 lookups/day. Returns product name, brand, description, images.
-/// This is for product IDENTIFICATION, not pricing — separate from eBay marketplace lookup.
-/// </summary>
-public sealed class UpcItemDbLookupService : IBarcodeLookupService
+internal sealed class UpcItemDbLookupService : IBarcodeLookupProvider
 {
     private readonly HttpClient _httpClient;
     private readonly ILogger<UpcItemDbLookupService> _logger;
@@ -21,6 +16,9 @@ public sealed class UpcItemDbLookupService : IBarcodeLookupService
         _httpClient = httpClient;
         _logger = logger;
     }
+
+    public string Name => "UPCitemdb";
+    public bool IsConfigured => true;
 
     public async Task<BarcodeLookupResult?> LookupAsync(string barcode, CancellationToken cancellationToken = default)
     {
