@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, View } from 'react-native';
 import { api } from '../../src/api/client';
 import { Button } from '../../src/components/Button';
 import { Card } from '../../src/components/Card';
@@ -136,6 +136,49 @@ export default function TripDetailScreen() {
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unable to apply checklist template.');
     }
+  }
+
+  async function deleteStop(stopId: string) {
+    if (!id) return;
+    try {
+      await api.deleteRouteStop(id, stopId);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Unable to delete stop.');
+    }
+  }
+
+  function confirmDeleteStop(stop: SourcingTripStop) {
+    Alert.alert(
+      'Delete stop?',
+      stop.name,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: () => void deleteStop(stop.id) },
+      ],
+    );
+  }
+
+  async function deleteRoute() {
+    if (!id) return;
+    try {
+      await api.deleteTrip(id);
+      router.replace('/(tabs)/trips');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Unable to delete route.');
+    }
+  }
+
+  function confirmDeleteRoute() {
+    if (!route) return;
+    Alert.alert(
+      'Delete route?',
+      route.trip.name,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: () => void deleteRoute() },
+      ],
+    );
   }
 
   async function startRoute() {
@@ -279,6 +322,14 @@ export default function TripDetailScreen() {
                   <Pressable onPress={() => void applyTemplate(stop.id)} hitSlop={8}>
                     <Ionicons name="checkbox-outline" size={20} color={c.primary} />
                   </Pressable>
+                  <Pressable
+                    onPress={() => confirmDeleteStop(stop)}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Delete stop ${stop.name}`}
+                  >
+                    <Ionicons name="trash-outline" size={20} color={c.danger} />
+                  </Pressable>
                 </View>
               </View>
             </View>
@@ -304,6 +355,13 @@ export default function TripDetailScreen() {
           onPress={route.trip.status === 'Active' || route.trip.status === 'Paused'
             ? () => router.push({ pathname: '/active-route', params: { tripId: route.trip.id } })
             : () => void startRoute()}
+        />
+        <Button
+          label="Delete Route"
+          icon="trash-outline"
+          variant="danger"
+          fullWidth
+          onPress={confirmDeleteRoute}
         />
       </View>
     </Screen>

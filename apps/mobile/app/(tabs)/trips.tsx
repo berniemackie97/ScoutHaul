@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, View } from 'react-native';
 import { api } from '../../src/api/client';
 import { Button } from '../../src/components/Button';
 import { Card } from '../../src/components/Card';
@@ -86,6 +86,27 @@ export default function TripsScreen() {
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unable to create trip.');
     }
+  }
+
+  async function deleteTrip(id: string) {
+    try {
+      await api.deleteTrip(id);
+      setTrips((current) => current.filter((trip) => trip.id !== id));
+      setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Unable to delete route.');
+    }
+  }
+
+  function confirmDeleteTrip(trip: SourcingTrip) {
+    Alert.alert(
+      'Delete route?',
+      trip.name,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: () => void deleteTrip(trip.id) },
+      ],
+    );
   }
 
   return (
@@ -195,7 +216,17 @@ export default function TripsScreen() {
                 <Text variant="bodyBold" numberOfLines={1} style={styles.tripName}>
                   {trip.name}
                 </Text>
-                <StatusPill label={trip.status} tone={isActive ? 'success' : trip.status === 'Paused' ? 'warning' : 'neutral'} size="sm" />
+                <View style={styles.tripHeaderActions}>
+                  <StatusPill label={trip.status} tone={isActive ? 'success' : trip.status === 'Paused' ? 'warning' : 'neutral'} size="sm" />
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`Delete ${trip.name}`}
+                    hitSlop={8}
+                    onPress={() => confirmDeleteTrip(trip)}
+                  >
+                    <Ionicons name="trash-outline" size={18} color={c.danger} />
+                  </Pressable>
+                </View>
               </View>
               <View style={styles.tripMeta}>
                 <View style={styles.tripStat}>
@@ -277,6 +308,11 @@ const styles = StyleSheet.create({
   },
   tripName: {
     flex: 1,
+  },
+  tripHeaderActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
   },
   tripMeta: {
     flexDirection: 'row',

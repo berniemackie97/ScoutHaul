@@ -34,6 +34,7 @@ public sealed class ListingsController(ScoutHaulDbContext db, ICurrentUserContex
         {
             OrganizationId = currentUser.OrganizationId,
             InventoryItemId = request.InventoryItemId,
+            InventoryItem = item,
             Platform = request.Platform.Trim(),
             ListingUrl = TrimToNull(request.ListingUrl),
             ListPrice = request.ListPrice,
@@ -90,12 +91,12 @@ public sealed class ListingsController(ScoutHaulDbContext db, ICurrentUserContex
         }
 
         var listings = await query
+            .Include(item => item.InventoryItem)
             .OrderByDescending(item => item.UpdatedAt)
             .Take(200)
-            .Select(item => item.ToDto())
             .ToListAsync(cancellationToken);
 
-        return listings;
+        return listings.Select(item => item.ToDto()).ToList();
     }
 
     [HttpPost("{id:guid}/mark-listed")]
@@ -120,8 +121,25 @@ public sealed class ListingsController(ScoutHaulDbContext db, ICurrentUserContex
         return listing.ToDto();
     }
 
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
+    {
+        var listing = await FindListing(id, cancellationToken);
+        if (listing is null)
+        {
+            return NotFound();
+        }
+
+        db.Listings.Remove(listing);
+        await db.SaveChangesAsync(cancellationToken);
+
+        return NoContent();
+    }
+
     private Task<Listing?> FindListing(Guid id, CancellationToken cancellationToken) =>
-        db.Listings.SingleOrDefaultAsync(item => item.Id == id && item.OrganizationId == currentUser.OrganizationId, cancellationToken);
+        db.Listings
+            .Include(item => item.InventoryItem)
+            .SingleOrDefaultAsync(item => item.Id == id && item.OrganizationId == currentUser.OrganizationId, cancellationToken);
 
     private static string? TrimToNull(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }

@@ -23,27 +23,37 @@ export function SwipeableRow({ children, leftAction, rightAction }: SwipeableRow
   const c = useColors();
   const translateX = useRef(new Animated.Value(0)).current;
   const lastOffset = useRef(0);
+  const gestureStartOffset = useRef(0);
 
   const panResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dx) > 10 && Math.abs(gesture.dy) < 10,
+      onPanResponderGrant: () => {
+        gestureStartOffset.current = lastOffset.current;
+      },
       onPanResponderMove: (_, gesture) => {
-        let dx = gesture.dx;
+        let dx = gestureStartOffset.current + gesture.dx;
         if (!leftAction && dx > 0) dx = 0;
         if (!rightAction && dx < 0) dx = 0;
+        dx = Math.max(-THRESHOLD, Math.min(THRESHOLD, dx));
         translateX.setValue(dx);
       },
       onPanResponderRelease: (_, gesture) => {
-        if (gesture.dx > THRESHOLD && leftAction) {
+        const nextOffset = gestureStartOffset.current + gesture.dx;
+        if (nextOffset > THRESHOLD / 2 && leftAction) {
           Animated.spring(translateX, { toValue: THRESHOLD, useNativeDriver: true }).start();
           lastOffset.current = THRESHOLD;
-        } else if (gesture.dx < -THRESHOLD && rightAction) {
+        } else if (nextOffset < -THRESHOLD / 2 && rightAction) {
           Animated.spring(translateX, { toValue: -THRESHOLD, useNativeDriver: true }).start();
           lastOffset.current = -THRESHOLD;
         } else {
           Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start();
           lastOffset.current = 0;
         }
+      },
+      onPanResponderTerminate: () => {
+        Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start();
+        lastOffset.current = 0;
       },
     }),
   ).current;

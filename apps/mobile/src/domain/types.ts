@@ -250,6 +250,8 @@ export type BudgetSummary = {
 export type Listing = {
   id: string;
   inventoryItemId: string;
+  inventoryItemTitle: string;
+  inventoryItemStatus: InventoryStatus;
   platform: string;
   listingUrl?: string | null;
   listPrice: number;

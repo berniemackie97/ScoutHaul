@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, View } from 'react-native';
 import { api } from '../../src/api/client';
 import { Button } from '../../src/components/Button';
 import { Card } from '../../src/components/Card';
@@ -59,45 +59,60 @@ function useHeroUri(itemId: string) {
   return uri;
 }
 
-function ItemCard({ item, onPress }: { item: InventoryItem; onPress: () => void }) {
+function ItemCard({
+  item,
+  onPress,
+  onAnalyze,
+  onCreateListing,
+  onArchive,
+}: {
+  item: InventoryItem;
+  onPress: () => void;
+  onAnalyze: () => void;
+  onCreateListing: () => void;
+  onArchive: () => void;
+}) {
   const { colors: c, shadows: s } = useAppTheme();
   const heroUri = useHeroUri(item.id);
   return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={`${item.title}, ${formatStatus(item.status)}`}
-      style={({ pressed }) => [
-        styles.itemCard,
-        { backgroundColor: c.surface, borderColor: c.borderLight, ...s.sm },
-        pressed && { backgroundColor: c.surfaceAlt, opacity: 0.9 },
-      ]}
-    >
-      <View style={styles.itemRow}>
-        <PhotoThumbnail uri={heroUri} size={48} />
-        <View style={styles.itemContent}>
-          <View style={styles.itemHeader}>
-            <Text variant="bodyBold" numberOfLines={1} style={styles.itemTitle}>
-              {item.title}
-            </Text>
-            <StatusPill
-              label={formatStatus(item.status)}
-              tone={statusTone(item.status)}
-              size="sm"
-            />
-          </View>
-          <View style={styles.itemMeta}>
-            <Text variant="caption">
-              {item.condition ?? 'Condition unknown'}
-            </Text>
-            <Text variant="caption">
-              Cost {formatMoney(item.purchasePrice ?? item.sellerAskingPrice)}
-              {item.estimatedSalePrice ? ` · Value ${formatMoney(item.estimatedSalePrice)}` : ''}
-            </Text>
+    <View style={[styles.itemCard, { backgroundColor: c.surface, borderColor: c.borderLight, ...s.sm }]}>
+      <Pressable
+        onPress={onPress}
+        accessibilityRole="button"
+        accessibilityLabel={`${item.title}, ${formatStatus(item.status)}`}
+        style={({ pressed }) => [pressed && { opacity: 0.85 }]}
+      >
+        <View style={styles.itemRow}>
+          <PhotoThumbnail uri={heroUri} size={48} />
+          <View style={styles.itemContent}>
+            <View style={styles.itemHeader}>
+              <Text variant="bodyBold" numberOfLines={1} style={styles.itemTitle}>
+                {item.title}
+              </Text>
+              <StatusPill
+                label={formatStatus(item.status)}
+                tone={statusTone(item.status)}
+                size="sm"
+              />
+            </View>
+            <View style={styles.itemMeta}>
+              <Text variant="caption">
+                {item.condition ?? 'Condition unknown'}
+              </Text>
+              <Text variant="caption">
+                Cost {formatMoney(item.purchasePrice ?? item.sellerAskingPrice)}
+                {item.estimatedSalePrice ? ` · Value ${formatMoney(item.estimatedSalePrice)}` : ''}
+              </Text>
+            </View>
           </View>
         </View>
+      </Pressable>
+      <View style={styles.itemActions}>
+        <InlineAction icon="calculator-outline" label="Analyze" color={c.primary} onPress={onAnalyze} />
+        <InlineAction icon="pricetag-outline" label="List" color={c.info} onPress={onCreateListing} />
+        <InlineAction icon="archive-outline" label="Archive" color={c.danger} onPress={onArchive} />
       </View>
-    </Pressable>
+    </View>
   );
 }
 
@@ -124,6 +139,48 @@ export default function InventoryListScreen() {
   }
 
   useFocusEffect(useCallback(() => { void load(); }, []));
+
+  async function archiveItem(id: string) {
+    try {
+      await api.deleteInventory(id);
+      setItems((current) => current.filter((item) => item.id !== id));
+      setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Unable to archive item.');
+    }
+  }
+
+  function confirmArchiveItem(item: InventoryItem) {
+    Alert.alert(
+      'Archive item?',
+      item.title,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Archive', style: 'destructive', onPress: () => void archiveItem(item.id) },
+      ],
+    );
+  }
+
+  async function createDraftListing(item: InventoryItem) {
+    const listPrice = item.estimatedSalePrice ?? item.sellerAskingPrice ?? item.purchasePrice;
+    if (!listPrice || listPrice <= 0) {
+      setError('Set an estimated sale price before creating a listing draft.');
+      return;
+    }
+
+    try {
+      await api.createListing({
+        inventoryItemId: item.id,
+        platform: 'eBay',
+        listingUrl: null,
+        listPrice,
+        notes: null,
+      });
+      router.push('/listing-queue');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Unable to create listing draft.');
+    }
+  }
 
   const filtered = useMemo(() => {
     let result = items;
@@ -199,9 +256,15 @@ export default function InventoryListScreen() {
             <SwipeableRow
               key={item.id}
               leftAction={{ icon: 'calculator-outline', label: 'Analyze', color: c.primary, onPress: () => router.push({ pathname: '/deal-analyzer', params: { inventoryItemId: item.id } }) }}
-              rightAction={{ icon: 'pricetag-outline', label: 'List', color: c.info, onPress: () => router.push('/listing-queue') }}
+              rightAction={{ icon: 'archive-outline', label: 'Archive', color: c.danger, onPress: () => confirmArchiveItem(item) }}
             >
-              <ItemCard item={item} onPress={() => router.push(`/inventory/${item.id}`)} />
+              <ItemCard
+                item={item}
+                onPress={() => router.push(`/inventory/${item.id}`)}
+                onAnalyze={() => router.push({ pathname: '/deal-analyzer', params: { inventoryItemId: item.id } })}
+                onCreateListing={() => void createDraftListing(item)}
+                onArchive={() => confirmArchiveItem(item)}
+              />
             </SwipeableRow>
           ))}
         </>
@@ -242,4 +305,40 @@ const styles = StyleSheet.create({
   itemMeta: {
     gap: spacing.xxs,
   },
+  itemActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    paddingTop: spacing.md,
+    marginTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(148, 163, 184, 0.25)',
+  },
+  inlineAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xxs,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+  },
 });
+
+function InlineAction({ icon, label, color, onPress }: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  color: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      hitSlop={6}
+      style={styles.inlineAction}
+    >
+      <Ionicons name={icon} size={16} color={color} />
+      <Text variant="caption" color={color}>{label}</Text>
+    </Pressable>
+  );
+}

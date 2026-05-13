@@ -80,6 +80,7 @@ export const api = {
   inventoryItem: (id: string) => apiRequest<InventoryItem>(`/api/inventory/${id}`),
   createInventory: (body: unknown) => apiRequest<InventoryItem>('/api/inventory', { method: 'POST', body }),
   updateInventory: (id: string, body: unknown) => apiRequest<InventoryItem>(`/api/inventory/${id}`, { method: 'PUT', body }),
+  deleteInventory: (id: string) => apiRequest<void>(`/api/inventory/${id}`, { method: 'DELETE' }),
   changeInventoryStatus: (id: string, status: string) =>
     apiRequest<InventoryItem>(`/api/inventory/${id}/status`, { method: 'PATCH', body: { status } }),
   searchProducts: (search: string) =>
@@ -97,6 +98,7 @@ export const api = {
   route: (id: string) => apiRequest<SourcingRouteDetail>(`/api/sourcing-trips/${id}/route`),
   tripSummary: (id: string) => apiRequest<SourcingTripSummary>(`/api/sourcing-trips/${id}/summary`),
   createTrip: (body: unknown) => apiRequest<SourcingTrip>('/api/sourcing-trips', { method: 'POST', body }),
+  deleteTrip: (id: string) => apiRequest<void>(`/api/sourcing-trips/${id}`, { method: 'DELETE' }),
   updateRouteStatus: (id: string, status: string) =>
     apiRequest<SourcingTrip>(`/api/sourcing-trips/${id}/status`, { method: 'PATCH', body: { status } }),
   startRoute: (id: string) => apiRequest<SourcingRouteDetail>(`/api/sourcing-trips/${id}/start`, { method: 'POST' }),
@@ -106,6 +108,8 @@ export const api = {
     apiRequest<SourcingTripStop>(`/api/sourcing-trips/${tripId}/stops`, { method: 'POST', body }),
   updateRouteStop: (tripId: string, stopId: string, body: unknown) =>
     apiRequest<SourcingTripStop>(`/api/sourcing-trips/${tripId}/stops/${stopId}`, { method: 'PUT', body }),
+  deleteRouteStop: (tripId: string, stopId: string) =>
+    apiRequest<void>(`/api/sourcing-trips/${tripId}/stops/${stopId}`, { method: 'DELETE' }),
   reorderRouteStops: (tripId: string, stopIds: string[]) =>
     apiRequest<SourcingRouteDetail>(`/api/sourcing-trips/${tripId}/stops/reorder`, { method: 'POST', body: { stopIds } }),
   applyStopChecklistTemplate: (tripId: string, stopId: string) =>
@@ -129,6 +133,9 @@ export const api = {
   addExpense: (body: unknown) => apiRequest('/api/budgets/expenses', { method: 'POST', body }),
   listings: () => apiRequest<Listing[]>('/api/listings'),
   createListing: (body: unknown) => apiRequest<Listing>('/api/listings', { method: 'POST', body }),
+  updateListing: (id: string, body: unknown) => apiRequest<Listing>(`/api/listings/${id}`, { method: 'PUT', body }),
+  markListingListed: (id: string) => apiRequest<Listing>(`/api/listings/${id}/mark-listed`, { method: 'POST' }),
+  deleteListing: (id: string) => apiRequest<void>(`/api/listings/${id}`, { method: 'DELETE' }),
   tasks: () => apiRequest<ResaleTask[]>('/api/tasks'),
   createTask: (body: unknown) => apiRequest<ResaleTask>('/api/tasks', { method: 'POST', body }),
   updateTaskStatus: (id: string, status: string) =>

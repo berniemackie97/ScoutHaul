@@ -225,6 +225,20 @@ public sealed class SourcingTripsController(ScoutHaulDbContext db, ICurrentUserC
         return BuildSummary(trip);
     }
 
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
+    {
+        var trip = await FindTrip(id).SingleOrDefaultAsync(cancellationToken);
+        if (trip is null)
+        {
+            return NotFound();
+        }
+
+        db.SourcingTrips.Remove(trip);
+        await db.SaveChangesAsync(cancellationToken);
+        return NoContent();
+    }
+
     [HttpPost("{id:guid}/stops")]
     public async Task<ActionResult<SourcingTripStopDto>> CreateStop(Guid id, UpsertSourcingTripStopRequest request, CancellationToken cancellationToken)
     {
@@ -289,6 +303,24 @@ public sealed class SourcingTripsController(ScoutHaulDbContext db, ICurrentUserC
         await db.SaveChangesAsync(cancellationToken);
 
         return stop.ToDto();
+    }
+
+    [HttpDelete("{id:guid}/stops/{stopId:guid}")]
+    public async Task<IActionResult> DeleteStop(Guid id, Guid stopId, CancellationToken cancellationToken)
+    {
+        var stop = await db.SourcingTripStops
+            .SingleOrDefaultAsync(
+                item => item.Id == stopId && item.SourcingTripId == id && item.OrganizationId == currentUser.OrganizationId,
+                cancellationToken);
+
+        if (stop is null)
+        {
+            return NotFound();
+        }
+
+        db.SourcingTripStops.Remove(stop);
+        await db.SaveChangesAsync(cancellationToken);
+        return NoContent();
     }
 
     [HttpPost("{id:guid}/stops/reorder")]

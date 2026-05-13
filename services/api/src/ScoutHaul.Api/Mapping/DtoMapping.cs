@@ -140,6 +140,8 @@ public static class DtoMapping
     public static ListingDto ToDto(this Listing item) => new(
         item.Id,
         item.InventoryItemId,
+        item.InventoryItem?.Title ?? string.Empty,
+        item.InventoryItem?.Status ?? default,
         item.Platform,
         item.ListingUrl,
         item.ListPrice,

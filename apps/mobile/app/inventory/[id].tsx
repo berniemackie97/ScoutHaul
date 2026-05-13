@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, View } from 'react-native';
 import { api } from '../../src/api/client';
 import { Button } from '../../src/components/Button';
 import { Card } from '../../src/components/Card';
@@ -83,6 +83,50 @@ export default function InventoryDetailScreen() {
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unable to update status.');
+    }
+  }
+
+  async function archiveItem() {
+    if (!id) return;
+    try {
+      await api.deleteInventory(id);
+      router.replace('/(tabs)/inventory');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Unable to archive item.');
+    }
+  }
+
+  function confirmArchiveItem() {
+    if (!item) return;
+    Alert.alert(
+      'Archive item?',
+      item.title,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Archive', style: 'destructive', onPress: () => void archiveItem() },
+      ],
+    );
+  }
+
+  async function createDraftListing() {
+    if (!item) return;
+    const listPrice = item.estimatedSalePrice ?? item.sellerAskingPrice ?? item.purchasePrice;
+    if (!listPrice || listPrice <= 0) {
+      setError('Set an estimated sale price before creating a listing draft.');
+      return;
+    }
+
+    try {
+      await api.createListing({
+        inventoryItemId: item.id,
+        platform: 'eBay',
+        listingUrl: null,
+        listPrice,
+        notes: null,
+      });
+      router.push('/listing-queue');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Unable to create listing draft.');
     }
   }
 
@@ -169,6 +213,22 @@ export default function InventoryDetailScreen() {
           variant="secondary"
           fullWidth
           onPress={() => router.push({ pathname: '/marketplace-links', params: { query: item.title } })}
+        />
+      </View>
+      <View style={styles.actionRow}>
+        <Button
+          label="Create Listing"
+          icon="pricetag-outline"
+          variant="secondary"
+          fullWidth
+          onPress={() => void createDraftListing()}
+        />
+        <Button
+          label="Archive"
+          icon="archive-outline"
+          variant="danger"
+          fullWidth
+          onPress={confirmArchiveItem}
         />
       </View>
 

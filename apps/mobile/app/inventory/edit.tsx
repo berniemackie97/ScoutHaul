@@ -15,6 +15,7 @@ import { Text } from '../../src/components/Text';
 import { TextField } from '../../src/components/TextField';
 import { radius, spacing } from '../../src/components/theme';
 import { useAppTheme } from '../../src/context/ThemeContext';
+import { enqueueOperation } from '../../src/db/localStore';
 import type { InventoryItem } from '../../src/domain/types';
 import { parseOptionalNumber } from '../../src/utils/money';
 
@@ -162,6 +163,12 @@ export default function EditInventoryScreen() {
         router.replace(`/inventory/${item.id}`);
       }
     } catch (e) {
+      if (!isEdit && params.sourcingTripId) {
+        await enqueueOperation('CreateRouteStopPurchase', '/api/inventory', 'POST', body);
+        router.replace({ pathname: '/active-route', params: { tripId: params.sourcingTripId } });
+        return;
+      }
+
       setError(e instanceof Error ? e.message : 'Unable to save item.');
     } finally {
       setIsSaving(false);

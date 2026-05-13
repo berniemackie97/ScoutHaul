@@ -330,7 +330,18 @@ public sealed record BudgetSummaryDto(Guid? BudgetId, decimal StartingAmount, de
 
 public sealed record CreateListingRequest(Guid InventoryItemId, string Platform, string? ListingUrl, decimal ListPrice, string? Notes);
 public sealed record UpdateListingRequest(string Platform, string? ListingUrl, decimal ListPrice, ListingStatus Status, string? Notes);
-public sealed record ListingDto(Guid Id, Guid InventoryItemId, string Platform, string? ListingUrl, decimal ListPrice, ListingStatus Status, DateTimeOffset? ListedAt, DateTimeOffset? EndedAt, string? Notes);
+public sealed record ListingDto(
+    Guid Id,
+    Guid InventoryItemId,
+    string InventoryItemTitle,
+    InventoryStatus InventoryItemStatus,
+    string Platform,
+    string? ListingUrl,
+    decimal ListPrice,
+    ListingStatus Status,
+    DateTimeOffset? ListedAt,
+    DateTimeOffset? EndedAt,
+    string? Notes);
 public sealed record RecordSaleRequest(Guid InventoryItemId, Guid? ListingId, string Platform, decimal SoldPrice, decimal PlatformFees, decimal PaymentFees, decimal ShippingCost, decimal SuppliesCost, decimal OtherCosts, DateTimeOffset? SoldAt, string? Notes);
 public sealed record SaleDto(Guid Id, Guid InventoryItemId, Guid? ListingId, string Platform, decimal SoldPrice, decimal PlatformFees, decimal PaymentFees, decimal ShippingCost, decimal SuppliesCost, decimal OtherCosts, decimal NetProfit, SaleStatus Status, DateTimeOffset SoldAt, string? Notes);
 public sealed record RealizedProfitDto(Guid SaleId, decimal SoldPrice, decimal PurchaseCost, decimal TotalFeesAndCosts, decimal NetProfit, decimal RoiPercent, decimal MarginPercent);
