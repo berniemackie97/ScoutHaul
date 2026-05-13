@@ -14,7 +14,6 @@
 .env.*
 !.env.example
 
-# AI agent files
 .claude/
 CLAUDE.md
 .cursorrules
