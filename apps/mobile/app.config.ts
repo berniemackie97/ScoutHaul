@@ -9,7 +9,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
 
   return {
     ...config,
-    name: IS_PROD ? 'ScoutHaul' : IS_PREVIEW ? 'ScoutHaul (Preview)' : 'ScoutHaul (Dev)',
+    name: IS_PROD ? 'HaulScout' : IS_PREVIEW ? 'HaulScout (Preview)' : 'HaulScout (Dev)',
     slug: 'scouthaul',
     version: '1.0.0',
     orientation: 'portrait',

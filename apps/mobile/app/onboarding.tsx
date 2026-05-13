@@ -82,7 +82,7 @@ export default function OnboardingScreen() {
           <Ionicons name="trail-sign-outline" size={26} color={c.textInverse} />
         </View>
         <View style={styles.headerText}>
-          <Text variant="title">Set up ScoutHaul</Text>
+          <Text variant="title">Set up HaulScout</Text>
           <Text variant="caption" color={c.textMuted}>Workspace-first, account-optional.</Text>
         </View>
         <Pressable accessibilityRole="button" accessibilityLabel="Continue local" onPress={() => void finish(true)} hitSlop={8}>

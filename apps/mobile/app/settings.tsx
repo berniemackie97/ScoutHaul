@@ -186,7 +186,7 @@ export default function SettingsScreen() {
       <SectionHeader title="About" />
       <Card>
         <Text variant="caption">
-          ScoutHaul MVP. Supabase handles cloud identity when configured; local and stub-auth workflows remain available for offline-first development and demos.
+          HaulScout. Supabase handles cloud identity when configured; local and stub-auth workflows remain available for offline-first development and demos.
         </Text>
         <Divider />
         <Text variant="caption">
