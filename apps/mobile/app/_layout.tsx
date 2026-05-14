@@ -88,10 +88,10 @@ function StartupGate() {
 
   if (!isReady) {
     return (
-      <View style={{ flex: 1, backgroundColor: c.background, alignItems: 'center', justifyContent: 'center', gap: spacing.md }}>
-        <Ionicons name="trail-sign" size={40} color={c.primary} />
-        <Text variant="bodyBold" color={c.primary}>HaulScout</Text>
-        <ActivityIndicator size="small" color={c.primary} />
+      <View style={{ flex: 1, backgroundColor: '#1e1b4b', alignItems: 'center', justifyContent: 'center', gap: spacing.md }}>
+        <Ionicons name="compass" size={56} color="#f59e0b" />
+        <Text variant="bodyBold" color="#fbbf24">HaulScout</Text>
+        <ActivityIndicator size="small" color="#f59e0b" />
       </View>
     );
   }

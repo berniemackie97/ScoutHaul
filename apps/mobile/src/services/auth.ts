@@ -104,7 +104,9 @@ export async function signUpWithPassword(email: string, password: string): Promi
 
 export async function signInWithOAuthProvider(provider: 'google' | 'apple'): Promise<Session | null> {
   const supabase = requireSupabaseClient();
-  const redirectTo = makeRedirectUri();
+  const redirectTo = makeRedirectUri({ scheme: 'scouthaul', path: 'auth/callback' });
+
+  console.log('[OAuth] redirectTo:', redirectTo);
 
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: provider as Provider,
