@@ -18,7 +18,7 @@ type LocalItemDraftRow = Omit<LocalItemDraft, 'needsResearch'> & {
   needsResearch: number;
 };
 
-export type WorkspaceUsageMode = 'solo' | 'team';
+export type WorkspaceUsageMode = 'solo' | 'join' | 'team';
 export type WorkspacePlanIntent = 'starter' | 'pro' | 'team';
 export type AccountMode = 'local' | 'signedOut' | 'signedIn';
 
@@ -34,6 +34,9 @@ export type AppWorkspaceProfile = {
   accountMode: AccountMode;
   accountEmail?: string | null;
   displayName?: string | null;
+  pendingInviteCode?: string | null;
+  joinedOrganizationId?: string | null;
+  joinedTeamId?: string | null;
   analyticsConsent: boolean;
   marketingConsent: boolean;
   createdAt: string;
@@ -163,6 +166,9 @@ export async function saveWorkspaceProfile(
     accountMode: input.accountMode ?? existing?.accountMode ?? 'local',
     accountEmail: input.accountEmail ?? existing?.accountEmail ?? null,
     displayName: input.displayName ?? existing?.displayName ?? null,
+    pendingInviteCode: hasOwn(input, 'pendingInviteCode') ? input.pendingInviteCode ?? null : existing?.pendingInviteCode ?? null,
+    joinedOrganizationId: hasOwn(input, 'joinedOrganizationId') ? input.joinedOrganizationId ?? null : existing?.joinedOrganizationId ?? null,
+    joinedTeamId: hasOwn(input, 'joinedTeamId') ? input.joinedTeamId ?? null : existing?.joinedTeamId ?? null,
     analyticsConsent: input.analyticsConsent ?? existing?.analyticsConsent ?? false,
     marketingConsent: input.marketingConsent ?? existing?.marketingConsent ?? false,
     createdAt: existing?.createdAt ?? now,
@@ -171,6 +177,10 @@ export async function saveWorkspaceProfile(
 
   await setPreference('workspaceProfile', profile);
   return profile;
+}
+
+function hasOwn<T extends object>(value: T, key: PropertyKey): boolean {
+  return Object.prototype.hasOwnProperty.call(value, key);
 }
 
 export type BudgetPlanBreakdown = {

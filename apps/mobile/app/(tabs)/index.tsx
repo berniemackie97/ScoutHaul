@@ -68,9 +68,13 @@ export default function DashboardScreen() {
     >
       <View style={styles.header}>
         <View style={{ flex: 1 }}>
-          <Text variant="title">{workspaceProfile?.workspaceName ?? 'HaulScout'}</Text>
+          <Text variant="title">{workspaceProfile?.workspaceName ?? 'ScoutHaul'}</Text>
           <Text variant="caption">
-            {workspaceProfile?.usageMode === 'team' ? 'Team resale command center' : 'Your resale command center'}
+            {workspaceProfile?.usageMode === 'team'
+              ? 'Team resale command center'
+              : workspaceProfile?.usageMode === 'join'
+                ? 'Team member command center'
+                : 'Your resale command center'}
           </Text>
         </View>
         <IconButton icon="search-outline" label="Search" onPress={() => router.push('/search')} />

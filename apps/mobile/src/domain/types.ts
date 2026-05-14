@@ -138,6 +138,33 @@ export type OrganizationTeamMember = {
   joinedAt: string;
 };
 
+export type OrganizationInviteCode = {
+  id: string;
+  organizationId: string;
+  teamId?: string | null;
+  teamName?: string | null;
+  roleId?: string | null;
+  roleName?: string | null;
+  name: string;
+  codePrefix: string;
+  isActive: boolean;
+  expiresAt?: string | null;
+  maxUses?: number | null;
+  useCount: number;
+  createdAt: string;
+};
+
+export type OrganizationInviteCodeCreated = {
+  invite: OrganizationInviteCode;
+  code: string;
+};
+
+export type OrganizationJoinResult = {
+  organization: Organization;
+  member: OrganizationMember;
+  teamId?: string | null;
+};
+
 export type ProductIdentity = {
   id: string;
   title: string;

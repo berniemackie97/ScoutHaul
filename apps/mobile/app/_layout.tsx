@@ -84,7 +84,7 @@ function StartupGate() {
     return (
       <View style={{ flex: 1, backgroundColor: '#1e1b4b', alignItems: 'center', justifyContent: 'center', gap: spacing.md }}>
         <Ionicons name="compass" size={56} color="#f59e0b" />
-        <Text variant="bodyBold" color="#fbbf24">HaulScout</Text>
+        <Text variant="bodyBold" color="#fbbf24">ScoutHaul</Text>
         <ActivityIndicator size="small" color="#f59e0b" />
       </View>
     );

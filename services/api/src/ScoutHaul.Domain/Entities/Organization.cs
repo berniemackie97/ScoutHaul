@@ -8,6 +8,7 @@ public sealed class Organization : EntityBase
     public ICollection<OrganizationMember> Members { get; set; } = [];
     public ICollection<OrganizationRoleDefinition> Roles { get; set; } = [];
     public ICollection<OrganizationTeam> Teams { get; set; } = [];
+    public ICollection<OrganizationInviteCode> InviteCodes { get; set; } = [];
 }
 
 public sealed class AppUser : EntityBase
@@ -78,4 +79,23 @@ public sealed class OrganizationTeamMember : EntityBase
     public Guid? RoleId { get; set; }
     public OrganizationRoleDefinition? RoleDefinition { get; set; }
     public DateTimeOffset JoinedAt { get; set; } = DateTimeOffset.UtcNow;
+}
+
+public sealed class OrganizationInviteCode : EntityBase
+{
+    public Guid OrganizationId { get; set; }
+    public Organization? Organization { get; set; }
+    public Guid? TeamId { get; set; }
+    public OrganizationTeam? Team { get; set; }
+    public Guid? RoleId { get; set; }
+    public OrganizationRoleDefinition? RoleDefinition { get; set; }
+    public Guid? CreatedByUserId { get; set; }
+    public AppUser? CreatedByUser { get; set; }
+    public required string Name { get; set; }
+    public required string CodeHash { get; set; }
+    public required string CodePrefix { get; set; }
+    public bool IsActive { get; set; } = true;
+    public DateTimeOffset? ExpiresAt { get; set; }
+    public int? MaxUses { get; set; }
+    public int UseCount { get; set; }
 }

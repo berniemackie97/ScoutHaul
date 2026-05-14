@@ -1,6 +1,5 @@
 using System.Security.Claims;
 using Microsoft.EntityFrameworkCore;
-using ScoutHaul.Api.Authorization;
 using ScoutHaul.Domain;
 using ScoutHaul.Domain.Entities;
 using ScoutHaul.Infrastructure.Persistence;
@@ -124,19 +123,8 @@ public sealed class JwtCurrentUserContext(IHttpContextAccessor httpContextAccess
         }
 
         var organization = new Organization { Name = $"{appUser.DisplayName}'s workspace" };
-        var ownerRole = new OrganizationRoleDefinition
-        {
-            OrganizationId = organization.Id,
-            Name = "Owner",
-            Description = "Full workspace control, including owners, billing, roles, teams, and business data.",
-            IsSystem = true,
-            IsOwnerRole = true
-        };
-
-        foreach (string permission in ScoutHaulPermissions.All)
-        {
-            ownerRole.Permissions.Add(new OrganizationRolePermission { Permission = permission });
-        }
+        OrganizationRoleDefinition ownerRole = OrganizationRoleDefaults.CreateOwnerRole(organization.Id);
+        OrganizationRoleDefinition operatorRole = OrganizationRoleDefaults.CreateOperatorRole(organization.Id);
 
         var membership = new OrganizationMember
         {
@@ -147,7 +135,7 @@ public sealed class JwtCurrentUserContext(IHttpContextAccessor httpContextAccess
         };
 
         db.Organizations.Add(organization);
-        db.OrganizationRoles.Add(ownerRole);
+        db.OrganizationRoles.AddRange(ownerRole, operatorRole);
         db.OrganizationMembers.Add(membership);
         return membership;
     }

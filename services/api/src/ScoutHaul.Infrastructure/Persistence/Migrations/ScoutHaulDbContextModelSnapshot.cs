@@ -664,6 +664,73 @@ namespace ScoutHaul.Infrastructure.Persistence.Migrations
                     b.ToTable("Organizations", (string)null);
                 });
 
+            modelBuilder.Entity("ScoutHaul.Domain.Entities.OrganizationInviteCode", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CodeHash")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("CodePrefix")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<int?>("MaxUses")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("RoleId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("TeamId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("UseCount")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CodeHash")
+                        .IsUnique();
+
+                    b.HasIndex("CreatedByUserId");
+
+                    b.HasIndex("RoleId");
+
+                    b.HasIndex("TeamId");
+
+                    b.HasIndex("OrganizationId", "IsActive");
+
+                    b.ToTable("OrganizationInviteCodes", (string)null);
+                });
+
             modelBuilder.Entity("ScoutHaul.Domain.Entities.OrganizationMember", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1450,6 +1517,38 @@ namespace ScoutHaul.Infrastructure.Persistence.Migrations
                     b.Navigation("ProductIdentity");
                 });
 
+            modelBuilder.Entity("ScoutHaul.Domain.Entities.OrganizationInviteCode", b =>
+                {
+                    b.HasOne("ScoutHaul.Domain.Entities.AppUser", "CreatedByUser")
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("ScoutHaul.Domain.Entities.Organization", "Organization")
+                        .WithMany("InviteCodes")
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ScoutHaul.Domain.Entities.OrganizationRoleDefinition", "RoleDefinition")
+                        .WithMany()
+                        .HasForeignKey("RoleId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("ScoutHaul.Domain.Entities.OrganizationTeam", "Team")
+                        .WithMany()
+                        .HasForeignKey("TeamId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("CreatedByUser");
+
+                    b.Navigation("Organization");
+
+                    b.Navigation("RoleDefinition");
+
+                    b.Navigation("Team");
+                });
+
             modelBuilder.Entity("ScoutHaul.Domain.Entities.OrganizationMember", b =>
                 {
                     b.HasOne("ScoutHaul.Domain.Entities.Organization", "Organization")
@@ -1661,6 +1760,8 @@ namespace ScoutHaul.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("ScoutHaul.Domain.Entities.Organization", b =>
                 {
+                    b.Navigation("InviteCodes");
+
                     b.Navigation("Members");
 
                     b.Navigation("Roles");

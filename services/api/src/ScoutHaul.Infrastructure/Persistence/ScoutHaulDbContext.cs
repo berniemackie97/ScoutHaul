@@ -16,6 +16,7 @@ public sealed class ScoutHaulDbContext(DbContextOptions<ScoutHaulDbContext> opti
     public DbSet<OrganizationRolePermission> OrganizationRolePermissions => Set<OrganizationRolePermission>();
     public DbSet<OrganizationTeam> OrganizationTeams => Set<OrganizationTeam>();
     public DbSet<OrganizationTeamMember> OrganizationTeamMembers => Set<OrganizationTeamMember>();
+    public DbSet<OrganizationInviteCode> OrganizationInviteCodes => Set<OrganizationInviteCode>();
     public DbSet<ProductIdentity> ProductIdentities => Set<ProductIdentity>();
     public DbSet<InventoryItem> InventoryItems => Set<InventoryItem>();
     public DbSet<MarketObservation> MarketObservations => Set<MarketObservation>();
@@ -120,6 +121,20 @@ public sealed class ScoutHaulDbContext(DbContextOptions<ScoutHaulDbContext> opti
             entity.HasOne(item => item.Team).WithMany(item => item.Members).HasForeignKey(item => item.TeamId).OnDelete(DeleteBehavior.Cascade);
             entity.HasOne(item => item.User).WithMany().HasForeignKey(item => item.UserId);
             entity.HasOne(item => item.RoleDefinition).WithMany().HasForeignKey(item => item.RoleId).OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<OrganizationInviteCode>(entity =>
+        {
+            entity.ToTable("OrganizationInviteCodes");
+            entity.Property(item => item.Name).HasMaxLength(160).IsRequired();
+            entity.Property(item => item.CodeHash).HasMaxLength(128).IsRequired();
+            entity.Property(item => item.CodePrefix).HasMaxLength(24).IsRequired();
+            entity.HasIndex(item => item.CodeHash).IsUnique();
+            entity.HasIndex(item => new { item.OrganizationId, item.IsActive });
+            entity.HasOne(item => item.Organization).WithMany(item => item.InviteCodes).HasForeignKey(item => item.OrganizationId);
+            entity.HasOne(item => item.Team).WithMany().HasForeignKey(item => item.TeamId).OnDelete(DeleteBehavior.SetNull);
+            entity.HasOne(item => item.RoleDefinition).WithMany().HasForeignKey(item => item.RoleId).OnDelete(DeleteBehavior.SetNull);
+            entity.HasOne(item => item.CreatedByUser).WithMany().HasForeignKey(item => item.CreatedByUserId).OnDelete(DeleteBehavior.SetNull);
         });
 
         modelBuilder.Entity<ProductIdentity>(entity =>

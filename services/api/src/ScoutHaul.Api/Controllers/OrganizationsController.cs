@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ScoutHaul.Api.Authorization;
@@ -16,7 +18,6 @@ public sealed class OrganizationsController(
     ScoutHaulDbContext db,
     ICurrentUserContext currentUser,
     OrganizationAccessService access,
-    OrganizationRoleSeeder roleSeeder,
     SupabaseAdminInviteService inviteService) : ControllerBase
 {
     [HttpGet]
@@ -62,7 +63,9 @@ public sealed class OrganizationsController(
 
         var organization = new Organization { Name = request.Name.Trim() };
         db.Organizations.Add(organization);
-        OrganizationRoleDefinition ownerRole = roleSeeder.EnsureOwnerRole(organization.Id);
+        OrganizationRoleDefinition ownerRole = OrganizationRoleDefaults.CreateOwnerRole(organization.Id);
+        OrganizationRoleDefinition operatorRole = OrganizationRoleDefaults.CreateOperatorRole(organization.Id);
+        db.OrganizationRoles.AddRange(ownerRole, operatorRole);
         organization.Members.Add(new OrganizationMember
         {
             UserId = user.Id,
@@ -147,8 +150,13 @@ public sealed class OrganizationsController(
         }
 
         OrganizationRoleDefinition? ownerRole = ownerRoleRequested && requestedRole is null
-            ? roleSeeder.EnsureOwnerRole(id)
+            ? await LoadOwnerRole(id, cancellationToken)
             : null;
+
+        if (ownerRoleRequested && requestedRole is null && ownerRole is null)
+        {
+            return BadRequest("Owner role is not configured for this organization.");
+        }
 
         var member = new OrganizationMember
         {
@@ -189,6 +197,216 @@ public sealed class OrganizationsController(
         return member.ToDto();
     }
 
+    [HttpGet("{id:guid}/invite-codes")]
+    public async Task<ActionResult<IReadOnlyList<OrganizationInviteCodeDto>>> ListInviteCodes(Guid id, CancellationToken cancellationToken)
+    {
+        await access.RequirePermission(id, ScoutHaulPermissions.ManageMembers, cancellationToken);
+
+        var inviteCodes = await db.OrganizationInviteCodes
+            .Include(item => item.Team)
+            .Include(item => item.RoleDefinition)
+            .Where(item => item.OrganizationId == id)
+            .OrderByDescending(item => item.IsActive)
+            .ThenByDescending(item => item.CreatedAt)
+            .ToListAsync(cancellationToken);
+
+        return inviteCodes.Select(item => item.ToDto()).ToArray();
+    }
+
+    [HttpPost("{id:guid}/invite-codes")]
+    public async Task<ActionResult<OrganizationInviteCodeCreatedDto>> CreateInviteCode(
+        Guid id,
+        CreateOrganizationInviteCodeRequest request,
+        CancellationToken cancellationToken)
+    {
+        await access.RequirePermission(id, ScoutHaulPermissions.ManageMembers, cancellationToken);
+
+        if (string.IsNullOrWhiteSpace(request.Name)) return BadRequest("Invite code name is required.");
+        if (request.MaxUses is <= 0) return BadRequest("Max uses must be greater than zero.");
+        if (request.ExpiresAt is not null && request.ExpiresAt <= DateTimeOffset.UtcNow)
+        {
+            return BadRequest("Expiration must be in the future.");
+        }
+
+        if (!await db.Organizations.AnyAsync(item => item.Id == id, cancellationToken))
+        {
+            return NotFound();
+        }
+
+        OrganizationTeam? team = null;
+        if (request.TeamId is not null)
+        {
+            team = await db.OrganizationTeams.SingleOrDefaultAsync(
+                item => item.Id == request.TeamId.Value && item.OrganizationId == id,
+                cancellationToken);
+            if (team is null) return BadRequest("Team does not belong to this organization.");
+        }
+
+        OrganizationRoleDefinition? role = null;
+        if (request.RoleId is not null)
+        {
+            role = await LoadRole(id, request.RoleId.Value, cancellationToken);
+            if (role is null) return BadRequest("Role does not belong to this organization.");
+            if (RoleRequiresOwner(role))
+            {
+                return BadRequest("Invite codes cannot grant owner-level permissions.");
+            }
+        }
+        else
+        {
+            role = await LoadDefaultInviteRole(id, cancellationToken);
+            if (role is null)
+            {
+                return BadRequest("Default operator role is not configured. Create a non-owner role before issuing invite codes.");
+            }
+        }
+
+        string code = string.Empty;
+        string codeHash = string.Empty;
+        bool codeAlreadyExists = true;
+        for (int attempt = 0; attempt < 5; attempt++)
+        {
+            code = GenerateInviteCode();
+            codeHash = HashInviteCode(code);
+            codeAlreadyExists = await db.OrganizationInviteCodes.AnyAsync(item => item.CodeHash == codeHash, cancellationToken);
+            if (!codeAlreadyExists) break;
+        }
+
+        if (string.IsNullOrWhiteSpace(code) || string.IsNullOrWhiteSpace(codeHash) || codeAlreadyExists)
+        {
+            return Problem("Unable to generate invite code.");
+        }
+
+        var inviteCode = new OrganizationInviteCode
+        {
+            OrganizationId = id,
+            TeamId = team?.Id,
+            RoleId = role?.Id,
+            CreatedByUserId = currentUser.UserId,
+            Name = request.Name.Trim(),
+            CodeHash = codeHash,
+            CodePrefix = BuildCodePrefix(code),
+            ExpiresAt = request.ExpiresAt,
+            MaxUses = request.MaxUses
+        };
+
+        db.OrganizationInviteCodes.Add(inviteCode);
+        await db.SaveChangesAsync(cancellationToken);
+
+        inviteCode.Team = team;
+        inviteCode.RoleDefinition = role;
+
+        return CreatedAtAction(nameof(ListInviteCodes), new { id }, new OrganizationInviteCodeCreatedDto(inviteCode.ToDto(), code));
+    }
+
+    [HttpPatch("{id:guid}/invite-codes/{inviteCodeId:guid}/deactivate")]
+    public async Task<ActionResult<OrganizationInviteCodeDto>> DeactivateInviteCode(
+        Guid id,
+        Guid inviteCodeId,
+        CancellationToken cancellationToken)
+    {
+        await access.RequirePermission(id, ScoutHaulPermissions.ManageMembers, cancellationToken);
+
+        var inviteCode = await db.OrganizationInviteCodes
+            .Include(item => item.Team)
+            .Include(item => item.RoleDefinition)
+            .SingleOrDefaultAsync(item => item.Id == inviteCodeId && item.OrganizationId == id, cancellationToken);
+
+        if (inviteCode is null) return NotFound();
+
+        inviteCode.IsActive = false;
+        await db.SaveChangesAsync(cancellationToken);
+        return inviteCode.ToDto();
+    }
+
+    [HttpPost("invite-codes/redeem")]
+    public async Task<ActionResult<OrganizationJoinResultDto>> RedeemInviteCode(
+        RedeemOrganizationInviteCodeRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(request.Code)) return BadRequest("Invite code is required.");
+
+        string codeHash = HashInviteCode(request.Code);
+        var inviteCode = await db.OrganizationInviteCodes
+            .Include(item => item.Organization)
+            .Include(item => item.Team)
+            .Include(item => item.RoleDefinition)
+            .SingleOrDefaultAsync(item => item.CodeHash == codeHash, cancellationToken);
+
+        if (inviteCode?.Organization is null)
+        {
+            return BadRequest("Invite code is invalid.");
+        }
+
+        if (!inviteCode.IsActive
+            || inviteCode.ExpiresAt <= DateTimeOffset.UtcNow
+            || inviteCode.MaxUses <= inviteCode.UseCount)
+        {
+            return BadRequest("Invite code is expired or inactive.");
+        }
+
+        var user = await db.Users.FindAsync([currentUser.UserId], cancellationToken);
+        if (user is null)
+        {
+            user = new AppUser
+            {
+                Id = currentUser.UserId,
+                Email = $"member-{currentUser.UserId:N}@scouthaul.local",
+                DisplayName = "Member"
+            };
+            db.Users.Add(user);
+        }
+
+        var member = await db.OrganizationMembers
+            .Include(item => item.User)
+            .Include(item => item.RoleDefinition)
+            .SingleOrDefaultAsync(
+                item => item.OrganizationId == inviteCode.OrganizationId && item.UserId == user.Id,
+                cancellationToken);
+
+        if (member is null)
+        {
+            member = new OrganizationMember
+            {
+                OrganizationId = inviteCode.OrganizationId,
+                UserId = user.Id,
+                RoleId = inviteCode.RoleId,
+                Role = OrganizationRole.Member,
+                JoinedAt = DateTimeOffset.UtcNow
+            };
+            db.OrganizationMembers.Add(member);
+        }
+
+        if (inviteCode.TeamId is not null)
+        {
+            bool hasTeamMembership = await db.OrganizationTeamMembers.AnyAsync(
+                item => item.TeamId == inviteCode.TeamId.Value && item.UserId == user.Id,
+                cancellationToken);
+
+            if (!hasTeamMembership)
+            {
+                db.OrganizationTeamMembers.Add(new OrganizationTeamMember
+                {
+                    TeamId = inviteCode.TeamId.Value,
+                    UserId = user.Id,
+                    RoleId = inviteCode.RoleId,
+                    JoinedAt = DateTimeOffset.UtcNow
+                });
+            }
+        }
+
+        inviteCode.UseCount++;
+        await db.SaveChangesAsync(cancellationToken);
+
+        member.User = user;
+        member.RoleDefinition ??= inviteCode.RoleDefinition;
+
+        return new OrganizationJoinResultDto(
+            inviteCode.Organization.ToDto(),
+            member.ToDto(),
+            inviteCode.TeamId);
+    }
+
     [HttpPatch("{id:guid}/members/{memberId:guid}/role")]
     public async Task<ActionResult<OrganizationMemberDto>> UpdateMemberRole(
         Guid id,
@@ -222,7 +440,11 @@ public sealed class OrganizationsController(
 
         if (ownerRoleRequested && role is null)
         {
-            role = roleSeeder.EnsureOwnerRole(id);
+            role = await LoadOwnerRole(id, cancellationToken);
+            if (role is null)
+            {
+                return BadRequest("Owner role is not configured for this organization.");
+            }
         }
 
         member.RoleId = role?.Id;
@@ -555,6 +777,24 @@ public sealed class OrganizationsController(
             cancellationToken);
     }
 
+    private async Task<OrganizationRoleDefinition?> LoadOwnerRole(Guid organizationId, CancellationToken cancellationToken)
+    {
+        return await db.OrganizationRoles
+            .Include(role => role.Permissions)
+            .Where(role => role.OrganizationId == organizationId && role.IsOwnerRole)
+            .OrderBy(role => role.CreatedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    private async Task<OrganizationRoleDefinition?> LoadDefaultInviteRole(Guid organizationId, CancellationToken cancellationToken)
+    {
+        return await db.OrganizationRoles
+            .Include(role => role.Permissions)
+            .Where(role => role.OrganizationId == organizationId && role.IsSystem && !role.IsOwnerRole)
+            .OrderBy(role => role.Name)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
     private async Task<bool> TeamBelongsToOrganization(Guid organizationId, Guid teamId, CancellationToken cancellationToken)
     {
         return await db.OrganizationTeams.AnyAsync(team => team.Id == teamId && team.OrganizationId == organizationId, cancellationToken);
@@ -601,5 +841,31 @@ public sealed class OrganizationsController(
         return permission is ScoutHaulPermissions.ManageOrganization
             or ScoutHaulPermissions.ManageOwners
             or ScoutHaulPermissions.ManageRoles;
+    }
+
+    private static string GenerateInviteCode()
+    {
+        string token = Convert.ToHexString(RandomNumberGenerator.GetBytes(6));
+        return $"SH-{token[..4]}-{token[4..8]}-{token[8..12]}";
+    }
+
+    private static string BuildCodePrefix(string code)
+    {
+        string normalized = NormalizeInviteCode(code);
+        return normalized.Length <= 8 ? normalized : $"{normalized[..8]}...";
+    }
+
+    private static string HashInviteCode(string code)
+    {
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(NormalizeInviteCode(code))));
+    }
+
+    private static string NormalizeInviteCode(string code)
+    {
+        return code
+            .Trim()
+            .Replace("-", string.Empty, StringComparison.Ordinal)
+            .Replace(" ", string.Empty, StringComparison.Ordinal)
+            .ToUpperInvariant();
     }
 }

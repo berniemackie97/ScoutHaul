@@ -69,7 +69,11 @@ export default function SettingsScreen() {
           <View style={styles.flex}>
             <Text variant="bodyBold">{workspaceProfile?.workspaceName ?? 'My resale workspace'}</Text>
             <Text variant="caption">
-              {workspaceProfile?.usageMode === 'team' ? 'Team workspace' : 'Solo workspace'} · {workspaceProfile?.role ?? 'owner'}
+              {workspaceProfile?.usageMode === 'team'
+                ? 'Team workspace'
+                : workspaceProfile?.usageMode === 'join'
+                  ? 'Joined team workspace'
+                  : 'Solo workspace'} · {workspaceProfile?.role ?? 'owner'}
             </Text>
           </View>
           <StatusPill label={workspaceProfile?.planIntent ?? 'starter'} tone="primary" size="sm" />
@@ -190,7 +194,7 @@ export default function SettingsScreen() {
       <SectionHeader title="About" />
       <Card>
         <Text variant="caption">
-          HaulScout. Supabase handles cloud identity when configured; local and stub-auth workflows remain available for offline-first development and demos.
+          ScoutHaul. Supabase handles cloud identity when configured; local and stub-auth workflows remain available for offline-first development and demos.
         </Text>
         <Divider />
         <Text variant="caption">

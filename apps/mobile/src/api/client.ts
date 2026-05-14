@@ -13,6 +13,9 @@ import type {
   MarketObservation,
   MarketplaceSearchLinks,
   Organization,
+  OrganizationInviteCode,
+  OrganizationInviteCodeCreated,
+  OrganizationJoinResult,
   OrganizationMember,
   OrganizationRoleDefinition,
   OrganizationTeam,
@@ -146,6 +149,14 @@ export const api = {
     apiRequest<OrganizationTeamMember>(`/api/organizations/${organizationId}/teams/${teamId}/members`, { method: 'POST', body }),
   removeOrganizationTeamMember: (organizationId: string, teamId: string, memberId: string) =>
     apiRequest<void>(`/api/organizations/${organizationId}/teams/${teamId}/members/${memberId}`, { method: 'DELETE' }),
+  organizationInviteCodes: (organizationId: string) =>
+    apiRequest<OrganizationInviteCode[]>(`/api/organizations/${organizationId}/invite-codes`),
+  createOrganizationInviteCode: (organizationId: string, body: unknown) =>
+    apiRequest<OrganizationInviteCodeCreated>(`/api/organizations/${organizationId}/invite-codes`, { method: 'POST', body }),
+  deactivateOrganizationInviteCode: (organizationId: string, inviteCodeId: string) =>
+    apiRequest<OrganizationInviteCode>(`/api/organizations/${organizationId}/invite-codes/${inviteCodeId}/deactivate`, { method: 'PATCH' }),
+  redeemOrganizationInviteCode: (code: string) =>
+    apiRequest<OrganizationJoinResult>('/api/organizations/invite-codes/redeem', { method: 'POST', body: { code } }),
   dashboard: () => apiRequest<DashboardSummary>('/api/dashboard/summary'),
   inventory: () => apiRequest<InventoryItem[]>('/api/inventory'),
   inventoryItem: (id: string) => apiRequest<InventoryItem>(`/api/inventory/${id}`),

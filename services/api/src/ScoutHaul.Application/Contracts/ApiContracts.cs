@@ -14,6 +14,24 @@ public sealed record UpsertOrganizationTeamRequest(string Name, string? Descript
 public sealed record OrganizationTeamDto(Guid Id, Guid OrganizationId, string Name, string? Description, int MemberCount, DateTimeOffset CreatedAt);
 public sealed record AddTeamMemberRequest(Guid UserId, Guid? RoleId);
 public sealed record OrganizationTeamMemberDto(Guid Id, Guid TeamId, Guid UserId, string Email, string DisplayName, Guid? RoleId, string? RoleName, DateTimeOffset JoinedAt);
+public sealed record CreateOrganizationInviteCodeRequest(string Name, Guid? TeamId, Guid? RoleId, DateTimeOffset? ExpiresAt, int? MaxUses);
+public sealed record OrganizationInviteCodeDto(
+    Guid Id,
+    Guid OrganizationId,
+    Guid? TeamId,
+    string? TeamName,
+    Guid? RoleId,
+    string? RoleName,
+    string Name,
+    string CodePrefix,
+    bool IsActive,
+    DateTimeOffset? ExpiresAt,
+    int? MaxUses,
+    int UseCount,
+    DateTimeOffset CreatedAt);
+public sealed record OrganizationInviteCodeCreatedDto(OrganizationInviteCodeDto Invite, string Code);
+public sealed record RedeemOrganizationInviteCodeRequest(string Code);
+public sealed record OrganizationJoinResultDto(OrganizationDto Organization, OrganizationMemberDto Member, Guid? TeamId);
 
 public sealed record UpsertProductIdentityRequest(
     string Title,

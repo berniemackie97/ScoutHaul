@@ -10,19 +10,23 @@ import { Screen } from '../src/components/Screen';
 import { StatusPill } from '../src/components/StatusPill';
 import { Text } from '../src/components/Text';
 import { TextField } from '../src/components/TextField';
+import { api } from '../src/api/client';
 import { radius, spacing, type ToneKey } from '../src/components/theme';
 import { useAppTheme } from '../src/context/ThemeContext';
 import { saveWorkspaceProfile, type WorkspacePlanIntent, type WorkspaceUsageMode } from '../src/db/localStore';
+import { authStore } from '../src/services/auth';
+import { setActiveOrganizationId } from '../src/services/workspaceSession';
 import { parseOptionalNumber } from '../src/utils/money';
 
 type Role = 'owner' | 'operator' | 'employee';
 type PrimaryGoal = 'source' | 'inventory' | 'listing' | 'profit';
 
-const steps = ['Welcome', 'Workspace', 'Business', 'Privacy'];
+const steps = ['Welcome', 'Workspace', 'Business', 'Privacy', 'Launch'];
 
 const usageOptions: { value: WorkspaceUsageMode; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
   { value: 'solo', label: 'Solo', icon: 'person-outline' },
-  { value: 'team', label: 'Team', icon: 'people-outline' },
+  { value: 'join', label: 'Join team', icon: 'enter-outline' },
+  { value: 'team', label: 'Run team', icon: 'people-outline' },
 ];
 
 const roleOptions: { value: Role; label: string }[] = [
@@ -50,29 +54,87 @@ export default function OnboardingScreen() {
   const [workspaceName, setWorkspaceName] = useState('My resale workspace');
   const [usageMode, setUsageMode] = useState<WorkspaceUsageMode>('solo');
   const [role, setRole] = useState<Role>('owner');
+  const [inviteCode, setInviteCode] = useState('');
   const [monthlyBudget, setMonthlyBudget] = useState('');
   const [primaryGoal, setPrimaryGoal] = useState<PrimaryGoal>('source');
   const [planIntent, setPlanIntent] = useState<WorkspacePlanIntent>('starter');
   const [analyticsConsent, setAnalyticsConsent] = useState(false);
   const [marketingConsent, setMarketingConsent] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
   async function finish(skipped = false) {
     setIsSaving(true);
-    await saveWorkspaceProfile({
-      onboardingCompleted: true,
-      onboardingSkipped: skipped,
-      workspaceName: skipped ? 'My resale workspace' : workspaceName,
-      usageMode: skipped ? 'solo' : usageMode,
-      role: skipped ? 'owner' : role,
-      monthlySourcingBudget: skipped ? null : parseOptionalNumber(monthlyBudget),
-      primaryGoal: skipped ? 'source' : primaryGoal,
-      planIntent: skipped ? 'starter' : planIntent,
-      analyticsConsent: skipped ? false : analyticsConsent,
-      marketingConsent: skipped ? false : marketingConsent,
-    });
-    setIsSaving(false);
-    router.replace('/(tabs)');
+    setMessage(null);
+
+    try {
+      const parsedBudget = parseOptionalNumber(monthlyBudget);
+      const normalizedInviteCode = inviteCode.trim();
+
+      if (!skipped && usageMode === 'join' && normalizedInviteCode.length === 0) {
+        setMessage('Enter the invite code from your team owner.');
+        return;
+      }
+
+      await saveWorkspaceProfile({
+        onboardingCompleted: true,
+        onboardingSkipped: skipped,
+        workspaceName: skipped ? 'My resale workspace' : workspaceName,
+        usageMode: skipped ? 'solo' : usageMode,
+        role: skipped || usageMode === 'join' ? 'employee' : role,
+        monthlySourcingBudget: skipped ? null : parsedBudget,
+        primaryGoal: skipped ? 'source' : primaryGoal,
+        planIntent: skipped ? 'starter' : planIntent,
+        pendingInviteCode: !skipped && usageMode === 'join' ? normalizedInviteCode : null,
+        analyticsConsent: skipped ? false : analyticsConsent,
+        marketingConsent: skipped ? false : marketingConsent,
+      });
+
+      if (skipped) {
+        router.replace('/(tabs)');
+        return;
+      }
+
+      if (usageMode === 'join') {
+        if (!authStore.isAuthenticated) {
+          router.replace({ pathname: '/account', params: { mode: 'signup' } });
+          return;
+        }
+
+        const result = await api.redeemOrganizationInviteCode(normalizedInviteCode);
+        await setActiveOrganizationId(result.organization.id);
+        await saveWorkspaceProfile({
+          accountMode: 'signedIn',
+          joinedOrganizationId: result.organization.id,
+          joinedTeamId: result.teamId ?? null,
+          pendingInviteCode: null,
+        });
+        router.replace('/(tabs)');
+        return;
+      }
+
+      const teamWorkspace = usageMode === 'team' || planIntent === 'team';
+      if (teamWorkspace && !authStore.isAuthenticated) {
+        router.replace({ pathname: '/account', params: { mode: 'signup' } });
+        return;
+      }
+
+      if (teamWorkspace) {
+        router.replace('/workspace-admin');
+        return;
+      }
+
+      if (parsedBudget !== null && parsedBudget > 0) {
+        router.replace('/budget');
+        return;
+      }
+
+      router.replace('/(tabs)');
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Unable to finish setup.');
+    } finally {
+      setIsSaving(false);
+    }
   }
 
   return (
@@ -82,7 +144,7 @@ export default function OnboardingScreen() {
           <Ionicons name="compass-outline" size={26} color={c.textInverse} />
         </View>
         <View style={styles.headerText}>
-          <Text variant="title">Set up HaulScout</Text>
+          <Text variant="title">Set up ScoutHaul</Text>
           <Text variant="caption" color={c.textMuted}>Workspace-first, account-optional.</Text>
         </View>
         <Pressable accessibilityRole="button" accessibilityLabel="Continue local" onPress={() => void finish(true)} hitSlop={8}>
@@ -95,6 +157,12 @@ export default function OnboardingScreen() {
         <Text variant="caption" color={c.textMuted}>{steps[step]} · {step + 1} of {steps.length}</Text>
       </View>
 
+      {message ? (
+        <Card>
+          <Text variant="bodyBold" color={c.warning}>{message}</Text>
+        </Card>
+      ) : null}
+
       {step === 0 ? (
         <WelcomeStep onLocal={() => void finish(true)} />
       ) : step === 1 ? (
@@ -105,6 +173,8 @@ export default function OnboardingScreen() {
           onUsageMode={setUsageMode}
           role={role}
           onRole={setRole}
+          inviteCode={inviteCode}
+          onInviteCode={setInviteCode}
         />
       ) : step === 2 ? (
         <BusinessStep
@@ -115,12 +185,19 @@ export default function OnboardingScreen() {
           planIntent={planIntent}
           onPlanIntent={setPlanIntent}
         />
-      ) : (
+      ) : step === 3 ? (
         <PrivacyStep
           analyticsConsent={analyticsConsent}
           onAnalyticsConsent={setAnalyticsConsent}
           marketingConsent={marketingConsent}
           onMarketingConsent={setMarketingConsent}
+        />
+      ) : (
+        <LaunchStep
+          usageMode={usageMode}
+          planIntent={planIntent}
+          monthlyBudget={monthlyBudget}
+          inviteCode={inviteCode}
         />
       )}
 
@@ -129,7 +206,7 @@ export default function OnboardingScreen() {
           <Button label="Back" icon="chevron-back-outline" variant="secondary" onPress={() => setStep((value) => Math.max(0, value - 1))} />
         ) : null}
         <Button
-          label={step === steps.length - 1 ? isSaving ? 'Saving...' : 'Finish Setup' : 'Continue'}
+          label={step === steps.length - 1 ? isSaving ? 'Saving...' : nextFinishLabel(usageMode, planIntent, monthlyBudget) : 'Continue'}
           icon={step === steps.length - 1 ? 'checkmark-circle-outline' : 'chevron-forward-outline'}
           fullWidth={step === 0}
           disabled={isSaving}
@@ -138,6 +215,23 @@ export default function OnboardingScreen() {
       </View>
     </Screen>
   );
+}
+
+function nextFinishLabel(usageMode: WorkspaceUsageMode, planIntent: WorkspacePlanIntent, monthlyBudget: string) {
+  if (usageMode === 'join') {
+    return authStore.isAuthenticated ? 'Finish & Join Team' : 'Finish & Sign In';
+  }
+
+  if (usageMode === 'team' || planIntent === 'team') {
+    return authStore.isAuthenticated ? 'Finish & Open Admin' : 'Finish & Create Account';
+  }
+
+  const parsedBudget = parseOptionalNumber(monthlyBudget);
+  if (parsedBudget !== null && parsedBudget > 0) {
+    return 'Finish & Open Budget';
+  }
+
+  return 'Finish Setup';
 }
 
 function WelcomeStep({ onLocal }: { onLocal: () => void }) {
@@ -192,6 +286,8 @@ function WorkspaceStep({
   onUsageMode,
   role,
   onRole,
+  inviteCode,
+  onInviteCode,
 }: {
   workspaceName: string;
   onWorkspaceName: (value: string) => void;
@@ -199,6 +295,8 @@ function WorkspaceStep({
   onUsageMode: (value: WorkspaceUsageMode) => void;
   role: Role;
   onRole: (value: Role) => void;
+  inviteCode: string;
+  onInviteCode: (value: string) => void;
 }) {
   return (
     <Card>
@@ -215,7 +313,22 @@ function WorkspaceStep({
           />
         ))}
       </View>
-      <SegmentedOptions options={roleOptions} value={role} onChange={onRole} />
+      {usageMode === 'join' ? (
+        <>
+          <TextField
+            label="Team invite code"
+            value={inviteCode}
+            onChangeText={onInviteCode}
+            autoCapitalize="characters"
+            placeholder="SH-ABCD-1234-EF56"
+          />
+          <Text variant="caption">
+            Your owner or manager can create this from Workspace Admin. You can also enter a code later from Account.
+          </Text>
+        </>
+      ) : (
+        <SegmentedOptions options={roleOptions} value={role} onChange={onRole} />
+      )}
     </Card>
   );
 }
@@ -325,6 +438,89 @@ function PrivacyStep({
         onChange={onMarketingConsent}
       />
     </Card>
+  );
+}
+
+function LaunchStep({
+  usageMode,
+  planIntent,
+  monthlyBudget,
+  inviteCode,
+}: {
+  usageMode: WorkspaceUsageMode;
+  planIntent: WorkspacePlanIntent;
+  monthlyBudget: string;
+  inviteCode: string;
+}) {
+  const parsedBudget = parseOptionalNumber(monthlyBudget);
+  const joiningTeam = usageMode === 'join';
+  const teamWorkspace = usageMode === 'team' || planIntent === 'team';
+
+  return (
+    <Card>
+      <Text variant="subtitle">Launch Plan</Text>
+      <Text variant="body">
+        ScoutHaul is ready to open the right workspace setup path for this account.
+      </Text>
+      <View style={styles.launchList}>
+        <LaunchRow
+          icon={joiningTeam ? 'enter-outline' : teamWorkspace ? 'business-outline' : 'person-outline'}
+          title={joiningTeam ? 'Join existing team' : teamWorkspace ? 'Organization workspace' : 'Solo workspace'}
+          text={joiningTeam
+            ? inviteCode.trim()
+              ? authStore.isAuthenticated
+                ? 'Redeem the invite code now and set this as your active workspace.'
+                : 'Create or sign into an account, then the invite code will be redeemed.'
+              : 'Enter the invite code from your team owner.'
+            : teamWorkspace
+              ? authStore.isAuthenticated
+                ? 'Open admin to create teams, roles, and invites.'
+                : 'Create an account first so teams, roles, and invites can sync.'
+              : 'Start with scouting, inventory, routes, and listings.'}
+          tone={joiningTeam || teamWorkspace ? 'primary' : 'success'}
+        />
+        <LaunchRow
+          icon="wallet-outline"
+          title={parsedBudget !== null && parsedBudget > 0 ? 'Budget setup' : 'Budget optional'}
+          text={parsedBudget !== null && parsedBudget > 0
+            ? `Open budget planning with $${parsedBudget.toFixed(2)} as the starting plan.`
+            : 'Budget planning stays available from More.'}
+          tone={parsedBudget !== null && parsedBudget > 0 ? 'warning' : 'info'}
+        />
+        <LaunchRow
+          icon="navigate-outline"
+          title="First workflow"
+          text="Use Scan, Trips, Inventory, Listing Queue, Sales, and Tasks as the operating loop."
+          tone="neutral"
+        />
+      </View>
+    </Card>
+  );
+}
+
+function LaunchRow({
+  icon,
+  title,
+  text,
+  tone,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  title: string;
+  text: string;
+  tone: ToneKey;
+}) {
+  const { colors: c, tones } = useAppTheme();
+  const palette = tones[tone] ?? tones.neutral;
+  return (
+    <View style={[styles.launchRow, { backgroundColor: palette.bg, borderColor: palette.border }]}>
+      <View style={[styles.launchIcon, { backgroundColor: c.surface }]}>
+        <Ionicons name={icon} size={18} color={palette.text} />
+      </View>
+      <View style={styles.launchText}>
+        <Text variant="bodyBold" color={palette.text}>{title}</Text>
+        <Text variant="caption">{text}</Text>
+      </View>
+    </View>
   );
 }
 
@@ -501,10 +697,12 @@ const styles = StyleSheet.create({
   },
   optionGrid: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: spacing.sm,
   },
   optionCard: {
     flex: 1,
+    minWidth: 96,
     alignItems: 'center',
     gap: spacing.sm,
     borderWidth: 1,
@@ -570,5 +768,27 @@ const styles = StyleSheet.create({
   },
   switchThumbOn: {
     alignSelf: 'flex-end',
+  },
+  launchList: {
+    gap: spacing.sm,
+  },
+  launchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    borderWidth: 1,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+  },
+  launchIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  launchText: {
+    flex: 1,
+    gap: spacing.xs,
   },
 });

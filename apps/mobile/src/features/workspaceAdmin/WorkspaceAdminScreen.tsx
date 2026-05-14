@@ -14,6 +14,7 @@ import { radius, spacing } from '../../components/theme';
 import { useColors } from '../../context/ThemeContext';
 import type { Organization, OrganizationMember, OrganizationRoleDefinition, OrganizationTeam } from '../../domain/types';
 import { getActiveOrganizationId, setActiveOrganizationId } from '../../services/workspaceSession';
+import { InviteCodeManager } from './InviteCodeManager';
 import { MemberManager } from './MemberManager';
 import { RoleManager } from './RoleManager';
 import { TeamManager } from './TeamManager';
@@ -185,6 +186,13 @@ export function WorkspaceAdminScreen() {
             permissions={data.permissions}
             roles={data.roles}
             onChanged={() => refreshScoped()}
+          />
+
+          <SectionHeader title="Invite Codes" />
+          <InviteCodeManager
+            organizationId={selectedOrganizationId}
+            roles={data.roles}
+            teams={data.teams}
           />
 
           <SectionHeader title="Members" />

@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from '../src/components/Text';
+import { api } from '../src/api/client';
 import { radius, spacing } from '../src/components/theme';
 import { appConfig } from '../src/config';
 import { useAppTheme } from '../src/context/ThemeContext';
@@ -25,6 +26,7 @@ import {
   signOut,
   signUpWithPassword,
 } from '../src/services/auth';
+import { setActiveOrganizationId } from '../src/services/workspaceSession';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -39,10 +41,12 @@ export default function AccountScreen() {
   );
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [inviteCode, setInviteCode] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [messageType, setMessageType] = useState<'error' | 'info'>('error');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isJoiningTeam, setIsJoiningTeam] = useState(false);
   const [oauthLoading, setOauthLoading] = useState<string | null>(null);
   const [focusedField, setFocusedField] = useState<'email' | 'password' | null>(null);
   const [isSigningOut, setIsSigningOut] = useState(false);
@@ -56,6 +60,87 @@ export default function AccountScreen() {
       setAccountInfo(authStore.getAccount());
     });
   }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+    void (async () => {
+      const existing = await getWorkspaceProfile();
+      if (isMounted && existing?.pendingInviteCode) {
+        setInviteCode(existing.pendingInviteCode);
+      }
+    })();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  async function redeemInviteCodeForSession(code: string) {
+    const result = await api.redeemOrganizationInviteCode(code);
+    await setActiveOrganizationId(result.organization.id);
+    await saveWorkspaceProfile({
+      usageMode: 'join',
+      accountMode: 'signedIn',
+      joinedOrganizationId: result.organization.id,
+      joinedTeamId: result.teamId ?? null,
+      pendingInviteCode: null,
+    });
+    setInviteCode('');
+    return result;
+  }
+
+  async function completeAuthenticatedSession(accountEmail: string, displayName: string) {
+    const existing = await getWorkspaceProfile();
+    await saveWorkspaceProfile({
+      accountMode: 'signedIn',
+      accountEmail,
+      displayName,
+    });
+
+    const pendingInviteCode = existing?.pendingInviteCode?.trim();
+    if (pendingInviteCode) {
+      await redeemInviteCodeForSession(pendingInviteCode);
+      router.replace('/(tabs)');
+      return;
+    }
+
+    router.replace(existing?.onboardingCompleted ? '/(tabs)' : '/onboarding');
+  }
+
+  async function joinTeamFromInviteCode() {
+    const normalizedInviteCode = inviteCode.trim();
+    if (!normalizedInviteCode) {
+      setMessageType('error');
+      setMessage('Enter a team invite code.');
+      return;
+    }
+
+    if (!authStore.isAuthenticated) {
+      await saveWorkspaceProfile({
+        usageMode: 'join',
+        planIntent: 'team',
+        pendingInviteCode: normalizedInviteCode,
+        accountMode: 'signedOut',
+      });
+      setMode('signup');
+      setMessageType('info');
+      setMessage('Invite code saved. Create an account or sign in to join that team.');
+      return;
+    }
+
+    setIsJoiningTeam(true);
+    setMessage(null);
+    try {
+      const result = await redeemInviteCodeForSession(normalizedInviteCode);
+      setMessageType('info');
+      setMessage(`Joined ${result.organization.name}.`);
+    } catch (e) {
+      setMessageType('error');
+      setMessage(e instanceof Error ? e.message : 'Unable to join team.');
+    } finally {
+      setIsJoiningTeam(false);
+    }
+  }
 
   async function handleOAuth(provider: 'google' | 'apple') {
     if (!appConfig.isSupabaseConfigured) {
@@ -79,13 +164,7 @@ export default function AccountScreen() {
             ? session.user.user_metadata.full_name
             : accountEmail.split('@')[0];
 
-      const existing = await getWorkspaceProfile();
-      await saveWorkspaceProfile({
-        accountMode: 'signedIn',
-        accountEmail,
-        displayName,
-      });
-      router.replace(existing?.onboardingCompleted ? '/(tabs)' : '/onboarding');
+      await completeAuthenticatedSession(accountEmail, displayName);
     } catch (e) {
       setMessageType('error');
       setMessage(e instanceof Error ? e.message : 'OAuth sign-in failed.');
@@ -135,14 +214,7 @@ export default function AccountScreen() {
           ? session.user.user_metadata.name
           : accountEmail.split('@')[0];
 
-      const existing = await getWorkspaceProfile();
-      await saveWorkspaceProfile({
-        accountMode: 'signedIn',
-        accountEmail,
-        displayName,
-      });
-
-      router.replace(existing?.onboardingCompleted ? '/(tabs)' : '/onboarding');
+      await completeAuthenticatedSession(accountEmail, displayName);
     } catch (e) {
       setMessageType('error');
       setMessage(e instanceof Error ? e.message : 'Something went wrong. Try again.');
@@ -155,6 +227,7 @@ export default function AccountScreen() {
     const existing = await getWorkspaceProfile();
     await saveWorkspaceProfile({
       accountMode: 'local',
+      pendingInviteCode: null,
     });
     router.replace(existing?.onboardingCompleted ? '/(tabs)' : '/onboarding');
   }
@@ -172,6 +245,65 @@ export default function AccountScreen() {
     } finally {
       setIsSigningOut(false);
     }
+  }
+
+  function renderInvitePanel() {
+    return (
+      <View style={[styles.joinCard, { backgroundColor: c.surface, borderColor: c.border }]}>
+        <View style={styles.joinHeader}>
+          <View style={styles.joinIcon}>
+            <Ionicons name="enter-outline" size={18} color={c.primary} />
+          </View>
+          <View style={styles.joinText}>
+            <Text variant="bodyBold">Join a team</Text>
+            <Text variant="caption" color={c.textMuted}>
+              Paste an invite code from your owner or manager.
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.fieldBlock}>
+          <Text variant="caption" color={c.textSecondary} style={styles.fieldLabel}>
+            Team invite code
+          </Text>
+          <View style={[styles.inputContainer, { borderColor: c.border, backgroundColor: c.surfaceAlt }]}>
+            <Ionicons name="key-outline" size={18} color={c.textMuted} style={styles.inputIcon} />
+            <TextInput
+              value={inviteCode}
+              onChangeText={setInviteCode}
+              placeholder="SH-ABCD-1234-EF56"
+              placeholderTextColor={c.textMuted}
+              autoCapitalize="characters"
+              autoCorrect={false}
+              style={[styles.textInput, { color: c.text }]}
+            />
+          </View>
+        </View>
+
+        <Pressable
+          accessibilityRole="button"
+          disabled={isJoiningTeam}
+          onPress={() => void joinTeamFromInviteCode()}
+          style={({ pressed }) => [
+            styles.joinButton,
+            { backgroundColor: c.primary },
+            pressed && { backgroundColor: c.primaryPressed },
+            isJoiningTeam && styles.submitDisabled,
+          ]}
+        >
+          {isJoiningTeam ? (
+            <ActivityIndicator size="small" color="#FFFFFF" />
+          ) : (
+            <View style={styles.submitInner}>
+              <Text variant="bodyBold" color="#FFFFFF">
+                {authStore.isAuthenticated ? 'Join Team' : 'Save Code & Sign In'}
+              </Text>
+              <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
+            </View>
+          )}
+        </Pressable>
+      </View>
+    );
   }
 
   const isSignUp = mode === 'signup';
@@ -193,7 +325,7 @@ export default function AccountScreen() {
               <View style={styles.logoMark}>
                 <Ionicons name="compass" size={20} color={c.primary} />
               </View>
-              <Text variant="bodyBold" color="#FFFFFF" style={styles.logoText}>HaulScout</Text>
+              <Text variant="bodyBold" color="#FFFFFF" style={styles.logoText}>ScoutHaul</Text>
             </View>
             <Text variant="title" color="#FFFFFF" style={styles.heroTitle}>Your Account</Text>
           </View>
@@ -222,6 +354,8 @@ export default function AccountScreen() {
               </View>
             </View>
           </View>
+
+          {renderInvitePanel()}
 
           {message ? (
             <View style={[styles.messageBanner, { backgroundColor: c.dangerLight, borderColor: c.danger }]}>
@@ -291,7 +425,7 @@ export default function AccountScreen() {
               <Ionicons name="compass" size={20} color={c.primary} />
             </View>
             <Text variant="bodyBold" color="#FFFFFF" style={styles.logoText}>
-              HaulScout
+              ScoutHaul
             </Text>
           </View>
           <Text variant="title" color="#FFFFFF" style={styles.heroTitle}>
@@ -336,6 +470,8 @@ export default function AccountScreen() {
             </Text>
           </Pressable>
         </View>
+
+        {renderInvitePanel()}
 
         {/* OAuth buttons */}
         <View style={styles.oauthSection}>
@@ -712,6 +848,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  joinButton: {
+    minHeight: 48,
+    borderRadius: radius.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.lg,
+  },
   submitInner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -747,6 +890,29 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     borderRadius: radius.lg,
     borderWidth: 1,
+  },
+  joinCard: {
+    borderWidth: 1,
+    borderRadius: radius.xl,
+    padding: spacing.lg,
+    gap: spacing.md,
+  },
+  joinHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  joinIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.full,
+    backgroundColor: 'rgba(11, 107, 91, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  joinText: {
+    flex: 1,
+    gap: spacing.xs,
   },
   avatarCircle: {
     width: 56,

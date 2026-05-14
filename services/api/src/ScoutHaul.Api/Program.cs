@@ -58,7 +58,6 @@ builder.Services
 
 builder.Services.AddScoped<JwtCurrentUserContext>();
 builder.Services.AddScoped<OrganizationAccessService>();
-builder.Services.AddScoped<OrganizationRoleSeeder>();
 builder.Services.AddScoped<MarketplaceLookupPersistenceService>();
 builder.Services.AddScoped<InventoryPhotoStorageService>();
 builder.Services.AddHttpClient<SupabaseAdminInviteService>();
