@@ -1,5 +1,4 @@
 using System.Text.Json.Serialization;
-using System.Text;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
@@ -47,12 +46,7 @@ builder.Services
             ValidateIssuerSigningKey = true,
             ClockSkew = TimeSpan.FromSeconds(30),
             NameClaimType = "name",
-            IssuerSigningKey = string.IsNullOrWhiteSpace(supabaseAuth.JwtSecret)
-                ? null
-                : new SymmetricSecurityKey(Encoding.UTF8.GetBytes(supabaseAuth.JwtSecret)),
-            IssuerSigningKeyResolver = string.IsNullOrWhiteSpace(supabaseAuth.JwtSecret)
-                ? signingKeyResolver.ResolveSigningKeys
-                : null
+            IssuerSigningKeyResolver = signingKeyResolver.ResolveSigningKeys
         };
     });
 
