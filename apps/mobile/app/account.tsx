@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as WebBrowser from 'expo-web-browser';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Platform,
@@ -17,10 +17,12 @@ import { Text } from '../src/components/Text';
 import { radius, spacing } from '../src/components/theme';
 import { appConfig } from '../src/config';
 import { useAppTheme } from '../src/context/ThemeContext';
-import { saveWorkspaceProfile } from '../src/db/localStore';
+import { getWorkspaceProfile, saveWorkspaceProfile } from '../src/db/localStore';
 import {
+  authStore,
   signInWithOAuthProvider,
   signInWithPassword,
+  signOut,
   signUpWithPassword,
 } from '../src/services/auth';
 
@@ -30,6 +32,8 @@ export default function AccountScreen() {
   const params = useLocalSearchParams<{ mode?: 'signin' | 'signup' }>();
   const { colors: c } = useAppTheme();
   const insets = useSafeAreaInsets();
+  const [isAuthenticated, setIsAuthenticated] = useState(authStore.isAuthenticated);
+  const [accountInfo, setAccountInfo] = useState(authStore.getAccount());
   const [mode, setMode] = useState<'signin' | 'signup'>(
     params.mode === 'signin' ? 'signin' : 'signup',
   );
@@ -41,8 +45,17 @@ export default function AccountScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [oauthLoading, setOauthLoading] = useState<string | null>(null);
   const [focusedField, setFocusedField] = useState<'email' | 'password' | null>(null);
+  const [isSigningOut, setIsSigningOut] = useState(false);
 
   const passwordRef = useRef<TextInput>(null);
+
+  // Subscribe to auth state changes
+  useEffect(() => {
+    return authStore.subscribe((authed) => {
+      setIsAuthenticated(authed);
+      setAccountInfo(authStore.getAccount());
+    });
+  }, []);
 
   async function handleOAuth(provider: 'google' | 'apple') {
     if (!appConfig.isSupabaseConfigured) {
@@ -66,14 +79,13 @@ export default function AccountScreen() {
             ? session.user.user_metadata.full_name
             : accountEmail.split('@')[0];
 
+      const existing = await getWorkspaceProfile();
       await saveWorkspaceProfile({
         accountMode: 'signedIn',
         accountEmail,
         displayName,
-        onboardingCompleted: true,
-        onboardingSkipped: false,
       });
-      router.replace('/(tabs)');
+      router.replace(existing?.onboardingCompleted ? '/(tabs)' : '/onboarding');
     } catch (e) {
       setMessageType('error');
       setMessage(e instanceof Error ? e.message : 'OAuth sign-in failed.');
@@ -123,15 +135,14 @@ export default function AccountScreen() {
           ? session.user.user_metadata.name
           : accountEmail.split('@')[0];
 
+      const existing = await getWorkspaceProfile();
       await saveWorkspaceProfile({
         accountMode: 'signedIn',
         accountEmail,
         displayName,
-        onboardingCompleted: true,
-        onboardingSkipped: false,
       });
 
-      router.replace('/(tabs)');
+      router.replace(existing?.onboardingCompleted ? '/(tabs)' : '/onboarding');
     } catch (e) {
       setMessageType('error');
       setMessage(e instanceof Error ? e.message : 'Something went wrong. Try again.');
@@ -141,16 +152,127 @@ export default function AccountScreen() {
   }
 
   async function continueLocal() {
+    const existing = await getWorkspaceProfile();
     await saveWorkspaceProfile({
       accountMode: 'local',
-      onboardingCompleted: true,
-      onboardingSkipped: true,
     });
-    router.replace('/(tabs)');
+    router.replace(existing?.onboardingCompleted ? '/(tabs)' : '/onboarding');
+  }
+
+  async function handleSignOut() {
+    setIsSigningOut(true);
+    try {
+      await signOut();
+      await saveWorkspaceProfile({ accountMode: 'signedOut' });
+      setMessage(null);
+      setMode('signin');
+    } catch (e) {
+      setMessageType('error');
+      setMessage(e instanceof Error ? e.message : 'Sign out failed.');
+    } finally {
+      setIsSigningOut(false);
+    }
   }
 
   const isSignUp = mode === 'signup';
 
+  // ── Signed-in view ──
+  if (isAuthenticated) {
+    return (
+      <View style={[styles.container, { backgroundColor: c.background }]}>
+        <LinearGradient
+          colors={[c.primary, c.primaryPressed]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[styles.headerGradient, { paddingTop: insets.top + spacing.lg }]}
+        >
+          <View style={[styles.decorCircle, styles.decorCircle1]} />
+          <View style={[styles.decorCircle, styles.decorCircle2]} />
+          <View style={styles.headerContent}>
+            <View style={styles.logoRow}>
+              <View style={styles.logoMark}>
+                <Ionicons name="compass" size={20} color={c.primary} />
+              </View>
+              <Text variant="bodyBold" color="#FFFFFF" style={styles.logoText}>HaulScout</Text>
+            </View>
+            <Text variant="title" color="#FFFFFF" style={styles.heroTitle}>Your Account</Text>
+          </View>
+        </LinearGradient>
+
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + spacing.xxl }]}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Account info card */}
+          <View style={[styles.accountCard, { backgroundColor: c.surface, borderColor: c.border }]}>
+            <View style={[styles.avatarCircle, { backgroundColor: c.primaryLight }]}>
+              <Ionicons name="person" size={28} color={c.primary} />
+            </View>
+            <View style={styles.accountInfo}>
+              {accountInfo?.displayName ? (
+                <Text variant="bodyBold">{accountInfo.displayName}</Text>
+              ) : null}
+              {accountInfo?.email ? (
+                <Text variant="caption" color={c.textSecondary}>{accountInfo.email}</Text>
+              ) : null}
+              <View style={styles.authBadge}>
+                <Ionicons name="checkmark-circle" size={14} color={c.success} />
+                <Text variant="label" color={c.success}>Signed in</Text>
+              </View>
+            </View>
+          </View>
+
+          {message ? (
+            <View style={[styles.messageBanner, { backgroundColor: c.dangerLight, borderColor: c.danger }]}>
+              <Ionicons name="alert-circle" size={18} color={c.danger} />
+              <Text variant="caption" color={c.danger} style={styles.messageText}>{message}</Text>
+            </View>
+          ) : null}
+
+          {/* Back to app */}
+          <Pressable
+            onPress={() => router.replace('/(tabs)')}
+            style={({ pressed }) => [
+              styles.submitButton,
+              { backgroundColor: c.primary },
+              pressed && { backgroundColor: c.primaryPressed },
+            ]}
+          >
+            <View style={styles.submitInner}>
+              <Ionicons name="arrow-back" size={18} color="#FFFFFF" />
+              <Text variant="bodyBold" color="#FFFFFF">Back to App</Text>
+            </View>
+          </Pressable>
+
+          {/* Sign out */}
+          <Pressable
+            onPress={() => void handleSignOut()}
+            disabled={isSigningOut}
+            style={({ pressed }) => [
+              styles.localButton,
+              { borderColor: c.danger, backgroundColor: pressed ? c.dangerLight : c.surface },
+              isSigningOut && styles.submitDisabled,
+            ]}
+          >
+            {isSigningOut ? (
+              <ActivityIndicator size="small" color={c.danger} />
+            ) : (
+              <View style={styles.localButtonInner}>
+                <Ionicons name="log-out-outline" size={20} color={c.danger} />
+                <View style={styles.localTextBlock}>
+                  <Text variant="bodyBold" color={c.danger}>Sign Out</Text>
+                  <Text variant="caption" color={c.textMuted}>Data stays on device</Text>
+                </View>
+              </View>
+            )}
+          </Pressable>
+        </ScrollView>
+      </View>
+    );
+  }
+
+  // ── Sign-in / Sign-up view ──
   return (
     <View style={[styles.container, { backgroundColor: c.background }]}>
       {/* Gradient header */}
@@ -166,7 +288,7 @@ export default function AccountScreen() {
         <View style={styles.headerContent}>
           <View style={styles.logoRow}>
             <View style={styles.logoMark}>
-              <Ionicons name="trail-sign" size={20} color={c.primary} />
+              <Ionicons name="compass" size={20} color={c.primary} />
             </View>
             <Text variant="bodyBold" color="#FFFFFF" style={styles.logoText}>
               HaulScout
@@ -617,5 +739,30 @@ const styles = StyleSheet.create({
     fontSize: 11,
     lineHeight: 16,
     paddingTop: spacing.sm,
+  },
+  accountCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    padding: spacing.lg,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+  },
+  avatarCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  accountInfo: {
+    flex: 1,
+    gap: spacing.xxs,
+  },
+  authBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xxs,
+    marginTop: spacing.xxs,
   },
 });

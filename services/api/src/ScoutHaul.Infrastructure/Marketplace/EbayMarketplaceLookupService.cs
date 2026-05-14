@@ -43,23 +43,22 @@ internal sealed class EbayMarketplaceLookupService : IMarketplacePricingProvider
         string token = await GetAccessTokenAsync(cancellationToken);
         string cleanBarcode = request.Barcode?.Trim() ?? request.Query.Trim();
 
-        // Search active listings by GTIN (UPC/EAN)
-        var activeTask = SearchBrowseApiAsync(token, $"gtin={cleanBarcode}", cancellationToken);
-        // Also try keyword search as fallback
-        var keywordTask = SearchBrowseApiAsync(token, $"q={Uri.EscapeDataString(cleanBarcode)}", cancellationToken);
+        // Search by GTIN (UPC/EAN) only — no keyword fallback for barcode lookups.
+        // Keyword fallback with raw barcode digits returns unrelated products.
+        List<MarketplaceListingDto> listings = await SearchBrowseApiAsync(
+            token, $"gtin={cleanBarcode}", cancellationToken);
 
-        await Task.WhenAll(activeTask, keywordTask);
-
-        List<MarketplaceListingDto> allListings = [];
-        allListings.AddRange(await activeTask);
-
-        // Add keyword results if GTIN returned nothing
-        if (allListings.Count == 0)
+        // If GTIN returned nothing and we have a resolved product name, try keyword search
+        // with the product name (not the raw barcode digits).
+        if (listings.Count == 0 && request.Product is not null && !string.IsNullOrWhiteSpace(request.Product.Title))
         {
-            allListings.AddRange(await keywordTask);
+            string productQuery = string.Join(' ', request.Product.Brand, request.Product.Title).Trim();
+            _logger.LogDebug("GTIN lookup empty for {Barcode}, falling back to product keyword: {Query}", cleanBarcode, productQuery);
+            listings = await SearchBrowseApiAsync(
+                token, $"q={Uri.EscapeDataString(productQuery)}", cancellationToken);
         }
 
-        return allListings;
+        return listings;
     }
 
     public async Task<IReadOnlyList<MarketplaceListingDto>> SearchByKeywordAsync(

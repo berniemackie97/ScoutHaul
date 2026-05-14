@@ -291,9 +291,22 @@ export default function BarcodeScannerScreen() {
                     </View>
                   </View>
                 ) : state.error ? (
-                  <Text variant="caption" color={c.danger}>{state.error}</Text>
+                  <View style={[styles.noPriceBox, { backgroundColor: c.dangerLight, borderColor: c.danger }]}>
+                    <Ionicons name="alert-circle-outline" size={18} color={c.danger} />
+                    <Text variant="caption" color={c.danger} style={{ flex: 1 }}>{state.error}</Text>
+                  </View>
                 ) : (
-                  <Text variant="caption" color={c.textMuted}>No marketplace results for this barcode</Text>
+                  <View style={[styles.noPriceBox, { backgroundColor: c.warningLight, borderColor: c.warning }]}>
+                    <Ionicons name="information-circle-outline" size={18} color={c.warning} />
+                    <View style={{ flex: 1 }}>
+                      <Text variant="caption" color={c.text}>No pricing data found</Text>
+                      <Text variant="label" color={c.textMuted}>
+                        {state.productTitle
+                          ? 'Product identified but no marketplace listings matched.'
+                          : 'Barcode not recognized. Try searching by name instead.'}
+                      </Text>
+                    </View>
+                  </View>
                 )}
 
                 {/* Listing cards */}
@@ -399,6 +412,14 @@ const styles = StyleSheet.create({
   listingNoImage: { alignItems: 'center', justifyContent: 'center' },
   listingInfo: { padding: spacing.sm, gap: spacing.xxs },
   listingTitle: { lineHeight: 16 },
+  noPriceBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+  },
   actions: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   iconBtn: {
     width: 44,

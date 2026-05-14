@@ -27,43 +27,34 @@ builder.Services.AddProblemDetails();
 builder.Services.AddHttpContextAccessor();
 
 // ── Authentication ───────────────────────────────────────────────
-bool useStubAuth = builder.Configuration.GetSection("StubAuth").Exists()
-    && !string.IsNullOrWhiteSpace(builder.Configuration["StubAuth:DefaultOrganizationId"]);
+SupabaseAuthOptions supabaseAuth = SupabaseAuthOptions.FromConfiguration(builder.Configuration)
+    ?? throw new InvalidOperationException("Authentication:Supabase:Url is required.");
 
-SupabaseAuthOptions? supabaseAuth = SupabaseAuthOptions.FromConfiguration(builder.Configuration);
-if (supabaseAuth is null && !useStubAuth)
-{
-    throw new InvalidOperationException("Authentication:Supabase:Url is required when StubAuth is disabled.");
-}
-
-if (supabaseAuth is not null)
-{
-    var signingKeyResolver = new SupabaseSigningKeyResolver(supabaseAuth);
-    builder.Services.AddSingleton(supabaseAuth);
-    builder.Services.AddSingleton(signingKeyResolver);
-    builder.Services
-        .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-        .AddJwtBearer(options =>
+var signingKeyResolver = new SupabaseSigningKeyResolver(supabaseAuth);
+builder.Services.AddSingleton(supabaseAuth);
+builder.Services.AddSingleton(signingKeyResolver);
+builder.Services
+    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
         {
-            options.TokenValidationParameters = new TokenValidationParameters
-            {
-                ValidateIssuer = true,
-                ValidIssuer = supabaseAuth.Issuer,
-                ValidateAudience = true,
-                ValidAudience = supabaseAuth.Audience,
-                ValidateLifetime = true,
-                ValidateIssuerSigningKey = true,
-                ClockSkew = TimeSpan.FromSeconds(30),
-                NameClaimType = "name",
-                IssuerSigningKey = string.IsNullOrWhiteSpace(supabaseAuth.JwtSecret)
-                    ? null
-                    : new SymmetricSecurityKey(Encoding.UTF8.GetBytes(supabaseAuth.JwtSecret)),
-                IssuerSigningKeyResolver = string.IsNullOrWhiteSpace(supabaseAuth.JwtSecret)
-                    ? signingKeyResolver.ResolveSigningKeys
-                    : null
-            };
-        });
-}
+            ValidateIssuer = true,
+            ValidIssuer = supabaseAuth.Issuer,
+            ValidateAudience = true,
+            ValidAudience = supabaseAuth.Audience,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ClockSkew = TimeSpan.FromSeconds(30),
+            NameClaimType = "name",
+            IssuerSigningKey = string.IsNullOrWhiteSpace(supabaseAuth.JwtSecret)
+                ? null
+                : new SymmetricSecurityKey(Encoding.UTF8.GetBytes(supabaseAuth.JwtSecret)),
+            IssuerSigningKeyResolver = string.IsNullOrWhiteSpace(supabaseAuth.JwtSecret)
+                ? signingKeyResolver.ResolveSigningKeys
+                : null
+        };
+    });
 
 builder.Services.AddScoped<JwtCurrentUserContext>();
 builder.Services.AddScoped<OrganizationAccessService>();
@@ -71,21 +62,13 @@ builder.Services.AddScoped<OrganizationRoleSeeder>();
 builder.Services.AddScoped<MarketplaceLookupPersistenceService>();
 builder.Services.AddScoped<InventoryPhotoStorageService>();
 builder.Services.AddHttpClient<SupabaseAdminInviteService>();
-if (useStubAuth)
+builder.Services.AddAuthorization(options =>
 {
-    builder.Services.AddAuthorization();
-    builder.Services.AddScoped<ICurrentUserContext, HeaderOrJwtCurrentUserContext>();
-}
-else
-{
-    builder.Services.AddAuthorization(options =>
-    {
-        options.FallbackPolicy = new AuthorizationPolicyBuilder()
-            .RequireAuthenticatedUser()
-            .Build();
-    });
-    builder.Services.AddScoped<ICurrentUserContext, JwtCurrentUserContext>();
-}
+    options.FallbackPolicy = new AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .Build();
+});
+builder.Services.AddScoped<ICurrentUserContext, JwtCurrentUserContext>();
 
 // ── Rate Limiting ────────────────────────────────────────────────
 builder.Services.AddRateLimiter(options =>
@@ -194,10 +177,7 @@ app.Use(async (context, next) =>
         });
     }
 });
-if (supabaseAuth is not null)
-{
-    app.UseAuthentication();
-}
+app.UseAuthentication();
 app.UseAuthorization();
 app.UseMiddleware<IdempotencyMiddleware>();
 

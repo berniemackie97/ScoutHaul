@@ -67,7 +67,7 @@ export default function DashboardScreen() {
     >
       <View style={styles.header}>
         <View style={{ flex: 1 }}>
-          <Text variant="title">{workspaceProfile?.workspaceName ?? 'ScoutHaul'}</Text>
+          <Text variant="title">{workspaceProfile?.workspaceName ?? 'HaulScout'}</Text>
           <Text variant="caption">
             {workspaceProfile?.usageMode === 'team' ? 'Team resale command center' : 'Your resale command center'}
           </Text>

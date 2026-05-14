@@ -61,17 +61,11 @@ function StartupGate() {
 
       setIsReady(true);
 
-      // New users: no profile at all → go to account (auth-first)
-      if (!profile) {
-        if (pathname !== '/account' && pathname !== '/onboarding') {
-          router.replace('/account');
+      // New users or onboarding not finished → onboarding flow
+      if (!profile || !profile.onboardingCompleted) {
+        if (pathname !== '/onboarding' && pathname !== '/account') {
+          router.replace('/onboarding');
         }
-        return;
-      }
-
-      // Profile exists but onboarding not finished → re-prompt
-      if (!profile.onboardingCompleted && pathname !== '/onboarding' && pathname !== '/account') {
-        router.replace('/onboarding');
         return;
       }
 

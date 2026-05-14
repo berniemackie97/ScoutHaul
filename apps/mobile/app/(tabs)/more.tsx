@@ -1,12 +1,21 @@
 import { router } from 'expo-router';
+import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { ActionCard } from '../../src/components/ActionCard';
 import { Screen } from '../../src/components/Screen';
 import { SectionHeader } from '../../src/components/SectionHeader';
 import { Text } from '../../src/components/Text';
 import { spacing } from '../../src/components/theme';
+import { authStore } from '../../src/services/auth';
 
 export default function MoreScreen() {
+  const [isAuthed, setIsAuthed] = useState(authStore.isAuthenticated);
+  const accountInfo = authStore.getAccount();
+
+  useEffect(() => {
+    return authStore.subscribe((authed) => setIsAuthed(authed));
+  }, []);
+
   return (
     <Screen edges={['top', 'left', 'right']}>
       <Text variant="title">More</Text>
@@ -41,7 +50,7 @@ export default function MoreScreen() {
       <ActionCard
         icon="person-circle-outline"
         title="Account & Workspace"
-        subtitle="Sign in, sign up, or keep using local mode"
+        subtitle={isAuthed ? `Signed in as ${accountInfo?.email ?? accountInfo?.displayName ?? 'user'}` : 'Sign in, sign up, or keep using local mode'}
         tone="primary"
         onPress={() => router.push('/account')}
       />

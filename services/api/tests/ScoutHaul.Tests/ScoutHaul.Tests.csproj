@@ -21,6 +21,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\ScoutHaul.Application\ScoutHaul.Application.csproj" />
     <ProjectReference Include="..\..\src\ScoutHaul.Domain\ScoutHaul.Domain.csproj" />
+    <ProjectReference Include="..\..\src\ScoutHaul.Infrastructure\ScoutHaul.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

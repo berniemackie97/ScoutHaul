@@ -1,0 +1,316 @@
+using Microsoft.Extensions.Logging.Abstractions;
+using ScoutHaul.Application.Contracts;
+using ScoutHaul.Application.Services;
+using ScoutHaul.Infrastructure.Marketplace;
+
+namespace ScoutHaul.Tests.Marketplace;
+
+public sealed class CompositeMarketplaceLookupTests
+{
+    // ── Stubs ────────────────────────────────────────────────────────
+
+    private sealed class StubBarcodeLookupService(BarcodeLookupResult? result) : IBarcodeLookupService
+    {
+        public int CallCount { get; private set; }
+        public string? LastBarcode { get; private set; }
+
+        public Task<BarcodeLookupResult?> LookupAsync(string barcode, CancellationToken cancellationToken = default)
+        {
+            CallCount++;
+            LastBarcode = barcode;
+            return Task.FromResult(result);
+        }
+    }
+
+    private sealed class StubPricingProvider(
+        string name,
+        bool isConfigured,
+        List<MarketplaceListingDto>? barcodeListings = null,
+        List<MarketplaceListingDto>? keywordListings = null) : IMarketplacePricingProvider
+    {
+        public string Name => name;
+        public bool IsConfigured => isConfigured;
+        public int BarcodeCallCount { get; private set; }
+        public int KeywordCallCount { get; private set; }
+        public MarketplacePricingRequest? LastBarcodeRequest { get; private set; }
+
+        public Task<IReadOnlyList<MarketplaceListingDto>> SearchByBarcodeAsync(
+            MarketplacePricingRequest request, CancellationToken cancellationToken)
+        {
+            BarcodeCallCount++;
+            LastBarcodeRequest = request;
+            return Task.FromResult<IReadOnlyList<MarketplaceListingDto>>(barcodeListings ?? []);
+        }
+
+        public Task<IReadOnlyList<MarketplaceListingDto>> SearchByKeywordAsync(
+            MarketplacePricingRequest request, CancellationToken cancellationToken)
+        {
+            KeywordCallCount++;
+            return Task.FromResult<IReadOnlyList<MarketplaceListingDto>>(keywordListings ?? []);
+        }
+    }
+
+    private sealed class ThrowingPricingProvider(string name) : IMarketplacePricingProvider
+    {
+        public string Name => name;
+        public bool IsConfigured => true;
+
+        public Task<IReadOnlyList<MarketplaceListingDto>> SearchByBarcodeAsync(
+            MarketplacePricingRequest request, CancellationToken cancellationToken) =>
+            throw new HttpRequestException("Simulated failure");
+
+        public Task<IReadOnlyList<MarketplaceListingDto>> SearchByKeywordAsync(
+            MarketplacePricingRequest request, CancellationToken cancellationToken) =>
+            throw new HttpRequestException("Simulated failure");
+    }
+
+    private static MarketplaceListingDto MakeListing(
+        string title, decimal price, string source = "eBay", string? itemUrl = null) =>
+        new(title, price, null, null, itemUrl ?? $"https://example.com/{title}", "Used", source, false, null);
+
+    private static BarcodeLookupResult MakeProduct(string barcode, string title, string? brand = null) =>
+        new(barcode, title, brand, null, null, null, barcode, null);
+
+    // ── SearchByBarcodeAsync tests ───────────────────────────────────
+
+    [Fact]
+    public async Task Barcode_search_calls_barcode_lookup_service_first()
+    {
+        var barcodeLookup = new StubBarcodeLookupService(MakeProduct("123", "Ranch Cup", "Hidden Valley"));
+        var provider = new StubPricingProvider("eBay", true);
+        var sut = new CompositeMarketplaceLookupService(barcodeLookup, [provider],
+            NullLogger<CompositeMarketplaceLookupService>.Instance);
+
+        await sut.SearchByBarcodeAsync("123");
+
+        Assert.Equal(1, barcodeLookup.CallCount);
+        Assert.Equal("123", barcodeLookup.LastBarcode);
+    }
+
+    [Fact]
+    public async Task Barcode_search_uses_product_name_as_pricing_query_when_resolved()
+    {
+        var barcodeLookup = new StubBarcodeLookupService(MakeProduct("123", "Ranch Cup", "Hidden Valley"));
+        var provider = new StubPricingProvider("eBay", true);
+        var sut = new CompositeMarketplaceLookupService(barcodeLookup, [provider],
+            NullLogger<CompositeMarketplaceLookupService>.Instance);
+
+        await sut.SearchByBarcodeAsync("123");
+
+        // Query should be "Hidden Valley Ranch Cup", NOT the raw barcode
+        Assert.NotNull(provider.LastBarcodeRequest);
+        Assert.Equal("Hidden Valley Ranch Cup", provider.LastBarcodeRequest.Query);
+        Assert.Equal("123", provider.LastBarcodeRequest.Barcode);
+    }
+
+    [Fact]
+    public async Task Barcode_search_uses_raw_barcode_as_query_when_product_not_resolved()
+    {
+        var barcodeLookup = new StubBarcodeLookupService(null);
+        var provider = new StubPricingProvider("eBay", true);
+        var sut = new CompositeMarketplaceLookupService(barcodeLookup, [provider],
+            NullLogger<CompositeMarketplaceLookupService>.Instance);
+
+        await sut.SearchByBarcodeAsync("070038643951");
+
+        Assert.NotNull(provider.LastBarcodeRequest);
+        Assert.Equal("070038643951", provider.LastBarcodeRequest.Query);
+        Assert.Null(provider.LastBarcodeRequest.Product);
+    }
+
+    [Fact]
+    public async Task Barcode_search_populates_product_metadata_in_result()
+    {
+        var barcodeLookup = new StubBarcodeLookupService(
+            MakeProduct("123", "Ranch Cup", "Hidden Valley"));
+        var sut = new CompositeMarketplaceLookupService(barcodeLookup, [],
+            NullLogger<CompositeMarketplaceLookupService>.Instance);
+
+        MarketplaceLookupResult result = await sut.SearchByBarcodeAsync("123");
+
+        Assert.Equal("Ranch Cup", result.ProductTitle);
+        Assert.Equal("Hidden Valley", result.ProductBrand);
+    }
+
+    [Fact]
+    public async Task Barcode_search_aggregates_listings_from_multiple_providers()
+    {
+        var barcodeLookup = new StubBarcodeLookupService(null);
+        var ebay = new StubPricingProvider("eBay", true,
+            barcodeListings: [MakeListing("eBay Item", 25.00m, "eBay")]);
+        var amazon = new StubPricingProvider("Amazon", true,
+            barcodeListings: [MakeListing("Amazon Item", 30.00m, "Amazon")]);
+
+        var sut = new CompositeMarketplaceLookupService(barcodeLookup, [ebay, amazon],
+            NullLogger<CompositeMarketplaceLookupService>.Instance);
+
+        MarketplaceLookupResult result = await sut.SearchByBarcodeAsync("123");
+
+        Assert.Equal(2, result.TotalResults);
+        Assert.Contains(result.ProvidersUsed!, p => p == "eBay");
+        Assert.Contains(result.ProvidersUsed!, p => p == "Amazon");
+    }
+
+    [Fact]
+    public async Task Barcode_search_calculates_price_stats_correctly()
+    {
+        var barcodeLookup = new StubBarcodeLookupService(null);
+        var provider = new StubPricingProvider("eBay", true,
+            barcodeListings:
+            [
+                MakeListing("Item A", 10.00m),
+                MakeListing("Item B", 20.00m),
+                MakeListing("Item C", 30.00m),
+            ]);
+
+        var sut = new CompositeMarketplaceLookupService(barcodeLookup, [provider],
+            NullLogger<CompositeMarketplaceLookupService>.Instance);
+
+        MarketplaceLookupResult result = await sut.SearchByBarcodeAsync("123");
+
+        Assert.Equal(10.00m, result.LowestPrice);
+        Assert.Equal(30.00m, result.HighestPrice);
+        Assert.Equal(20.00m, result.AverageSoldPrice); // (10+20+30)/3
+    }
+
+    [Fact]
+    public async Task Barcode_search_returns_null_stats_when_no_listings()
+    {
+        var barcodeLookup = new StubBarcodeLookupService(null);
+        var sut = new CompositeMarketplaceLookupService(barcodeLookup, [],
+            NullLogger<CompositeMarketplaceLookupService>.Instance);
+
+        MarketplaceLookupResult result = await sut.SearchByBarcodeAsync("123");
+
+        Assert.Null(result.AverageSoldPrice);
+        Assert.Null(result.LowestPrice);
+        Assert.Null(result.HighestPrice);
+        Assert.Equal(0, result.TotalResults);
+    }
+
+    [Fact]
+    public async Task Barcode_search_survives_provider_exception()
+    {
+        var barcodeLookup = new StubBarcodeLookupService(null);
+        var broken = new ThrowingPricingProvider("Broken");
+        var good = new StubPricingProvider("Good", true,
+            barcodeListings: [MakeListing("Survived", 15.00m)]);
+
+        var sut = new CompositeMarketplaceLookupService(barcodeLookup, [broken, good],
+            NullLogger<CompositeMarketplaceLookupService>.Instance);
+
+        MarketplaceLookupResult result = await sut.SearchByBarcodeAsync("123");
+
+        Assert.Equal(1, result.TotalResults);
+        Assert.Contains(result.ProviderWarnings!, w => w.Contains("Broken"));
+    }
+
+    [Fact]
+    public async Task Barcode_search_skips_unconfigured_providers()
+    {
+        var barcodeLookup = new StubBarcodeLookupService(null);
+        var unconfigured = new StubPricingProvider("Unconfigured", false,
+            barcodeListings: [MakeListing("Should Not Appear", 99.99m)]);
+        var configured = new StubPricingProvider("Configured", true,
+            barcodeListings: [MakeListing("Should Appear", 10.00m)]);
+
+        var sut = new CompositeMarketplaceLookupService(barcodeLookup, [unconfigured, configured],
+            NullLogger<CompositeMarketplaceLookupService>.Instance);
+
+        MarketplaceLookupResult result = await sut.SearchByBarcodeAsync("123");
+
+        Assert.Equal(1, result.TotalResults);
+        Assert.Equal(0, unconfigured.BarcodeCallCount);
+    }
+
+    [Fact]
+    public async Task Barcode_search_deduplicates_by_url()
+    {
+        var barcodeLookup = new StubBarcodeLookupService(null);
+        var p1 = new StubPricingProvider("P1", true,
+            barcodeListings: [MakeListing("Same Item", 20.00m, "eBay", "https://ebay.com/item/123")]);
+        var p2 = new StubPricingProvider("P2", true,
+            barcodeListings: [MakeListing("Same Item", 20.00m, "eBay", "https://ebay.com/item/123")]);
+
+        var sut = new CompositeMarketplaceLookupService(barcodeLookup, [p1, p2],
+            NullLogger<CompositeMarketplaceLookupService>.Instance);
+
+        MarketplaceLookupResult result = await sut.SearchByBarcodeAsync("123");
+
+        Assert.Equal(1, result.TotalResults); // deduped
+    }
+
+    // ── SearchByKeywordAsync tests ───────────────────────────────────
+
+    [Fact]
+    public async Task Keyword_search_does_not_call_barcode_lookup()
+    {
+        var barcodeLookup = new StubBarcodeLookupService(MakeProduct("123", "Should Not Resolve"));
+        var provider = new StubPricingProvider("eBay", true,
+            keywordListings: [MakeListing("Keyword Result", 12.00m)]);
+
+        var sut = new CompositeMarketplaceLookupService(barcodeLookup, [provider],
+            NullLogger<CompositeMarketplaceLookupService>.Instance);
+
+        MarketplaceLookupResult result = await sut.SearchByKeywordAsync("ranch dressing cup");
+
+        Assert.Equal(0, barcodeLookup.CallCount);
+        Assert.Equal(1, result.TotalResults);
+        Assert.Null(result.ProductTitle); // no product resolution for keyword search
+    }
+
+    [Fact]
+    public async Task Keyword_search_uses_keyword_method_on_providers()
+    {
+        var barcodeLookup = new StubBarcodeLookupService(null);
+        var provider = new StubPricingProvider("eBay", true,
+            keywordListings: [MakeListing("Keyword Hit", 10.00m)]);
+
+        var sut = new CompositeMarketplaceLookupService(barcodeLookup, [provider],
+            NullLogger<CompositeMarketplaceLookupService>.Instance);
+
+        await sut.SearchByKeywordAsync("test query");
+
+        Assert.Equal(1, provider.KeywordCallCount);
+        Assert.Equal(0, provider.BarcodeCallCount);
+    }
+
+    // ── Price stats edge cases ───────────────────────────────────────
+
+    [Fact]
+    public async Task Price_stats_include_shipping_cost()
+    {
+        var barcodeLookup = new StubBarcodeLookupService(null);
+        // Item: $10 + $5 shipping = $15 total
+        var listing = new MarketplaceListingDto("Item", 10.00m, 5.00m, null, "https://x.com/1", "New", "eBay", false, null);
+        var provider = new StubPricingProvider("eBay", true,
+            barcodeListings: [listing]);
+
+        var sut = new CompositeMarketplaceLookupService(barcodeLookup, [provider],
+            NullLogger<CompositeMarketplaceLookupService>.Instance);
+
+        MarketplaceLookupResult result = await sut.SearchByBarcodeAsync("123");
+
+        Assert.Equal(15.00m, result.AverageSoldPrice); // price + shipping
+    }
+
+    [Fact]
+    public async Task Zero_price_listings_are_excluded()
+    {
+        var barcodeLookup = new StubBarcodeLookupService(null);
+        var provider = new StubPricingProvider("eBay", true,
+            barcodeListings:
+            [
+                new MarketplaceListingDto("Free", 0m, null, null, "https://x.com/free", "New", "eBay", false, null),
+                MakeListing("Paid", 25.00m),
+            ]);
+
+        var sut = new CompositeMarketplaceLookupService(barcodeLookup, [provider],
+            NullLogger<CompositeMarketplaceLookupService>.Instance);
+
+        MarketplaceLookupResult result = await sut.SearchByBarcodeAsync("123");
+
+        Assert.Equal(1, result.TotalResults); // zero-price excluded
+        Assert.Equal(25.00m, result.AverageSoldPrice);
+    }
+}

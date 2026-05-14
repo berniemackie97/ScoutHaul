@@ -19,10 +19,10 @@ public static class DependencyInjection
 
         services.AddDbContext<ScoutHaulDbContext>(options => options.UseNpgsql(connectionString));
 
+        // Barcode lookup — tried in order. Go-UPC (paid, best data) → Open Food Facts (free, food) → UPCitemdb (free, broad but unreliable).
         services.AddScoped<IBarcodeLookupService, CompositeBarcodeLookupService>();
-        services.AddHttpClient<IBarcodeLookupProvider, EanDbBarcodeLookupProvider>(ConfigureJsonClient);
-        services.AddHttpClient<IBarcodeLookupProvider, BarcodeLookupProvider>(ConfigureJsonClient);
-        services.AddHttpClient<IBarcodeLookupProvider, UpcDevLookupProvider>(ConfigureJsonClient);
+        services.AddHttpClient<IBarcodeLookupProvider, GoUpcBarcodeLookupProvider>(ConfigureJsonClient);
+        services.AddHttpClient<IBarcodeLookupProvider, OpenFoodFactsBarcodeLookupProvider>(ConfigureJsonClient);
         services.AddHttpClient<IBarcodeLookupProvider, UpcItemDbLookupService>(ConfigureJsonClient);
 
         services.AddScoped<IMarketplaceLookupService, CompositeMarketplaceLookupService>();

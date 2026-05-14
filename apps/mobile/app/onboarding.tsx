@@ -79,7 +79,7 @@ export default function OnboardingScreen() {
     <Screen edges={['top', 'left', 'right', 'bottom']}>
       <View style={styles.header}>
         <View style={styles.brandMark}>
-          <Ionicons name="trail-sign-outline" size={26} color={c.textInverse} />
+          <Ionicons name="compass-outline" size={26} color={c.textInverse} />
         </View>
         <View style={styles.headerText}>
           <Text variant="title">Set up HaulScout</Text>

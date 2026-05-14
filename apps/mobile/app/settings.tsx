@@ -76,7 +76,7 @@ export default function SettingsScreen() {
         </View>
         <Button
           label="Run Setup Again"
-          icon="trail-sign-outline"
+          icon="compass-outline"
           variant="secondary"
           fullWidth
           onPress={() => router.push('/onboarding')}
@@ -99,7 +99,11 @@ export default function SettingsScreen() {
           <StatusPill label={workspaceProfile?.accountMode ?? 'local'} tone={workspaceProfile?.accountMode === 'signedIn' ? 'success' : 'neutral'} size="sm" />
         </View>
         <View style={styles.buttonRow}>
-          <Button label="Sign In / Up" icon="person-circle-outline" variant="secondary" onPress={() => router.push('/account')} />
+          {workspaceProfile?.accountMode !== 'signedIn' ? (
+            <Button label="Sign In / Up" icon="person-circle-outline" variant="secondary" onPress={() => router.push('/account')} />
+          ) : (
+            <Button label="Manage Account" icon="person-circle-outline" variant="secondary" onPress={() => router.push('/account')} />
+          )}
           {workspaceProfile?.accountMode === 'signedIn' ? (
             <Button label="Sign Out" icon="log-out-outline" variant="danger" onPress={() => void disconnectAccount()} />
           ) : null}
