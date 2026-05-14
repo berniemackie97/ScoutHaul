@@ -1,27 +1,30 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as WebBrowser from 'expo-web-browser';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useRef, useState } from 'react';
 import {
-  Animated,
-  Dimensions,
-  KeyboardAvoidingView,
+  ActivityIndicator,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   TextInput,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Button } from '../src/components/Button';
 import { Text } from '../src/components/Text';
 import { radius, spacing } from '../src/components/theme';
 import { appConfig } from '../src/config';
 import { useAppTheme } from '../src/context/ThemeContext';
 import { saveWorkspaceProfile } from '../src/db/localStore';
-import { signInWithPassword, signUpWithPassword } from '../src/services/auth';
+import {
+  signInWithOAuthProvider,
+  signInWithPassword,
+  signUpWithPassword,
+} from '../src/services/auth';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+WebBrowser.maybeCompleteAuthSession();
 
 export default function AccountScreen() {
   const params = useLocalSearchParams<{ mode?: 'signin' | 'signup' }>();
@@ -36,33 +39,53 @@ export default function AccountScreen() {
   const [message, setMessage] = useState<string | null>(null);
   const [messageType, setMessageType] = useState<'error' | 'info'>('error');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [oauthLoading, setOauthLoading] = useState<string | null>(null);
   const [focusedField, setFocusedField] = useState<'email' | 'password' | null>(null);
 
   const passwordRef = useRef<TextInput>(null);
-  const fadeAnim = useRef(new Animated.Value(1)).current;
 
-  function switchMode(newMode: 'signin' | 'signup') {
-    Animated.timing(fadeAnim, {
-      toValue: 0,
-      duration: 120,
-      useNativeDriver: true,
-    }).start(() => {
-      setMode(newMode);
-      setMessage(null);
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 200,
-        useNativeDriver: true,
-      }).start();
-    });
+  async function handleOAuth(provider: 'google' | 'apple') {
+    if (!appConfig.isSupabaseConfigured) {
+      setMessageType('error');
+      setMessage('Auth not configured.');
+      return;
+    }
+    setOauthLoading(provider);
+    setMessage(null);
+    try {
+      const session = await signInWithOAuthProvider(provider);
+      if (!session) {
+        setOauthLoading(null);
+        return;
+      }
+      const accountEmail = session.user.email ?? '';
+      const displayName =
+        typeof session.user.user_metadata?.name === 'string'
+          ? session.user.user_metadata.name
+          : typeof session.user.user_metadata?.full_name === 'string'
+            ? session.user.user_metadata.full_name
+            : accountEmail.split('@')[0];
+
+      await saveWorkspaceProfile({
+        accountMode: 'signedIn',
+        accountEmail,
+        displayName,
+        onboardingCompleted: true,
+        onboardingSkipped: false,
+      });
+      router.replace('/(tabs)');
+    } catch (e) {
+      setMessageType('error');
+      setMessage(e instanceof Error ? e.message : 'OAuth sign-in failed.');
+    } finally {
+      setOauthLoading(null);
+    }
   }
 
   async function submitAccount() {
     if (!appConfig.isSupabaseConfigured) {
       setMessageType('error');
-      setMessage(
-        'Auth not configured. Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY, then restart.',
-      );
+      setMessage('Auth not configured.');
       return;
     }
 
@@ -135,234 +158,259 @@ export default function AccountScreen() {
         colors={[c.primary, c.primaryPressed]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        style={[styles.headerGradient, { paddingTop: insets.top + spacing.xl }]}
+        style={[styles.headerGradient, { paddingTop: insets.top + spacing.lg }]}
       >
-        {/* Decorative circles */}
         <View style={[styles.decorCircle, styles.decorCircle1]} />
         <View style={[styles.decorCircle, styles.decorCircle2]} />
-        <View style={[styles.decorCircle, styles.decorCircle3]} />
 
         <View style={styles.headerContent}>
           <View style={styles.logoRow}>
             <View style={styles.logoMark}>
-              <Ionicons name="trail-sign" size={22} color={c.primary} />
+              <Ionicons name="trail-sign" size={20} color={c.primary} />
             </View>
             <Text variant="bodyBold" color="#FFFFFF" style={styles.logoText}>
               HaulScout
             </Text>
           </View>
           <Text variant="title" color="#FFFFFF" style={styles.heroTitle}>
-            {isSignUp ? 'Start your resale\nbusiness command center' : 'Welcome back'}
-          </Text>
-          <Text variant="body" color="rgba(255,255,255,0.75)" style={styles.heroSubtitle}>
-            {isSignUp
-              ? 'Source smarter. Track everything. Scale with confidence.'
-              : 'Sign in to sync your inventory, routes, and analytics.'}
+            {isSignUp ? 'Create your account' : 'Welcome back'}
           </Text>
         </View>
       </LinearGradient>
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.formWrapper}
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + spacing.xxl }]}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="none"
+        showsVerticalScrollIndicator={false}
       >
         {/* Mode toggle */}
         <View style={[styles.modeToggle, { backgroundColor: c.surfaceAlt, borderColor: c.border }]}>
           <Pressable
             accessibilityRole="tab"
             accessibilityState={{ selected: isSignUp }}
-            onPress={() => switchMode('signup')}
+            onPress={() => { setMode('signup'); setMessage(null); }}
             style={[
               styles.modeTab,
               isSignUp && [styles.modeTabActive, { backgroundColor: c.surface }],
             ]}
           >
-            <Text
-              variant="bodyBold"
-              color={isSignUp ? c.primary : c.textMuted}
-              style={styles.modeTabText}
-            >
+            <Text variant="bodyBold" color={isSignUp ? c.primary : c.textMuted}>
               Create Account
             </Text>
           </Pressable>
           <Pressable
             accessibilityRole="tab"
             accessibilityState={{ selected: !isSignUp }}
-            onPress={() => switchMode('signin')}
+            onPress={() => { setMode('signin'); setMessage(null); }}
             style={[
               styles.modeTab,
               !isSignUp && [styles.modeTabActive, { backgroundColor: c.surface }],
             ]}
           >
-            <Text
-              variant="bodyBold"
-              color={!isSignUp ? c.primary : c.textMuted}
-              style={styles.modeTabText}
-            >
+            <Text variant="bodyBold" color={!isSignUp ? c.primary : c.textMuted}>
               Sign In
             </Text>
           </Pressable>
         </View>
 
-        <Animated.View style={[styles.formCard, { backgroundColor: c.surface, borderColor: c.borderLight, opacity: fadeAnim }]}>
-          {/* Message banner */}
-          {message ? (
-            <View
-              style={[
-                styles.messageBanner,
-                {
-                  backgroundColor:
-                    messageType === 'error' ? c.dangerLight : c.infoLight,
-                  borderColor:
-                    messageType === 'error' ? c.danger : c.info,
-                },
-              ]}
-            >
-              <Ionicons
-                name={messageType === 'error' ? 'alert-circle' : 'information-circle'}
-                size={18}
-                color={messageType === 'error' ? c.danger : c.info}
-              />
-              <Text
-                variant="caption"
-                color={messageType === 'error' ? c.dangerDark : c.info}
-                style={styles.messageText}
-              >
-                {message}
-              </Text>
-            </View>
-          ) : null}
-
-          {/* Email field */}
-          <View style={styles.fieldBlock}>
-            <Text variant="caption" color={c.textSecondary} style={styles.fieldLabel}>
-              Email
-            </Text>
-            <View
-              style={[
-                styles.inputContainer,
-                {
-                  borderColor: focusedField === 'email' ? c.primary : c.border,
-                  backgroundColor: c.background,
-                },
-                focusedField === 'email' && styles.inputFocused,
-              ]}
-            >
-              <Ionicons
-                name="mail-outline"
-                size={18}
-                color={focusedField === 'email' ? c.primary : c.textMuted}
-                style={styles.inputIcon}
-              />
-              <TextInput
-                value={email}
-                onChangeText={setEmail}
-                placeholder="you@example.com"
-                placeholderTextColor={c.textMuted}
-                autoCapitalize="none"
-                autoCorrect={false}
-                autoComplete="email"
-                keyboardType="email-address"
-                textContentType="emailAddress"
-                returnKeyType="next"
-                onSubmitEditing={() => passwordRef.current?.focus()}
-                onFocus={() => setFocusedField('email')}
-                onBlur={() => setFocusedField(null)}
-                style={[styles.textInput, { color: c.text }]}
-              />
-            </View>
-          </View>
-
-          {/* Password field */}
-          <View style={styles.fieldBlock}>
-            <Text variant="caption" color={c.textSecondary} style={styles.fieldLabel}>
-              Password
-            </Text>
-            <View
-              style={[
-                styles.inputContainer,
-                {
-                  borderColor: focusedField === 'password' ? c.primary : c.border,
-                  backgroundColor: c.background,
-                },
-                focusedField === 'password' && styles.inputFocused,
-              ]}
-            >
-              <Ionicons
-                name="lock-closed-outline"
-                size={18}
-                color={focusedField === 'password' ? c.primary : c.textMuted}
-                style={styles.inputIcon}
-              />
-              <TextInput
-                ref={passwordRef}
-                value={password}
-                onChangeText={setPassword}
-                placeholder={isSignUp ? 'Create a strong password' : 'Enter your password'}
-                placeholderTextColor={c.textMuted}
-                secureTextEntry={!showPassword}
-                autoCapitalize="none"
-                autoComplete={isSignUp ? 'new-password' : 'current-password'}
-                textContentType={isSignUp ? 'newPassword' : 'password'}
-                returnKeyType="done"
-                onSubmitEditing={() => void submitAccount()}
-                onFocus={() => setFocusedField('password')}
-                onBlur={() => setFocusedField(null)}
-                style={[styles.textInput, { color: c.text }]}
-              />
-              <Pressable
-                onPress={() => setShowPassword(!showPassword)}
-                hitSlop={8}
-                style={styles.eyeButton}
-                accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
-              >
-                <Ionicons
-                  name={showPassword ? 'eye-off-outline' : 'eye-outline'}
-                  size={20}
-                  color={c.textMuted}
-                />
-              </Pressable>
-            </View>
-            {isSignUp ? (
-              <Text variant="caption" color={c.textMuted} style={styles.fieldHint}>
-                Minimum 8 characters
-              </Text>
-            ) : null}
-          </View>
-
-          {/* Submit */}
+        {/* OAuth buttons */}
+        <View style={styles.oauthSection}>
           <Pressable
             accessibilityRole="button"
-            disabled={!appConfig.isSupabaseConfigured || isSubmitting}
-            onPress={() => void submitAccount()}
+            accessibilityLabel="Continue with Google"
+            disabled={oauthLoading !== null}
+            onPress={() => void handleOAuth('google')}
             style={({ pressed }) => [
-              styles.submitButton,
-              { backgroundColor: c.primary },
-              pressed && { backgroundColor: c.primaryPressed },
-              (isSubmitting || !appConfig.isSupabaseConfigured) && styles.submitDisabled,
+              styles.oauthButton,
+              { backgroundColor: c.surface, borderColor: c.border },
+              pressed && { backgroundColor: c.surfaceAlt },
             ]}
           >
-            {isSubmitting ? (
-              <Text variant="bodyBold" color="#FFFFFF">
-                {isSignUp ? 'Creating account...' : 'Signing in...'}
-              </Text>
+            {oauthLoading === 'google' ? (
+              <ActivityIndicator size="small" color={c.textSecondary} />
             ) : (
-              <View style={styles.submitInner}>
-                <Text variant="bodyBold" color="#FFFFFF">
-                  {isSignUp ? 'Create Account' : 'Sign In'}
-                </Text>
-                <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
-              </View>
+              <>
+                <Ionicons name="logo-google" size={20} color="#4285F4" />
+                <Text variant="bodyBold" color={c.text}>Continue with Google</Text>
+              </>
             )}
           </Pressable>
-        </Animated.View>
+
+          {Platform.OS === 'ios' ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Continue with Apple"
+              disabled={oauthLoading !== null}
+              onPress={() => void handleOAuth('apple')}
+              style={({ pressed }) => [
+                styles.oauthButton,
+                { backgroundColor: c.text, borderColor: c.text },
+                pressed && { opacity: 0.85 },
+              ]}
+            >
+              {oauthLoading === 'apple' ? (
+                <ActivityIndicator size="small" color={c.textInverse} />
+              ) : (
+                <>
+                  <Ionicons name="logo-apple" size={20} color={c.textInverse} />
+                  <Text variant="bodyBold" color={c.textInverse}>Continue with Apple</Text>
+                </>
+              )}
+            </Pressable>
+          ) : null}
+        </View>
 
         {/* Divider */}
         <View style={styles.dividerRow}>
           <View style={[styles.dividerLine, { backgroundColor: c.border }]} />
-          <Text variant="caption" color={c.textMuted} style={styles.dividerText}>
-            or
+          <Text variant="caption" color={c.textMuted}>or use email</Text>
+          <View style={[styles.dividerLine, { backgroundColor: c.border }]} />
+        </View>
+
+        {/* Message banner */}
+        {message ? (
+          <View
+            style={[
+              styles.messageBanner,
+              {
+                backgroundColor: messageType === 'error' ? c.dangerLight : c.infoLight,
+                borderColor: messageType === 'error' ? c.danger : c.info,
+              },
+            ]}
+          >
+            <Ionicons
+              name={messageType === 'error' ? 'alert-circle' : 'information-circle'}
+              size={18}
+              color={messageType === 'error' ? c.danger : c.info}
+            />
+            <Text
+              variant="caption"
+              color={messageType === 'error' ? c.dangerDark : c.info}
+              style={styles.messageText}
+            >
+              {message}
+            </Text>
+          </View>
+        ) : null}
+
+        {/* Email field */}
+        <View style={styles.fieldBlock}>
+          <Text variant="caption" color={c.textSecondary} style={styles.fieldLabel}>
+            Email
           </Text>
+          <View
+            style={[
+              styles.inputContainer,
+              {
+                borderColor: focusedField === 'email' ? c.primary : c.border,
+                backgroundColor: c.surface,
+              },
+            ]}
+          >
+            <Ionicons
+              name="mail-outline"
+              size={18}
+              color={focusedField === 'email' ? c.primary : c.textMuted}
+              style={styles.inputIcon}
+            />
+            <TextInput
+              value={email}
+              onChangeText={setEmail}
+              placeholder="you@example.com"
+              placeholderTextColor={c.textMuted}
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoComplete="email"
+              keyboardType="email-address"
+              textContentType="emailAddress"
+              returnKeyType="next"
+              onSubmitEditing={() => passwordRef.current?.focus()}
+              onFocus={() => setFocusedField('email')}
+              onBlur={() => setFocusedField(null)}
+              style={[styles.textInput, { color: c.text }]}
+            />
+          </View>
+        </View>
+
+        {/* Password field */}
+        <View style={styles.fieldBlock}>
+          <Text variant="caption" color={c.textSecondary} style={styles.fieldLabel}>
+            Password
+          </Text>
+          <View
+            style={[
+              styles.inputContainer,
+              {
+                borderColor: focusedField === 'password' ? c.primary : c.border,
+                backgroundColor: c.surface,
+              },
+            ]}
+          >
+            <Ionicons
+              name="lock-closed-outline"
+              size={18}
+              color={focusedField === 'password' ? c.primary : c.textMuted}
+              style={styles.inputIcon}
+            />
+            <TextInput
+              ref={passwordRef}
+              value={password}
+              onChangeText={setPassword}
+              placeholder={isSignUp ? 'Min. 8 characters' : 'Your password'}
+              placeholderTextColor={c.textMuted}
+              secureTextEntry={!showPassword}
+              autoCapitalize="none"
+              autoComplete={isSignUp ? 'new-password' : 'current-password'}
+              textContentType={isSignUp ? 'newPassword' : 'password'}
+              returnKeyType="done"
+              onSubmitEditing={() => void submitAccount()}
+              onFocus={() => setFocusedField('password')}
+              onBlur={() => setFocusedField(null)}
+              style={[styles.textInput, { color: c.text }]}
+            />
+            <Pressable
+              onPress={() => setShowPassword(!showPassword)}
+              hitSlop={8}
+              style={styles.eyeButton}
+              accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+            >
+              <Ionicons
+                name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                size={20}
+                color={c.textMuted}
+              />
+            </Pressable>
+          </View>
+        </View>
+
+        {/* Submit */}
+        <Pressable
+          accessibilityRole="button"
+          disabled={!appConfig.isSupabaseConfigured || isSubmitting}
+          onPress={() => void submitAccount()}
+          style={({ pressed }) => [
+            styles.submitButton,
+            { backgroundColor: c.primary },
+            pressed && { backgroundColor: c.primaryPressed },
+            (isSubmitting || !appConfig.isSupabaseConfigured) && styles.submitDisabled,
+          ]}
+        >
+          {isSubmitting ? (
+            <ActivityIndicator size="small" color="#FFFFFF" />
+          ) : (
+            <View style={styles.submitInner}>
+              <Text variant="bodyBold" color="#FFFFFF">
+                {isSignUp ? 'Create Account' : 'Sign In'}
+              </Text>
+              <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
+            </View>
+          )}
+        </Pressable>
+
+        {/* Second divider */}
+        <View style={styles.dividerRow}>
           <View style={[styles.dividerLine, { backgroundColor: c.border }]} />
         </View>
 
@@ -376,28 +424,20 @@ export default function AccountScreen() {
           ]}
         >
           <View style={styles.localButtonInner}>
-            <View style={[styles.localIcon, { backgroundColor: c.surfaceAlt }]}>
-              <Ionicons name="phone-portrait-outline" size={18} color={c.textSecondary} />
-            </View>
+            <Ionicons name="phone-portrait-outline" size={20} color={c.textSecondary} />
             <View style={styles.localTextBlock}>
-              <Text variant="bodyBold" color={c.text}>
-                Continue without account
-              </Text>
-              <Text variant="caption" color={c.textMuted}>
-                Full offline access. Sync anytime later.
-              </Text>
+              <Text variant="bodyBold" color={c.text}>Continue without account</Text>
+              <Text variant="caption" color={c.textMuted}>Full offline access. Sync later.</Text>
             </View>
-            <Ionicons name="chevron-forward" size={18} color={c.textMuted} />
+            <Ionicons name="chevron-forward" size={16} color={c.textMuted} />
           </View>
         </Pressable>
 
         {/* Footer */}
-        <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.lg }]}>
-          <Text variant="caption" color={c.textMuted} style={styles.footerText}>
-            By continuing, you agree to our Terms of Service and Privacy Policy.
-          </Text>
-        </View>
-      </KeyboardAvoidingView>
+        <Text variant="caption" color={c.textMuted} style={styles.footerText}>
+          By continuing you agree to our Terms of Service and Privacy Policy.
+        </Text>
+      </ScrollView>
     </View>
   );
 }
@@ -408,7 +448,7 @@ const styles = StyleSheet.create({
   },
   headerGradient: {
     paddingHorizontal: spacing.xl,
-    paddingBottom: spacing.xxxl,
+    paddingBottom: spacing.xl,
     overflow: 'hidden',
   },
   decorCircle: {
@@ -417,25 +457,19 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.06)',
   },
   decorCircle1: {
-    width: 200,
-    height: 200,
-    top: -40,
-    right: -60,
+    width: 180,
+    height: 180,
+    top: -50,
+    right: -50,
   },
   decorCircle2: {
-    width: 120,
-    height: 120,
-    top: 60,
-    left: -30,
-  },
-  decorCircle3: {
-    width: 80,
-    height: 80,
-    bottom: 10,
-    right: 40,
+    width: 100,
+    height: 100,
+    bottom: -20,
+    left: -20,
   },
   headerContent: {
-    gap: spacing.md,
+    gap: spacing.sm,
   },
   logoRow: {
     flexDirection: 'row',
@@ -443,32 +477,30 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   logoMark: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
+    width: 32,
+    height: 32,
+    borderRadius: 8,
     backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
   },
   logoText: {
-    fontSize: 17,
+    fontSize: 16,
     letterSpacing: 0.5,
   },
   heroTitle: {
-    fontSize: 26,
-    lineHeight: 32,
+    fontSize: 24,
+    lineHeight: 30,
     fontWeight: '800',
     letterSpacing: -0.3,
   },
-  heroSubtitle: {
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  formWrapper: {
+  scrollView: {
     flex: 1,
-    marginTop: -spacing.xl,
+  },
+  scrollContent: {
     paddingHorizontal: spacing.lg,
-    gap: spacing.lg,
+    paddingTop: spacing.lg,
+    gap: spacing.md,
   },
   modeToggle: {
     flexDirection: 'row',
@@ -489,19 +521,27 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     elevation: 2,
   },
-  modeTabText: {
-    fontSize: 14,
+  oauthSection: {
+    gap: spacing.sm,
   },
-  formCard: {
-    borderRadius: radius.xl,
+  oauthButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    minHeight: 48,
+    borderRadius: radius.md,
     borderWidth: 1,
-    padding: spacing.xl,
-    gap: spacing.lg,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 2,
+  },
+  dividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingVertical: spacing.xs,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
   },
   messageBanner: {
     flexDirection: 'row',
@@ -531,13 +571,6 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderRadius: radius.md,
   },
-  inputFocused: {
-    shadowColor: '#0B6B5B',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.12,
-    shadowRadius: 4,
-    elevation: 2,
-  },
   inputIcon: {
     marginLeft: spacing.md,
   },
@@ -551,16 +584,11 @@ const styles = StyleSheet.create({
   eyeButton: {
     padding: spacing.md,
   },
-  fieldHint: {
-    marginLeft: spacing.xs,
-    fontSize: 11,
-  },
   submitButton: {
     minHeight: 52,
     borderRadius: radius.md,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: spacing.xs,
   },
   submitInner: {
     flexDirection: 'row',
@@ -570,47 +598,24 @@ const styles = StyleSheet.create({
   submitDisabled: {
     opacity: 0.5,
   },
-  dividerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-  },
-  dividerText: {
-    fontSize: 12,
-  },
   localButton: {
     borderRadius: radius.lg,
     borderWidth: 1,
-    padding: spacing.lg,
+    padding: spacing.md,
   },
   localButtonInner: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
   },
-  localIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   localTextBlock: {
     flex: 1,
     gap: 2,
-  },
-  footer: {
-    marginTop: 'auto',
-    alignItems: 'center',
-    paddingTop: spacing.lg,
   },
   footerText: {
     textAlign: 'center',
     fontSize: 11,
     lineHeight: 16,
+    paddingTop: spacing.sm,
   },
 });

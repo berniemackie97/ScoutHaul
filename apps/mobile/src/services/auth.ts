@@ -1,4 +1,6 @@
-import type { Session, User } from '@supabase/supabase-js';
+import type { Provider, Session, User } from '@supabase/supabase-js';
+import * as WebBrowser from 'expo-web-browser';
+import { makeRedirectUri } from 'expo-auth-session';
 import { getSupabaseClient } from './supabaseClient';
 
 type AuthListener = (isAuthenticated: boolean) => void;
@@ -98,6 +100,57 @@ export async function signUpWithPassword(email: string, password: string): Promi
   if (error) throw new Error(error.message);
   syncSession(data.session);
   return data.session;
+}
+
+export async function signInWithOAuthProvider(provider: 'google' | 'apple'): Promise<Session | null> {
+  const supabase = requireSupabaseClient();
+  const redirectTo = makeRedirectUri();
+
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: provider as Provider,
+    options: {
+      redirectTo,
+      skipBrowserRedirect: true,
+    },
+  });
+
+  if (error) throw new Error(error.message);
+  if (!data.url) throw new Error('No OAuth URL returned.');
+
+  const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+
+  if (result.type !== 'success' || !result.url) {
+    return null;
+  }
+
+  // Extract tokens from the redirect URL fragment
+  const url = new URL(result.url);
+  // Supabase puts tokens in the hash fragment
+  const hashParams = new URLSearchParams(url.hash.substring(1));
+  const accessToken = hashParams.get('access_token');
+  const refreshToken = hashParams.get('refresh_token');
+
+  if (!accessToken) {
+    // Try query params as fallback (some flows use code exchange)
+    const code = url.searchParams.get('code');
+    if (code) {
+      const { data: sessionData, error: exchangeError } =
+        await supabase.auth.exchangeCodeForSession(code);
+      if (exchangeError) throw new Error(exchangeError.message);
+      syncSession(sessionData.session);
+      return sessionData.session;
+    }
+    throw new Error('No authentication tokens received.');
+  }
+
+  const { data: sessionData, error: setError } = await supabase.auth.setSession({
+    access_token: accessToken,
+    refresh_token: refreshToken ?? '',
+  });
+
+  if (setError) throw new Error(setError.message);
+  syncSession(sessionData.session);
+  return sessionData.session;
 }
 
 export async function signOut(): Promise<void> {

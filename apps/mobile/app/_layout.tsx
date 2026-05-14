@@ -1,9 +1,12 @@
+import { Ionicons } from '@expo/vector-icons';
 import { Stack, usePathname, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { initializeLocalDatabase, hasCompletedOnboarding } from '../src/db/localStore';
+import { ActivityIndicator, View } from 'react-native';
+import { initializeLocalDatabase, hasCompletedOnboarding, getWorkspaceProfile } from '../src/db/localStore';
+import { Text } from '../src/components/Text';
+import { spacing } from '../src/components/theme';
 import { ThemeProvider, useColors } from '../src/context/ThemeContext';
-import { View } from 'react-native';
-import { initializeAuthSession } from '../src/services/auth';
+import { initializeAuthSession, authStore } from '../src/services/auth';
 
 function RootStack() {
   const c = useColors();
@@ -20,7 +23,7 @@ function RootStack() {
     >
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="onboarding" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
-      <Stack.Screen name="account" options={{ title: 'Account' }} />
+      <Stack.Screen name="account" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
       <Stack.Screen name="scanner" options={{ title: 'Scan Barcode', presentation: 'fullScreenModal' }} />
       <Stack.Screen name="manual-search" options={{ title: 'Search' }} />
       <Stack.Screen name="marketplace-links" options={{ title: 'Marketplace Search' }} />
@@ -53,12 +56,28 @@ function StartupGate() {
     void (async () => {
       await initializeLocalDatabase();
       await initializeAuthSession();
-      const completed = await hasCompletedOnboarding();
+      const profile = await getWorkspaceProfile();
       if (!isMounted) return;
 
       setIsReady(true);
-      if (!completed && pathname !== '/onboarding') {
+
+      // New users: no profile at all → go to account (auth-first)
+      if (!profile) {
+        if (pathname !== '/account' && pathname !== '/onboarding') {
+          router.replace('/account');
+        }
+        return;
+      }
+
+      // Profile exists but onboarding not finished → re-prompt
+      if (!profile.onboardingCompleted && pathname !== '/onboarding' && pathname !== '/account') {
         router.replace('/onboarding');
+        return;
+      }
+
+      // Signed out users who previously had account → prompt sign-in
+      if (profile.accountMode === 'signedOut' && !authStore.isAuthenticated && pathname !== '/account') {
+        router.replace({ pathname: '/account', params: { mode: 'signin' } });
       }
     })();
 
@@ -68,7 +87,13 @@ function StartupGate() {
   }, []);
 
   if (!isReady) {
-    return <View style={{ flex: 1, backgroundColor: c.background }} />;
+    return (
+      <View style={{ flex: 1, backgroundColor: c.background, alignItems: 'center', justifyContent: 'center', gap: spacing.md }}>
+        <Ionicons name="trail-sign" size={40} color={c.primary} />
+        <Text variant="bodyBold" color={c.primary}>HaulScout</Text>
+        <ActivityIndicator size="small" color={c.primary} />
+      </View>
+    );
   }
 
   return <RootStack />;
