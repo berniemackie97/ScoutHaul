@@ -3,13 +3,14 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Animated, Easing, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { api } from '../src/api/client';
 import { Button } from '../src/components/Button';
 import { Card } from '../src/components/Card';
 import { Screen } from '../src/components/Screen';
 import { StatusPill } from '../src/components/StatusPill';
 import { Text } from '../src/components/Text';
+import { TextField } from '../src/components/TextField';
 import { radius, spacing } from '../src/components/theme';
 import { useAppTheme } from '../src/context/ThemeContext';
 import type { MarketplaceListing } from '../src/domain/types';
@@ -58,6 +59,10 @@ export default function BarcodeScannerScreen() {
   const routeParams = useLocalSearchParams<{ sourcingTripId?: string; sourcingTripStopId?: string }>();
   const [permission, requestPermission] = useCameraPermissions();
   const [state, setState] = useState<ScanState>({ phase: 'scanning' });
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState({ title: '', brand: '', model: '', category: '', upc: '', ean: '' });
   const scanLine = useRef(new Animated.Value(0)).current;
   const isScanning = state.phase === 'scanning';
 
@@ -148,6 +153,69 @@ export default function BarcodeScannerScreen() {
     router.push({ pathname: '/inventory/edit', params });
   }
 
+  function openEditForm() {
+    if (state.phase !== 'done') return;
+    const barcode = state.barcode.trim();
+    const isUpc = /^\d{8}$|^\d{12}$/.test(barcode);
+    const isEan = /^\d{13}$|^\d{14}$/.test(barcode);
+    setEditForm({
+      title: resolveProductName(state) ?? '',
+      brand: state.productBrand ?? '',
+      model: '',
+      category: state.productCategory ?? '',
+      upc: isUpc ? barcode : '',
+      ean: isEan ? barcode : '',
+    });
+    setSaveError(null);
+    setEditing(true);
+  }
+
+  async function saveProduct() {
+    if (state.phase !== 'done') return;
+    const title = editForm.title.trim();
+    if (!title) {
+      setSaveError('Product title is required.');
+      return;
+    }
+
+    setSaving(true);
+    setSaveError(null);
+    try {
+      const body = {
+        title,
+        brand: editForm.brand.trim() || null,
+        model: editForm.model.trim() || null,
+        category: editForm.category.trim() || null,
+        upc: editForm.upc.trim() || null,
+        ean: editForm.ean.trim() || null,
+        searchQuery: state.barcode,
+      };
+
+      let savedId: string;
+      if (state.productIdentityId) {
+        const updated = await api.updateProductIdentity(state.productIdentityId, body);
+        savedId = updated.id;
+      } else {
+        const created = await api.createProductIdentity(body);
+        savedId = created.id;
+      }
+
+      // Update scan state with corrected product info
+      setState({
+        ...state,
+        productTitle: title,
+        productBrand: body.brand,
+        productCategory: body.category,
+        productIdentityId: savedId,
+      });
+      setEditing(false);
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : 'Save failed');
+    } finally {
+      setSaving(false);
+    }
+  }
+
   if (!permission) return <Screen><Text variant="body">Checking camera...</Text></Screen>;
 
   if (!permission.granted) {
@@ -208,7 +276,11 @@ export default function BarcodeScannerScreen() {
         </View>
 
         {/* Results panel */}
-        <View style={[styles.panel, { backgroundColor: c.surface }]}>
+        <KeyboardAvoidingView
+          style={[styles.panel, { backgroundColor: c.surface }]}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          keyboardVerticalOffset={0}
+        >
           {state.phase === 'scanning' ? (
             <View style={styles.panelInner}>
               <Text variant="bodyBold">Point at a barcode</Text>
@@ -334,11 +406,18 @@ export default function BarcodeScannerScreen() {
                 {/* Actions */}
                 <View style={styles.actions}>
                   <Pressable
-                    onPress={() => setState({ phase: 'scanning' })}
+                    onPress={() => { setEditing(false); setState({ phase: 'scanning' }); }}
                     style={[styles.iconBtn, { backgroundColor: c.surfaceAlt }]}
                     accessibilityLabel="Rescan"
                   >
                     <Ionicons name="refresh-outline" size={22} color={c.textSecondary} />
+                  </Pressable>
+                  <Pressable
+                    onPress={openEditForm}
+                    style={[styles.iconBtn, { backgroundColor: c.primaryLight }]}
+                    accessibilityLabel={state.productIdentityId ? 'Correct product info' : 'Add product info'}
+                  >
+                    <Ionicons name={state.productIdentityId ? 'create-outline' : 'add-outline'} size={22} color={c.primary} />
                   </Pressable>
                   <Pressable
                     onPress={addToInventory}
@@ -352,10 +431,90 @@ export default function BarcodeScannerScreen() {
                     <Ionicons name="arrow-forward" size={20} color={c.textInverse} />
                   </Pressable>
                 </View>
+
+                {/* Inline product edit form */}
+                {editing ? (
+                  <View style={[styles.editSection, { borderColor: c.border }]}>
+                    <View style={styles.editHeader}>
+                      <View style={{ flex: 1 }}>
+                        <Text variant="bodyBold">
+                          {state.productIdentityId ? 'Correct Product' : 'Add Product'}
+                        </Text>
+                        <Text variant="label" color={c.textMuted}>
+                          Saved as verified data for future scans
+                        </Text>
+                      </View>
+                      <Pressable onPress={() => setEditing(false)} hitSlop={8}>
+                        <Ionicons name="close" size={22} color={c.textMuted} />
+                      </Pressable>
+                    </View>
+                    <TextField
+                      label="Title *"
+                      value={editForm.title}
+                      onChangeText={(v) => setEditForm((f) => ({ ...f, title: v }))}
+                      placeholder="e.g. Ranch Dressing 16oz"
+                      returnKeyType="next"
+                      error={saveError && !editForm.title.trim() ? 'Required' : null}
+                    />
+                    <TextField
+                      label="Brand"
+                      value={editForm.brand}
+                      onChangeText={(v) => setEditForm((f) => ({ ...f, brand: v }))}
+                      placeholder="e.g. Hidden Valley"
+                    />
+                    <TextField
+                      label="Model"
+                      value={editForm.model}
+                      onChangeText={(v) => setEditForm((f) => ({ ...f, model: v }))}
+                      placeholder="Optional"
+                    />
+                    <TextField
+                      label="Category"
+                      value={editForm.category}
+                      onChangeText={(v) => setEditForm((f) => ({ ...f, category: v }))}
+                      placeholder="e.g. Food & Beverage"
+                    />
+                    <View style={styles.editRow}>
+                      <TextField
+                        label="UPC"
+                        value={editForm.upc}
+                        onChangeText={(v) => setEditForm((f) => ({ ...f, upc: v }))}
+                        keyboardType="number-pad"
+                        containerStyle={{ flex: 1 }}
+                      />
+                      <TextField
+                        label="EAN"
+                        value={editForm.ean}
+                        onChangeText={(v) => setEditForm((f) => ({ ...f, ean: v }))}
+                        keyboardType="number-pad"
+                        containerStyle={{ flex: 1 }}
+                      />
+                    </View>
+                    {saveError && editForm.title.trim() ? (
+                      <Text variant="caption" color={c.danger}>{saveError}</Text>
+                    ) : null}
+                    <View style={styles.editActions}>
+                      <Button
+                        label="Cancel"
+                        variant="ghost"
+                        size="sm"
+                        onPress={() => setEditing(false)}
+                      />
+                      <Button
+                        label={saving ? 'Saving...' : 'Save Product'}
+                        icon={saving ? undefined : 'checkmark-outline'}
+                        variant="primary"
+                        size="sm"
+                        disabled={saving}
+                        onPress={() => void saveProduct()}
+                      />
+                    </View>
+                  </View>
+                ) : null}
               </View>
             </ScrollView>
           )}
-        </View>
+        </KeyboardAvoidingView>
       </View>
     </Screen>
   );
@@ -382,7 +541,7 @@ const styles = StyleSheet.create({
   cornerBL: { bottom: 0, left: 0, borderBottomWidth: CW, borderLeftWidth: CW, borderBottomLeftRadius: radius.sm },
   cornerBR: { bottom: 0, right: 0, borderBottomWidth: CW, borderRightWidth: CW, borderBottomRightRadius: radius.sm },
   scanLine: { position: 'absolute', left: spacing.md, right: spacing.md, height: 2, borderRadius: 1, top: 8 },
-  panel: { borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, maxHeight: '55%' },
+  panel: { borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, maxHeight: '65%' },
   panelScroll: { paddingHorizontal: spacing.lg, paddingTop: spacing.lg },
   panelInner: { gap: spacing.md, paddingBottom: spacing.xl },
   productHero: { flexDirection: 'row', gap: spacing.md, alignItems: 'center' },
@@ -436,5 +595,25 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     height: 44,
     borderRadius: radius.md,
+  },
+  editSection: {
+    gap: spacing.sm,
+    borderTopWidth: 1,
+    paddingTop: spacing.md,
+  },
+  editHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+  },
+  editRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  editActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: spacing.sm,
+    paddingTop: spacing.xs,
   },
 });

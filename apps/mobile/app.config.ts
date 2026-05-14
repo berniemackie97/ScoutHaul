@@ -49,8 +49,6 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     extra: {
       apiBaseUrl,
       apiPort: Number(apiPort),
-      organizationId: process.env.EXPO_PUBLIC_SCOUTHAUL_ORG_ID ?? '',
-      userId: process.env.EXPO_PUBLIC_SCOUTHAUL_USER_ID ?? '',
       supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL ?? '',
       supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '',
       eas: {

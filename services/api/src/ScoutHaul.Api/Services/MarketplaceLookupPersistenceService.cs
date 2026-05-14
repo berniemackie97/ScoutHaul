@@ -90,10 +90,17 @@ public sealed class MarketplaceLookupPersistenceService(
                 Upc = upc,
                 Ean = ean,
                 Isbn = isbn,
-                SearchQuery = TrimToNull(result.Query, 500)
+                SearchQuery = TrimToNull(result.Query, 500),
+                DataSource = "external"
             };
 
             db.ProductIdentities.Add(product);
+            return product;
+        }
+
+        // Never overwrite user-verified product data with external API results.
+        if (product.DataSource == "user")
+        {
             return product;
         }
 

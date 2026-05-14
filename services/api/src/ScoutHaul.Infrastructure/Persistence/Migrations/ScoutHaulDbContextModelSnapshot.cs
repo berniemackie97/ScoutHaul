@@ -856,6 +856,10 @@ namespace ScoutHaul.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("DataSource")
+                        .IsRequired()
+                        .HasColumnType("text");
+
                     b.Property<string>("Ean")
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)");

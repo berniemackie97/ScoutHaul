@@ -50,15 +50,16 @@ async function buildHeaders(includeContentType = true): Promise<Record<string, s
 
   if (activeOrganizationId) {
     headers['X-ScoutHaul-Organization-Id'] = activeOrganizationId;
-  } else if (!token && appConfig.isStubAuth) {
-    headers['X-ScoutHaul-Organization-Id'] = appConfig.organizationId;
-    headers['X-ScoutHaul-User-Id'] = appConfig.userId;
   }
 
   return headers;
 }
 
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  if (!authStore.getToken()) {
+    throw new Error('Sign in to access this feature.');
+  }
+
   const response = await fetch(`${appConfig.apiBaseUrl}${path}`, {
     method: options.method ?? 'GET',
     headers: {
@@ -175,6 +176,29 @@ export const api = {
     apiRequest<InventoryItem>(`/api/inventory/${id}/status`, { method: 'PATCH', body: { status } }),
   searchProducts: (search: string) =>
     apiRequest<ProductIdentity[]>(`/api/product-identities?search=${encodeURIComponent(search)}`),
+  getProductIdentity: (id: string) => apiRequest<ProductIdentity>(`/api/product-identities/${id}`),
+  createProductIdentity: (body: {
+    title: string;
+    brand?: string | null;
+    model?: string | null;
+    category?: string | null;
+    upc?: string | null;
+    ean?: string | null;
+    isbn?: string | null;
+    searchQuery?: string | null;
+    notes?: string | null;
+  }) => apiRequest<ProductIdentity>('/api/product-identities', { method: 'POST', body }),
+  updateProductIdentity: (id: string, body: {
+    title: string;
+    brand?: string | null;
+    model?: string | null;
+    category?: string | null;
+    upc?: string | null;
+    ean?: string | null;
+    isbn?: string | null;
+    searchQuery?: string | null;
+    notes?: string | null;
+  }) => apiRequest<ProductIdentity>(`/api/product-identities/${id}`, { method: 'PUT', body }),
   deleteProductIdentity: (id: string) => apiRequest<void>(`/api/product-identities/${id}`, { method: 'DELETE' }),
   marketplaceLinks: (query: string) =>
     apiRequest<MarketplaceSearchLinks>(`/api/marketplace-links?query=${encodeURIComponent(query)}`),

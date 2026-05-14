@@ -119,6 +119,7 @@ public sealed class ProductIdentitiesController(ScoutHaulDbContext db, ICurrentU
         product.Sku = TrimToNull(request.Sku);
         product.SearchQuery = TrimToNull(request.SearchQuery);
         product.Notes = TrimToNull(request.Notes);
+        product.DataSource = "user"; // user-submitted = trusted, overrides external API data
     }
 
     private static string? TrimToNull(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();

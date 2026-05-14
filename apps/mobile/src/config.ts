@@ -6,9 +6,6 @@ export type Environment = 'development' | 'preview' | 'production';
 export interface AppConfig {
   env: Environment;
   apiBaseUrl: string;
-  organizationId: string;
-  userId: string;
-  isStubAuth: boolean;
   supabaseUrl: string;
   supabaseAnonKey: string;
   isSupabaseConfigured: boolean;
@@ -40,17 +37,12 @@ function resolveApiBaseUrl(): string {
 function buildConfig(): AppConfig {
   const extra = Constants.expoConfig?.extra;
   const env = resolveEnvironment();
-  const orgId = (extra?.organizationId as string) ?? '';
-  const userId = (extra?.userId as string) ?? '';
   const supabaseUrl = ((extra?.supabaseUrl as string) ?? '').replace(/\/+$/, '');
   const supabaseAnonKey = (extra?.supabaseAnonKey as string) ?? '';
 
   return {
     env,
     apiBaseUrl: resolveApiBaseUrl(),
-    organizationId: orgId,
-    userId: userId,
-    isStubAuth: env === 'development' && !!orgId && !!userId,
     supabaseUrl,
     supabaseAnonKey,
     isSupabaseConfigured: !!supabaseUrl && !!supabaseAnonKey,

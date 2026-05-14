@@ -16,6 +16,13 @@ public sealed class ProductIdentity : EntityBase, IOrganizationScoped
     public string? Sku { get; set; }
     public string? SearchQuery { get; set; }
     public string? Notes { get; set; }
+
+    /// <summary>
+    /// Tracks where this product data originated.
+    /// "user" = manually entered/corrected by a user (trusted).
+    /// "external" = auto-saved from an external barcode API (may be wrong).
+    /// </summary>
+    public string DataSource { get; set; } = "user";
     public ICollection<InventoryItem> InventoryItems { get; set; } = [];
     public ICollection<MarketObservation> MarketObservations { get; set; } = [];
 }

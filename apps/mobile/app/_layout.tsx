@@ -69,8 +69,8 @@ function StartupGate() {
         return;
       }
 
-      // Signed out users who previously had account → prompt sign-in
-      if (profile.accountMode === 'signedOut' && !authStore.isAuthenticated && pathname !== '/account') {
+      // Not authenticated and didn't explicitly choose local/offline mode → sign in
+      if (!authStore.isAuthenticated && profile.accountMode !== 'local' && pathname !== '/account') {
         router.replace({ pathname: '/account', params: { mode: 'signin' } });
       }
     })();

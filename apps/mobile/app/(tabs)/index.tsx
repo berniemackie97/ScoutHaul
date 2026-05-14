@@ -4,6 +4,7 @@ import { useCallback, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { api } from '../../src/api/client';
 import { IconButton } from '../../src/components/Button';
+import { authStore } from '../../src/services/auth';
 import { ActionCard } from '../../src/components/ActionCard';
 import { Card } from '../../src/components/Card';
 import { ErrorBanner } from '../../src/components/ErrorBanner';
@@ -38,7 +39,7 @@ export default function DashboardScreen() {
       setWorkspaceProfile(await getWorkspaceProfile());
       setPendingSync(syncCount);
 
-      if (connectivity.isOnline) {
+      if (connectivity.isOnline && authStore.isAuthenticated) {
         setSummary(await api.dashboard());
         setError(null);
       }
