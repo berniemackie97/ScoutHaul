@@ -90,6 +90,7 @@ public static class DtoMapping
             item.Condition,
             item.SizeSystem,
             item.SizeValue,
+            item.AttributesJson,
             item.MeasurementsJson,
             item.StorageLocation,
             item.Accessories,

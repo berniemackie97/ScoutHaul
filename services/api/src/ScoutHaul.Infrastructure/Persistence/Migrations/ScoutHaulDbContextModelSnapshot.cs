@@ -415,6 +415,9 @@ namespace ScoutHaul.Infrastructure.Persistence.Migrations
                     b.Property<string>("Accessories")
                         .HasColumnType("text");
 
+                    b.Property<string>("AttributesJson")
+                        .HasColumnType("jsonb");
+
                     b.Property<string>("Barcode")
                         .HasMaxLength(80)
                         .HasColumnType("character varying(80)");

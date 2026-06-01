@@ -168,6 +168,7 @@ export default function InventoryDetailScreen() {
   const projectedProfit = item.estimatedSalePrice && cost
     ? item.estimatedSalePrice - cost
     : null;
+  const attributes = parseAttributes(item.attributesJson);
 
   return (
     <Screen>
@@ -204,6 +205,17 @@ export default function InventoryDetailScreen() {
           </>
         ) : null}
       </Card>
+
+      {attributes.length > 0 ? (
+        <Card>
+          <SectionHeader title="Category Details" />
+          <View style={styles.detailGrid}>
+            {attributes.map(([key, value]) => (
+              <DetailRow key={key} label={formatAttributeLabel(key)} value={value} />
+            ))}
+          </View>
+        </Card>
+      ) : null}
 
       <View style={styles.actionRow}>
         <Button
@@ -360,6 +372,26 @@ function DetailRow({ label, value, valueColor }: { label: string; value: string;
       <Text variant="bodyBold" color={valueColor}>{value}</Text>
     </View>
   );
+}
+
+function parseAttributes(value?: string | null): [string, string][] {
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return [];
+    return Object.entries(parsed as Record<string, unknown>)
+      .filter(([, entry]) => typeof entry === 'string' && entry.trim().length > 0)
+      .map(([key, entry]) => [key, entry as string]);
+  } catch {
+    return [];
+  }
+}
+
+function formatAttributeLabel(key: string): string {
+  return key
+    .replace(/([A-Z])/g, ' $1')
+    .replace(/^./, (letter) => letter.toUpperCase())
+    .trim();
 }
 
 const styles = StyleSheet.create({

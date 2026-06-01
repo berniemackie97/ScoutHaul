@@ -61,6 +61,7 @@ public sealed class InventoryItem : EntityBase, IOrganizationScoped
     public string? Condition { get; set; }
     public string? SizeSystem { get; set; }
     public string? SizeValue { get; set; }
+    public string? AttributesJson { get; set; }
     public string? MeasurementsJson { get; set; }
     public string? StorageLocation { get; set; }
     public string? Accessories { get; set; }

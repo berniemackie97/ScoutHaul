@@ -655,6 +655,7 @@ public sealed class InventoryController(
         item.Condition = TrimToNull(request.Condition);
         item.SizeSystem = TrimToNull(request.SizeSystem);
         item.SizeValue = TrimToNull(request.SizeValue);
+        item.AttributesJson = NormalizeJsonObject(request.AttributesJson);
         item.MeasurementsJson = NormalizeJsonObject(request.MeasurementsJson);
         item.StorageLocation = TrimToNull(request.StorageLocation);
         item.Accessories = TrimToNull(request.Accessories);

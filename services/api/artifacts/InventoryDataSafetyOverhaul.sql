@@ -1460,3 +1460,21 @@ BEGIN
 END $EF$;
 COMMIT;
 
+START TRANSACTION;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260601230206_InventoryAttributesJson') THEN
+    ALTER TABLE "InventoryItems" ADD "AttributesJson" jsonb;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260601230206_InventoryAttributesJson') THEN
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20260601230206_InventoryAttributesJson', '10.0.7');
+    END IF;
+END $EF$;
+COMMIT;
+

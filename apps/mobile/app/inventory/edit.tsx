@@ -16,7 +16,7 @@ import { TextField } from '../../src/components/TextField';
 import { radius, spacing } from '../../src/components/theme';
 import { useAppTheme } from '../../src/context/ThemeContext';
 import { enqueueOperation } from '../../src/db/localStore';
-import { categoryOptions, conditionOptions, damageSeverityOptions, damageTypeOptions, sizeSystemOptions } from '../../src/domain/inventoryOptions';
+import { categoryAttributeFields, categoryOptions, conditionOptions, damageSeverityOptions, damageTypeOptions, sizeSystemOptions } from '../../src/domain/inventoryOptions';
 import type { InventoryItem } from '../../src/domain/types';
 import { parseOptionalNumber } from '../../src/utils/money';
 import { resolvePhotoUrl } from '../../src/utils/photoUrl';
@@ -28,6 +28,8 @@ type LocalPhoto = {
   isHero: boolean;
   isRemote?: boolean;
 };
+
+type AttributeMap = Record<string, string>;
 
 export default function EditInventoryScreen() {
   const { colors: c } = useAppTheme();
@@ -52,6 +54,7 @@ export default function EditInventoryScreen() {
   const [color, setColor] = useState('');
   const [sizeSystem, setSizeSystem] = useState('');
   const [sizeValue, setSizeValue] = useState('');
+  const [attributes, setAttributes] = useState<AttributeMap>({});
   const [storageLocation, setStorageLocation] = useState('');
   const [accessories, setAccessories] = useState('');
   const [missingParts, setMissingParts] = useState('');
@@ -90,6 +93,7 @@ export default function EditInventoryScreen() {
       setColor(item.color ?? '');
       setSizeSystem(item.sizeSystem ?? '');
       setSizeValue(item.sizeValue ?? '');
+      setAttributes(parseAttributes(item.attributesJson));
       setStorageLocation(item.storageLocation ?? '');
       setAccessories(item.accessories ?? '');
       setMissingParts(item.missingParts ?? '');
@@ -186,6 +190,7 @@ export default function EditInventoryScreen() {
       condition: condition || null,
       sizeSystem: sizeSystem || null,
       sizeValue: sizeValue || null,
+      attributesJson: serializeAttributes(attributes),
       measurementsJson: null,
       storageLocation: storageLocation || null,
       accessories: accessories || null,
@@ -369,6 +374,11 @@ export default function EditInventoryScreen() {
           onChangeText={setSizeValue}
           placeholder="M, 32x30, 10.5, One size"
         />
+        <CategoryAttributes
+          category={category}
+          attributes={attributes}
+          onChange={(key, value) => setAttributes((current) => ({ ...current, [key]: value }))}
+        />
         <TextField
           label="Barcode"
           value={barcode}
@@ -526,6 +536,59 @@ function ChipGroup({
   );
 }
 
+function CategoryAttributes({
+  category,
+  attributes,
+  onChange,
+}: {
+  category: string;
+  attributes: AttributeMap;
+  onChange: (key: string, value: string) => void;
+}) {
+  const fields = categoryAttributeFields[category] ?? [];
+  if (fields.length === 0) return null;
+
+  return (
+    <View style={styles.attributeBlock}>
+      <Text variant="caption">Category details</Text>
+      {fields.map((field) => (
+        <TextField
+          key={field.key}
+          label={field.label}
+          value={attributes[field.key] ?? ''}
+          onChangeText={(value) => onChange(field.key, value)}
+          placeholder={field.placeholder}
+          multiline={field.multiline}
+        />
+      ))}
+    </View>
+  );
+}
+
+function parseAttributes(value?: string | null): AttributeMap {
+  if (!value) return {};
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+    return Object.fromEntries(
+      Object.entries(parsed as Record<string, unknown>)
+        .filter(([, entry]) => typeof entry === 'string')
+        .map(([key, entry]) => [key, entry as string]),
+    );
+  } catch {
+    return {};
+  }
+}
+
+function serializeAttributes(value: AttributeMap): string | null {
+  const cleaned = Object.fromEntries(
+    Object.entries(value)
+      .map(([key, entry]) => [key, entry.trim()])
+      .filter(([, entry]) => entry.length > 0),
+  );
+  return Object.keys(cleaned).length > 0 ? JSON.stringify(cleaned) : null;
+}
+
 const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
@@ -549,6 +612,10 @@ const styles = StyleSheet.create({
     borderRadius: radius.full,
     borderWidth: 1,
     justifyContent: 'center',
+  },
+  attributeBlock: {
+    gap: spacing.md,
+    paddingTop: spacing.xs,
   },
   photoScroll: {
     gap: spacing.sm,

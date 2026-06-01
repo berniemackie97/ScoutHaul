@@ -179,6 +179,7 @@ public sealed class ScoutHaulDbContext(DbContextOptions<ScoutHaulDbContext> opti
             entity.Property(item => item.Condition).HasMaxLength(120);
             entity.Property(item => item.SizeSystem).HasMaxLength(80);
             entity.Property(item => item.SizeValue).HasMaxLength(80);
+            entity.Property(item => item.AttributesJson).HasColumnType("jsonb");
             entity.Property(item => item.MeasurementsJson).HasColumnType("jsonb");
             entity.Property(item => item.StorageLocation).HasMaxLength(160);
             entity.Property(item => item.Barcode).HasMaxLength(80);

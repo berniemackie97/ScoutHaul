@@ -85,6 +85,7 @@ export type InventoryItem = {
   condition?: string | null;
   sizeSystem?: string | null;
   sizeValue?: string | null;
+  attributesJson?: string | null;
   measurementsJson?: string | null;
   storageLocation?: string | null;
   accessories?: string | null;
