@@ -27,11 +27,12 @@ public static class DependencyInjection
         services.AddHttpClient<IBarcodeLookupProvider, OpenFoodFactsBarcodeLookupProvider>(ConfigureJsonClient);
         services.AddHttpClient<IBarcodeLookupProvider, UpcItemDbLookupService>(ConfigureJsonClient);
 
+        // Marketplace pricing — tried in order. PriceCharting for collectibles (free token),
+        // Keepa for Amazon price history, SerpApi for Google Shopping. All need API keys.
         services.AddScoped<IMarketplaceLookupService, CompositeMarketplaceLookupService>();
         services.AddHttpClient<IMarketplacePricingProvider, PriceChartingMarketplaceProvider>(ConfigureJsonClient);
         services.AddHttpClient<IMarketplacePricingProvider, KeepaMarketplaceProvider>(ConfigureJsonClient);
         services.AddHttpClient<IMarketplacePricingProvider, SerpApiGoogleShoppingProvider>(ConfigureJsonClient);
-        services.AddHttpClient<IMarketplacePricingProvider, EbayMarketplaceLookupService>(ConfigureJsonClient);
 
         return services;
     }

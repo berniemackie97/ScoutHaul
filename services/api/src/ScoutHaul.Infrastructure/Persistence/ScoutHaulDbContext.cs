@@ -19,6 +19,8 @@ public sealed class ScoutHaulDbContext(DbContextOptions<ScoutHaulDbContext> opti
     public DbSet<OrganizationInviteCode> OrganizationInviteCodes => Set<OrganizationInviteCode>();
     public DbSet<ProductIdentity> ProductIdentities => Set<ProductIdentity>();
     public DbSet<InventoryItem> InventoryItems => Set<InventoryItem>();
+    public DbSet<InventoryPhoto> InventoryPhotos => Set<InventoryPhoto>();
+    public DbSet<InventoryIssue> InventoryIssues => Set<InventoryIssue>();
     public DbSet<MarketObservation> MarketObservations => Set<MarketObservation>();
     public DbSet<MarketAnalysis> MarketAnalyses => Set<MarketAnalysis>();
     public DbSet<BuyRecommendation> BuyRecommendations => Set<BuyRecommendation>();
@@ -170,7 +172,15 @@ public sealed class ScoutHaulDbContext(DbContextOptions<ScoutHaulDbContext> opti
         {
             entity.ToTable("InventoryItems");
             entity.Property(item => item.Title).HasMaxLength(300).IsRequired();
+            entity.Property(item => item.Category).HasMaxLength(160);
+            entity.Property(item => item.Brand).HasMaxLength(160);
+            entity.Property(item => item.Model).HasMaxLength(160);
+            entity.Property(item => item.Color).HasMaxLength(120);
             entity.Property(item => item.Condition).HasMaxLength(120);
+            entity.Property(item => item.SizeSystem).HasMaxLength(80);
+            entity.Property(item => item.SizeValue).HasMaxLength(80);
+            entity.Property(item => item.MeasurementsJson).HasColumnType("jsonb");
+            entity.Property(item => item.StorageLocation).HasMaxLength(160);
             entity.Property(item => item.Barcode).HasMaxLength(80);
             entity.Property(item => item.Status).HasConversion<string>().HasMaxLength(40);
             ConfigureMoney(entity.Property(item => item.SellerAskingPrice));
@@ -183,6 +193,31 @@ public sealed class ScoutHaulDbContext(DbContextOptions<ScoutHaulDbContext> opti
             entity.HasOne(item => item.SourceLocation).WithMany().HasForeignKey(item => item.SourceLocationId).OnDelete(DeleteBehavior.SetNull);
             entity.HasOne(item => item.SourcingTrip).WithMany(item => item.Items).HasForeignKey(item => item.SourcingTripId).OnDelete(DeleteBehavior.SetNull);
             entity.HasOne(item => item.SourcingTripStop).WithMany(item => item.Items).HasForeignKey(item => item.SourcingTripStopId).OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<InventoryPhoto>(entity =>
+        {
+            entity.ToTable("InventoryPhotos");
+            entity.Property(item => item.OriginalFileName).HasMaxLength(240);
+            entity.Property(item => item.ContentType).HasMaxLength(80).IsRequired();
+            entity.Property(item => item.OriginalBytes).IsRequired();
+            entity.Property(item => item.ThumbnailBytes).IsRequired();
+            entity.HasIndex(item => new { item.OrganizationId, item.InventoryItemId, item.SortOrder });
+            entity.HasIndex(item => new { item.InventoryItemId, item.IsHero });
+            entity.HasOne(item => item.Organization).WithMany().HasForeignKey(item => item.OrganizationId);
+            entity.HasOne(item => item.InventoryItem).WithMany(item => item.Photos).HasForeignKey(item => item.InventoryItemId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<InventoryIssue>(entity =>
+        {
+            entity.ToTable("InventoryIssues");
+            entity.Property(item => item.IssueType).HasMaxLength(80).IsRequired();
+            entity.Property(item => item.Severity).HasMaxLength(40).IsRequired();
+            entity.Property(item => item.Note).HasMaxLength(2000);
+            entity.HasIndex(item => new { item.OrganizationId, item.InventoryItemId, item.IsResolved });
+            entity.HasOne(item => item.Organization).WithMany().HasForeignKey(item => item.OrganizationId);
+            entity.HasOne(item => item.InventoryItem).WithMany(item => item.Issues).HasForeignKey(item => item.InventoryItemId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(item => item.InventoryPhoto).WithMany().HasForeignKey(item => item.InventoryPhotoId).OnDelete(DeleteBehavior.SetNull);
         });
 
         modelBuilder.Entity<MarketObservation>(entity =>

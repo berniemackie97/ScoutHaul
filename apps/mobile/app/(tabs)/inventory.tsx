@@ -57,14 +57,17 @@ function formatStatus(status: InventoryStatus): string {
 function useHeroUri(item: InventoryItem) {
   const [uri, setUri] = useState<string | null>(null);
   useEffect(() => {
-    const remoteHero = resolvePhotoUrl(item.photoUrls?.[0]);
+    const typedHero = item.photos?.find((photo) => photo.isHero) ?? item.photos?.[0];
+    const remoteHero = resolvePhotoUrl(
+      item.heroPhotoThumbnailUrl ?? typedHero?.thumbnailUrl ?? item.photoUrls?.[0],
+    );
     if (remoteHero) {
       setUri(remoteHero);
       return;
     }
 
     void getHeroPhoto(item.id).then(setUri);
-  }, [item.id, item.photoUrls]);
+  }, [item.id, item.heroPhotoThumbnailUrl, item.photoUrls, item.photos]);
   return uri;
 }
 

@@ -108,19 +108,46 @@ public sealed class InventoryController(
             return BadRequest("Photo file is required.");
         }
 
-        string uploadedUrl;
+        InventoryPhotoStorageService.ProcessedInventoryPhoto processed;
         try
         {
-            uploadedUrl = await photoStorage.SaveAsync(currentUser.OrganizationId, item.Id, request.File, cancellationToken);
+            processed = await photoStorage.ProcessAsync(request.File, cancellationToken);
         }
         catch (InvalidOperationException exception)
         {
             return BadRequest(exception.Message);
         }
 
+        if (request.IsHero || item.Photos.Count == 0)
+        {
+            foreach (var existingPhoto in item.Photos)
+            {
+                existingPhoto.IsHero = false;
+            }
+        }
+
+        var photo = new InventoryPhoto
+        {
+            OrganizationId = currentUser.OrganizationId,
+            InventoryItemId = item.Id,
+            IsHero = request.IsHero || item.Photos.Count == 0,
+            SortOrder = item.Photos.Count == 0 ? 0 : item.Photos.Max(existing => existing.SortOrder) + 1,
+            OriginalFileName = processed.OriginalFileName,
+            ContentType = processed.ContentType,
+            OriginalBytes = processed.OriginalBytes,
+            ThumbnailBytes = processed.ThumbnailBytes,
+            OriginalByteSize = processed.OriginalByteSize,
+            ThumbnailByteSize = processed.ThumbnailByteSize,
+            Width = processed.Width,
+            Height = processed.Height
+        };
+
+        db.InventoryPhotos.Add(photo);
+
         List<string> photoUrls = ParsePhotoUrls(item.PhotoLocalReferencesJson);
+        string uploadedUrl = PhotoOriginalUrl(item.Id, photo.Id);
         photoUrls.RemoveAll(url => string.Equals(url, uploadedUrl, StringComparison.OrdinalIgnoreCase));
-        if (request.IsHero || photoUrls.Count == 0)
+        if (photo.IsHero || photoUrls.Count == 0)
         {
             photoUrls.Insert(0, uploadedUrl);
         }
@@ -132,7 +159,8 @@ public sealed class InventoryController(
         item.PhotoLocalReferencesJson = JsonSerializer.Serialize(photoUrls);
         await db.SaveChangesAsync(cancellationToken);
 
-        return new InventoryPhotoUploadResultDto(item.Id, photoUrls, uploadedUrl);
+        await db.Entry(item).Collection(existing => existing.Photos).LoadAsync(cancellationToken);
+        return new InventoryPhotoUploadResultDto(item.Id, photoUrls, uploadedUrl, OrderedPhotos(item).Select(item => item.ToDto()).ToArray());
     }
 
     [HttpDelete("{id:guid}/photos")]
@@ -152,18 +180,48 @@ public sealed class InventoryController(
             return BadRequest("Photo URL is required.");
         }
 
+        InventoryPhoto? photo = ResolvePhotoByUrl(item, url);
+        if (photo is not null)
+        {
+            db.InventoryPhotos.Remove(photo);
+        }
+
         List<string> photoUrls = ParsePhotoUrls(item.PhotoLocalReferencesJson);
-        bool removed = photoUrls.RemoveAll(existing => string.Equals(existing, url, StringComparison.OrdinalIgnoreCase)) > 0;
-        if (!removed)
+        bool removedLegacyUrl = photoUrls.RemoveAll(existing => string.Equals(existing, url, StringComparison.OrdinalIgnoreCase)) > 0;
+        if (photo is not null)
+        {
+            photoUrls.RemoveAll(existing =>
+                string.Equals(existing, PhotoOriginalUrl(item.Id, photo.Id), StringComparison.OrdinalIgnoreCase)
+                || string.Equals(existing, PhotoThumbnailUrl(item.Id, photo.Id), StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (photo is null && !removedLegacyUrl)
         {
             return NotFound("Photo was not found on this inventory item.");
         }
 
         item.PhotoLocalReferencesJson = photoUrls.Count == 0 ? null : JsonSerializer.Serialize(photoUrls);
-        await photoStorage.DeleteAsync(currentUser.OrganizationId, item.Id, url);
+        if (photo is null)
+        {
+            await photoStorage.DeleteAsync(currentUser.OrganizationId, item.Id, url);
+        }
+
+        if (photo?.IsHero == true)
+        {
+            InventoryPhoto? nextHero = item.Photos
+                .Where(candidate => candidate.Id != photo.Id)
+                .OrderBy(candidate => candidate.SortOrder)
+                .ThenBy(candidate => candidate.CreatedAt)
+                .FirstOrDefault();
+            if (nextHero is not null)
+            {
+                nextHero.IsHero = true;
+            }
+        }
+
         await db.SaveChangesAsync(cancellationToken);
 
-        return new InventoryPhotoUploadResultDto(item.Id, photoUrls, UploadedUrl: null);
+        return new InventoryPhotoUploadResultDto(item.Id, photoUrls, UploadedUrl: null, OrderedPhotos(item).Where(candidate => candidate.Id != photo?.Id).Select(candidate => candidate.ToDto()).ToArray());
     }
 
     [HttpPatch("{id:guid}/photos/hero")]
@@ -183,8 +241,28 @@ public sealed class InventoryController(
             return BadRequest("Photo URL is required.");
         }
 
+        InventoryPhoto? photo = ResolvePhotoByUrl(item, url);
+        if (photo is not null)
+        {
+            foreach (var existingPhoto in item.Photos)
+            {
+                existingPhoto.IsHero = existingPhoto.Id == photo.Id;
+            }
+        }
+
         List<string> photoUrls = ParsePhotoUrls(item.PhotoLocalReferencesJson);
         int index = photoUrls.FindIndex(existing => string.Equals(existing, url, StringComparison.OrdinalIgnoreCase));
+        if (index < 0 && photo is not null)
+        {
+            url = PhotoOriginalUrl(item.Id, photo.Id);
+            index = photoUrls.FindIndex(existing => string.Equals(existing, url, StringComparison.OrdinalIgnoreCase));
+            if (index < 0)
+            {
+                photoUrls.Insert(0, url);
+                index = 0;
+            }
+        }
+
         if (index < 0)
         {
             return NotFound("Photo was not found on this inventory item.");
@@ -195,7 +273,65 @@ public sealed class InventoryController(
         item.PhotoLocalReferencesJson = JsonSerializer.Serialize(photoUrls);
         await db.SaveChangesAsync(cancellationToken);
 
-        return new InventoryPhotoUploadResultDto(item.Id, photoUrls, UploadedUrl: null);
+        return new InventoryPhotoUploadResultDto(item.Id, photoUrls, UploadedUrl: null, OrderedPhotos(item).Select(item => item.ToDto()).ToArray());
+    }
+
+    [HttpGet("{id:guid}/photos/{photoId:guid}/thumbnail")]
+    [ResponseCache(Duration = 86400, Location = ResponseCacheLocation.Client)]
+    public async Task<IActionResult> GetPhotoThumbnail(Guid id, Guid photoId, CancellationToken cancellationToken)
+    {
+        var photo = await FindPhoto(id, photoId, cancellationToken);
+        return photo is null ? NotFound() : File(photo.ThumbnailBytes, "image/jpeg");
+    }
+
+    [HttpGet("{id:guid}/photos/{photoId:guid}/original")]
+    [ResponseCache(Duration = 86400, Location = ResponseCacheLocation.Client)]
+    public async Task<IActionResult> GetPhotoOriginal(Guid id, Guid photoId, CancellationToken cancellationToken)
+    {
+        var photo = await FindPhoto(id, photoId, cancellationToken);
+        return photo is null ? NotFound() : File(photo.OriginalBytes, photo.ContentType);
+    }
+
+    [HttpDelete("{id:guid}/photos/{photoId:guid}")]
+    public async Task<ActionResult<InventoryPhotoUploadResultDto>> DeletePhotoById(
+        Guid id,
+        Guid photoId,
+        CancellationToken cancellationToken)
+    {
+        var item = await FindItem(id, cancellationToken);
+        if (item is null)
+        {
+            return NotFound();
+        }
+
+        var photo = item.Photos.SingleOrDefault(candidate => candidate.Id == photoId);
+        if (photo is null)
+        {
+            return NotFound("Photo was not found on this inventory item.");
+        }
+
+        db.InventoryPhotos.Remove(photo);
+        List<string> photoUrls = ParsePhotoUrls(item.PhotoLocalReferencesJson);
+        photoUrls.RemoveAll(existing =>
+            string.Equals(existing, PhotoOriginalUrl(item.Id, photo.Id), StringComparison.OrdinalIgnoreCase)
+            || string.Equals(existing, PhotoThumbnailUrl(item.Id, photo.Id), StringComparison.OrdinalIgnoreCase));
+        item.PhotoLocalReferencesJson = photoUrls.Count == 0 ? null : JsonSerializer.Serialize(photoUrls);
+
+        if (photo.IsHero)
+        {
+            InventoryPhoto? nextHero = item.Photos
+                .Where(candidate => candidate.Id != photo.Id)
+                .OrderBy(candidate => candidate.SortOrder)
+                .ThenBy(candidate => candidate.CreatedAt)
+                .FirstOrDefault();
+            if (nextHero is not null)
+            {
+                nextHero.IsHero = true;
+            }
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+        return new InventoryPhotoUploadResultDto(item.Id, photoUrls, UploadedUrl: null, OrderedPhotos(item).Where(candidate => candidate.Id != photo.Id).Select(candidate => candidate.ToDto()).ToArray());
     }
 
 
@@ -218,12 +354,115 @@ public sealed class InventoryController(
         }
 
         var items = await query
+            .Include(item => item.Photos)
             .OrderByDescending(item => item.UpdatedAt)
             .Take(200)
             .Select(item => item.ToDto())
             .ToListAsync(cancellationToken);
 
         return items;
+    }
+
+    [HttpGet("{id:guid}/issues")]
+    public async Task<ActionResult<IReadOnlyList<InventoryIssueDto>>> ListIssues(Guid id, CancellationToken cancellationToken)
+    {
+        if (!await db.InventoryItems.AnyAsync(item => item.Id == id && item.OrganizationId == currentUser.OrganizationId, cancellationToken))
+        {
+            return NotFound();
+        }
+
+        var issues = await db.InventoryIssues
+            .Where(item => item.InventoryItemId == id && item.OrganizationId == currentUser.OrganizationId)
+            .OrderBy(item => item.IsResolved)
+            .ThenBy(item => item.SortOrder)
+            .ThenByDescending(item => item.CreatedAt)
+            .Select(item => item.ToDto())
+            .ToListAsync(cancellationToken);
+
+        return issues;
+    }
+
+    [HttpPost("{id:guid}/issues")]
+    public async Task<ActionResult<InventoryIssueDto>> CreateIssue(
+        Guid id,
+        UpsertInventoryIssueRequest request,
+        CancellationToken cancellationToken)
+    {
+        var item = await FindItem(id, cancellationToken);
+        if (item is null)
+        {
+            return NotFound();
+        }
+
+        string? validation = await ValidateIssueRequest(id, request, cancellationToken);
+        if (validation is not null)
+        {
+            return BadRequest(validation);
+        }
+
+        var issue = new InventoryIssue
+        {
+            OrganizationId = currentUser.OrganizationId,
+            InventoryItemId = id,
+            InventoryPhotoId = request.InventoryPhotoId,
+            IssueType = request.IssueType.Trim(),
+            Severity = request.Severity.Trim(),
+            Note = TrimToNull(request.Note),
+            SortOrder = request.SortOrder ?? await NextIssueSortOrder(id, cancellationToken),
+            IsResolved = request.IsResolved ?? false
+        };
+
+        db.InventoryIssues.Add(issue);
+        await db.SaveChangesAsync(cancellationToken);
+        return CreatedAtAction(nameof(ListIssues), new { id }, issue.ToDto());
+    }
+
+    [HttpPut("{id:guid}/issues/{issueId:guid}")]
+    public async Task<ActionResult<InventoryIssueDto>> UpdateIssue(
+        Guid id,
+        Guid issueId,
+        UpsertInventoryIssueRequest request,
+        CancellationToken cancellationToken)
+    {
+        var issue = await db.InventoryIssues.SingleOrDefaultAsync(
+            item => item.Id == issueId && item.InventoryItemId == id && item.OrganizationId == currentUser.OrganizationId,
+            cancellationToken);
+        if (issue is null)
+        {
+            return NotFound();
+        }
+
+        string? validation = await ValidateIssueRequest(id, request, cancellationToken);
+        if (validation is not null)
+        {
+            return BadRequest(validation);
+        }
+
+        issue.InventoryPhotoId = request.InventoryPhotoId;
+        issue.IssueType = request.IssueType.Trim();
+        issue.Severity = request.Severity.Trim();
+        issue.Note = TrimToNull(request.Note);
+        issue.SortOrder = request.SortOrder ?? issue.SortOrder;
+        issue.IsResolved = request.IsResolved ?? issue.IsResolved;
+
+        await db.SaveChangesAsync(cancellationToken);
+        return issue.ToDto();
+    }
+
+    [HttpDelete("{id:guid}/issues/{issueId:guid}")]
+    public async Task<IActionResult> DeleteIssue(Guid id, Guid issueId, CancellationToken cancellationToken)
+    {
+        var issue = await db.InventoryIssues.SingleOrDefaultAsync(
+            item => item.Id == issueId && item.InventoryItemId == id && item.OrganizationId == currentUser.OrganizationId,
+            cancellationToken);
+        if (issue is null)
+        {
+            return NotFound();
+        }
+
+        db.InventoryIssues.Remove(issue);
+        await db.SaveChangesAsync(cancellationToken);
+        return NoContent();
     }
 
     [HttpPatch("{id:guid}/status")]
@@ -260,8 +499,18 @@ public sealed class InventoryController(
     }
 
     private Task<InventoryItem?> FindItem(Guid id, CancellationToken cancellationToken) =>
-        db.InventoryItems.SingleOrDefaultAsync(
+        db.InventoryItems
+            .Include(item => item.Photos)
+            .Include(item => item.Issues)
+            .SingleOrDefaultAsync(
             item => item.Id == id && item.OrganizationId == currentUser.OrganizationId,
+            cancellationToken);
+
+    private Task<InventoryPhoto?> FindPhoto(Guid itemId, Guid photoId, CancellationToken cancellationToken) =>
+        db.InventoryPhotos.SingleOrDefaultAsync(
+            item => item.Id == photoId
+                && item.InventoryItemId == itemId
+                && item.OrganizationId == currentUser.OrganizationId,
             cancellationToken);
 
     private async Task SyncInventoryPurchaseExpense(
@@ -399,7 +648,20 @@ public sealed class InventoryController(
         item.SourceLocationId = request.SourceLocationId;
         item.Title = request.Title.Trim();
         item.Description = TrimToNull(request.Description);
+        item.Category = TrimToNull(request.Category);
+        item.Brand = TrimToNull(request.Brand);
+        item.Model = TrimToNull(request.Model);
+        item.Color = TrimToNull(request.Color);
         item.Condition = TrimToNull(request.Condition);
+        item.SizeSystem = TrimToNull(request.SizeSystem);
+        item.SizeValue = TrimToNull(request.SizeValue);
+        item.MeasurementsJson = NormalizeJsonObject(request.MeasurementsJson);
+        item.StorageLocation = TrimToNull(request.StorageLocation);
+        item.Accessories = TrimToNull(request.Accessories);
+        item.MissingParts = TrimToNull(request.MissingParts);
+        item.TestingNotes = TrimToNull(request.TestingNotes);
+        item.CleaningNotes = TrimToNull(request.CleaningNotes);
+        item.ListingNotes = TrimToNull(request.ListingNotes);
         item.SellerAskingPrice = request.SellerAskingPrice;
         item.PurchasePrice = request.PurchasePrice;
         item.EstimatedSalePrice = request.EstimatedSalePrice;
@@ -408,6 +670,93 @@ public sealed class InventoryController(
     }
 
     private static string? TrimToNull(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private static string? NormalizeJsonObject(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(value);
+            return document.RootElement.ValueKind == JsonValueKind.Object
+                ? JsonSerializer.Serialize(document.RootElement)
+                : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    private async Task<string?> ValidateIssueRequest(Guid inventoryItemId, UpsertInventoryIssueRequest request, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(request.IssueType))
+        {
+            return "Issue type is required.";
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Severity))
+        {
+            return "Issue severity is required.";
+        }
+
+        if (request.InventoryPhotoId.HasValue)
+        {
+            bool photoExists = await db.InventoryPhotos.AnyAsync(
+                item => item.Id == request.InventoryPhotoId.Value
+                    && item.InventoryItemId == inventoryItemId
+                    && item.OrganizationId == currentUser.OrganizationId,
+                cancellationToken);
+            if (!photoExists)
+            {
+                return "Issue photo does not belong to this inventory item.";
+            }
+        }
+
+        return null;
+    }
+
+    private async Task<int> NextIssueSortOrder(Guid inventoryItemId, CancellationToken cancellationToken)
+    {
+        int? max = await db.InventoryIssues
+            .Where(item => item.InventoryItemId == inventoryItemId && item.OrganizationId == currentUser.OrganizationId)
+            .MaxAsync(item => (int?)item.SortOrder, cancellationToken);
+        return (max ?? -1) + 1;
+    }
+
+    private static IReadOnlyList<InventoryPhoto> OrderedPhotos(InventoryItem item) =>
+        item.Photos
+            .OrderByDescending(photo => photo.IsHero)
+            .ThenBy(photo => photo.SortOrder)
+            .ThenBy(photo => photo.CreatedAt)
+            .ToArray();
+
+    private static InventoryPhoto? ResolvePhotoByUrl(InventoryItem item, string url)
+    {
+        if (TryExtractPhotoId(url, out Guid photoId))
+        {
+            return item.Photos.SingleOrDefault(photo => photo.Id == photoId);
+        }
+
+        return null;
+    }
+
+    private static bool TryExtractPhotoId(string url, out Guid photoId)
+    {
+        photoId = default;
+        string[] parts = url.Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        int photosIndex = Array.FindIndex(parts, part => string.Equals(part, "photos", StringComparison.OrdinalIgnoreCase));
+        return photosIndex >= 0
+            && photosIndex + 1 < parts.Length
+            && Guid.TryParse(parts[photosIndex + 1], out photoId);
+    }
+
+    private static string PhotoOriginalUrl(Guid itemId, Guid photoId) => $"/api/inventory/{itemId}/photos/{photoId}/original";
+
+    private static string PhotoThumbnailUrl(Guid itemId, Guid photoId) => $"/api/inventory/{itemId}/photos/{photoId}/thumbnail";
 
     private static List<string> ParsePhotoUrls(string? value)
     {

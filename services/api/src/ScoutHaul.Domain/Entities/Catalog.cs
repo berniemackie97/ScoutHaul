@@ -54,7 +54,20 @@ public sealed class InventoryItem : EntityBase, IOrganizationScoped
     public SourcingTripStop? SourcingTripStop { get; set; }
     public required string Title { get; set; }
     public string? Description { get; set; }
+    public string? Category { get; set; }
+    public string? Brand { get; set; }
+    public string? Model { get; set; }
+    public string? Color { get; set; }
     public string? Condition { get; set; }
+    public string? SizeSystem { get; set; }
+    public string? SizeValue { get; set; }
+    public string? MeasurementsJson { get; set; }
+    public string? StorageLocation { get; set; }
+    public string? Accessories { get; set; }
+    public string? MissingParts { get; set; }
+    public string? TestingNotes { get; set; }
+    public string? CleaningNotes { get; set; }
+    public string? ListingNotes { get; set; }
     public InventoryStatus Status { get; set; } = InventoryStatus.Draft;
     public decimal? SellerAskingPrice { get; set; }
     public decimal? PurchasePrice { get; set; }
@@ -67,6 +80,41 @@ public sealed class InventoryItem : EntityBase, IOrganizationScoped
     public DateTimeOffset? ListedAt { get; set; }
     public DateTimeOffset? SoldAt { get; set; }
     public ICollection<MarketObservation> MarketObservations { get; set; } = [];
+    public ICollection<InventoryPhoto> Photos { get; set; } = [];
+    public ICollection<InventoryIssue> Issues { get; set; } = [];
     public ICollection<Listing> Listings { get; set; } = [];
     public ICollection<Sale> Sales { get; set; } = [];
+}
+
+public sealed class InventoryPhoto : EntityBase, IOrganizationScoped
+{
+    public Guid OrganizationId { get; set; }
+    public Organization? Organization { get; set; }
+    public Guid InventoryItemId { get; set; }
+    public InventoryItem? InventoryItem { get; set; }
+    public bool IsHero { get; set; }
+    public int SortOrder { get; set; }
+    public string? OriginalFileName { get; set; }
+    public required string ContentType { get; set; }
+    public required byte[] OriginalBytes { get; set; }
+    public required byte[] ThumbnailBytes { get; set; }
+    public long OriginalByteSize { get; set; }
+    public long ThumbnailByteSize { get; set; }
+    public int? Width { get; set; }
+    public int? Height { get; set; }
+}
+
+public sealed class InventoryIssue : EntityBase, IOrganizationScoped
+{
+    public Guid OrganizationId { get; set; }
+    public Organization? Organization { get; set; }
+    public Guid InventoryItemId { get; set; }
+    public InventoryItem? InventoryItem { get; set; }
+    public Guid? InventoryPhotoId { get; set; }
+    public InventoryPhoto? InventoryPhoto { get; set; }
+    public required string IssueType { get; set; }
+    public required string Severity { get; set; }
+    public string? Note { get; set; }
+    public int SortOrder { get; set; }
+    public bool IsResolved { get; set; }
 }

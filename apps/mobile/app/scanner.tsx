@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { recognizeText } from '@infinitered/react-native-mlkit-text-recognition';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -19,6 +20,8 @@ import { formatMoney } from '../src/utils/money';
 type ScanState =
   | { phase: 'scanning' }
   | { phase: 'searching'; barcode: string }
+  | { phase: 'ocr-processing' }
+  | { phase: 'ocr-review'; extractedText: string; ocrQuery: string }
   | {
       phase: 'done';
       barcode: string;
@@ -38,7 +41,7 @@ type ScanState =
       providerWarnings: string[];
     };
 
-/** Get best product name — prefer UPCitemdb, fall back to eBay listing title */
+/** Get best product name — prefer barcode provider, fall back to first listing title */
 function resolveProductName(state: Extract<ScanState, { phase: 'done' }>): string | null {
   if (state.productTitle) return state.productTitle;
   if (state.listings.length === 0) return null;
@@ -49,9 +52,35 @@ function resolveProductName(state: Extract<ScanState, { phase: 'done' }>): strin
     .trim() || raw;
 }
 
-/** Get best product image — prefer UPCitemdb, fall back to first eBay listing */
+/** Get best product image — prefer barcode provider, fall back to first listing image */
 function resolveProductImage(state: Extract<ScanState, { phase: 'done' }>): string | null {
   return state.productImageUrl ?? state.listings[0]?.imageUrl ?? null;
+}
+
+/**
+ * Build a search query from raw OCR text.
+ * Prefers lines that look like product names (longer, mixed case, no URLs).
+ * Falls back to first meaningful chunk.
+ */
+function buildOcrQuery(raw: string): string {
+  const lines = raw
+    .split('\n')
+    .map((l) => l.trim())
+    .filter((l) => l.length > 2 && !l.match(/^https?:\/\//i) && !l.match(/^\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}$/));
+
+  // Score lines: prefer longer, mixed-case, no all-caps short fragments
+  const scored = lines.map((line) => {
+    let score = line.length;
+    if (line.length > 8 && line.length < 80) score += 20;
+    if (/[a-z]/.test(line) && /[A-Z]/.test(line)) score += 10; // mixed case
+    if (/^\d+$/.test(line)) score -= 50; // pure numbers
+    if (/^[A-Z\s]{1,6}$/.test(line)) score -= 20; // short all-caps
+    return { line, score };
+  });
+
+  scored.sort((a, b) => b.score - a.score);
+  const best = scored.slice(0, 3).map((s) => s.line);
+  return best.join(' ').slice(0, 120).trim();
 }
 
 export default function BarcodeScannerScreen() {
@@ -63,6 +92,7 @@ export default function BarcodeScannerScreen() {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({ title: '', brand: '', model: '', category: '', upc: '', ean: '' });
+  const cameraRef = useRef<CameraView>(null);
   const scanLine = useRef(new Animated.Value(0)).current;
   const isScanning = state.phase === 'scanning';
 
@@ -110,6 +140,76 @@ export default function BarcodeScannerScreen() {
         highPrice: null,
         totalResults: 0,
         error: e instanceof Error ? e.message : 'Lookup failed',
+        productTitle: null,
+        productBrand: null,
+        productImageUrl: null,
+        productCategory: null,
+        productIdentityId: null,
+        savedObservationCount: 0,
+        providersUsed: [],
+        providerWarnings: [],
+      });
+    }
+  }
+
+  async function captureAndOcr() {
+    if (!cameraRef.current) return;
+    setState({ phase: 'ocr-processing' });
+    try {
+      const photo = await cameraRef.current.takePictureAsync({ quality: 0.8, skipProcessing: true });
+      if (!photo?.uri) {
+        setState({ phase: 'scanning' });
+        return;
+      }
+      const result = await recognizeText(photo.uri);
+      const raw = result.text.trim();
+      if (!raw) {
+        setState({ phase: 'scanning' });
+        return;
+      }
+      // Build a smart query: take first ~120 chars, prefer lines that look like product names
+      const query = buildOcrQuery(raw);
+      setState({ phase: 'ocr-review', extractedText: raw, ocrQuery: query });
+    } catch (e) {
+      console.warn('OCR failed:', e);
+      setState({ phase: 'scanning' });
+    }
+  }
+
+  async function searchOcrText(query: string) {
+    const q = query.trim();
+    if (!q) return;
+    setState({ phase: 'searching', barcode: `OCR: ${q.slice(0, 40)}` });
+    try {
+      const result = await api.lookupSearch(q);
+      setState({
+        phase: 'done',
+        barcode: q,
+        listings: result.listings,
+        avgPrice: result.averageSoldPrice ?? null,
+        lowPrice: result.lowestPrice ?? null,
+        highPrice: result.highestPrice ?? null,
+        totalResults: result.totalResults,
+        error: null,
+        productTitle: result.productTitle ?? null,
+        productBrand: result.productBrand ?? null,
+        productImageUrl: result.productImageUrl ?? null,
+        productCategory: result.productCategory ?? null,
+        productIdentityId: result.productIdentityId ?? null,
+        savedObservationCount: result.savedObservationCount ?? 0,
+        providersUsed: result.providersUsed ?? [],
+        providerWarnings: result.providerWarnings ?? [],
+      });
+    } catch (e) {
+      setState({
+        phase: 'done',
+        barcode: q,
+        listings: [],
+        avgPrice: null,
+        lowPrice: null,
+        highPrice: null,
+        totalResults: 0,
+        error: e instanceof Error ? e.message : 'Search failed',
         productTitle: null,
         productBrand: null,
         productImageUrl: null,
@@ -245,6 +345,7 @@ export default function BarcodeScannerScreen() {
     <Screen scroll={false} edges={['bottom']}>
       <View style={styles.container}>
         <CameraView
+          ref={cameraRef}
           style={styles.camera}
           facing="back"
           barcodeScannerSettings={{
@@ -285,15 +386,71 @@ export default function BarcodeScannerScreen() {
             <View style={styles.panelInner}>
               <Text variant="bodyBold">Point at a barcode</Text>
               <Text variant="caption" color={c.textMuted}>UPC, EAN, ISBN, Code 128, or QR</Text>
+              <View style={styles.ocrDivider}>
+                <View style={[styles.ocrDividerLine, { backgroundColor: c.border }]} />
+                <Text variant="label" color={c.textMuted}>or</Text>
+                <View style={[styles.ocrDividerLine, { backgroundColor: c.border }]} />
+              </View>
+              <Pressable
+                onPress={() => void captureAndOcr()}
+                style={[styles.ocrBtn, { backgroundColor: c.primaryLight }]}
+              >
+                <Ionicons name="text-outline" size={20} color={c.primary} />
+                <Text variant="bodyBold" color={c.primary}>Photo Scan (OCR)</Text>
+                <Text variant="label" color={c.textMuted}>Read text from label or packaging</Text>
+              </Pressable>
             </View>
+          ) : state.phase === 'ocr-processing' ? (
+            <View style={styles.panelInner}>
+              <View style={styles.searchingRow}>
+                <ActivityIndicator size="small" color={c.primary} />
+                <Text variant="bodyBold" color={c.primary}>Reading text from image...</Text>
+              </View>
+            </View>
+          ) : state.phase === 'ocr-review' ? (
+            <ScrollView style={styles.panelScroll} showsVerticalScrollIndicator={false} bounces={false}>
+              <View style={styles.panelInner}>
+                <View style={styles.editHeader}>
+                  <View style={{ flex: 1 }}>
+                    <Text variant="bodyBold">Text detected — review & search</Text>
+                    <Text variant="label" color={c.textMuted}>Edit query before searching</Text>
+                  </View>
+                  <Pressable onPress={() => setState({ phase: 'scanning' })} hitSlop={8}>
+                    <Ionicons name="close" size={22} color={c.textMuted} />
+                  </Pressable>
+                </View>
+                <View style={[styles.ocrTextBox, { backgroundColor: c.surfaceAlt, borderColor: c.border }]}>
+                  <Text variant="label" color={c.textMuted}>Raw OCR text:</Text>
+                  <Text variant="caption" color={c.textSecondary} numberOfLines={4}>{state.extractedText}</Text>
+                </View>
+                <TextField
+                  label="Search query"
+                  value={state.ocrQuery}
+                  onChangeText={(v) => setState({ ...state, ocrQuery: v })}
+                  placeholder="Product name, brand, model..."
+                  returnKeyType="search"
+                  onSubmitEditing={() => void searchOcrText(state.ocrQuery)}
+                />
+                <View style={styles.editActions}>
+                  <Button label="Back" variant="ghost" size="sm" onPress={() => setState({ phase: 'scanning' })} />
+                  <Button
+                    label="Search"
+                    icon="search-outline"
+                    variant="primary"
+                    size="sm"
+                    onPress={() => void searchOcrText(state.ocrQuery)}
+                  />
+                </View>
+              </View>
+            </ScrollView>
           ) : state.phase === 'searching' ? (
             <View style={styles.panelInner}>
               <View style={styles.barcodeRow}>
-                <Ionicons name="barcode-outline" size={20} color={c.primary} />
-                <Text variant="bodyBold" style={styles.mono}>{state.barcode}</Text>
+                <Ionicons name={state.barcode.startsWith('OCR:') ? 'text-outline' : 'barcode-outline'} size={20} color={c.primary} />
+                <Text variant="bodyBold" style={styles.mono} numberOfLines={1}>{state.barcode}</Text>
               </View>
               <View style={styles.searchingRow}>
-                <Ionicons name="search-outline" size={16} color={c.info} />
+                <ActivityIndicator size="small" color={c.info} />
                 <Text variant="caption" color={c.info}>Checking pricing sources...</Text>
               </View>
             </View>
@@ -595,6 +752,28 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     height: 44,
     borderRadius: radius.md,
+  },
+  ocrDivider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+  ocrDividerLine: {
+    flex: 1,
+    height: 1,
+  },
+  ocrBtn: {
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingVertical: spacing.md,
+    borderRadius: radius.lg,
+  },
+  ocrTextBox: {
+    gap: spacing.xs,
+    padding: spacing.sm,
+    borderRadius: radius.md,
+    borderWidth: 1,
   },
   editSection: {
     gap: spacing.sm,

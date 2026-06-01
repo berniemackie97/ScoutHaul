@@ -153,11 +153,16 @@ export default function SettingsScreen() {
         <View style={styles.row}>
           <Text variant="bodyBold">{pendingSync} pending</Text>
           <StatusPill
-            label={pendingSync > 0 ? 'Needs sync' : 'Clear'}
+            label={pendingSync > 0 ? 'Not safe yet' : 'Safe to update'}
             tone={pendingSync > 0 ? 'warning' : 'success'}
             size="sm"
           />
         </View>
+        <Text variant="caption" color={pendingSync > 0 ? c.warningDark : c.successDark}>
+          {pendingSync > 0
+            ? 'Sync before installing a new APK so queued local work reaches the server.'
+            : 'Signed-in server data should restore after reinstalling or updating the APK.'}
+        </Text>
         <Button
           label={isSyncing ? 'Syncing...' : 'Sync Now'}
           icon="cloud-upload-outline"

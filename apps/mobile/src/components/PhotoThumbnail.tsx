@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Image, Pressable, StyleSheet, View } from 'react-native';
+import { Image } from 'expo-image';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from './Text';
 import { radius, spacing } from './theme';
 import { useColors } from '../context/ThemeContext';
@@ -29,7 +30,13 @@ export function PhotoThumbnail({ uri, size = 56, onPress, placeholder }: PhotoTh
 
   return (
     <Pressable onPress={onPress} accessibilityLabel="Item photo" accessibilityRole="image">
-      <Image source={{ uri }} style={[styles.image, { width: size, height: size }]} />
+      <Image
+        source={{ uri }}
+        style={[styles.image, { width: size, height: size }]}
+        contentFit="cover"
+        cachePolicy="disk"
+        transition={120}
+      />
     </Pressable>
   );
 }

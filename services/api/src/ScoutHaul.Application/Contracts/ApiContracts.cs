@@ -33,6 +33,21 @@ public sealed record OrganizationInviteCodeCreatedDto(OrganizationInviteCodeDto 
 public sealed record RedeemOrganizationInviteCodeRequest(string Code);
 public sealed record OrganizationJoinResultDto(OrganizationDto Organization, OrganizationMemberDto Member, Guid? TeamId);
 
+public sealed record SessionUserDto(Guid Id, string Email, string DisplayName);
+public sealed record SessionRemoteCountsDto(
+    int InventoryItems,
+    int Budgets,
+    int MarketObservations,
+    int Listings,
+    int Tasks,
+    int PendingSyncOperations);
+public sealed record SessionBootstrapDto(
+    SessionUserDto User,
+    IReadOnlyList<OrganizationDto> Organizations,
+    Guid SelectedOrganizationId,
+    SessionRemoteCountsDto RemoteCounts,
+    DateTimeOffset ServerTime);
+
 public sealed record UpsertProductIdentityRequest(
     string Title,
     string? Brand,
@@ -67,7 +82,20 @@ public sealed record UpsertInventoryItemRequest(
     Guid? SourceLocationId,
     string Title,
     string? Description,
+    string? Category,
+    string? Brand,
+    string? Model,
+    string? Color,
     string? Condition,
+    string? SizeSystem,
+    string? SizeValue,
+    string? MeasurementsJson,
+    string? StorageLocation,
+    string? Accessories,
+    string? MissingParts,
+    string? TestingNotes,
+    string? CleaningNotes,
+    string? ListingNotes,
     decimal? SellerAskingPrice,
     decimal? PurchasePrice,
     decimal? EstimatedSalePrice,
@@ -84,7 +112,20 @@ public sealed record InventoryItemDto(
     Guid? SourceLocationId,
     string Title,
     string? Description,
+    string? Category,
+    string? Brand,
+    string? Model,
+    string? Color,
     string? Condition,
+    string? SizeSystem,
+    string? SizeValue,
+    string? MeasurementsJson,
+    string? StorageLocation,
+    string? Accessories,
+    string? MissingParts,
+    string? TestingNotes,
+    string? CleaningNotes,
+    string? ListingNotes,
     InventoryStatus Status,
     decimal? SellerAskingPrice,
     decimal? PurchasePrice,
@@ -92,11 +133,51 @@ public sealed record InventoryItemDto(
     string? Barcode,
     string? Notes,
     IReadOnlyList<string> PhotoUrls,
+    IReadOnlyList<InventoryPhotoDto> Photos,
+    string? HeroPhotoThumbnailUrl,
     bool IsArchived,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);
 
-public sealed record InventoryPhotoUploadResultDto(Guid InventoryItemId, IReadOnlyList<string> PhotoUrls, string? UploadedUrl);
+public sealed record InventoryPhotoDto(
+    Guid Id,
+    Guid InventoryItemId,
+    bool IsHero,
+    int SortOrder,
+    string OriginalUrl,
+    string ThumbnailUrl,
+    string ContentType,
+    long OriginalByteSize,
+    long ThumbnailByteSize,
+    int? Width,
+    int? Height,
+    DateTimeOffset CreatedAt);
+
+public sealed record InventoryPhotoUploadResultDto(
+    Guid InventoryItemId,
+    IReadOnlyList<string> PhotoUrls,
+    string? UploadedUrl,
+    IReadOnlyList<InventoryPhotoDto> Photos);
+
+public sealed record UpsertInventoryIssueRequest(
+    string IssueType,
+    string Severity,
+    string? Note,
+    Guid? InventoryPhotoId,
+    int? SortOrder,
+    bool? IsResolved);
+
+public sealed record InventoryIssueDto(
+    Guid Id,
+    Guid InventoryItemId,
+    Guid? InventoryPhotoId,
+    string IssueType,
+    string Severity,
+    string? Note,
+    int SortOrder,
+    bool IsResolved,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset UpdatedAt);
 
 public sealed record UpsertMarketObservationRequest(
     Guid? ProductIdentityId,

@@ -354,15 +354,85 @@ namespace ScoutHaul.Infrastructure.Persistence.Migrations
                     b.ToTable("IdempotencyRecords", (string)null);
                 });
 
+            modelBuilder.Entity("ScoutHaul.Domain.Entities.InventoryIssue", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("InventoryItemId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("InventoryPhotoId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsResolved")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("IssueType")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Severity")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("InventoryItemId");
+
+                    b.HasIndex("InventoryPhotoId");
+
+                    b.HasIndex("OrganizationId", "InventoryItemId", "IsResolved");
+
+                    b.ToTable("InventoryIssues", (string)null);
+                });
+
             modelBuilder.Entity("ScoutHaul.Domain.Entities.InventoryItem", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("Accessories")
+                        .HasColumnType("text");
+
                     b.Property<string>("Barcode")
                         .HasMaxLength(80)
                         .HasColumnType("character varying(80)");
+
+                    b.Property<string>("Brand")
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)");
+
+                    b.Property<string>("Category")
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)");
+
+                    b.Property<string>("CleaningNotes")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Color")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
 
                     b.Property<string>("Condition")
                         .HasMaxLength(120)
@@ -383,6 +453,19 @@ namespace ScoutHaul.Infrastructure.Persistence.Migrations
 
                     b.Property<DateTimeOffset?>("ListedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ListingNotes")
+                        .HasColumnType("text");
+
+                    b.Property<string>("MeasurementsJson")
+                        .HasColumnType("jsonb");
+
+                    b.Property<string>("MissingParts")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Model")
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)");
 
                     b.Property<string>("Notes")
                         .HasColumnType("text");
@@ -407,6 +490,14 @@ namespace ScoutHaul.Infrastructure.Persistence.Migrations
                         .HasPrecision(12, 2)
                         .HasColumnType("numeric(12,2)");
 
+                    b.Property<string>("SizeSystem")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<string>("SizeValue")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
                     b.Property<DateTimeOffset?>("SoldAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -423,6 +514,13 @@ namespace ScoutHaul.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(40)
                         .HasColumnType("character varying(40)");
+
+                    b.Property<string>("StorageLocation")
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)");
+
+                    b.Property<string>("TestingNotes")
+                        .HasColumnType("text");
 
                     b.Property<string>("Title")
                         .IsRequired()
@@ -447,6 +545,68 @@ namespace ScoutHaul.Infrastructure.Persistence.Migrations
                     b.HasIndex("OrganizationId", "Status");
 
                     b.ToTable("InventoryItems", (string)null);
+                });
+
+            modelBuilder.Entity("ScoutHaul.Domain.Entities.InventoryPhoto", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("Height")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("InventoryItemId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsHero")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("OriginalByteSize")
+                        .HasColumnType("bigint");
+
+                    b.Property<byte[]>("OriginalBytes")
+                        .IsRequired()
+                        .HasColumnType("bytea");
+
+                    b.Property<string>("OriginalFileName")
+                        .HasMaxLength(240)
+                        .HasColumnType("character varying(240)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<long>("ThumbnailByteSize")
+                        .HasColumnType("bigint");
+
+                    b.Property<byte[]>("ThumbnailBytes")
+                        .IsRequired()
+                        .HasColumnType("bytea");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("Width")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("InventoryItemId", "IsHero");
+
+                    b.HasIndex("OrganizationId", "InventoryItemId", "SortOrder");
+
+                    b.ToTable("InventoryPhotos", (string)null);
                 });
 
             modelBuilder.Entity("ScoutHaul.Domain.Entities.Listing", b =>
@@ -1442,6 +1602,32 @@ namespace ScoutHaul.Infrastructure.Persistence.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("ScoutHaul.Domain.Entities.InventoryIssue", b =>
+                {
+                    b.HasOne("ScoutHaul.Domain.Entities.InventoryItem", "InventoryItem")
+                        .WithMany("Issues")
+                        .HasForeignKey("InventoryItemId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ScoutHaul.Domain.Entities.InventoryPhoto", "InventoryPhoto")
+                        .WithMany()
+                        .HasForeignKey("InventoryPhotoId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("ScoutHaul.Domain.Entities.Organization", "Organization")
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("InventoryItem");
+
+                    b.Navigation("InventoryPhoto");
+
+                    b.Navigation("Organization");
+                });
+
             modelBuilder.Entity("ScoutHaul.Domain.Entities.InventoryItem", b =>
                 {
                     b.HasOne("ScoutHaul.Domain.Entities.Organization", "Organization")
@@ -1479,6 +1665,25 @@ namespace ScoutHaul.Infrastructure.Persistence.Migrations
                     b.Navigation("SourcingTrip");
 
                     b.Navigation("SourcingTripStop");
+                });
+
+            modelBuilder.Entity("ScoutHaul.Domain.Entities.InventoryPhoto", b =>
+                {
+                    b.HasOne("ScoutHaul.Domain.Entities.InventoryItem", "InventoryItem")
+                        .WithMany("Photos")
+                        .HasForeignKey("InventoryItemId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ScoutHaul.Domain.Entities.Organization", "Organization")
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("InventoryItem");
+
+                    b.Navigation("Organization");
                 });
 
             modelBuilder.Entity("ScoutHaul.Domain.Entities.Listing", b =>
@@ -1751,9 +1956,13 @@ namespace ScoutHaul.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("ScoutHaul.Domain.Entities.InventoryItem", b =>
                 {
+                    b.Navigation("Issues");
+
                     b.Navigation("Listings");
 
                     b.Navigation("MarketObservations");
+
+                    b.Navigation("Photos");
 
                     b.Navigation("Sales");
                 });

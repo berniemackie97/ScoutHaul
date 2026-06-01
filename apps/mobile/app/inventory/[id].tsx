@@ -16,7 +16,7 @@ import { StatusPill } from '../../src/components/StatusPill';
 import { Text } from '../../src/components/Text';
 import { radius, spacing, type ToneKey } from '../../src/components/theme';
 import { useColors } from '../../src/context/ThemeContext';
-import type { InventoryItem, InventoryStatus, MarketObservation } from '../../src/domain/types';
+import type { InventoryIssue, InventoryItem, InventoryStatus, MarketObservation } from '../../src/domain/types';
 import { formatMoney } from '../../src/utils/money';
 import { getPhotos, type ItemPhoto } from '../../src/utils/photos';
 import { resolvePhotoUrl } from '../../src/utils/photoUrl';
@@ -52,6 +52,7 @@ export default function InventoryDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [item, setItem] = useState<InventoryItem | null>(null);
   const [comps, setComps] = useState<MarketObservation[]>([]);
+  const [issues, setIssues] = useState<InventoryIssue[]>([]);
   const [photos, setPhotos] = useState<ItemPhoto[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -59,15 +60,29 @@ export default function InventoryDetailScreen() {
   async function load() {
     if (!id) return;
     try {
-      const [inv, obs, ph] = await Promise.all([
+      const [inv, obs, remoteIssues, localPhotos] = await Promise.all([
         api.inventoryItem(id),
         api.comps(`inventoryItemId=${encodeURIComponent(id)}`),
+        api.inventoryIssues(id).catch(() => []),
         getPhotos(id),
       ]);
       setItem(inv);
       setComps(obs);
-      const remotePhotos = inv.photoUrls.map((uri) => ({ id: uri, inventoryItemId: id, localUri: resolvePhotoUrl(uri) ?? uri, isHero: false, createdAt: inv.updatedAt }));
-      setPhotos([...remotePhotos, ...ph]);
+      setIssues(remoteIssues);
+      const typedRemotePhotos = inv.photos?.length
+        ? inv.photos.map((photo) => ({
+            id: photo.id,
+            inventoryItemId: id,
+            localUri: resolvePhotoUrl(photo.thumbnailUrl) ?? photo.thumbnailUrl,
+            isHero: photo.isHero,
+            createdAt: photo.createdAt,
+          }))
+        : [];
+      const legacyRemotePhotos = typedRemotePhotos.length > 0
+        ? []
+        : inv.photoUrls.map((uri) => ({ id: uri, inventoryItemId: id, localUri: resolvePhotoUrl(uri) ?? uri, isHero: false, createdAt: inv.updatedAt }));
+      const remotePhotos = [...typedRemotePhotos, ...legacyRemotePhotos];
+      setPhotos([...remotePhotos, ...localPhotos]);
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Item unavailable.');
@@ -176,6 +191,10 @@ export default function InventoryDetailScreen() {
           />
           <Divider />
           <DetailRow label="Condition" value={item.condition ?? 'Not set'} />
+          <DetailRow label="Category" value={item.category ?? 'Not set'} />
+          <DetailRow label="Brand/model" value={[item.brand, item.model].filter(Boolean).join(' / ') || 'Not set'} />
+          <DetailRow label="Size" value={[item.sizeSystem, item.sizeValue].filter(Boolean).join(' · ') || 'Not set'} />
+          <DetailRow label="Storage" value={item.storageLocation ?? 'Not set'} />
           <DetailRow label="Barcode" value={item.barcode ?? 'None'} />
         </View>
         {item.notes ? (
@@ -308,6 +327,25 @@ export default function InventoryDetailScreen() {
               <StatusPill label={comp.observationType} size="sm" />
               <Text variant="caption">{comp.source}</Text>
             </View>
+          </Card>
+        ))
+      )}
+
+      <SectionHeader title={`Issues (${issues.length})`} />
+      {issues.length === 0 ? (
+        <Card>
+          <Text variant="caption">No documented damage or missing parts.</Text>
+        </Card>
+      ) : (
+        issues.map((issue) => (
+          <Card key={issue.id}>
+            <View style={styles.compHeader}>
+              <Text variant="bodyBold" numberOfLines={1} style={styles.flex}>
+                {issue.issueType}
+              </Text>
+              <StatusPill label={issue.severity} tone={issue.isResolved ? 'success' : 'warning'} size="sm" />
+            </View>
+            {issue.note ? <Text variant="caption">{issue.note}</Text> : null}
           </Card>
         ))
       )}

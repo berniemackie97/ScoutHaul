@@ -16,12 +16,15 @@ import { TextField } from '../../src/components/TextField';
 import { radius, spacing } from '../../src/components/theme';
 import { useAppTheme } from '../../src/context/ThemeContext';
 import { enqueueOperation } from '../../src/db/localStore';
+import { categoryOptions, conditionOptions, damageSeverityOptions, damageTypeOptions, sizeSystemOptions } from '../../src/domain/inventoryOptions';
 import type { InventoryItem } from '../../src/domain/types';
 import { parseOptionalNumber } from '../../src/utils/money';
 import { resolvePhotoUrl } from '../../src/utils/photoUrl';
 
 type LocalPhoto = {
   uri: string;
+  thumbnailUri?: string;
+  remoteId?: string;
   isHero: boolean;
   isRemote?: boolean;
 };
@@ -43,13 +46,28 @@ export default function EditInventoryScreen() {
   const [isLoading, setIsLoading] = useState(isEdit);
   const [title, setTitle] = useState(params.title ?? '');
   const [condition, setCondition] = useState(params.condition ?? '');
+  const [category, setCategory] = useState('');
+  const [brand, setBrand] = useState('');
+  const [model, setModel] = useState('');
+  const [color, setColor] = useState('');
+  const [sizeSystem, setSizeSystem] = useState('');
+  const [sizeValue, setSizeValue] = useState('');
+  const [storageLocation, setStorageLocation] = useState('');
+  const [accessories, setAccessories] = useState('');
+  const [missingParts, setMissingParts] = useState('');
+  const [testingNotes, setTestingNotes] = useState('');
+  const [cleaningNotes, setCleaningNotes] = useState('');
+  const [listingNotes, setListingNotes] = useState('');
+  const [damageType, setDamageType] = useState('');
+  const [damageSeverity, setDamageSeverity] = useState('');
+  const [damageNote, setDamageNote] = useState('');
   const [purchasePrice, setPurchasePrice] = useState('');
   const [estimatedSalePrice, setEstimatedSalePrice] = useState(params.estimatedSalePrice ?? '');
   const [barcode, setBarcode] = useState(params.barcode ?? '');
   const [notes, setNotes] = useState('');
   const [description, setDescription] = useState('');
   const [photos, setPhotos] = useState<LocalPhoto[]>([]);
-  const [originalRemotePhotoUrls, setOriginalRemotePhotoUrls] = useState<string[]>([]);
+  const [originalRemotePhotoRefs, setOriginalRemotePhotoRefs] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -66,14 +84,35 @@ export default function EditInventoryScreen() {
       const item = await api.inventoryItem(id);
       setTitle(item.title);
       setCondition(item.condition ?? '');
+      setCategory(item.category ?? '');
+      setBrand(item.brand ?? '');
+      setModel(item.model ?? '');
+      setColor(item.color ?? '');
+      setSizeSystem(item.sizeSystem ?? '');
+      setSizeValue(item.sizeValue ?? '');
+      setStorageLocation(item.storageLocation ?? '');
+      setAccessories(item.accessories ?? '');
+      setMissingParts(item.missingParts ?? '');
+      setTestingNotes(item.testingNotes ?? '');
+      setCleaningNotes(item.cleaningNotes ?? '');
+      setListingNotes(item.listingNotes ?? '');
       setPurchasePrice(item.purchasePrice != null ? String(item.purchasePrice) : '');
       setEstimatedSalePrice(item.estimatedSalePrice != null ? String(item.estimatedSalePrice) : '');
       setBarcode(item.barcode ?? '');
       setNotes(item.notes ?? '');
       setDescription(item.description ?? '');
-      const remotePhotos = item.photoUrls ?? [];
-      setOriginalRemotePhotoUrls(remotePhotos);
-      setPhotos(remotePhotos.map((uri, index) => ({ uri, isHero: index === 0, isRemote: true })));
+      const typedPhotos = item.photos ?? [];
+      const remotePhotos = typedPhotos.length > 0
+        ? typedPhotos.map((photo) => ({
+            uri: photo.originalUrl,
+            thumbnailUri: photo.thumbnailUrl,
+            remoteId: photo.id,
+            isHero: photo.isHero,
+            isRemote: true,
+          }))
+        : (item.photoUrls ?? []).map((uri, index) => ({ uri, isHero: index === 0, isRemote: true }));
+      setOriginalRemotePhotoRefs(remotePhotos.map(remotePhotoKey));
+      setPhotos(remotePhotos);
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unable to load item.');
@@ -140,7 +179,20 @@ export default function EditInventoryScreen() {
 
     const body = {
       title,
+      category: category || null,
+      brand: brand || null,
+      model: model || null,
+      color: color || null,
       condition: condition || null,
+      sizeSystem: sizeSystem || null,
+      sizeValue: sizeValue || null,
+      measurementsJson: null,
+      storageLocation: storageLocation || null,
+      accessories: accessories || null,
+      missingParts: missingParts || null,
+      testingNotes: testingNotes || null,
+      cleaningNotes: cleaningNotes || null,
+      listingNotes: listingNotes || null,
       purchasePrice: parseOptionalNumber(purchasePrice),
       estimatedSalePrice: parseOptionalNumber(estimatedSalePrice),
       barcode: barcode || null,
@@ -153,6 +205,7 @@ export default function EditInventoryScreen() {
       sellerAskingPrice: null,
     };
 
+    let savedItem: InventoryItem | null = null;
     try {
       setIsSaving(true);
       setError(null);
@@ -162,16 +215,24 @@ export default function EditInventoryScreen() {
       } else {
         item = await api.createInventory(body);
       }
+      savedItem = item;
       await persistPhotoChanges(item.id);
+      await persistIssueChanges(item.id);
       if (params.sourcingTripId) {
         router.replace({ pathname: '/active-route', params: { tripId: params.sourcingTripId } });
       } else {
         router.replace(`/inventory/${item.id}`);
       }
     } catch (e) {
-      if (!isEdit && params.sourcingTripId) {
+      if (!isEdit && params.sourcingTripId && !savedItem) {
         await enqueueOperation('CreateRouteStopPurchase', '/api/inventory', 'POST', body);
         router.replace({ pathname: '/active-route', params: { tripId: params.sourcingTripId } });
+        return;
+      }
+
+      if (!isEdit && !savedItem) {
+        await enqueueOperation('CreateInventory', '/api/inventory', 'POST', body);
+        setError('Inventory create queued locally. Sync before installing a new APK so it reaches the server.');
         return;
       }
 
@@ -182,21 +243,41 @@ export default function EditInventoryScreen() {
   }
 
   async function persistPhotoChanges(itemId: string) {
-    const currentRemotePhotoUrls = photos.filter((photo) => photo.isRemote).map((photo) => photo.uri);
-    const removedRemotePhotoUrls = originalRemotePhotoUrls.filter((uri) => !currentRemotePhotoUrls.includes(uri));
+    const currentRemotePhotoRefs = photos.filter((photo) => photo.isRemote).map(remotePhotoKey);
+    const removedRemotePhotoRefs = originalRemotePhotoRefs.filter((ref) => !currentRemotePhotoRefs.includes(ref));
 
-    for (const uri of removedRemotePhotoUrls) {
-      await api.deleteInventoryPhoto(itemId, uri);
+    for (const ref of removedRemotePhotoRefs) {
+      if (ref.startsWith('id:')) {
+        await api.deleteInventoryPhotoById(itemId, ref.slice(3));
+      } else {
+        await api.deleteInventoryPhoto(itemId, ref.slice(4));
+      }
     }
 
     const remoteHero = photos.find((photo) => photo.isHero && photo.isRemote);
-    if (remoteHero && originalRemotePhotoUrls[0] !== remoteHero.uri) {
+    if (remoteHero && originalRemotePhotoRefs[0] !== remotePhotoKey(remoteHero)) {
       await api.setInventoryHeroPhoto(itemId, remoteHero.uri);
     }
 
     for (const photo of photos.filter((candidate) => !candidate.isRemote)) {
       await api.uploadInventoryPhoto(itemId, photo.uri, photo.isHero);
     }
+  }
+
+  function remotePhotoKey(photo: LocalPhoto): string {
+    return photo.remoteId ? `id:${photo.remoteId}` : `url:${photo.uri}`;
+  }
+
+  async function persistIssueChanges(itemId: string) {
+    if (!damageType && !damageSeverity && !damageNote.trim()) return;
+    await api.createInventoryIssue(itemId, {
+      issueType: damageType || 'Other',
+      severity: damageSeverity || 'Minor',
+      note: damageNote.trim() || null,
+      inventoryPhotoId: photos.find((photo) => photo.isHero && photo.remoteId)?.remoteId ?? null,
+      sortOrder: null,
+      isResolved: false,
+    });
   }
 
   if (isLoading) {
@@ -220,9 +301,9 @@ export default function EditInventoryScreen() {
           contentContainerStyle={styles.photoScroll}
         >
           {photos.map((photo, i) => (
-            <View key={photo.uri} style={styles.photoWrapper}>
+            <View key={photo.remoteId ?? photo.uri} style={styles.photoWrapper}>
               <Pressable onPress={() => setHero(i)} style={styles.photoTouch}>
-                <Image source={{ uri: resolvePhotoUrl(photo.uri) ?? photo.uri }} style={styles.photoThumb} contentFit="cover" />
+                <Image source={{ uri: resolvePhotoUrl(photo.thumbnailUri ?? photo.uri) ?? photo.thumbnailUri ?? photo.uri }} style={styles.photoThumb} contentFit="cover" cachePolicy="disk" />
                 {photo.isHero ? (
                   <View style={[styles.heroBadge, { backgroundColor: c.primary }]}>
                     <Ionicons name="star" size={10} color={c.textInverse} />
@@ -274,11 +355,19 @@ export default function EditInventoryScreen() {
           placeholder="Details, color, size, model year"
           multiline
         />
+        <ChipGroup label="Category" value={category} options={categoryOptions} onSelect={setCategory} />
+        <View style={styles.row}>
+          <TextField label="Brand" value={brand} onChangeText={setBrand} placeholder="Nike, Sony, Lego" containerStyle={styles.flex} />
+          <TextField label="Model" value={model} onChangeText={setModel} placeholder="Style, model, SKU" containerStyle={styles.flex} />
+        </View>
+        <TextField label="Color" value={color} onChangeText={setColor} placeholder="Black, red, multicolor" />
+        <ChipGroup label="Condition" value={condition} options={conditionOptions} onSelect={setCondition} />
+        <ChipGroup label="Size system" value={sizeSystem} options={sizeSystemOptions} onSelect={setSizeSystem} />
         <TextField
-          label="Condition"
-          value={condition}
-          onChangeText={setCondition}
-          placeholder="New, Used - Good, For Parts"
+          label="Size"
+          value={sizeValue}
+          onChangeText={setSizeValue}
+          placeholder="M, 32x30, 10.5, One size"
         />
         <TextField
           label="Barcode"
@@ -315,6 +404,64 @@ export default function EditInventoryScreen() {
       </Card>
 
       <Card>
+        <SectionHeader title="Item Work" />
+        <TextField
+          label="Storage/bin"
+          value={storageLocation}
+          onChangeText={setStorageLocation}
+          placeholder="Bin A4, shelf 2, photo station"
+        />
+        <TextField
+          label="Accessories included"
+          value={accessories}
+          onChangeText={setAccessories}
+          multiline
+          placeholder="Charger, box, manual, extra parts"
+        />
+        <TextField
+          label="Missing parts"
+          value={missingParts}
+          onChangeText={setMissingParts}
+          multiline
+          placeholder="No remote, missing laces, no box"
+        />
+        <TextField
+          label="Testing notes"
+          value={testingNotes}
+          onChangeText={setTestingNotes}
+          multiline
+          placeholder="Powers on, buttons tested, untested"
+        />
+        <TextField
+          label="Cleaning notes"
+          value={cleaningNotes}
+          onChangeText={setCleaningNotes}
+          multiline
+          placeholder="Needs wash, wipe down, odor treatment"
+        />
+        <TextField
+          label="Listing notes"
+          value={listingNotes}
+          onChangeText={setListingNotes}
+          multiline
+          placeholder="Keywords, bundle notes, listing reminders"
+        />
+      </Card>
+
+      <Card>
+        <SectionHeader title="Damage / Issues" />
+        <ChipGroup label="Issue type" value={damageType} options={damageTypeOptions} onSelect={setDamageType} />
+        <ChipGroup label="Severity" value={damageSeverity} options={damageSeverityOptions} onSelect={setDamageSeverity} />
+        <TextField
+          label="Damage note"
+          value={damageNote}
+          onChangeText={setDamageNote}
+          multiline
+          placeholder="Where it is, how visible it is, whether it affects function"
+        />
+      </Card>
+
+      <Card>
         <TextField
           label="Notes"
           value={notes}
@@ -336,6 +483,49 @@ export default function EditInventoryScreen() {
   );
 }
 
+function ChipGroup({
+  label,
+  value,
+  options,
+  onSelect,
+}: {
+  label: string;
+  value: string;
+  options: readonly string[];
+  onSelect: (value: string) => void;
+}) {
+  const { colors: c } = useAppTheme();
+  return (
+    <View style={styles.chipGroup}>
+      <Text variant="caption" color={c.textSecondary}>{label}</Text>
+      <View style={styles.chipWrap}>
+        {options.map((option) => {
+          const selected = option === value;
+          return (
+            <Pressable
+              key={option}
+              accessibilityRole="button"
+              accessibilityState={{ selected }}
+              onPress={() => onSelect(selected ? '' : option)}
+              style={[
+                styles.chip,
+                {
+                  backgroundColor: selected ? c.primary : c.surfaceAlt,
+                  borderColor: selected ? c.primary : c.border,
+                },
+              ]}
+            >
+              <Text variant="caption" color={selected ? c.textInverse : c.textSecondary}>
+                {option}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
@@ -343,6 +533,22 @@ const styles = StyleSheet.create({
   },
   flex: {
     flex: 1,
+  },
+  chipGroup: {
+    gap: spacing.xs,
+  },
+  chipWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  chip: {
+    minHeight: 36,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.full,
+    borderWidth: 1,
+    justifyContent: 'center',
   },
   photoScroll: {
     gap: spacing.sm,

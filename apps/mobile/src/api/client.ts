@@ -6,7 +6,9 @@ import type {
   Budget,
   DashboardSummary,
   Expense,
+  InventoryIssue,
   InventoryItem,
+  InventoryPhoto,
   Listing,
   MarketAnalysisResponse,
   MarketplaceLookupResult,
@@ -23,6 +25,7 @@ import type {
   ProductIdentity,
   ResaleTask,
   Sale,
+  SessionBootstrap,
   SourcingRouteDetail,
   SourcingTrip,
   SourcingTripStop,
@@ -117,6 +120,7 @@ async function uploadMultipart<T>(path: string, formData: FormData, idempotencyK
 }
 
 export const api = {
+  bootstrapSession: () => apiRequest<SessionBootstrap>('/api/session/bootstrap'),
   organizations: () => apiRequest<Organization[]>('/api/organizations'),
   createOrganization: (body: { name: string }) => apiRequest<Organization>('/api/organizations', { method: 'POST', body }),
   organizationMembers: (organizationId: string) => apiRequest<OrganizationMember[]>(`/api/organizations/${organizationId}/members`),
@@ -171,18 +175,30 @@ export const api = {
       type: 'image/jpeg',
     } as unknown as Blob);
     form.append('isHero', String(isHero));
-    return uploadMultipart<{ inventoryItemId: string; photoUrls: string[]; uploadedUrl?: string | null }>(`/api/inventory/${id}/photos`, form);
+    return uploadMultipart<{ inventoryItemId: string; photoUrls: string[]; uploadedUrl?: string | null; photos: InventoryPhoto[] }>(`/api/inventory/${id}/photos`, form);
   },
   deleteInventoryPhoto: (id: string, url: string) =>
-    apiRequest<{ inventoryItemId: string; photoUrls: string[]; uploadedUrl?: string | null }>(
+    apiRequest<{ inventoryItemId: string; photoUrls: string[]; uploadedUrl?: string | null; photos: InventoryPhoto[] }>(
       `/api/inventory/${id}/photos?url=${encodeURIComponent(url)}`,
       { method: 'DELETE' },
     ),
+  deleteInventoryPhotoById: (id: string, photoId: string) =>
+    apiRequest<{ inventoryItemId: string; photoUrls: string[]; uploadedUrl?: string | null; photos: InventoryPhoto[] }>(
+      `/api/inventory/${id}/photos/${photoId}`,
+      { method: 'DELETE' },
+    ),
   setInventoryHeroPhoto: (id: string, url: string) =>
-    apiRequest<{ inventoryItemId: string; photoUrls: string[]; uploadedUrl?: string | null }>(
+    apiRequest<{ inventoryItemId: string; photoUrls: string[]; uploadedUrl?: string | null; photos: InventoryPhoto[] }>(
       `/api/inventory/${id}/photos/hero?url=${encodeURIComponent(url)}`,
       { method: 'PATCH' },
     ),
+  inventoryIssues: (id: string) => apiRequest<InventoryIssue[]>(`/api/inventory/${id}/issues`),
+  createInventoryIssue: (id: string, body: unknown) =>
+    apiRequest<InventoryIssue>(`/api/inventory/${id}/issues`, { method: 'POST', body }),
+  updateInventoryIssue: (id: string, issueId: string, body: unknown) =>
+    apiRequest<InventoryIssue>(`/api/inventory/${id}/issues/${issueId}`, { method: 'PUT', body }),
+  deleteInventoryIssue: (id: string, issueId: string) =>
+    apiRequest<void>(`/api/inventory/${id}/issues/${issueId}`, { method: 'DELETE' }),
   changeInventoryStatus: (id: string, status: string) =>
     apiRequest<InventoryItem>(`/api/inventory/${id}/status`, { method: 'PATCH', body: { status } }),
   searchProducts: (search: string) =>

@@ -2,11 +2,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { Stack, usePathname, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
-import { initializeLocalDatabase, hasCompletedOnboarding, getWorkspaceProfile } from '../src/db/localStore';
+import { getPendingSyncCount, getWorkspaceProfile, initializeLocalDatabase, processSyncQueue } from '../src/db/localStore';
 import { Text } from '../src/components/Text';
 import { spacing } from '../src/components/theme';
 import { ThemeProvider, useColors } from '../src/context/ThemeContext';
 import { initializeAuthSession, authStore } from '../src/services/auth';
+import { bootstrapSignedInWorkspace } from '../src/services/sessionBootstrap';
 
 function RootStack() {
   const c = useColors();
@@ -56,7 +57,18 @@ function StartupGate() {
     void (async () => {
       await initializeLocalDatabase();
       await initializeAuthSession();
-      const profile = await getWorkspaceProfile();
+      let profile = await getWorkspaceProfile();
+      if (authStore.isAuthenticated) {
+        try {
+          await bootstrapSignedInWorkspace();
+          if (await getPendingSyncCount() > 0) {
+            await processSyncQueue();
+          }
+          profile = await getWorkspaceProfile();
+        } catch (error) {
+          console.warn('Unable to bootstrap signed-in workspace:', error);
+        }
+      }
       if (!isMounted) return;
 
       setIsReady(true);

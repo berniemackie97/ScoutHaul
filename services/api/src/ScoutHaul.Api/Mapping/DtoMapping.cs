@@ -80,20 +80,71 @@ public static class DtoMapping
         item.ProductIdentityId,
         item.SourcingTripId,
         item.SourcingTripStopId,
-        item.SourceLocationId,
-        item.Title,
-        item.Description,
-        item.Condition,
-        item.Status,
-        item.SellerAskingPrice,
-        item.PurchasePrice,
+            item.SourceLocationId,
+            item.Title,
+            item.Description,
+            item.Category,
+            item.Brand,
+            item.Model,
+            item.Color,
+            item.Condition,
+            item.SizeSystem,
+            item.SizeValue,
+            item.MeasurementsJson,
+            item.StorageLocation,
+            item.Accessories,
+            item.MissingParts,
+            item.TestingNotes,
+            item.CleaningNotes,
+            item.ListingNotes,
+            item.Status,
+            item.SellerAskingPrice,
+            item.PurchasePrice,
             item.EstimatedSalePrice,
             item.Barcode,
             item.Notes,
             ParsePhotoUrls(item.PhotoLocalReferencesJson),
+            item.Photos
+                .OrderByDescending(photo => photo.IsHero)
+                .ThenBy(photo => photo.SortOrder)
+                .ThenBy(photo => photo.CreatedAt)
+                .Select(photo => photo.ToDto())
+                .ToArray(),
+            item.Photos
+                .OrderByDescending(photo => photo.IsHero)
+                .ThenBy(photo => photo.SortOrder)
+                .ThenBy(photo => photo.CreatedAt)
+                .Select(photo => $"/api/inventory/{item.Id}/photos/{photo.Id}/thumbnail")
+                .FirstOrDefault(),
             item.IsArchived,
             item.CreatedAt,
             item.UpdatedAt);
+
+    public static InventoryPhotoDto ToDto(this InventoryPhoto item) => new(
+        item.Id,
+        item.InventoryItemId,
+        item.IsHero,
+        item.SortOrder,
+        $"/api/inventory/{item.InventoryItemId}/photos/{item.Id}/original",
+        $"/api/inventory/{item.InventoryItemId}/photos/{item.Id}/thumbnail",
+        item.ContentType,
+        item.OriginalByteSize,
+        item.ThumbnailByteSize,
+        item.Width,
+        item.Height,
+        item.CreatedAt);
+
+    public static InventoryIssueDto ToDto(this InventoryIssue item) => new(
+        item.Id,
+        item.InventoryItemId,
+        item.InventoryPhotoId,
+        item.IssueType,
+        item.Severity,
+        item.Note,
+        item.SortOrder,
+        item.IsResolved,
+        item.CreatedAt,
+        item.UpdatedAt);
 
     public static MarketObservationDto ToDto(this MarketObservation item) => new(
         item.Id,

@@ -1,4 +1,7 @@
 using Microsoft.AspNetCore.Hosting;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats.Jpeg;
+using SixLabors.ImageSharp.Processing;
 
 namespace ScoutHaul.Api.Services;
 
@@ -7,27 +10,27 @@ public sealed class InventoryPhotoStorageService(
     IConfiguration configuration,
     ILogger<InventoryPhotoStorageService> logger)
 {
+    public sealed record ProcessedInventoryPhoto(
+        byte[] OriginalBytes,
+        byte[] ThumbnailBytes,
+        string ContentType,
+        string? OriginalFileName,
+        long OriginalByteSize,
+        long ThumbnailByteSize,
+        int Width,
+        int Height);
+
     private static readonly HashSet<string> AllowedContentTypes = new(StringComparer.OrdinalIgnoreCase)
     {
         "image/jpeg",
         "image/png",
-        "image/webp",
-        "image/heic",
-        "image/heif"
-    };
-
-    private static readonly Dictionary<string, string> ExtensionByContentType = new(StringComparer.OrdinalIgnoreCase)
-    {
-        ["image/jpeg"] = ".jpg",
-        ["image/png"] = ".png",
-        ["image/webp"] = ".webp",
-        ["image/heic"] = ".heic",
-        ["image/heif"] = ".heif"
+        "image/webp"
     };
 
     public long MaxBytes => configuration.GetValue("Storage:InventoryPhotos:MaxBytes", 8_000_000);
+    public int ThumbnailMaxPixels => configuration.GetValue("Storage:InventoryPhotos:ThumbnailMaxPixels", 360);
 
-    public async Task<string> SaveAsync(Guid organizationId, Guid inventoryItemId, IFormFile file, CancellationToken cancellationToken)
+    public async Task<ProcessedInventoryPhoto> ProcessAsync(IFormFile file, CancellationToken cancellationToken)
     {
         if (file.Length <= 0)
         {
@@ -41,21 +44,45 @@ public sealed class InventoryPhotoStorageService(
 
         if (!AllowedContentTypes.Contains(file.ContentType))
         {
-            throw new InvalidOperationException("Only JPEG, PNG, WebP, HEIC, and HEIF photos are supported.");
+            throw new InvalidOperationException("Only JPEG, PNG, and WebP photos are supported.");
         }
 
-        string extension = ExtensionByContentType[file.ContentType];
-        string relativeDirectory = Path.Combine("uploads", "inventory", organizationId.ToString("N"), inventoryItemId.ToString("N"));
-        string absoluteDirectory = Path.Combine(WebRootPath(), relativeDirectory);
-        Directory.CreateDirectory(absoluteDirectory);
+        await using MemoryStream originalStream = new();
+        await file.CopyToAsync(originalStream, cancellationToken);
+        byte[] originalBytes = originalStream.ToArray();
 
-        string fileName = $"{Guid.NewGuid():N}{extension}";
-        string absolutePath = Path.Combine(absoluteDirectory, fileName);
-        await using FileStream stream = File.Create(absolutePath);
-        await file.CopyToAsync(stream, cancellationToken);
+        originalStream.Position = 0;
+        try
+        {
+            using Image image = await Image.LoadAsync(originalStream, cancellationToken);
+            int width = image.Width;
+            int height = image.Height;
 
-        string relativeUrl = "/" + Path.Combine(relativeDirectory, fileName).Replace(Path.DirectorySeparatorChar, '/');
-        return relativeUrl;
+            image.Mutate(operation => operation.AutoOrient());
+            image.Mutate(operation => operation.Resize(new ResizeOptions
+            {
+                Mode = ResizeMode.Max,
+                Size = new Size(ThumbnailMaxPixels, ThumbnailMaxPixels)
+            }));
+
+            await using MemoryStream thumbnailStream = new();
+            await image.SaveAsJpegAsync(thumbnailStream, new JpegEncoder { Quality = 74 }, cancellationToken);
+            byte[] thumbnailBytes = thumbnailStream.ToArray();
+
+            return new ProcessedInventoryPhoto(
+                originalBytes,
+                thumbnailBytes,
+                file.ContentType,
+                string.IsNullOrWhiteSpace(file.FileName) ? null : Path.GetFileName(file.FileName),
+                originalBytes.LongLength,
+                thumbnailBytes.LongLength,
+                width,
+                height);
+        }
+        catch (Exception exception) when (exception is UnknownImageFormatException or InvalidImageContentException)
+        {
+            throw new InvalidOperationException("Photo could not be decoded. Upload a valid JPEG, PNG, or WebP image.", exception);
+        }
     }
 
     public Task DeleteAsync(Guid organizationId, Guid inventoryItemId, string url)

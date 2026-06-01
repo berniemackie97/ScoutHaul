@@ -58,7 +58,7 @@ export default function ManualSearchScreen() {
       setIsSearching(true);
       setError(null);
 
-      // Search internal DB and eBay marketplace in parallel
+      // Search internal DB and marketplace providers in parallel
       const [dbResults, ebayResults] = await Promise.allSettled([
         api.searchProducts(q),
         api.lookupSearch(q),
@@ -111,7 +111,7 @@ export default function ManualSearchScreen() {
           value={query}
           onChangeText={setQuery}
           placeholder="Brand, model, SKU, barcode..."
-          hint="Searches your database + eBay marketplace"
+          hint="Searches your database + marketplace providers"
         />
         <Button
           label={isSearching ? 'Searching...' : 'Search'}
@@ -157,7 +157,7 @@ export default function ManualSearchScreen() {
         />
       </View>
 
-      {/* Marketplace deep links — search eBay, Google, FB, Amazon, Mercari etc. */}
+      {/* Marketplace deep links — opens external search on eBay, Google, FB, Amazon, etc. */}
       <Button
         label="Search Marketplaces"
         icon="open-outline"
@@ -195,7 +195,7 @@ export default function ManualSearchScreen() {
         />
       ) : (
         <>
-          {/* eBay marketplace results */}
+          {/* Marketplace pricing results */}
           {marketResults.length > 0 ? (
             <>
               <SectionHeader title="Marketplace Results" />

@@ -26,6 +26,7 @@ import {
   signOut,
   signUpWithPassword,
 } from '../src/services/auth';
+import { bootstrapSignedInWorkspace } from '../src/services/sessionBootstrap';
 import { setActiveOrganizationId } from '../src/services/workspaceSession';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -104,7 +105,8 @@ export default function AccountScreen() {
       return;
     }
 
-    router.replace(existing?.onboardingCompleted ? '/(tabs)' : '/onboarding');
+    await bootstrapSignedInWorkspace();
+    router.replace('/(tabs)');
   }
 
   async function joinTeamFromInviteCode() {

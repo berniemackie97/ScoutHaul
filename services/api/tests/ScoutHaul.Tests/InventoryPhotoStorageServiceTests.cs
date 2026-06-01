@@ -1,0 +1,64 @@
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.FileProviders;
+using Microsoft.Extensions.Logging.Abstractions;
+using ScoutHaul.Api.Services;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.PixelFormats;
+
+namespace ScoutHaul.Tests;
+
+public sealed class InventoryPhotoStorageServiceTests
+{
+    [Fact]
+    public async Task ProcessAsync_CreatesThumbnailBytesAndMetadata()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Storage:InventoryPhotos:MaxBytes"] = "8000000",
+                ["Storage:InventoryPhotos:ThumbnailMaxPixels"] = "120"
+            })
+            .Build();
+        var service = new InventoryPhotoStorageService(
+            new TestWebHostEnvironment(),
+            configuration,
+            NullLogger<InventoryPhotoStorageService>.Instance);
+        byte[] pngBytes;
+        using (var image = new Image<Rgba32>(2, 2, Color.Red))
+        {
+            await using var pngStream = new MemoryStream();
+            await image.SaveAsPngAsync(pngStream);
+            pngBytes = pngStream.ToArray();
+        }
+
+        await using var stream = new MemoryStream(pngBytes);
+        var file = new FormFile(stream, 0, pngBytes.Length, "file", "item.png")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "image/png"
+        };
+
+        var result = await service.ProcessAsync(file, CancellationToken.None);
+
+        Assert.Equal("image/png", result.ContentType);
+        Assert.Equal("item.png", result.OriginalFileName);
+        Assert.Equal(2, result.Width);
+        Assert.Equal(2, result.Height);
+        Assert.Equal(pngBytes.Length, result.OriginalByteSize);
+        Assert.NotEmpty(result.OriginalBytes);
+        Assert.NotEmpty(result.ThumbnailBytes);
+        Assert.True(result.ThumbnailByteSize > 0);
+    }
+
+    private sealed class TestWebHostEnvironment : IWebHostEnvironment
+    {
+        public string ApplicationName { get; set; } = "ScoutHaul.Tests";
+        public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
+        public string ContentRootPath { get; set; } = Path.GetTempPath();
+        public string EnvironmentName { get; set; } = "Development";
+        public string WebRootPath { get; set; } = Path.GetTempPath();
+        public IFileProvider WebRootFileProvider { get; set; } = new NullFileProvider();
+    }
+}
