@@ -25,13 +25,14 @@ const providerIcons: Record<string, keyof typeof Ionicons.glyphMap> = {
 };
 
 export default function MarketplaceLinksScreen() {
-  const params = useLocalSearchParams<{ query?: string }>();
+  const params = useLocalSearchParams<{ query?: string; barcode?: string }>();
   const { colors: c, shadows: s } = useAppTheme();
   const connectivity = useConnectivity();
   const [query, setQuery] = useState(params.query ?? '');
   const [links, setLinks] = useState<MarketplaceSearchLink[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [activeQuery, setActiveQuery] = useState('');
 
   async function loadLinks(q = query) {
     if (!q.trim()) {
@@ -41,6 +42,7 @@ export default function MarketplaceLinksScreen() {
     try {
       setIsLoading(true);
       setError(null);
+      setActiveQuery(q);
       const result = await api.marketplaceLinks(q);
       setLinks(result.links);
     } catch (e) {
@@ -56,6 +58,8 @@ export default function MarketplaceLinksScreen() {
       void loadLinks(params.query);
     }
   }, [params.query]);
+
+  const hasBarcode = params.barcode && params.barcode !== query && params.barcode !== activeQuery;
 
   return (
     <Screen>
@@ -75,6 +79,18 @@ export default function MarketplaceLinksScreen() {
           disabled={isLoading}
           onPress={() => void loadLinks()}
         />
+        {hasBarcode ? (
+          <Button
+            label={`Search by barcode: ${params.barcode}`}
+            icon="barcode-outline"
+            variant="secondary"
+            fullWidth
+            onPress={() => {
+              setQuery(params.barcode!);
+              void loadLinks(params.barcode!);
+            }}
+          />
+        ) : null}
       </Card>
 
       <Card variant="flat">

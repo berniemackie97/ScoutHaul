@@ -7,7 +7,7 @@ export type ScanState =
   | { phase: 'searching'; barcode: string }
   | { phase: 'capturing' }
   | { phase: 'identifying'; photoUri: string; ocrText: string | null }
-  | { phase: 'photo-review'; photoUri: string; ocrText: string; query: string }
+  | { phase: 'photo-review'; photoUri: string; ocrText: string; query: string; identifyResult?: import('./photoIdentify').IdentifyResult }
   | ScanDoneState;
 
 export type ScanDoneState = {

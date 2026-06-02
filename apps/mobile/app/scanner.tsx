@@ -1,13 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
-import { recognizeText } from '@infinitered/react-native-mlkit-text-recognition';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Image } from 'expo-image';
-import * as Linking from 'expo-linking';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
+  Dimensions,
   Easing,
   KeyboardAvoidingView,
   Platform,
@@ -20,19 +19,26 @@ import { api } from '../src/api';
 import { Button } from '../src/components/Button';
 import { Card } from '../src/components/Card';
 import { Screen } from '../src/components/Screen';
+import { StatusPill } from '../src/components/StatusPill';
 import { Text } from '../src/components/Text';
 import { TextField } from '../src/components/TextField';
 import { ScanResults } from '../src/features/scanner/ScanResults';
+import { identifyFromPhoto } from '../src/features/scanner/photoIdentify';
 import { radius, spacing } from '../src/components/theme';
 import { useAppTheme } from '../src/context/ThemeContext';
 import type { ScanMode, ScanState } from '../src/features/scanner/types';
 import {
-  buildSearchQuery,
   makeDoneError,
   makeDoneFromResult,
   resolveProductName,
 } from '../src/features/scanner/types';
 import { useHaptics } from '../src/hooks/useHaptics';
+
+const SCREEN_WIDTH = Dimensions.get('window').width;
+const BARCODE_VF = 260;
+const PHOTO_VF = SCREEN_WIDTH - 48;
+const CS = 24;
+const CW = 3;
 
 export default function BarcodeScannerScreen() {
   const { colors: c } = useAppTheme();
@@ -48,9 +54,10 @@ export default function BarcodeScannerScreen() {
   const cameraRef = useRef<CameraView>(null);
   const scanLine = useRef(new Animated.Value(0)).current;
   const isScanning = state.phase === 'scanning';
+  const isPhotoMode = mode === 'photo-identify';
 
   useEffect(() => {
-    if (!isScanning || mode !== 'barcode') return;
+    if (!isScanning || isPhotoMode) return;
     const anim = Animated.loop(
       Animated.sequence([
         Animated.timing(scanLine, { toValue: 1, duration: 2000, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
@@ -59,49 +66,51 @@ export default function BarcodeScannerScreen() {
     );
     anim.start();
     return () => anim.stop();
-  }, [isScanning, mode, scanLine]);
+  }, [isScanning, isPhotoMode, scanLine]);
 
+  // ── Barcode lookup ──
   async function lookupBarcode(barcode: string) {
     haptics.success();
     setState({ phase: 'searching', barcode });
     try {
-      const result = await api.lookupBarcode(barcode);
-      setState(makeDoneFromResult(barcode, result));
+      setState(makeDoneFromResult(barcode, await api.lookupBarcode(barcode)));
     } catch (e) {
       setState(makeDoneError(barcode, e));
     }
   }
 
-  async function capturePhoto() {
+  // ── Photo identify — OCR + smart extraction, then auto-search ──
+  async function captureAndIdentify() {
     if (!cameraRef.current) return;
     setState({ phase: 'capturing' });
     haptics.medium();
+
     try {
       const photo = await cameraRef.current.takePictureAsync({ quality: 0.85 });
-      if (!photo?.uri) {
-        setState({ phase: 'scanning' });
-        return;
-      }
+      if (!photo?.uri) { setState({ phase: 'scanning' }); return; }
 
       setState({ phase: 'identifying', photoUri: photo.uri, ocrText: null });
 
-      let ocrText = '';
-      try {
-        const ocrResult = await recognizeText(photo.uri);
-        ocrText = ocrResult.text.trim();
-      } catch {
-        // OCR failed — still allow manual query
-      }
+      const identified = await identifyFromPhoto(photo.uri);
 
-      if (ocrText) {
-        const query = buildSearchQuery(ocrText);
-        setState({ phase: 'photo-review', photoUri: photo.uri, ocrText, query });
+      if (identified.confidence === 'high' && identified.searchQuery) {
+        // High confidence — auto-search immediately
+        haptics.success();
+        setState({ phase: 'searching', barcode: identified.searchQuery });
+        try {
+          const result = await api.lookupSearch(identified.searchQuery);
+          setState(makeDoneFromResult(identified.searchQuery, result, photo.uri));
+        } catch (e) {
+          setState(makeDoneError(identified.searchQuery, e));
+        }
       } else {
+        // Show review with pre-filled query for user confirmation
         setState({
           phase: 'photo-review',
           photoUri: photo.uri,
-          ocrText: '',
-          query: '',
+          ocrText: identified.rawText,
+          query: identified.searchQuery,
+          identifyResult: identified,
         });
       }
     } catch {
@@ -109,25 +118,15 @@ export default function BarcodeScannerScreen() {
     }
   }
 
+  // ── Manual search from review ──
   async function searchQuery(query: string, photoUri?: string) {
     const q = query.trim();
     if (!q) return;
     setState({ phase: 'searching', barcode: q });
     try {
-      const result = await api.lookupSearch(q);
-      setState(makeDoneFromResult(q, result, photoUri));
+      setState(makeDoneFromResult(q, await api.lookupSearch(q), photoUri));
     } catch (e) {
       setState(makeDoneError(q, e));
-    }
-  }
-
-  function openGoogleLens(photoUri: string) {
-    // Google Lens intent — opens the image in Google Lens for visual identification.
-    // User identifies the product, comes back, types the name in the query field.
-    if (Platform.OS === 'android') {
-      Linking.openURL('https://lens.google.com');
-    } else {
-      Linking.openURL('https://lens.google.com');
     }
   }
 
@@ -193,7 +192,6 @@ export default function BarcodeScannerScreen() {
     if (state.phase !== 'done') return;
     const title = editForm.title.trim();
     if (!title) { setSaveError('Product title is required.'); return; }
-
     setSaving(true);
     setSaveError(null);
     try {
@@ -206,14 +204,12 @@ export default function BarcodeScannerScreen() {
         ean: editForm.ean.trim() || null,
         searchQuery: state.barcode,
       };
-
       let savedId: string;
       if (state.productIdentityId) {
         savedId = (await api.updateProductIdentity(state.productIdentityId, body)).id;
       } else {
         savedId = (await api.createProductIdentity(body)).id;
       }
-
       setState({ ...state, productTitle: title, productBrand: body.brand, productCategory: body.category, productIdentityId: savedId });
       setEditing(false);
     } catch (e) {
@@ -223,8 +219,8 @@ export default function BarcodeScannerScreen() {
     }
   }
 
+  // ── Permissions ──
   if (!permission) return <Screen><Text variant="body">Checking camera...</Text></Screen>;
-
   if (!permission.granted) {
     return (
       <Screen>
@@ -242,11 +238,13 @@ export default function BarcodeScannerScreen() {
     );
   }
 
+  // ── Computed ──
   const scanLineY = scanLine.interpolate({ inputRange: [0, 1], outputRange: [0, 120] });
   const doneState = state.phase === 'done' ? state : null;
   const cornerColor = doneState
     ? (doneState.listings.length > 0 || doneState.productTitle ? c.success : c.warning)
     : c.primary;
+  const vfWidth = isPhotoMode ? PHOTO_VF : BARCODE_VF;
 
   return (
     <Screen scroll={false} edges={['bottom']} keyboardAvoiding={false}>
@@ -255,11 +253,11 @@ export default function BarcodeScannerScreen() {
           ref={cameraRef}
           style={styles.camera}
           facing="back"
-          barcodeScannerSettings={mode === 'barcode' ? {
+          barcodeScannerSettings={!isPhotoMode ? {
             barcodeTypes: ['upc_a', 'upc_e', 'ean13', 'ean8', 'code128', 'code39', 'qr'],
           } : undefined}
           onBarcodeScanned={
-            isScanning && mode === 'barcode'
+            isScanning && !isPhotoMode
               ? (result) => { if (result.data) void lookupBarcode(result.data); }
               : undefined
           }
@@ -267,43 +265,44 @@ export default function BarcodeScannerScreen() {
 
         {/* Viewfinder overlay */}
         <View style={styles.overlay} pointerEvents="none">
-          <View style={styles.dimTop} />
-          <View style={styles.middleRow}>
-            <View style={styles.dimSide} />
-            <View style={[styles.viewfinder, mode === 'photo-identify' && styles.viewfinderPhoto]}>
+          <View style={isPhotoMode ? styles.dimTopPhoto : styles.dimTop} />
+          <View style={[styles.middleRow, isPhotoMode && styles.middleRowPhoto]}>
+            <View style={isPhotoMode ? styles.dimSidePhoto : styles.dimSide} />
+            <View style={[styles.viewfinder, { width: vfWidth }]}>
               {(['TL', 'TR', 'BL', 'BR'] as const).map((pos) => (
-                <View key={pos} style={[styles.corner, styles[`corner${pos}`], { borderColor: mode === 'photo-identify' ? c.accent : cornerColor }]} />
+                <View key={pos} style={[styles.corner, styles[`corner${pos}`], { borderColor: isPhotoMode ? c.accent : cornerColor }]} />
               ))}
-              {isScanning && mode === 'barcode' ? (
+              {isScanning && !isPhotoMode ? (
                 <Animated.View style={[styles.scanLine, { backgroundColor: c.primary, transform: [{ translateY: scanLineY }] }]} />
               ) : null}
-              {mode === 'photo-identify' && isScanning ? (
-                <View style={styles.photoTargetCenter}>
-                  <Ionicons name="add" size={32} color={c.accent} style={{ opacity: 0.5 }} />
+              {isPhotoMode && isScanning ? (
+                <View style={styles.crosshair}>
+                  <View style={[styles.crosshairH, { backgroundColor: c.accent }]} />
+                  <View style={[styles.crosshairV, { backgroundColor: c.accent }]} />
                 </View>
               ) : null}
             </View>
-            <View style={styles.dimSide} />
+            <View style={isPhotoMode ? styles.dimSidePhoto : styles.dimSide} />
           </View>
-          <View style={styles.dimBottom} />
+          <View style={isPhotoMode ? styles.dimBottomPhoto : styles.dimBottom} />
         </View>
 
-        {/* Mode toggle — floating above panel */}
+        {/* Mode toggle */}
         {isScanning ? (
           <View style={[styles.modeToggle, { backgroundColor: c.surface }]}>
             <Pressable
               onPress={() => switchMode('barcode')}
-              style={[styles.modeTab, mode === 'barcode' && [styles.modeTabActive, { backgroundColor: c.primary }]]}
+              style={[styles.modeTab, !isPhotoMode && [styles.modeTabActive, { backgroundColor: c.primary }]]}
             >
-              <Ionicons name="barcode-outline" size={18} color={mode === 'barcode' ? c.textInverse : c.textMuted} />
-              <Text variant="caption" color={mode === 'barcode' ? c.textInverse : c.textMuted}>Barcode</Text>
+              <Ionicons name="barcode-outline" size={18} color={!isPhotoMode ? c.textInverse : c.textMuted} />
+              <Text variant="caption" color={!isPhotoMode ? c.textInverse : c.textMuted}>Barcode</Text>
             </Pressable>
             <Pressable
               onPress={() => switchMode('photo-identify')}
-              style={[styles.modeTab, mode === 'photo-identify' && [styles.modeTabActive, { backgroundColor: c.accent }]]}
+              style={[styles.modeTab, isPhotoMode && [styles.modeTabActive, { backgroundColor: c.accent }]]}
             >
-              <Ionicons name="camera-outline" size={18} color={mode === 'photo-identify' ? c.textInverse : c.textMuted} />
-              <Text variant="caption" color={mode === 'photo-identify' ? c.textInverse : c.textMuted}>Photo ID</Text>
+              <Ionicons name="eye-outline" size={18} color={isPhotoMode ? c.textInverse : c.textMuted} />
+              <Text variant="caption" color={isPhotoMode ? c.textInverse : c.textMuted}>Identify</Text>
             </Pressable>
           </View>
         ) : null}
@@ -314,35 +313,44 @@ export default function BarcodeScannerScreen() {
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           keyboardVerticalOffset={0}
         >
-          {/* ── Scanning state ── */}
-          {state.phase === 'scanning' && mode === 'barcode' ? (
+          {/* Barcode scanning */}
+          {state.phase === 'scanning' && !isPhotoMode ? (
             <View style={styles.panelInner}>
               <Text variant="bodyBold">Point at a barcode</Text>
               <Text variant="caption" color={c.textMuted}>UPC, EAN, ISBN, Code 128, or QR</Text>
             </View>
-          ) : state.phase === 'scanning' && mode === 'photo-identify' ? (
+
+          /* Photo identify — scanning */
+          ) : state.phase === 'scanning' && isPhotoMode ? (
             <View style={styles.panelInner}>
-              <Text variant="bodyBold">Aim at the item</Text>
+              <View style={styles.photoModeHeader}>
+                <Ionicons name="eye" size={22} color={c.accent} />
+                <Text variant="bodyBold">Visual Product Identification</Text>
+              </View>
               <Text variant="caption" color={c.textMuted}>
-                Center the product in the viewfinder. Works best with labels, boxes, or clear product shots.
+                Center the product, label, or packaging. AI reads text and identifies the item visually.
               </Text>
               <Pressable
-                onPress={() => void capturePhoto()}
+                onPress={() => void captureAndIdentify()}
                 style={[styles.captureBtn, { backgroundColor: c.accent }]}
               >
-                <Ionicons name="camera" size={24} color={c.textInverse} />
+                <View style={[styles.captureDot, { borderColor: c.textInverse }]}>
+                  <Ionicons name="camera" size={28} color={c.textInverse} />
+                </View>
                 <Text variant="bodyBold" color={c.textInverse}>Capture & Identify</Text>
               </Pressable>
             </View>
 
-          /* ── Capturing / Processing ── */
+          /* Capturing */
           ) : state.phase === 'capturing' ? (
             <View style={styles.panelInner}>
-              <View style={styles.searchingRow}>
+              <View style={styles.processingRow}>
                 <ActivityIndicator size="small" color={c.accent} />
                 <Text variant="bodyBold" color={c.accent}>Capturing...</Text>
               </View>
             </View>
+
+          /* Identifying — ML Kit running */
           ) : state.phase === 'identifying' ? (
             <View style={styles.panelInner}>
               <View style={styles.identifyRow}>
@@ -350,16 +358,16 @@ export default function BarcodeScannerScreen() {
                   <Image source={{ uri: state.photoUri }} style={styles.identifyThumb} contentFit="cover" />
                 ) : null}
                 <View style={styles.identifyText}>
-                  <View style={styles.searchingRow}>
+                  <View style={styles.processingRow}>
                     <ActivityIndicator size="small" color={c.primary} />
-                    <Text variant="bodyBold" color={c.primary}>Reading text...</Text>
+                    <Text variant="bodyBold" color={c.primary}>Identifying item...</Text>
                   </View>
-                  <Text variant="caption" color={c.textMuted}>Extracting product info from image</Text>
+                  <Text variant="caption" color={c.textMuted}>Reading text and identifying product</Text>
                 </View>
               </View>
             </View>
 
-          /* ── Photo Review ── */
+          /* Photo review — show what was found, let user edit/confirm */
           ) : state.phase === 'photo-review' ? (
             <ScrollView style={styles.panelScroll} showsVerticalScrollIndicator={false} bounces={false}>
               <View style={styles.panelInner}>
@@ -368,25 +376,50 @@ export default function BarcodeScannerScreen() {
                     <Image source={{ uri: state.photoUri }} style={styles.reviewThumb} contentFit="cover" />
                   ) : null}
                   <View style={styles.identifyText}>
-                    <View style={styles.editHeader}>
-                      <Text variant="bodyBold">
-                        {state.ocrText ? 'Text detected' : 'No text found'}
-                      </Text>
+                    <View style={styles.reviewHeader}>
+                      <View style={{ flex: 1 }}>
+                        <Text variant="bodyBold">
+                          {state.identifyResult?.confidence === 'medium' ? 'Partial match' : state.query ? 'Text detected' : 'No product identified'}
+                        </Text>
+                        {state.identifyResult ? (
+                          <StatusPill
+                            label={state.identifyResult.confidence === 'high' ? 'High' : state.identifyResult.confidence === 'medium' ? 'Medium' : 'Low'}
+                            tone={state.identifyResult.confidence === 'high' ? 'success' : state.identifyResult.confidence === 'medium' ? 'warning' : 'neutral'}
+                            size="sm"
+                          />
+                        ) : null}
+                      </View>
                       <Pressable onPress={resetToScanning} hitSlop={8}>
                         <Ionicons name="close" size={22} color={c.textMuted} />
                       </Pressable>
                     </View>
-                    {state.ocrText ? (
-                      <Text variant="caption" color={c.textSecondary} numberOfLines={2}>
-                        {state.ocrText.slice(0, 80)}{state.ocrText.length > 80 ? '...' : ''}
-                      </Text>
-                    ) : (
-                      <Text variant="caption" color={c.textMuted}>
-                        Type a product name below, or use Google Lens to identify visually.
-                      </Text>
-                    )}
                   </View>
                 </View>
+
+                {/* Detected fields from identification */}
+                {state.identifyResult?.brand || state.identifyResult?.category ? (
+                  <View style={[styles.detectedFields, { backgroundColor: c.primaryLight }]}>
+                    {state.identifyResult.brand ? (
+                      <View style={styles.detectedField}>
+                        <Text variant="label" color={c.textMuted}>Brand</Text>
+                        <Text variant="bodyBold" color={c.primary}>{state.identifyResult.brand}</Text>
+                      </View>
+                    ) : null}
+                    {state.identifyResult.category ? (
+                      <View style={styles.detectedField}>
+                        <Text variant="label" color={c.textMuted}>Category</Text>
+                        <Text variant="bodyBold" color={c.primary}>{state.identifyResult.category}</Text>
+                      </View>
+                    ) : null}
+                    {state.identifyResult.model ? (
+                      <View style={styles.detectedField}>
+                        <Text variant="label" color={c.textMuted}>Model</Text>
+                        <Text variant="bodyBold" color={c.primary}>{state.identifyResult.model}</Text>
+                      </View>
+                    ) : null}
+                  </View>
+                ) : null}
+
                 <TextField
                   label="Search marketplace"
                   value={state.query}
@@ -403,37 +436,24 @@ export default function BarcodeScannerScreen() {
                   disabled={!state.query.trim()}
                   onPress={() => void searchQuery(state.query, state.photoUri)}
                 />
-                <View style={styles.altActions}>
-                  <Pressable
-                    onPress={() => openGoogleLens(state.photoUri)}
-                    style={[styles.lensBtn, { backgroundColor: c.surfaceAlt, borderColor: c.border }]}
-                  >
-                    <Ionicons name="eye-outline" size={20} color={c.textSecondary} />
-                    <View style={styles.lensBtnText}>
-                      <Text variant="bodyBold">Open Google Lens</Text>
-                      <Text variant="caption" color={c.textMuted}>Visual identify, then type name above</Text>
-                    </View>
-                    <Ionicons name="open-outline" size={16} color={c.textMuted} />
-                  </Pressable>
-                  <Button label="Retake" variant="ghost" size="sm" icon="camera-outline" onPress={resetToScanning} />
-                </View>
+                <Button label="Retake" variant="ghost" size="sm" icon="camera-outline" onPress={resetToScanning} />
               </View>
             </ScrollView>
 
-          /* ── Searching ── */
+          /* Searching */
           ) : state.phase === 'searching' ? (
             <View style={styles.panelInner}>
-              <View style={styles.barcodeRow}>
+              <View style={styles.processingRow}>
                 <Ionicons name="search-outline" size={20} color={c.primary} />
                 <Text variant="bodyBold" style={styles.mono} numberOfLines={1}>{state.barcode}</Text>
               </View>
-              <View style={styles.searchingRow}>
+              <View style={styles.processingRow}>
                 <ActivityIndicator size="small" color={c.info} />
                 <Text variant="caption" color={c.info}>Checking pricing sources...</Text>
               </View>
             </View>
 
-          /* ── Results ── */
+          /* Results */
           ) : state.phase === 'done' ? (
             <ScanResults
               state={state}
@@ -456,29 +476,36 @@ export default function BarcodeScannerScreen() {
   );
 }
 
-const VF = 260;
-const CS = 24;
-const CW = 3;
-
 const styles = StyleSheet.create({
   container: { flex: 1 },
   center: { flex: 1, justifyContent: 'center' },
   permContent: { alignItems: 'center', gap: spacing.md },
   camera: { flex: 1, backgroundColor: '#000' },
   overlay: { ...StyleSheet.absoluteFillObject },
+
+  // Barcode mode — small viewfinder, heavy dim
   dimTop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)' },
   dimBottom: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)' },
-  middleRow: { flexDirection: 'row', height: VF * 0.55 },
   dimSide: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)' },
-  viewfinder: { width: VF, height: '100%', overflow: 'hidden' },
-  viewfinderPhoto: { width: VF * 1.1, height: '120%' },
+  middleRow: { flexDirection: 'row', height: BARCODE_VF * 0.55 },
+
+  // Photo mode — large viewfinder, light dim
+  dimTopPhoto: { flex: 0.5, backgroundColor: 'rgba(0,0,0,0.35)' },
+  dimBottomPhoto: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)' },
+  dimSidePhoto: { width: 24, backgroundColor: 'rgba(0,0,0,0.35)' },
+  middleRowPhoto: { flexDirection: 'row', height: PHOTO_VF * 0.85 },
+
+  viewfinder: { height: '100%', overflow: 'hidden' },
   corner: { position: 'absolute', width: CS, height: CS },
   cornerTL: { top: 0, left: 0, borderTopWidth: CW, borderLeftWidth: CW, borderTopLeftRadius: radius.sm },
   cornerTR: { top: 0, right: 0, borderTopWidth: CW, borderRightWidth: CW, borderTopRightRadius: radius.sm },
   cornerBL: { bottom: 0, left: 0, borderBottomWidth: CW, borderLeftWidth: CW, borderBottomLeftRadius: radius.sm },
   cornerBR: { bottom: 0, right: 0, borderBottomWidth: CW, borderRightWidth: CW, borderBottomRightRadius: radius.sm },
   scanLine: { position: 'absolute', left: spacing.md, right: spacing.md, height: 2, borderRadius: 1, top: 8 },
-  photoTargetCenter: { position: 'absolute', top: '50%', left: '50%', marginTop: -16, marginLeft: -16 },
+
+  crosshair: { position: 'absolute', top: '50%', left: '50%', width: 40, height: 40, marginTop: -20, marginLeft: -20 },
+  crosshairH: { position: 'absolute', top: 19, left: 4, right: 4, height: 2, borderRadius: 1, opacity: 0.4 },
+  crosshairV: { position: 'absolute', left: 19, top: 4, bottom: 4, width: 2, borderRadius: 1, opacity: 0.4 },
 
   modeToggle: {
     position: 'absolute',
@@ -504,38 +531,44 @@ const styles = StyleSheet.create({
   },
   modeTabActive: {},
 
-  panel: { borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, maxHeight: '65%' },
+  panel: { borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, maxHeight: '55%' },
   panelScroll: { paddingHorizontal: spacing.lg, paddingTop: spacing.lg },
   panelInner: { gap: spacing.md, paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.xl },
+
+  photoModeHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
 
   captureBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.sm,
-    paddingVertical: spacing.md,
-    borderRadius: radius.lg,
-    marginTop: spacing.xs,
+    gap: spacing.md,
+    paddingVertical: spacing.lg,
+    borderRadius: radius.xl,
+  },
+  captureDot: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    borderWidth: 3,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
+  processingRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   identifyRow: { flexDirection: 'row', gap: spacing.md, alignItems: 'center' },
   identifyThumb: { width: 56, height: 56, borderRadius: radius.md },
   reviewThumb: { width: 72, height: 72, borderRadius: radius.md },
   identifyText: { flex: 1, gap: spacing.xs },
+  reviewHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
 
-  altActions: { gap: spacing.sm, paddingTop: spacing.xs },
-  lensBtn: {
+  detectedFields: {
     flexDirection: 'row',
-    alignItems: 'center',
+    flexWrap: 'wrap',
     gap: spacing.md,
     padding: spacing.md,
-    borderRadius: radius.lg,
-    borderWidth: 1,
+    borderRadius: radius.md,
   },
-  lensBtnText: { flex: 1, gap: spacing.xxs },
+  detectedField: { gap: spacing.xxs },
 
-  barcodeRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  searchingRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   mono: { fontVariant: ['tabular-nums'], letterSpacing: 0.5 },
-  editHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
 });

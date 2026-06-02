@@ -78,4 +78,16 @@ export const marketplaceApi = {
   addComp: (body: CreateCompRequest) => apiRequest<MarketObservation>('/api/market-observations', { method: 'POST', body }),
   comps: (params: string) => apiRequest<MarketObservation[]>(`/api/market-observations?${params}`),
   analyze: (body: AnalyzeRequest) => apiRequest<MarketAnalysisResponse>('/api/market-analysis/calculate', { method: 'POST', body }),
+
+  visionIdentify: (imageBase64: string) =>
+    apiRequest<VisionIdentifyResult>('/api/vision/identify', { method: 'POST', body: { imageBase64 } }),
+};
+
+export type VisionIdentifyResult = {
+  bestGuessLabel: string | null;
+  webEntities: { description: string; score: number }[];
+  matchingPages: { url: string; title: string | null }[];
+  similarImages: { url: string }[];
+  labels: string[];
+  searchQuery: string | null;
 };

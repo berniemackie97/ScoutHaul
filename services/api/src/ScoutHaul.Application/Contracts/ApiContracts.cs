@@ -477,3 +477,28 @@ public sealed record DashboardSummaryDto(
     decimal CashDeployed,
     int UnlistedInventoryCount,
     int StaleInventoryCount);
+
+// ── Vision Identification ────────────────────────────────────────
+
+public sealed record VisionIdentifyRequest(
+    string? ImageBase64,
+    string? ImageUrl);
+
+public sealed record VisionIdentifyResult(
+    string? BestGuessLabel,
+    IReadOnlyList<VisionWebEntity> WebEntities,
+    IReadOnlyList<VisionMatchingPage> MatchingPages,
+    IReadOnlyList<VisionSimilarImage> SimilarImages,
+    IReadOnlyList<string> Labels,
+    string? SearchQuery);
+
+public sealed record VisionWebEntity(
+    string Description,
+    double Score);
+
+public sealed record VisionMatchingPage(
+    string Url,
+    string? Title);
+
+public sealed record VisionSimilarImage(
+    string Url);

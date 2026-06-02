@@ -166,10 +166,21 @@ export default function ManualSearchScreen() {
         onPress={() =>
           router.push({
             pathname: '/marketplace-links',
-            params: { query: params.productName ?? query },
+            params: { query: params.productName ?? query, barcode },
           })
         }
       />
+
+      {/* If we have a barcode, offer direct barcode search too */}
+      {barcode && barcode !== query ? (
+        <Button
+          label={`Search by barcode: ${barcode}`}
+          icon="barcode-outline"
+          variant="ghost"
+          fullWidth
+          onPress={() => { setQuery(barcode); void search(); }}
+        />
+      ) : null}
 
       {error ? <ErrorBanner message={error} /> : null}
 

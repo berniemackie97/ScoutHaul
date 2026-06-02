@@ -73,6 +73,7 @@ export const api = {
   addComp: marketplaceApi.addComp,
   comps: marketplaceApi.comps,
   analyze: marketplaceApi.analyze,
+  visionIdentify: marketplaceApi.visionIdentify,
 
   // Sourcing
   trips: sourcingApi.trips,

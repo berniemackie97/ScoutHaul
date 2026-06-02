@@ -27,6 +27,9 @@ public static class DependencyInjection
         services.AddHttpClient<IBarcodeLookupProvider, OpenFoodFactsBarcodeLookupProvider>(ConfigureJsonClient);
         services.AddHttpClient<IBarcodeLookupProvider, UpcItemDbLookupService>(ConfigureJsonClient);
 
+        // Vision — Google Cloud Vision for visual product identification
+        services.AddHttpClient<IVisionIdentificationService, GoogleCloudVisionService>(ConfigureJsonClient);
+
         // Marketplace pricing — tried in order. PriceCharting for collectibles (free token),
         // Keepa for Amazon price history, SerpApi for Google Shopping. All need API keys.
         services.AddScoped<IMarketplaceLookupService, CompositeMarketplaceLookupService>();
