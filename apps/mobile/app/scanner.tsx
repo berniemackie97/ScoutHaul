@@ -79,7 +79,7 @@ export default function BarcodeScannerScreen() {
     }
   }
 
-  // ── Photo identify — OCR + smart extraction, then auto-search ──
+  // ── Photo identify — Cloud Vision + OCR in parallel, then auto-search ──
   async function captureAndIdentify() {
     if (!cameraRef.current) return;
     setState({ phase: 'capturing' });
@@ -379,7 +379,13 @@ export default function BarcodeScannerScreen() {
                     <View style={styles.reviewHeader}>
                       <View style={{ flex: 1 }}>
                         <Text variant="bodyBold">
-                          {state.identifyResult?.confidence === 'medium' ? 'Partial match' : state.query ? 'Text detected' : 'No product identified'}
+                          {state.identifyResult?.bestGuessLabel
+                            ? 'Product identified'
+                            : state.identifyResult?.confidence === 'medium'
+                              ? 'Partial match'
+                              : state.query
+                                ? 'Text detected'
+                                : 'No product identified'}
                         </Text>
                         {state.identifyResult ? (
                           <StatusPill

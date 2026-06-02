@@ -490,6 +490,8 @@ public sealed record VisionIdentifyResult(
     IReadOnlyList<VisionMatchingPage> MatchingPages,
     IReadOnlyList<VisionSimilarImage> SimilarImages,
     IReadOnlyList<string> Labels,
+    IReadOnlyList<string> DetectedLogos,
+    string? DetectedText,
     string? SearchQuery);
 
 public sealed record VisionWebEntity(

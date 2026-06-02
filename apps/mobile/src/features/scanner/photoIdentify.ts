@@ -14,6 +14,7 @@ export type IdentifyResult = {
   searchQuery: string;
   visionLabels: string[];
   webEntities: { description: string; score: number }[];
+  matchingPages: { url: string; title: string | null }[];
   bestGuessLabel: string | null;
 };
 
@@ -40,25 +41,12 @@ const KNOWN_BRANDS = [
 
 const BRAND_PATTERN = new RegExp(`\\b(${KNOWN_BRANDS.map(escapeRegex).join('|')})\\b`, 'i');
 
-// ── Category signals ──
-
-const CATEGORY_SIGNALS: Record<string, string[]> = {
-  'Electronics': ['HDMI', 'USB', 'Bluetooth', 'WiFi', 'wireless', 'battery', 'charger', 'adapter'],
-  'Clothing': ['cotton', 'polyester', 'nylon', 'fabric', 'wash', 'dry clean'],
-  'Shoes': ['sole', 'insole', 'footbed', 'EUR'],
-  'Toys': ['ages', 'choking hazard', 'small parts', 'assembly required'],
-  'Appliances': ['watt', 'volt', 'cycles', 'capacity'],
-  'Tools': ['torque', 'RPM', 'amp-hour', 'cordless'],
-  'Video Games': ['ESRB', 'rated', 'players'],
-  'Books': ['ISBN', 'edition', 'published', 'author', 'paperback', 'hardcover'],
-};
-
 const LABEL_CATEGORY_MAP: Record<string, string> = {
   'Laptop': 'Tech', 'Computer': 'Tech', 'Tablet': 'Tech', 'Phone': 'Tech',
   'Electronic device': 'Electronics', 'Audio equipment': 'Electronics', 'Camera': 'Electronics',
-  'Clothing': 'Clothing', 'Shirt': 'Clothing', 'T-shirt': 'Clothing', 'Dress': 'Clothing', 'Jacket': 'Clothing',
+  'Clothing': 'Clothing', 'Shirt': 'Clothing', 'T-shirt': 'Clothing', 'Dress': 'Clothing',
   'Shoe': 'Shoes', 'Footwear': 'Shoes', 'Sneakers': 'Shoes', 'Boot': 'Shoes',
-  'Toy': 'Toys', 'Action figure': 'Collectibles', 'Doll': 'Toys', 'Board game': 'Toys',
+  'Toy': 'Toys', 'Action figure': 'Collectibles', 'Doll': 'Toys',
   'Furniture': 'Furniture', 'Chair': 'Furniture', 'Table': 'Furniture',
   'Cookware': 'Home', 'Kitchen utensil': 'Home', 'Tableware': 'Home',
   'Tool': 'Tools', 'Power tool': 'Tools', 'Drill': 'Tools',
@@ -75,55 +63,52 @@ const MODEL_PATTERNS = [
 
 const BARCODE_PATTERN = /\b(\d{8}|\d{12,14})\b/;
 
-// ── Main identification function ──
-// Strategy: Cloud Vision (visual AI) + OCR (text) in parallel.
-// Cloud Vision gives: product name, brand, category from image recognition.
-// OCR gives: model numbers, barcodes, text-based brand detection.
-// Combine both for best results.
+// ── Main ──
+// Cloud Vision is primary — gives product ID, text, logos, labels in one call.
+// On-device OCR is fallback only when Vision API is unavailable.
 
 export async function identifyFromPhoto(photoUri: string): Promise<IdentifyResult> {
-  const [visionResult, ocrResult] = await Promise.allSettled([
-    callCloudVision(photoUri),
-    callOcr(photoUri),
-  ]);
+  // Try Cloud Vision first (one call gets everything)
+  const vision = await callCloudVision(photoUri);
 
-  const vision = visionResult.status === 'fulfilled' ? visionResult.value : null;
-  const rawText = ocrResult.status === 'fulfilled' ? ocrResult.value : '';
+  if (vision) {
+    return buildFromVision(vision);
+  }
 
-  // Extract from OCR
-  const ocrBrand = rawText ? extractBrand(rawText) : null;
-  const ocrModel = rawText ? extractModel(rawText) : null;
-  const ocrCategory = rawText ? inferCategoryFromText(rawText) : null;
-  const ocrBarcode = rawText ? extractBarcode(rawText) : null;
+  // Fallback: on-device OCR only (offline, free)
+  return buildFromOcrOnly(photoUri);
+}
 
-  // Extract from Cloud Vision
-  const visionBrand = vision ? extractBrandFromVision(vision) : null;
-  const visionCategory = vision ? inferCategoryFromVision(vision) : null;
+// ── Build result from Cloud Vision response ──
 
-  // Merge — Cloud Vision takes priority for title/brand, OCR for model/barcode
-  const brand = visionBrand ?? ocrBrand;
-  const model = ocrModel;
-  const category = visionCategory ?? ocrCategory;
-  const barcode = ocrBarcode;
+function buildFromVision(vision: VisionIdentifyResult): IdentifyResult {
+  const rawText = vision.detectedText ?? '';
 
-  // Title: Cloud Vision bestGuessLabel > OCR title > web entity combo
-  const title = vision?.bestGuessLabel
-    ?? buildOcrTitle(rawText, brand, model)
-    ?? (vision?.webEntities?.slice(0, 2).map((e) => e.description).join(' ') || null);
+  // Brand: logos > web entities > OCR text
+  const logoBrand = vision.detectedLogos.length > 0 ? vision.detectedLogos[0] : null;
+  const entityBrand = extractBrandFromEntities(vision.webEntities, vision.bestGuessLabel);
+  const textBrand = rawText ? extractBrandFromText(rawText) : null;
+  const brand = logoBrand ?? entityBrand ?? textBrand;
 
-  // Search query: bestGuessLabel is the most powerful signal
-  const searchQuery = vision?.searchQuery
-    ?? buildQuery(brand, model, title, rawText);
+  // Model: from OCR text (Cloud Vision text detection)
+  const model = rawText ? extractModel(rawText) : null;
 
-  // Confidence: vision bestGuessLabel = high. Vision entities = medium. OCR only = depends.
-  const hasVisionId = !!vision?.bestGuessLabel;
-  const hasVisionEntities = (vision?.webEntities?.length ?? 0) > 0;
-  const hasOcrFields = [brand, model, category].filter(Boolean).length;
+  // Category: from labels
+  const category = inferCategoryFromLabels(vision.labels);
 
-  let confidence: 'high' | 'medium' | 'low' = 'low';
-  if (hasVisionId) confidence = 'high';
-  else if (hasVisionEntities || hasOcrFields >= 2) confidence = 'medium';
-  else if (hasOcrFields >= 1) confidence = 'medium';
+  // Barcode: from OCR text
+  const barcode = rawText ? extractBarcode(rawText) : null;
+
+  // Title: bestGuessLabel is the strongest
+  const title = vision.bestGuessLabel ?? buildTitleFallback(brand, model, vision.webEntities);
+
+  // Search query
+  const searchQuery = vision.searchQuery ?? title ?? '';
+
+  // Confidence
+  const hasVisionId = !!vision.bestGuessLabel;
+  const hasEntities = vision.webEntities.length > 0;
+  const confidence: IdentifyResult['confidence'] = hasVisionId ? 'high' : hasEntities ? 'medium' : 'low';
 
   return {
     title,
@@ -133,85 +118,93 @@ export async function identifyFromPhoto(photoUri: string): Promise<IdentifyResul
     barcode,
     rawText,
     confidence,
-    searchQuery: searchQuery ?? '',
-    visionLabels: vision?.labels ?? [],
-    webEntities: vision?.webEntities ?? [],
-    bestGuessLabel: vision?.bestGuessLabel ?? null,
+    searchQuery,
+    visionLabels: vision.labels,
+    webEntities: vision.webEntities,
+    matchingPages: vision.matchingPages,
+    bestGuessLabel: vision.bestGuessLabel,
   };
 }
 
-// ── Cloud Vision call ──
+// ── Fallback: on-device OCR only ──
+
+async function buildFromOcrOnly(photoUri: string): Promise<IdentifyResult> {
+  let rawText = '';
+  try {
+    const result = await recognizeText(photoUri);
+    rawText = result.text.trim();
+  } catch {
+    return emptyResult();
+  }
+
+  if (!rawText || rawText.length < 3) return emptyResult();
+
+  const brand = extractBrandFromText(rawText);
+  const model = extractModel(rawText);
+  const barcode = extractBarcode(rawText);
+  const title = buildOcrTitle(rawText, brand, model);
+  const searchQuery = brand && model ? `${brand} ${model}` : title ?? '';
+  const fieldCount = [brand, model, title].filter(Boolean).length;
+
+  return {
+    title,
+    brand,
+    model,
+    category: null,
+    barcode,
+    rawText,
+    confidence: fieldCount >= 2 ? 'medium' : fieldCount >= 1 ? 'medium' : 'low',
+    searchQuery,
+    visionLabels: [],
+    webEntities: [],
+    matchingPages: [],
+    bestGuessLabel: null,
+  };
+}
+
+// ── Cloud Vision API call ──
 
 async function callCloudVision(photoUri: string): Promise<VisionIdentifyResult | null> {
   try {
     const file = new File(photoUri);
     const buffer = await file.arrayBuffer();
-    const bytes = new Uint8Array(buffer);
-    let binary = '';
-    for (let i = 0; i < bytes.byteLength; i++) {
-      binary += String.fromCharCode(bytes[i]);
-    }
-    const base64 = btoa(binary);
+    const base64 = uint8ToBase64(new Uint8Array(buffer));
     return await api.visionIdentify(base64);
   } catch {
-    // Vision API unavailable — fall back to OCR only
     return null;
   }
 }
 
-async function callOcr(photoUri: string): Promise<string> {
-  try {
-    const result = await recognizeText(photoUri);
-    return result.text.trim();
-  } catch {
-    return '';
+function uint8ToBase64(bytes: Uint8Array): string {
+  const CHUNK = 8192;
+  const chunks: string[] = [];
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    chunks.push(String.fromCharCode(...bytes.subarray(i, Math.min(i + CHUNK, bytes.length))));
   }
+  return btoa(chunks.join(''));
 }
 
-// ── Brand extraction ──
+// ── Extractors ──
 
-function extractBrand(text: string): string | null {
-  const match = text.match(BRAND_PATTERN);
-  return match ? normalizeCase(match[1]) : null;
-}
-
-function extractBrandFromVision(vision: VisionIdentifyResult): string | null {
-  // Check web entities for known brands (highest confidence)
-  for (const entity of vision.webEntities) {
+function extractBrandFromEntities(
+  entities: { description: string }[],
+  bestGuess: string | null,
+): string | null {
+  for (const entity of entities) {
     const match = entity.description.match(BRAND_PATTERN);
     if (match) return normalizeCase(match[1]);
   }
-  // Check bestGuessLabel
-  if (vision.bestGuessLabel) {
-    const match = vision.bestGuessLabel.match(BRAND_PATTERN);
+  if (bestGuess) {
+    const match = bestGuess.match(BRAND_PATTERN);
     if (match) return normalizeCase(match[1]);
   }
   return null;
 }
 
-// ── Category inference ──
-
-function inferCategoryFromVision(vision: VisionIdentifyResult): string | null {
-  for (const label of vision.labels) {
-    for (const [key, cat] of Object.entries(LABEL_CATEGORY_MAP)) {
-      if (label.toLowerCase().includes(key.toLowerCase())) return cat;
-    }
-  }
-  return null;
+function extractBrandFromText(text: string): string | null {
+  const match = text.match(BRAND_PATTERN);
+  return match ? normalizeCase(match[1]) : null;
 }
-
-function inferCategoryFromText(text: string): string | null {
-  const lower = text.toLowerCase();
-  let best: string | null = null;
-  let bestScore = 0;
-  for (const [cat, signals] of Object.entries(CATEGORY_SIGNALS)) {
-    const score = signals.filter((s) => lower.includes(s.toLowerCase())).length;
-    if (score > bestScore) { bestScore = score; best = cat; }
-  }
-  return bestScore >= 2 ? best : null;
-}
-
-// ── Model / barcode extraction ──
 
 function extractModel(text: string): string | null {
   for (const pattern of MODEL_PATTERNS) {
@@ -225,16 +218,35 @@ function extractModel(text: string): string | null {
 }
 
 function extractBarcode(text: string): string | null {
-  const match = text.replace(/\s/g, '').match(BARCODE_PATTERN);
+  const clean = text.replace(/\s/g, '');
+  const match = clean.match(BARCODE_PATTERN);
   if (!match) return null;
   const len = match[1].length;
   return (len === 8 || len === 12 || len === 13 || len === 14) ? match[1] : null;
 }
 
-// ── Title / query building ──
+function inferCategoryFromLabels(labels: string[]): string | null {
+  for (const label of labels) {
+    for (const [key, cat] of Object.entries(LABEL_CATEGORY_MAP)) {
+      if (label.toLowerCase().includes(key.toLowerCase())) return cat;
+    }
+  }
+  return null;
+}
+
+function buildTitleFallback(
+  brand: string | null,
+  model: string | null,
+  entities: { description: string }[],
+): string | null {
+  if (brand && model) return `${brand} ${model}`;
+  if (entities.length >= 2) return entities.slice(0, 2).map((e) => e.description).join(' ');
+  if (brand) return brand;
+  if (entities.length > 0) return entities[0].description;
+  return null;
+}
 
 function buildOcrTitle(text: string, brand: string | null, model: string | null): string | null {
-  if (!text) return brand && model ? `${brand} ${model}` : brand;
   const lines = text.split('\n').map((l) => l.trim()).filter((l) =>
     l.length > 4 && l.length < 80 &&
     !l.match(/^https?:\/\//i) &&
@@ -255,19 +267,16 @@ function buildOcrTitle(text: string, brand: string | null, model: string | null)
   return brand;
 }
 
-function buildQuery(brand: string | null, model: string | null, title: string | null, rawText: string): string | null {
-  if (brand && model) return `${brand} ${model}`;
-  if (title) return title.slice(0, 100);
-  if (rawText) {
-    const lines = rawText.split('\n').map((l) => l.trim()).filter((l) => l.length > 3);
-    const joined = lines.slice(0, 2).join(' ').slice(0, 100);
-    return joined || null;
-  }
-  return null;
-}
-
 function normalizeCase(text: string): string {
   return KNOWN_BRANDS.find((b) => b.toLowerCase() === text.toLowerCase()) ?? text;
+}
+
+function emptyResult(): IdentifyResult {
+  return {
+    title: null, brand: null, model: null, category: null, barcode: null,
+    rawText: '', confidence: 'low', searchQuery: '',
+    visionLabels: [], webEntities: [], matchingPages: [], bestGuessLabel: null,
+  };
 }
 
 function escapeRegex(str: string): string {

@@ -89,5 +89,7 @@ export type VisionIdentifyResult = {
   matchingPages: { url: string; title: string | null }[];
   similarImages: { url: string }[];
   labels: string[];
+  detectedLogos: string[];
+  detectedText: string | null;
   searchQuery: string | null;
 };

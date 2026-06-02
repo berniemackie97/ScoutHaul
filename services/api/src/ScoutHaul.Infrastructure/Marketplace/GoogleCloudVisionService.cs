@@ -37,6 +37,8 @@ internal sealed class GoogleCloudVisionService(
                     {
                         new { type = "WEB_DETECTION", maxResults = 10 },
                         new { type = "LABEL_DETECTION", maxResults = 15 },
+                        new { type = "TEXT_DETECTION", maxResults = 1 },
+                        new { type = "LOGO_DETECTION", maxResults = 5 },
                     }
                 }
             }
@@ -58,18 +60,21 @@ internal sealed class GoogleCloudVisionService(
             return EmptyResult();
         }
 
-        if (!response.IsSuccessStatusCode)
+        using (response)
         {
-            string errorBody = await response.Content.ReadAsStringAsync(cancellationToken);
-            logger.LogWarning("Google Cloud Vision returned {StatusCode}: {Body}",
-                response.StatusCode, errorBody[..Math.Min(errorBody.Length, 500)]);
-            return EmptyResult();
+            if (!response.IsSuccessStatusCode)
+            {
+                string errorBody = await response.Content.ReadAsStringAsync(cancellationToken);
+                logger.LogWarning("Google Cloud Vision returned {StatusCode}: {Body}",
+                    response.StatusCode, errorBody[..Math.Min(errorBody.Length, 500)]);
+                return EmptyResult();
+            }
+
+            using Stream stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+            using JsonDocument doc = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
+
+            return ParseResponse(doc);
         }
-
-        using Stream stream = await response.Content.ReadAsStreamAsync(cancellationToken);
-        using JsonDocument doc = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
-
-        return ParseResponse(doc);
     }
 
     private VisionIdentifyResult ParseResponse(JsonDocument doc)
@@ -165,6 +170,31 @@ internal sealed class GoogleCloudVisionService(
             }
         }
 
+        // Parse Logo Detection — brand logos
+        List<string> logos = [];
+        if (firstResponse.TryGetProperty("logoAnnotations", out JsonElement logoAnnotations)
+            && logoAnnotations.ValueKind == JsonValueKind.Array)
+        {
+            foreach (JsonElement annotation in logoAnnotations.EnumerateArray().Take(5))
+            {
+                string? desc = GetString(annotation, "description");
+                if (!string.IsNullOrWhiteSpace(desc))
+                {
+                    logos.Add(desc);
+                }
+            }
+        }
+
+        // Parse Text Detection — OCR from image
+        string? detectedText = null;
+        if (firstResponse.TryGetProperty("textAnnotations", out JsonElement textAnnotations)
+            && textAnnotations.ValueKind == JsonValueKind.Array
+            && textAnnotations.GetArrayLength() > 0)
+        {
+            // First annotation is full text block
+            detectedText = GetString(textAnnotations[0], "description")?.Trim();
+        }
+
         // Build search query — best guess label is strongest signal
         string? searchQuery = bestGuessLabel;
         if (string.IsNullOrWhiteSpace(searchQuery) && webEntities.Count > 0)
@@ -182,6 +212,8 @@ internal sealed class GoogleCloudVisionService(
             MatchingPages: matchingPages,
             SimilarImages: similarImages,
             Labels: labels,
+            DetectedLogos: logos,
+            DetectedText: detectedText,
             SearchQuery: searchQuery?.Trim());
     }
 
@@ -199,5 +231,7 @@ internal sealed class GoogleCloudVisionService(
         MatchingPages: [],
         SimilarImages: [],
         Labels: [],
+        DetectedLogos: [],
+        DetectedText: null,
         SearchQuery: null);
 }

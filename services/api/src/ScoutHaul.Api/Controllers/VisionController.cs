@@ -9,7 +9,8 @@ namespace ScoutHaul.Api.Controllers;
 [Route("api/vision")]
 [RequireOrganizationPermission(ScoutHaulPermissions.ManageInventory)]
 public sealed class VisionController(
-    IVisionIdentificationService visionService) : ControllerBase
+    IVisionIdentificationService visionService,
+    IHttpClientFactory httpClientFactory) : ControllerBase
 {
     /// <summary>
     /// Identify a product from a photo using Google Cloud Vision Web Detection + Label Detection.
@@ -33,12 +34,12 @@ public sealed class VisionController(
 
         string imageBase64 = request.ImageBase64 ?? "";
 
-        // If URL provided instead of base64, download and convert
+        // If URL provided instead of base64, download and convert via IHttpClientFactory
         if (string.IsNullOrWhiteSpace(imageBase64) && !string.IsNullOrWhiteSpace(request.ImageUrl))
         {
             try
             {
-                using HttpClient client = new();
+                using HttpClient client = httpClientFactory.CreateClient();
                 client.Timeout = TimeSpan.FromSeconds(10);
                 byte[] imageBytes = await client.GetByteArrayAsync(request.ImageUrl, cancellationToken);
                 imageBase64 = Convert.ToBase64String(imageBytes);
@@ -50,9 +51,10 @@ public sealed class VisionController(
         }
 
         // Strip data URI prefix if present (e.g., "data:image/jpeg;base64,...")
-        if (imageBase64.Contains(','))
+        int commaIndex = imageBase64.IndexOf(',');
+        if (commaIndex >= 0)
         {
-            imageBase64 = imageBase64[(imageBase64.IndexOf(',') + 1)..];
+            imageBase64 = imageBase64[(commaIndex + 1)..];
         }
 
         VisionIdentifyResult result = await visionService.IdentifyAsync(imageBase64, cancellationToken);
