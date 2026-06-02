@@ -1,17 +1,16 @@
 import { Ionicons } from '@expo/vector-icons';
+import { FlashList } from '@shopify/flash-list';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, Pressable, StyleSheet, View } from 'react-native';
+import { Alert, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { api } from '../../src/api/client';
 import { Button } from '../../src/components/Button';
-import { Card } from '../../src/components/Card';
 import { EmptyState } from '../../src/components/EmptyState';
 import { ErrorBanner } from '../../src/components/ErrorBanner';
 import { FilterChips } from '../../src/components/FilterChips';
 import { PhotoThumbnail } from '../../src/components/PhotoThumbnail';
 import { SkeletonList } from '../../src/components/Skeleton';
-import { SwipeableRow } from '../../src/components/SwipeableRow';
-import { Screen } from '../../src/components/Screen';
 import { StatusPill } from '../../src/components/StatusPill';
 import { Text } from '../../src/components/Text';
 import { TextField } from '../../src/components/TextField';
@@ -119,7 +118,7 @@ function ItemCard({
           </View>
         </View>
       </Pressable>
-      <View style={styles.itemActions}>
+      <View style={[styles.itemActions, { borderTopColor: c.borderLight }]}>
         <InlineAction icon="calculator-outline" label="Analyze" color={c.primary} onPress={onAnalyze} />
         <InlineAction icon="pricetag-outline" label="List" color={c.info} onPress={onCreateListing} />
         <InlineAction icon="archive-outline" label="Archive" color={c.danger} onPress={onArchive} />
@@ -216,12 +215,20 @@ export default function InventoryListScreen() {
     return result;
   }, [items, filter, search]);
 
-  return (
-    <Screen
-      refreshing={refreshing}
-      onRefresh={() => void load(true)}
-      edges={['top', 'left', 'right']}
-    >
+  const renderItem = useCallback(({ item }: { item: InventoryItem }) => (
+    <View style={styles.listItem}>
+      <ItemCard
+        item={item}
+        onPress={() => router.push(`/inventory/${item.id}`)}
+        onAnalyze={() => router.push({ pathname: '/deal-analyzer', params: { inventoryItemId: item.id } })}
+        onCreateListing={() => void createDraftListing(item)}
+        onArchive={() => confirmArchiveItem(item)}
+      />
+    </View>
+  ), [c]);
+
+  const listHeader = useMemo(() => (
+    <View style={styles.listHeader}>
       <View style={styles.header}>
         <Text variant="title">Inventory</Text>
         <Button
@@ -262,30 +269,47 @@ export default function InventoryListScreen() {
           />
         )
       ) : (
-        <>
-          <Text variant="caption">{filtered.length} item{filtered.length !== 1 ? 's' : ''}</Text>
-          {filtered.map((item) => (
-            <SwipeableRow
-              key={item.id}
-              leftAction={{ icon: 'calculator-outline', label: 'Analyze', color: c.primary, onPress: () => router.push({ pathname: '/deal-analyzer', params: { inventoryItemId: item.id } }) }}
-              rightAction={{ icon: 'archive-outline', label: 'Archive', color: c.danger, onPress: () => confirmArchiveItem(item) }}
-            >
-              <ItemCard
-                item={item}
-                onPress={() => router.push(`/inventory/${item.id}`)}
-                onAnalyze={() => router.push({ pathname: '/deal-analyzer', params: { inventoryItemId: item.id } })}
-                onCreateListing={() => void createDraftListing(item)}
-                onArchive={() => confirmArchiveItem(item)}
-              />
-            </SwipeableRow>
-          ))}
-        </>
+        <Text variant="caption">{filtered.length} item{filtered.length !== 1 ? 's' : ''}</Text>
       )}
-    </Screen>
+    </View>
+  ), [search, filter, error, isLoading, filtered.length, items.length]);
+
+  return (
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: c.background }]} edges={['top', 'left', 'right']}>
+      <FlashList
+        data={isLoading || filtered.length === 0 ? [] : filtered}
+        renderItem={renderItem}
+        keyExtractor={(item) => item.id}
+        ListHeaderComponent={listHeader}
+        contentContainerStyle={styles.listContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => void load(true)}
+            tintColor={c.primary}
+            colors={[c.primary]}
+          />
+        }
+      />
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+  },
+  listContent: {
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.xxl,
+  },
+  listHeader: {
+    gap: spacing.md,
+    paddingTop: spacing.lg,
+  },
+  listItem: {
+    paddingTop: spacing.md,
+  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -324,7 +348,6 @@ const styles = StyleSheet.create({
     paddingTop: spacing.md,
     marginTop: spacing.md,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(148, 163, 184, 0.25)',
   },
   inlineAction: {
     flexDirection: 'row',

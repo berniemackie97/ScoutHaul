@@ -1,9 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
-import { StyleSheet, View } from 'react-native';
+import { useEffect, useRef } from 'react';
+import { Animated, Easing, StyleSheet, View } from 'react-native';
 import { Button } from './Button';
 import { Text } from './Text';
 import { spacing } from './theme';
-import { useColors } from '../context/ThemeContext';
+import { useAppTheme } from '../context/ThemeContext';
 
 type EmptyStateProps = {
   icon?: keyof typeof Ionicons.glyphMap;
@@ -14,11 +15,25 @@ type EmptyStateProps = {
 };
 
 export function EmptyState({ icon = 'file-tray-outline', title, message, actionLabel, onAction }: EmptyStateProps) {
-  const c = useColors();
+  const { colors: c } = useAppTheme();
+  const scale = useRef(new Animated.Value(0.9)).current;
+  const opacity = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(opacity, { toValue: 1, duration: 400, useNativeDriver: true }),
+      Animated.timing(scale, { toValue: 1, duration: 500, easing: Easing.out(Easing.back(1.2)), useNativeDriver: true }),
+    ]).start();
+  }, []);
+
   return (
-    <View style={styles.container}>
-      <View style={[styles.iconWrap, { backgroundColor: c.surfaceAlt }]}>
-        <Ionicons name={icon} size={36} color={c.textMuted} />
+    <Animated.View style={[styles.container, { opacity, transform: [{ scale }] }]}>
+      <View style={styles.iconStack}>
+        <View style={[styles.outerRing, { backgroundColor: c.surfaceAlt }]} />
+        <View style={[styles.innerRing, { backgroundColor: c.primaryLight }]} />
+        <View style={[styles.iconCenter, { backgroundColor: c.surface }]}>
+          <Ionicons name={icon} size={32} color={c.primary} />
+        </View>
       </View>
       <Text variant="subtitle" style={styles.title}>
         {title}
@@ -27,9 +42,11 @@ export function EmptyState({ icon = 'file-tray-outline', title, message, actionL
         {message}
       </Text>
       {actionLabel && onAction ? (
-        <Button label={actionLabel} variant="secondary" size="sm" onPress={onAction} />
+        <View style={styles.action}>
+          <Button label={actionLabel} variant="secondary" size="sm" onPress={onAction} />
+        </View>
       ) : null}
-    </View>
+    </Animated.View>
   );
 }
 
@@ -40,13 +57,36 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     gap: spacing.sm,
   },
-  iconWrap: {
+  iconStack: {
+    width: 88,
+    height: 88,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.md,
+  },
+  outerRing: {
+    position: 'absolute',
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+  },
+  innerRing: {
+    position: 'absolute',
     width: 64,
     height: 64,
     borderRadius: 32,
+  },
+  iconCenter: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing.sm,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    elevation: 2,
   },
   title: {
     textAlign: 'center',
@@ -54,5 +94,8 @@ const styles = StyleSheet.create({
   message: {
     textAlign: 'center',
     maxWidth: 280,
+  },
+  action: {
+    marginTop: spacing.sm,
   },
 });

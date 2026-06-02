@@ -1,5 +1,5 @@
 import { PropsWithChildren } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { spacing } from './theme';
 import { useColors } from '../context/ThemeContext';
@@ -9,43 +9,55 @@ type ScreenProps = PropsWithChildren<{
   refreshing?: boolean;
   onRefresh?: () => void;
   edges?: ('top' | 'bottom' | 'left' | 'right')[];
+  keyboardAvoiding?: boolean;
 }>;
 
-export function Screen({ children, scroll = true, refreshing, onRefresh, edges }: ScreenProps) {
+export function Screen({ children, scroll = true, refreshing, onRefresh, edges, keyboardAvoiding = true }: ScreenProps) {
   const c = useColors();
 
-  if (!scroll) {
-    return (
-      <SafeAreaView style={[styles.safeArea, { backgroundColor: c.background }]} edges={edges}>
-        <View style={styles.content}>{children}</View>
-      </SafeAreaView>
-    );
-  }
+  const content = scroll ? (
+    <ScrollView
+      contentContainerStyle={styles.content}
+      keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={false}
+      refreshControl={
+        onRefresh ? (
+          <RefreshControl
+            refreshing={refreshing ?? false}
+            onRefresh={onRefresh}
+            tintColor={c.primary}
+            colors={[c.primary]}
+          />
+        ) : undefined
+      }
+    >
+      {children}
+    </ScrollView>
+  ) : (
+    <View style={styles.content}>{children}</View>
+  );
+
+  const inner = keyboardAvoiding ? (
+    <KeyboardAvoidingView
+      style={styles.flex}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
+    >
+      {content}
+    </KeyboardAvoidingView>
+  ) : content;
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: c.background }]} edges={edges}>
-      <ScrollView
-        contentContainerStyle={styles.content}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          onRefresh ? (
-            <RefreshControl
-              refreshing={refreshing ?? false}
-              onRefresh={onRefresh}
-              tintColor={c.primary}
-              colors={[c.primary]}
-            />
-          ) : undefined
-        }
-      >
-        {children}
-      </ScrollView>
+      {inner}
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  flex: {
+    flex: 1,
+  },
   safeArea: {
     flex: 1,
   },

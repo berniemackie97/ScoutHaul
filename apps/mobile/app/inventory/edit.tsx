@@ -2,21 +2,30 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { api } from '../../src/api/client';
 import { Button } from '../../src/components/Button';
-import { Card } from '../../src/components/Card';
 import { ErrorBanner } from '../../src/components/ErrorBanner';
+import { ExpandableSection } from '../../src/components/ExpandableSection';
 import { LoadingState } from '../../src/components/LoadingState';
 import { Screen } from '../../src/components/Screen';
-import { SectionHeader } from '../../src/components/SectionHeader';
+import { SelectField } from '../../src/components/SelectField';
+import { StatusPill } from '../../src/components/StatusPill';
 import { Text } from '../../src/components/Text';
 import { TextField } from '../../src/components/TextField';
 import { radius, spacing } from '../../src/components/theme';
 import { useAppTheme } from '../../src/context/ThemeContext';
+import { useHaptics } from '../../src/hooks/useHaptics';
 import { enqueueOperation } from '../../src/db/localStore';
-import { categoryAttributeFields, categoryOptions, conditionOptions, damageSeverityOptions, damageTypeOptions, sizeSystemOptions } from '../../src/domain/inventoryOptions';
+import {
+  categoryAttributeFields,
+  categoryOptions,
+  conditionOptions,
+  damageSeverityOptions,
+  damageTypeOptions,
+  sizeSystemOptions,
+} from '../../src/domain/inventoryOptions';
 import type { InventoryItem } from '../../src/domain/types';
 import { parseOptionalNumber } from '../../src/utils/money';
 import { resolvePhotoUrl } from '../../src/utils/photoUrl';
@@ -32,7 +41,8 @@ type LocalPhoto = {
 type AttributeMap = Record<string, string>;
 
 export default function EditInventoryScreen() {
-  const { colors: c } = useAppTheme();
+  const { colors: c, shadows: s } = useAppTheme();
+  const haptics = useHaptics();
   const params = useLocalSearchParams<{
     id?: string;
     title?: string;
@@ -72,7 +82,72 @@ export default function EditInventoryScreen() {
   const [photos, setPhotos] = useState<LocalPhoto[]>([]);
   const [originalRemotePhotoRefs, setOriginalRemotePhotoRefs] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [titleTouched, setTitleTouched] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+
+  // Dynamic category attribute fields
+  const categoryFields = useMemo(
+    () => categoryAttributeFields[category] ?? [],
+    [category],
+  );
+
+  // Section fill counts for collapsed badges
+  const essentialsFilled = useMemo(() => {
+    let n = 0;
+    if (title.trim()) n++;
+    if (condition) n++;
+    if (category) n++;
+    if (brand.trim()) n++;
+    return n;
+  }, [title, condition, category, brand]);
+
+  const pricingFilled = useMemo(() => {
+    let n = 0;
+    if (purchasePrice.trim()) n++;
+    if (estimatedSalePrice.trim()) n++;
+    return n;
+  }, [purchasePrice, estimatedSalePrice]);
+
+  const detailsFilled = useMemo(() => {
+    let n = 0;
+    if (sizeSystem) n++;
+    if (sizeValue.trim()) n++;
+    if (barcode.trim()) n++;
+    const filled = Object.values(attributes).filter((v) => v.trim()).length;
+    n += filled;
+    return n;
+  }, [sizeSystem, sizeValue, barcode, attributes]);
+
+  const detailsTotal = useMemo(() => 3 + categoryFields.length, [categoryFields]);
+
+  const workFilled = useMemo(() => {
+    let n = 0;
+    if (storageLocation.trim()) n++;
+    if (accessories.trim()) n++;
+    if (testingNotes.trim()) n++;
+    if (cleaningNotes.trim()) n++;
+    if (listingNotes.trim()) n++;
+    if (missingParts.trim()) n++;
+    return n;
+  }, [storageLocation, accessories, testingNotes, cleaningNotes, listingNotes, missingParts]);
+
+  const damageFilled = useMemo(() => {
+    let n = 0;
+    if (damageType) n++;
+    if (damageSeverity) n++;
+    if (damageNote.trim()) n++;
+    return n;
+  }, [damageType, damageSeverity, damageNote]);
+
+  // Margin summary computed in real-time
+  const projectedMargin = useMemo(() => {
+    const cost = parseOptionalNumber(purchasePrice);
+    const sale = parseOptionalNumber(estimatedSalePrice);
+    if (cost === null || sale === null || sale === 0) return null;
+    const profit = sale - cost;
+    const pct = ((profit / sale) * 100).toFixed(0);
+    return { profit, pct, positive: profit > 0 };
+  }, [purchasePrice, estimatedSalePrice]);
 
   useFocusEffect(
     useCallback(() => {
@@ -139,29 +214,28 @@ export default function EditInventoryScreen() {
     }));
     setPhotos((prev) => {
       const combined = [...prev, ...newPhotos];
-      // First photo is hero if none set
       if (!combined.some((p) => p.isHero) && combined.length > 0) {
         combined[0].isHero = true;
       }
       return combined;
     });
+    haptics.light();
   }
 
   async function takePhoto() {
     const perm = await ImagePicker.requestCameraPermissionsAsync();
     if (!perm.granted) return;
-    const result = await ImagePicker.launchCameraAsync({
-      quality: 0.8,
-    });
+    const result = await ImagePicker.launchCameraAsync({ quality: 0.8 });
     if (result.canceled) return;
     const newPhoto: LocalPhoto = { uri: result.assets[0].uri, isHero: photos.length === 0 };
     setPhotos((prev) => [...prev, newPhoto]);
+    haptics.light();
   }
 
   function removePhoto(index: number) {
+    haptics.warning();
     setPhotos((prev) => {
       const next = prev.filter((_, i) => i !== index);
-      // Ensure hero exists
       if (next.length > 0 && !next.some((p) => p.isHero)) {
         next[0].isHero = true;
       }
@@ -170,12 +244,12 @@ export default function EditInventoryScreen() {
   }
 
   function setHero(index: number) {
-    setPhotos((prev) =>
-      prev.map((p, i) => ({ ...p, isHero: i === index })),
-    );
+    haptics.selection();
+    setPhotos((prev) => prev.map((p, i) => ({ ...p, isHero: i === index })));
   }
 
   async function save() {
+    setTitleTouched(true);
     if (!title.trim()) {
       setError('Item title is required.');
       return;
@@ -223,12 +297,14 @@ export default function EditInventoryScreen() {
       savedItem = item;
       await persistPhotoChanges(item.id);
       await persistIssueChanges(item.id);
+      haptics.success();
       if (params.sourcingTripId) {
         router.replace({ pathname: '/active-route', params: { tripId: params.sourcingTripId } });
       } else {
         router.replace(`/inventory/${item.id}`);
       }
     } catch (e) {
+      haptics.error();
       if (!isEdit && params.sourcingTripId && !savedItem) {
         await enqueueOperation('CreateRouteStopPurchase', '/api/inventory', 'POST', body);
         router.replace({ pathname: '/active-route', params: { tripId: params.sourcingTripId } });
@@ -237,7 +313,7 @@ export default function EditInventoryScreen() {
 
       if (!isEdit && !savedItem) {
         await enqueueOperation('CreateInventory', '/api/inventory', 'POST', body);
-        setError('Inventory create queued locally. Sync before installing a new APK so it reaches the server.');
+        setError('Saved locally. Will sync when online.');
         return;
       }
 
@@ -293,92 +369,92 @@ export default function EditInventoryScreen() {
     );
   }
 
+  const titleError = titleTouched && !title.trim() ? 'Title is required' : null;
+
   return (
     <Screen>
       {error ? <ErrorBanner message={error} /> : null}
 
-      {/* Photos section */}
-      <Card>
-        <SectionHeader title="Photos" />
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.photoScroll}
-        >
-          {photos.map((photo, i) => (
-            <View key={photo.remoteId ?? photo.uri} style={styles.photoWrapper}>
-              <Pressable onPress={() => setHero(i)} style={styles.photoTouch}>
-                <Image source={{ uri: resolvePhotoUrl(photo.thumbnailUri ?? photo.uri) ?? photo.thumbnailUri ?? photo.uri }} style={styles.photoThumb} contentFit="cover" cachePolicy="disk" />
-                {photo.isHero ? (
-                  <View style={[styles.heroBadge, { backgroundColor: c.primary }]}>
-                    <Ionicons name="star" size={10} color={c.textInverse} />
-                  </View>
-                ) : null}
-              </Pressable>
-              <Pressable
-                onPress={() => removePhoto(i)}
-                style={[styles.removeBtn, { backgroundColor: c.dangerLight }]}
-                hitSlop={4}
-              >
-                <Ionicons name="close" size={14} color={c.danger} />
-              </Pressable>
-            </View>
-          ))}
-          <View style={styles.addPhotoButtons}>
-            <Pressable
-              onPress={() => void takePhoto()}
-              style={[styles.addPhotoBtn, { backgroundColor: c.surfaceAlt, borderColor: c.border }]}
-              accessibilityLabel="Take photo"
-            >
-              <Ionicons name="camera-outline" size={24} color={c.primary} />
-              <Text variant="label" color={c.primary}>Camera</Text>
-            </Pressable>
-            <Pressable
-              onPress={() => void pickPhotos()}
-              style={[styles.addPhotoBtn, { backgroundColor: c.surfaceAlt, borderColor: c.border }]}
-              accessibilityLabel="Pick from library"
-            >
-              <Ionicons name="images-outline" size={24} color={c.primary} />
-              <Text variant="label" color={c.primary}>Library</Text>
-            </Pressable>
-          </View>
-        </ScrollView>
-      </Card>
+      {/* ── Photo Management ── */}
+      <PhotoManager
+        photos={photos}
+        onTake={() => void takePhoto()}
+        onPick={() => void pickPhotos()}
+        onRemove={removePhoto}
+        onSetHero={setHero}
+      />
 
-      <Card>
-        <SectionHeader title="Item Info" />
+      {/* ── Essentials — always expanded ── */}
+      <ExpandableSection
+        title="Item Info"
+        icon="cube-outline"
+        defaultExpanded
+        filledCount={essentialsFilled}
+        totalCount={4}
+      >
         <TextField
           label="Title"
           value={title}
           onChangeText={setTitle}
+          onBlur={() => setTitleTouched(true)}
           placeholder="What is this item?"
+          error={titleError}
         />
         <TextField
           label="Description"
           value={description}
           onChangeText={setDescription}
-          placeholder="Details, color, size, model year"
+          placeholder="Details, color, size, model year..."
           multiline
         />
-        <ChipGroup label="Category" value={category} options={categoryOptions} onSelect={setCategory} />
+        <SelectField
+          label="Category"
+          value={category}
+          options={categoryOptions}
+          onChange={(v) => {
+            setCategory(v);
+            if (v !== category) setAttributes({});
+          }}
+          placeholder="Select category..."
+          searchable
+        />
         <View style={styles.row}>
           <TextField label="Brand" value={brand} onChangeText={setBrand} placeholder="Nike, Sony, Lego" containerStyle={styles.flex} />
           <TextField label="Model" value={model} onChangeText={setModel} placeholder="Style, model, SKU" containerStyle={styles.flex} />
         </View>
         <TextField label="Color" value={color} onChangeText={setColor} placeholder="Black, red, multicolor" />
-        <ChipGroup label="Condition" value={condition} options={conditionOptions} onSelect={setCondition} />
-        <ChipGroup label="Size system" value={sizeSystem} options={sizeSystemOptions} onSelect={setSizeSystem} />
-        <TextField
-          label="Size"
-          value={sizeValue}
-          onChangeText={setSizeValue}
-          placeholder="M, 32x30, 10.5, One size"
+        <SelectField
+          label="Condition"
+          value={condition}
+          options={conditionOptions}
+          onChange={setCondition}
+          placeholder="Select condition..."
+          required
         />
-        <CategoryAttributes
-          category={category}
-          attributes={attributes}
-          onChange={(key, value) => setAttributes((current) => ({ ...current, [key]: value }))}
+      </ExpandableSection>
+
+      {/* ── Size, Identifiers & Category Details — collapsed ── */}
+      <ExpandableSection
+        title="Details & Identifiers"
+        icon="resize-outline"
+        filledCount={detailsFilled}
+        totalCount={detailsTotal}
+      >
+        <SelectField
+          label="Size system"
+          value={sizeSystem}
+          options={sizeSystemOptions}
+          onChange={setSizeSystem}
+          placeholder="Select sizing..."
         />
+        {sizeSystem ? (
+          <TextField
+            label="Size value"
+            value={sizeValue}
+            onChangeText={setSizeValue}
+            placeholder={sizePlaceholder(sizeSystem)}
+          />
+        ) : null}
         <TextField
           label="Barcode"
           value={barcode}
@@ -386,10 +462,58 @@ export default function EditInventoryScreen() {
           keyboardType="number-pad"
           placeholder="UPC, EAN, ISBN"
         />
-      </Card>
 
-      <Card>
-        <SectionHeader title="Pricing" />
+        {/* Dynamic category attribute fields */}
+        {categoryFields.length > 0 ? (
+          <View style={styles.dynamicSection}>
+            <View style={styles.dynamicHeader}>
+              <View style={[styles.dynamicBadge, { backgroundColor: c.primaryLight }]}>
+                <Ionicons name="layers-outline" size={14} color={c.primary} />
+              </View>
+              <Text variant="bodyBold" color={c.primary}>
+                {category} Details
+              </Text>
+            </View>
+            {categoryFields.map((field) =>
+              field.type === 'select' && field.options ? (
+                <SelectField
+                  key={field.key}
+                  label={field.label}
+                  value={attributes[field.key] ?? ''}
+                  options={field.options}
+                  onChange={(v) => setAttributes((curr) => ({ ...curr, [field.key]: v }))}
+                  placeholder={field.placeholder}
+                />
+              ) : (
+                <TextField
+                  key={field.key}
+                  label={field.label}
+                  value={attributes[field.key] ?? ''}
+                  onChangeText={(v) => setAttributes((curr) => ({ ...curr, [field.key]: v }))}
+                  placeholder={field.placeholder}
+                  multiline={field.multiline}
+                />
+              ),
+            )}
+          </View>
+        ) : category ? (
+          <View style={[styles.noCategoryFields, { backgroundColor: c.surfaceAlt }]}>
+            <Ionicons name="information-circle-outline" size={16} color={c.textMuted} />
+            <Text variant="caption" color={c.textMuted}>
+              No additional fields for {category}.
+            </Text>
+          </View>
+        ) : null}
+      </ExpandableSection>
+
+      {/* ── Pricing — collapsed, shows margin ── */}
+      <ExpandableSection
+        title="Pricing"
+        icon="cash-outline"
+        filledCount={pricingFilled}
+        totalCount={2}
+        badge={projectedMargin ? `${projectedMargin.pct}%` : undefined}
+      >
         <View style={styles.row}>
           <TextField
             label="Purchase price"
@@ -411,12 +535,34 @@ export default function EditInventoryScreen() {
             hint={params.estimatedSalePrice ? 'From marketplace avg' : undefined}
           />
         </View>
-      </Card>
+        {projectedMargin ? (
+          <View style={[styles.marginBar, { backgroundColor: projectedMargin.positive ? c.successLight : c.dangerLight }]}>
+            <Ionicons
+              name={projectedMargin.positive ? 'trending-up' : 'trending-down'}
+              size={18}
+              color={projectedMargin.positive ? c.success : c.danger}
+            />
+            <Text variant="bodyBold" color={projectedMargin.positive ? c.successDark : c.dangerDark}>
+              ${Math.abs(projectedMargin.profit).toFixed(2)} {projectedMargin.positive ? 'profit' : 'loss'}
+            </Text>
+            <StatusPill
+              label={`${projectedMargin.pct}% margin`}
+              tone={projectedMargin.positive ? 'success' : 'danger'}
+              size="sm"
+            />
+          </View>
+        ) : null}
+      </ExpandableSection>
 
-      <Card>
-        <SectionHeader title="Item Work" />
+      {/* ── Item Work — collapsed ── */}
+      <ExpandableSection
+        title="Item Work"
+        icon="construct-outline"
+        filledCount={workFilled}
+        totalCount={6}
+      >
         <TextField
-          label="Storage/bin"
+          label="Storage / bin location"
           value={storageLocation}
           onChangeText={setStorageLocation}
           placeholder="Bin A4, shelf 2, photo station"
@@ -456,31 +602,50 @@ export default function EditInventoryScreen() {
           multiline
           placeholder="Keywords, bundle notes, listing reminders"
         />
-      </Card>
+      </ExpandableSection>
 
-      <Card>
-        <SectionHeader title="Damage / Issues" />
-        <ChipGroup label="Issue type" value={damageType} options={damageTypeOptions} onSelect={setDamageType} />
-        <ChipGroup label="Severity" value={damageSeverity} options={damageSeverityOptions} onSelect={setDamageSeverity} />
+      {/* ── Damage & Issues — collapsed ── */}
+      <ExpandableSection
+        title="Damage / Issues"
+        icon="warning-outline"
+        filledCount={damageFilled}
+        totalCount={3}
+      >
+        <SelectField
+          label="Issue type"
+          value={damageType}
+          options={damageTypeOptions}
+          onChange={setDamageType}
+          placeholder="Select issue type..."
+        />
+        <SelectField
+          label="Severity"
+          value={damageSeverity}
+          options={damageSeverityOptions}
+          onChange={setDamageSeverity}
+          placeholder="Select severity..."
+        />
         <TextField
           label="Damage note"
           value={damageNote}
           onChangeText={setDamageNote}
           multiline
-          placeholder="Where it is, how visible it is, whether it affects function"
+          placeholder="Where it is, how visible, whether it affects function"
         />
-      </Card>
+      </ExpandableSection>
 
-      <Card>
+      {/* ── Notes — collapsed ── */}
+      <ExpandableSection title="Notes" icon="document-text-outline">
         <TextField
           label="Notes"
           value={notes}
           onChangeText={setNotes}
           multiline
-          placeholder="Accessories, damage notes, storage location"
+          placeholder="Anything else worth remembering"
         />
-      </Card>
+      </ExpandableSection>
 
+      {/* ── Save Button ── */}
       <Button
         label={isSaving ? 'Saving...' : isEdit ? 'Update Item' : 'Add to Inventory'}
         icon={isEdit ? 'save-outline' : 'add-circle-outline'}
@@ -493,76 +658,115 @@ export default function EditInventoryScreen() {
   );
 }
 
-function ChipGroup({
-  label,
-  value,
-  options,
-  onSelect,
+// ── Photo Manager ──
+
+function PhotoManager({
+  photos,
+  onTake,
+  onPick,
+  onRemove,
+  onSetHero,
 }: {
-  label: string;
-  value: string;
-  options: readonly string[];
-  onSelect: (value: string) => void;
+  photos: LocalPhoto[];
+  onTake: () => void;
+  onPick: () => void;
+  onRemove: (index: number) => void;
+  onSetHero: (index: number) => void;
 }) {
-  const { colors: c } = useAppTheme();
+  const { colors: c, shadows: s } = useAppTheme();
+  const hasPhotos = photos.length > 0;
+
   return (
-    <View style={styles.chipGroup}>
-      <Text variant="caption" color={c.textSecondary}>{label}</Text>
-      <View style={styles.chipWrap}>
-        {options.map((option) => {
-          const selected = option === value;
-          return (
-            <Pressable
-              key={option}
-              accessibilityRole="button"
-              accessibilityState={{ selected }}
-              onPress={() => onSelect(selected ? '' : option)}
-              style={[
-                styles.chip,
-                {
-                  backgroundColor: selected ? c.primary : c.surfaceAlt,
-                  borderColor: selected ? c.primary : c.border,
-                },
-              ]}
-            >
-              <Text variant="caption" color={selected ? c.textInverse : c.textSecondary}>
-                {option}
-              </Text>
-            </Pressable>
-          );
-        })}
+    <View style={[styles.photoSection, { backgroundColor: c.surface, borderColor: c.borderLight, ...s.sm }]}>
+      <View style={styles.photoHeader}>
+        <View style={styles.photoHeaderLeft}>
+          <Ionicons name="camera-outline" size={18} color={c.primary} />
+          <Text variant="bodyBold">Photos</Text>
+        </View>
+        {hasPhotos ? (
+          <View style={[styles.photoCountBadge, { backgroundColor: c.primaryLight }]}>
+            <Text variant="label" color={c.primary}>{photos.length}</Text>
+          </View>
+        ) : (
+          <Text variant="caption" color={c.textMuted}>Tap to add</Text>
+        )}
       </View>
+
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.photoScroll}
+      >
+        <Pressable
+          onPress={onTake}
+          style={[styles.addPhotoBtn, styles.addPhotoPrimary, { backgroundColor: c.primaryLight, borderColor: c.primary }]}
+          accessibilityLabel="Take photo"
+        >
+          <Ionicons name="camera" size={24} color={c.primary} />
+          <Text variant="label" color={c.primary}>Camera</Text>
+        </Pressable>
+        <Pressable
+          onPress={onPick}
+          style={[styles.addPhotoBtn, { backgroundColor: c.surfaceAlt, borderColor: c.border }]}
+          accessibilityLabel="Pick from library"
+        >
+          <Ionicons name="images-outline" size={22} color={c.textSecondary} />
+          <Text variant="label" color={c.textSecondary}>Library</Text>
+        </Pressable>
+        {photos.map((photo, i) => (
+          <View key={photo.remoteId ?? photo.uri} style={styles.photoWrapper}>
+            <Pressable onPress={() => onSetHero(i)} style={styles.photoTouch}>
+              <Image
+                source={{ uri: resolvePhotoUrl(photo.thumbnailUri ?? photo.uri) ?? photo.thumbnailUri ?? photo.uri }}
+                style={styles.photoThumb}
+                contentFit="cover"
+                cachePolicy="disk"
+              />
+              {photo.isHero ? (
+                <View style={[styles.heroBadge, { backgroundColor: c.primary }]}>
+                  <Ionicons name="star" size={10} color={c.textInverse} />
+                </View>
+              ) : (
+                <View style={[styles.orderBadge, { backgroundColor: 'rgba(0,0,0,0.5)' }]}>
+                  <Text variant="label" color={c.textInverse} style={styles.orderText}>{i + 1}</Text>
+                </View>
+              )}
+            </Pressable>
+            <Pressable
+              onPress={() => onRemove(i)}
+              style={[styles.removeBtn, { backgroundColor: c.danger }]}
+              hitSlop={6}
+            >
+              <Ionicons name="close" size={12} color={c.textInverse} />
+            </Pressable>
+          </View>
+        ))}
+      </ScrollView>
+
+      {!hasPhotos ? (
+        <View style={[styles.photoHint, { backgroundColor: c.surfaceAlt }]}>
+          <Ionicons name="information-circle-outline" size={14} color={c.textMuted} />
+          <Text variant="caption" color={c.textMuted}>
+            First photo becomes the hero image. Tap any photo to set it as hero.
+          </Text>
+        </View>
+      ) : null}
     </View>
   );
 }
 
-function CategoryAttributes({
-  category,
-  attributes,
-  onChange,
-}: {
-  category: string;
-  attributes: AttributeMap;
-  onChange: (key: string, value: string) => void;
-}) {
-  const fields = categoryAttributeFields[category] ?? [];
-  if (fields.length === 0) return null;
+// ── Helpers ──
 
-  return (
-    <View style={styles.attributeBlock}>
-      <Text variant="caption">Category details</Text>
-      {fields.map((field) => (
-        <TextField
-          key={field.key}
-          label={field.label}
-          value={attributes[field.key] ?? ''}
-          onChangeText={(value) => onChange(field.key, value)}
-          placeholder={field.placeholder}
-          multiline={field.multiline}
-        />
-      ))}
-    </View>
-  );
+function sizePlaceholder(system: string): string {
+  switch (system) {
+    case 'US letter': return 'XS, S, M, L, XL, 2XL';
+    case 'US numeric': return '0, 2, 4, 6, 8, 10, 12';
+    case 'Waist/Inseam': return '32×30, 34×32';
+    case 'Shoe US M': return '8, 9.5, 10, 11, 12';
+    case 'Shoe US W': return '6, 7.5, 8, 9, 10';
+    case 'Youth': return '4T, 5, 6, 7, 8, 10-12';
+    default: return 'Enter size';
+  }
 }
 
 function parseAttributes(value?: string | null): AttributeMap {
@@ -589,6 +793,8 @@ function serializeAttributes(value: AttributeMap): string | null {
   return Object.keys(cleaned).length > 0 ? JSON.stringify(cleaned) : null;
 }
 
+// ── Styles ──
+
 const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
@@ -597,29 +803,31 @@ const styles = StyleSheet.create({
   flex: {
     flex: 1,
   },
-  chipGroup: {
-    gap: spacing.xs,
+
+  // Photo section
+  photoSection: {
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    padding: spacing.lg,
+    gap: spacing.md,
   },
-  chipWrap: {
+  photoHeader: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  photoHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: spacing.sm,
   },
-  chip: {
-    minHeight: 36,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+  photoCountBadge: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xxs,
     borderRadius: radius.full,
-    borderWidth: 1,
-    justifyContent: 'center',
-  },
-  attributeBlock: {
-    gap: spacing.md,
-    paddingTop: spacing.xs,
   },
   photoScroll: {
     gap: spacing.sm,
-    paddingBottom: spacing.xs,
   },
   photoWrapper: {
     position: 'relative',
@@ -629,42 +837,98 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   photoThumb: {
-    width: 80,
-    height: 80,
+    width: 76,
+    height: 76,
     borderRadius: radius.md,
   },
   heroBadge: {
     position: 'absolute',
     bottom: 4,
     left: 4,
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  removeBtn: {
-    position: 'absolute',
-    top: -4,
-    right: -4,
     width: 20,
     height: 20,
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  addPhotoButtons: {
-    flexDirection: 'row',
-    gap: spacing.sm,
+  orderBadge: {
+    position: 'absolute',
+    bottom: 4,
+    left: 4,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  orderText: {
+    fontSize: 9,
+    lineHeight: 12,
+    letterSpacing: 0,
+  },
+  removeBtn: {
+    position: 'absolute',
+    top: -5,
+    right: -5,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   addPhotoBtn: {
-    width: 80,
-    height: 80,
+    width: 76,
+    height: 76,
     borderRadius: radius.md,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderStyle: 'dashed',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.xs,
+    gap: spacing.xxs,
+  },
+  addPhotoPrimary: {
+    borderStyle: 'solid',
+  },
+  photoHint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    padding: spacing.sm,
+    borderRadius: radius.sm,
+  },
+
+  // Dynamic category fields
+  dynamicSection: {
+    gap: spacing.md,
+  },
+  dynamicHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingTop: spacing.xs,
+  },
+  dynamicBadge: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  noCategoryFields: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    padding: spacing.md,
+    borderRadius: radius.sm,
+  },
+
+  // Margin bar
+  marginBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    padding: spacing.md,
+    borderRadius: radius.md,
   },
 });

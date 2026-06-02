@@ -1,7 +1,8 @@
 import { ExpoConfig, ConfigContext } from 'expo/config';
 
-const IS_PROD = process.env.EAS_BUILD_PROFILE === 'production';
-const IS_PREVIEW = process.env.EAS_BUILD_PROFILE === 'preview';
+const BUILD_PROFILE = process.env.EAS_BUILD_PROFILE;
+const IS_PROD = BUILD_PROFILE === 'production' || BUILD_PROFILE === 'release-apk';
+const IS_PREVIEW = BUILD_PROFILE === 'preview';
 
 export default ({ config }: ConfigContext): ExpoConfig => {
   const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL ?? 'http://localhost:5080';

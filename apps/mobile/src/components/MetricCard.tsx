@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { useRef } from 'react';
+import { Animated, Pressable, StyleSheet, View } from 'react-native';
 import { Text } from './Text';
 import { radius, spacing, type ToneKey } from './theme';
 import { useAppTheme, useTones } from '../context/ThemeContext';
@@ -17,6 +18,16 @@ export function MetricCard({ label, value, icon, tone, subtitle, onPress }: Metr
   const { colors: col, shadows: s } = useAppTheme();
   const tones = useTones();
   const t = tone ? tones[tone] : null;
+  const scale = useRef(new Animated.Value(1)).current;
+
+  function handlePressIn() {
+    if (!onPress) return;
+    Animated.spring(scale, { toValue: 0.97, useNativeDriver: true, speed: 50, bounciness: 0 }).start();
+  }
+
+  function handlePressOut() {
+    Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 30, bounciness: 4 }).start();
+  }
 
   const cardStyle = [styles.card, { backgroundColor: col.surface, borderColor: col.borderLight, ...s.sm }];
 
@@ -30,28 +41,40 @@ export function MetricCard({ label, value, icon, tone, subtitle, onPress }: Metr
         ) : null}
         <Text variant="label">{label}</Text>
       </View>
-      <Text variant="metric">{value}</Text>
+      <Text variant="metric" color={t?.text}>{value}</Text>
       {subtitle ? <Text variant="caption">{subtitle}</Text> : null}
+      {t ? <View style={[styles.accentStripe, { backgroundColor: t.border }]} /> : null}
     </>
   );
 
   if (onPress) {
     return (
-      <Pressable
-        onPress={onPress}
-        accessibilityRole="button"
-        accessibilityLabel={`${label}: ${value}`}
-        style={({ pressed }) => [...cardStyle, pressed && styles.pressed]}
-      >
-        {content}
-      </Pressable>
+      <Animated.View style={[styles.flex, { transform: [{ scale }] }]}>
+        <Pressable
+          onPress={onPress}
+          onPressIn={handlePressIn}
+          onPressOut={handlePressOut}
+          accessibilityRole="button"
+          accessibilityLabel={`${label}: ${value}`}
+          style={({ pressed }) => [...cardStyle, pressed && { backgroundColor: col.surfaceAlt }]}
+        >
+          {content}
+        </Pressable>
+      </Animated.View>
     );
   }
 
-  return <View style={cardStyle} accessibilityLabel={`${label}: ${value}`}>{content}</View>;
+  return (
+    <View style={cardStyle} accessibilityLabel={`${label}: ${value}`}>
+      {content}
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
+  flex: {
+    flex: 1,
+  },
   card: {
     flex: 1,
     borderRadius: radius.lg,
@@ -59,9 +82,7 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
     minHeight: 100,
     borderWidth: 1,
-  },
-  pressed: {
-    opacity: 0.85,
+    overflow: 'hidden',
   },
   top: {
     flexDirection: 'row',
@@ -74,5 +95,12 @@ const styles = StyleSheet.create({
     borderRadius: radius.sm,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  accentStripe: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 3,
   },
 });

@@ -4,6 +4,7 @@ import { Animated, PanResponder, Pressable, StyleSheet, View } from 'react-nativ
 import { Text } from './Text';
 import { radius, spacing } from './theme';
 import { useColors } from '../context/ThemeContext';
+import { useHaptics } from '../hooks/useHaptics';
 
 type SwipeAction = {
   icon: keyof typeof Ionicons.glyphMap;
@@ -21,6 +22,7 @@ const THRESHOLD = 80;
 
 export function SwipeableRow({ children, leftAction, rightAction }: SwipeableRowProps) {
   const c = useColors();
+  const haptics = useHaptics();
   const translateX = useRef(new Animated.Value(0)).current;
 
   const panResponder = useRef(
@@ -35,6 +37,7 @@ export function SwipeableRow({ children, leftAction, rightAction }: SwipeableRow
       },
       onPanResponderRelease: (_, gesture) => {
         const action = gesture.dx > THRESHOLD / 2 ? leftAction : gesture.dx < -THRESHOLD / 2 ? rightAction : null;
+        if (action) haptics.medium();
         Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start(() => action?.onPress());
       },
       onPanResponderTerminate: () => {
@@ -56,8 +59,8 @@ export function SwipeableRow({ children, leftAction, rightAction }: SwipeableRow
           accessibilityLabel={leftAction.label}
           accessibilityRole="button"
         >
-          <Ionicons name={leftAction.icon} size={22} color="#fff" />
-          <Text variant="caption" color="#fff">{leftAction.label}</Text>
+          <Ionicons name={leftAction.icon} size={22} color={c.textInverse} />
+          <Text variant="caption" color={c.textInverse}>{leftAction.label}</Text>
         </Pressable>
       ) : null}
       {rightAction ? (
@@ -67,8 +70,8 @@ export function SwipeableRow({ children, leftAction, rightAction }: SwipeableRow
           accessibilityLabel={rightAction.label}
           accessibilityRole="button"
         >
-          <Ionicons name={rightAction.icon} size={22} color="#fff" />
-          <Text variant="caption" color="#fff">{rightAction.label}</Text>
+          <Ionicons name={rightAction.icon} size={22} color={c.textInverse} />
+          <Text variant="caption" color={c.textInverse}>{rightAction.label}</Text>
         </Pressable>
       ) : null}
       <Animated.View

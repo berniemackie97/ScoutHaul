@@ -140,7 +140,7 @@ export default function OnboardingScreen() {
   return (
     <Screen edges={['top', 'left', 'right', 'bottom']}>
       <View style={styles.header}>
-        <View style={styles.brandMark}>
+        <View style={[styles.brandMark, { backgroundColor: c.primary }]}>
           <Ionicons name="compass-outline" size={26} color={c.textInverse} />
         </View>
         <View style={styles.headerText}>
@@ -238,7 +238,7 @@ function WelcomeStep({ onLocal }: { onLocal: () => void }) {
   const { colors: c } = useAppTheme();
   return (
     <>
-      <View style={[styles.heroPanel, { backgroundColor: c.surface }]}>
+      <View style={[styles.heroPanel, { backgroundColor: c.surface, borderColor: c.borderLight }]}>
         <StatusPill label="Workspace operating system" tone="primary" />
         <Text variant="hero">Run sourcing, inventory, listings, and budgets from one workspace.</Text>
         <Text variant="body" color={c.textSecondary}>
@@ -549,7 +549,7 @@ function ConsentRow({
         <Text variant="caption">{subtitle}</Text>
       </View>
       <View style={[styles.switchTrack, { backgroundColor: value ? c.primary : c.border }]}>
-        <View style={[styles.switchThumb, value && styles.switchThumbOn]} />
+        <View style={[styles.switchThumb, { backgroundColor: c.surface }, value && styles.switchThumbOn]} />
       </View>
     </Pressable>
   );
@@ -660,7 +660,6 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#0B6B5B',
   },
   headerText: {
     flex: 1,
@@ -679,7 +678,6 @@ const styles = StyleSheet.create({
     padding: spacing.xl,
     gap: spacing.lg,
     borderWidth: 1,
-    borderColor: 'rgba(148, 163, 184, 0.25)',
   },
   ctaStack: {
     gap: spacing.sm,
@@ -764,7 +762,6 @@ const styles = StyleSheet.create({
     width: 22,
     height: 22,
     borderRadius: 11,
-    backgroundColor: '#fff',
   },
   switchThumbOn: {
     alignSelf: 'flex-end',

@@ -276,7 +276,7 @@ export default function ActiveRouteScreen() {
         {currentStop ? (
           <Card variant="elevated" style={styles.currentStopCard}>
             <View style={styles.currentHeader}>
-              <View style={styles.stopNumber}>
+              <View style={[styles.stopNumber, { backgroundColor: c.info }]}>
                 <Text variant="bodyBold" color={c.textInverse}>{currentStop.plannedOrder}</Text>
               </View>
               <View style={styles.currentTitle}>
@@ -414,7 +414,7 @@ function TimerBlock({ stop, now }: { stop: SourcingTripStop; now: Date }) {
   const remaining = stop.estimatedDurationMinutes - elapsedMinutes;
   const isOver = remaining < 0;
   return (
-    <View style={styles.timerBlock}>
+    <View style={[styles.timerBlock, { backgroundColor: c.surfaceAlt }]}>
       <View>
         <Text variant="label">Elapsed</Text>
         <Text variant="metricSmall">{formatMinutes(elapsedMinutes)}</Text>
@@ -633,7 +633,6 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#2563eb',
   },
   currentTitle: {
     flex: 1,
@@ -654,7 +653,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     borderRadius: 8,
     padding: spacing.md,
-    backgroundColor: 'rgba(15, 23, 42, 0.04)',
   },
   timerRight: {
     alignItems: 'flex-end',

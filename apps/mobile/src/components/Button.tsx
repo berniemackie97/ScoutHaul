@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { useRef } from 'react';
+import { Animated, Pressable, StyleSheet, View } from 'react-native';
 import { Text } from './Text';
 import { radius, spacing } from './theme';
 import { useColors } from '../context/ThemeContext';
@@ -32,6 +33,8 @@ export function Button({
 }: ButtonProps) {
   const c = useColors();
   const haptics = useHaptics();
+  const scale = useRef(new Animated.Value(1)).current;
+
   const isSolid = variant === 'primary' || variant === 'danger';
   const iconColor = isSolid ? c.textInverse : c.primary;
   const textColor = isSolid ? c.textInverse : c.primary;
@@ -43,32 +46,55 @@ export function Button({
     ghost: 'transparent',
   };
 
+  const borderMap = {
+    primary: c.primary,
+    secondary: c.primary,
+    danger: c.danger,
+    ghost: 'transparent',
+  };
+
+  function handlePressIn() {
+    Animated.spring(scale, { toValue: 0.97, useNativeDriver: true, speed: 50, bounciness: 0 }).start();
+  }
+
+  function handlePressOut() {
+    Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 30, bounciness: 4 }).start();
+  }
+
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      disabled={disabled}
-      onPress={() => { haptics.light(); onPress(); }}
-      style={({ pressed }) => [
-        styles.button,
-        { minHeight: heights[size], backgroundColor: bgMap[variant] },
-        size === 'sm' && styles.smPadding,
-        size === 'lg' && styles.lgPadding,
-        fullWidth && styles.fullWidth,
-        disabled && styles.disabled,
-        pressed && !disabled && styles.pressed,
-      ]}
-    >
-      <View style={styles.inner}>
-        {icon ? <Ionicons name={icon} size={iconSizes[size]} color={disabled ? c.textMuted : iconColor} /> : null}
-        <Text
-          variant={size === 'lg' ? 'bodyBold' : size === 'sm' ? 'caption' : 'bodyBold'}
-          color={disabled ? c.textMuted : textColor}
-        >
-          {label}
-        </Text>
-      </View>
-    </Pressable>
+    <Animated.View style={[fullWidth && styles.fullWidth, { transform: [{ scale }] }]}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        disabled={disabled}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        onPress={() => { haptics.light(); onPress(); }}
+        style={({ pressed }) => [
+          styles.button,
+          {
+            minHeight: heights[size],
+            backgroundColor: bgMap[variant],
+            borderColor: variant === 'secondary' ? c.border : borderMap[variant],
+            borderWidth: variant === 'ghost' ? 0 : variant === 'secondary' ? 1 : 0,
+          },
+          size === 'sm' && styles.smPadding,
+          size === 'lg' && styles.lgPadding,
+          disabled && styles.disabled,
+          pressed && !disabled && { opacity: 0.9 },
+        ]}
+      >
+        <View style={styles.inner}>
+          {icon ? <Ionicons name={icon} size={iconSizes[size]} color={disabled ? c.textMuted : iconColor} /> : null}
+          <Text
+            variant={size === 'lg' ? 'bodyBold' : size === 'sm' ? 'caption' : 'bodyBold'}
+            color={disabled ? c.textMuted : textColor}
+          >
+            {label}
+          </Text>
+        </View>
+      </Pressable>
+    </Animated.View>
   );
 }
 
@@ -89,7 +115,7 @@ export function IconButton({ icon, label, size = 22, color, onPress }: IconButto
       accessibilityLabel={label}
       onPress={() => { haptics.light(); onPress(); }}
       hitSlop={8}
-      style={({ pressed }) => [styles.iconButton, pressed && styles.pressed]}
+      style={({ pressed }) => [styles.iconButton, pressed && { opacity: 0.7, transform: [{ scale: 0.95 }] }]}
     >
       <Ionicons name={icon} size={size} color={color ?? c.textSecondary} />
     </Pressable>
@@ -120,9 +146,6 @@ const styles = StyleSheet.create({
   },
   disabled: {
     opacity: 0.4,
-  },
-  pressed: {
-    opacity: 0.8,
   },
   iconButton: {
     padding: spacing.sm,

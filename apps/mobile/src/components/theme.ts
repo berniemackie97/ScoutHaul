@@ -1,4 +1,5 @@
 import { TextStyle, ViewStyle } from 'react-native';
+import { fontFamily } from '../hooks/useFonts';
 
 export type ColorPalette = typeof lightColors;
 
@@ -132,21 +133,21 @@ export const darkShadows = {
 };
 
 export const typography = {
-  hero: { fontSize: 32, lineHeight: 38, fontWeight: '800' } as TextStyle,
-  title: { fontSize: 24, lineHeight: 30, fontWeight: '800' } as TextStyle,
-  subtitle: { fontSize: 18, lineHeight: 24, fontWeight: '700' } as TextStyle,
-  body: { fontSize: 15, lineHeight: 22, fontWeight: '400' } as TextStyle,
-  bodyBold: { fontSize: 15, lineHeight: 22, fontWeight: '600' } as TextStyle,
-  caption: { fontSize: 13, lineHeight: 18, fontWeight: '500' } as TextStyle,
+  hero: { fontSize: 32, lineHeight: 38, fontFamily: fontFamily.display } as TextStyle,
+  title: { fontSize: 24, lineHeight: 30, fontFamily: fontFamily.display } as TextStyle,
+  subtitle: { fontSize: 18, lineHeight: 24, fontFamily: fontFamily.bold } as TextStyle,
+  body: { fontSize: 15, lineHeight: 22, fontFamily: fontFamily.regular } as TextStyle,
+  bodyBold: { fontSize: 15, lineHeight: 22, fontFamily: fontFamily.semiBold } as TextStyle,
+  caption: { fontSize: 13, lineHeight: 18, fontFamily: fontFamily.medium } as TextStyle,
   label: {
     fontSize: 11,
     lineHeight: 14,
-    fontWeight: '700',
+    fontFamily: fontFamily.bold,
     letterSpacing: 0.8,
     textTransform: 'uppercase',
   } as TextStyle,
-  metric: { fontSize: 28, lineHeight: 34, fontWeight: '800' } as TextStyle,
-  metricSmall: { fontSize: 20, lineHeight: 26, fontWeight: '700' } as TextStyle,
+  metric: { fontSize: 28, lineHeight: 34, fontFamily: fontFamily.display } as TextStyle,
+  metricSmall: { fontSize: 20, lineHeight: 26, fontFamily: fontFamily.displayBold } as TextStyle,
 };
 
 export type ToneKey = 'neutral' | 'success' | 'warning' | 'danger' | 'info' | 'primary';

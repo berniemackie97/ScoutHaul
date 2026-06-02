@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, Easing, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { api } from '../src/api/client';
 import { Button } from '../src/components/Button';
+import { useHaptics } from '../src/hooks/useHaptics';
 import { Card } from '../src/components/Card';
 import { Screen } from '../src/components/Screen';
 import { StatusPill } from '../src/components/StatusPill';
@@ -85,6 +86,7 @@ function buildOcrQuery(raw: string): string {
 
 export default function BarcodeScannerScreen() {
   const { colors: c } = useAppTheme();
+  const haptics = useHaptics();
   const routeParams = useLocalSearchParams<{ sourcingTripId?: string; sourcingTripStopId?: string }>();
   const [permission, requestPermission] = useCameraPermissions();
   const [state, setState] = useState<ScanState>({ phase: 'scanning' });
@@ -109,6 +111,7 @@ export default function BarcodeScannerScreen() {
   }, [isScanning, scanLine]);
 
   async function lookupBarcode(barcode: string) {
+    haptics.success();
     setState({ phase: 'searching', barcode });
     try {
       const result = await api.lookupBarcode(barcode);

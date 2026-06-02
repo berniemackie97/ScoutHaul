@@ -1,7 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api } from '../../src/api/client';
 import { Card } from '../../src/components/Card';
 import { Screen } from '../../src/components/Screen';
@@ -80,13 +82,22 @@ export default function ScoutScreen() {
     },
   ];
 
+  const insets = useSafeAreaInsets();
+
   return (
-    <Screen edges={['top', 'left', 'right']}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text variant="title">Scout</Text>
-        <StatusPill label={connectivity.label} tone={connectivity.isOnline ? 'success' : 'warning'} />
-      </View>
+    <Screen edges={['left', 'right']}>
+      <LinearGradient
+        colors={[c.primary, c.primaryPressed]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={[styles.heroGradient, { paddingTop: insets.top + spacing.md }]}
+      >
+        <View style={styles.heroDecor1} />
+        <View style={styles.header}>
+          <Text variant="title" color="#FFFFFF">Scout</Text>
+          <StatusPill label={connectivity.label} tone={connectivity.isOnline ? 'success' : 'warning'} />
+        </View>
+      </LinearGradient>
 
       {/* Hero scan button */}
       <Pressable
@@ -219,6 +230,24 @@ function statusTone(status: string): 'success' | 'warning' | 'danger' | 'info' |
 }
 
 const styles = StyleSheet.create({
+  heroGradient: {
+    marginHorizontal: -spacing.lg,
+    marginTop: -spacing.lg,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.xl,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+    overflow: 'hidden',
+  },
+  heroDecor1: {
+    position: 'absolute',
+    width: 180,
+    height: 180,
+    borderRadius: 90,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    top: -50,
+    right: -40,
+  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',

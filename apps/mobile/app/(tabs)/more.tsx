@@ -1,14 +1,18 @@
+import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { ActionCard } from '../../src/components/ActionCard';
 import { Screen } from '../../src/components/Screen';
 import { SectionHeader } from '../../src/components/SectionHeader';
+import { StatusPill } from '../../src/components/StatusPill';
 import { Text } from '../../src/components/Text';
-import { spacing } from '../../src/components/theme';
+import { radius, spacing } from '../../src/components/theme';
+import { useAppTheme } from '../../src/context/ThemeContext';
 import { authStore } from '../../src/services/auth';
 
 export default function MoreScreen() {
+  const { colors: c, shadows: s } = useAppTheme();
   const [isAuthed, setIsAuthed] = useState(authStore.isAuthenticated);
   const accountInfo = authStore.getAccount();
 
@@ -19,6 +23,41 @@ export default function MoreScreen() {
   return (
     <Screen edges={['top', 'left', 'right']}>
       <Text variant="title">More</Text>
+
+      {/* Account Summary Card */}
+      <Pressable
+        onPress={() => router.push('/account')}
+        style={({ pressed }) => [
+          styles.accountCard,
+          { backgroundColor: c.surface, borderColor: c.borderLight, ...s.md },
+          pressed && { backgroundColor: c.surfaceAlt },
+        ]}
+      >
+        <View style={[styles.avatar, { backgroundColor: isAuthed ? c.primaryLight : c.surfaceAlt }]}>
+          <Ionicons
+            name={isAuthed ? 'person' : 'person-outline'}
+            size={24}
+            color={isAuthed ? c.primary : c.textMuted}
+          />
+        </View>
+        <View style={styles.accountInfo}>
+          <Text variant="bodyBold">
+            {isAuthed
+              ? accountInfo?.displayName ?? accountInfo?.email ?? 'Signed In'
+              : 'Local Mode'}
+          </Text>
+          <Text variant="caption" numberOfLines={1}>
+            {isAuthed
+              ? accountInfo?.email ?? 'Cloud sync active'
+              : 'Tap to sign in or create account'}
+          </Text>
+        </View>
+        <StatusPill
+          label={isAuthed ? 'Connected' : 'Local'}
+          tone={isAuthed ? 'success' : 'neutral'}
+          size="sm"
+        />
+      </Pressable>
 
       <SectionHeader title="Workflow" />
       <ActionCard
@@ -36,7 +75,7 @@ export default function MoreScreen() {
       <ActionCard
         icon="paper-plane-outline"
         title="Sales & Shipping"
-        subtitle="Record sales, pack orders, and move shipments forward"
+        subtitle="Record sales, pack orders, move shipments"
         onPress={() => router.push('/sales')}
       />
       <ActionCard
@@ -46,26 +85,41 @@ export default function MoreScreen() {
         onPress={() => router.push('/tasks')}
       />
 
-      <SectionHeader title="App" />
-      <ActionCard
-        icon="person-circle-outline"
-        title="Account & Workspace"
-        subtitle={isAuthed ? `Signed in as ${accountInfo?.email ?? accountInfo?.displayName ?? 'user'}` : 'Sign in, sign up, or keep using local mode'}
-        tone="primary"
-        onPress={() => router.push('/account')}
-      />
+      <SectionHeader title="Workspace" />
       <ActionCard
         icon="business-outline"
         title="Workspace Admin"
-        subtitle="Organizations, teams, members, roles, and permissions"
+        subtitle="Teams, members, roles, and permissions"
         onPress={() => router.push('/workspace-admin')}
       />
       <ActionCard
         icon="settings-outline"
         title="Settings"
-        subtitle="API, sync queue, and local drafts"
+        subtitle="Theme, sync, API, and local data"
         onPress={() => router.push('/settings')}
       />
     </Screen>
   );
 }
+
+const styles = StyleSheet.create({
+  accountCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    padding: spacing.lg,
+    borderRadius: radius.xl,
+    borderWidth: 1,
+  },
+  avatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  accountInfo: {
+    flex: 1,
+    gap: spacing.xxs,
+  },
+});

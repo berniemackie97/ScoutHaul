@@ -20,6 +20,7 @@
     "preview": {
       "distribution": "internal",
       "environment": "preview",
+      "autoIncrement": true,
       "android": {
         "buildType": "apk"
       },
@@ -30,10 +31,26 @@
       },
       "channel": "preview"
     },
+    "release-apk": {
+      "distribution": "internal",
+      "environment": "production",
+      "autoIncrement": true,
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_BASE_URL": "https://scouthaul-production.up.railway.app",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://zafexeixnmguccancpvw.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_Jo6ZrwOnguPjV1XduZ2yoA_DD55fhRN"
+      },
+      "channel": "production"
+    },
     "production": {
       "environment": "production",
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "https://api.scouthaul.com"
+        "EXPO_PUBLIC_API_BASE_URL": "https://scouthaul-production.up.railway.app",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://zafexeixnmguccancpvw.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_Jo6ZrwOnguPjV1XduZ2yoA_DD55fhRN"
       },
       "channel": "production",
       "autoIncrement": true

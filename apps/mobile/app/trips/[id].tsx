@@ -293,7 +293,7 @@ export default function TripDetailScreen() {
             <View key={stop.id}>
               {index > 0 ? <Divider /> : null}
               <View style={styles.stopRow}>
-                <View style={styles.orderBadge}>
+                <View style={[styles.orderBadge, { backgroundColor: c.infoLight }]}>
                   <Text variant="bodyBold" color={c.primary}>{stop.plannedOrder}</Text>
                 </View>
                 <View style={styles.stopInfo}>
@@ -515,7 +515,6 @@ const styles = StyleSheet.create({
     borderRadius: 17,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(37, 99, 235, 0.1)',
   },
   stopInfo: {
     flex: 1,

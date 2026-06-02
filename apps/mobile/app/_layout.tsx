@@ -1,13 +1,107 @@
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, usePathname, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Animated, Easing, StyleSheet, View } from 'react-native';
 import { getPendingSyncCount, getWorkspaceProfile, initializeLocalDatabase, processSyncQueue } from '../src/db/localStore';
 import { Text } from '../src/components/Text';
 import { spacing } from '../src/components/theme';
 import { ThemeProvider, useColors } from '../src/context/ThemeContext';
 import { initializeAuthSession, authStore } from '../src/services/auth';
 import { bootstrapSignedInWorkspace } from '../src/services/sessionBootstrap';
+import { useAppFonts } from '../src/hooks/useFonts';
+
+function BrandedSplash() {
+  const c = useColors();
+  const logoScale = useRef(new Animated.Value(0.8)).current;
+  const logoOpacity = useRef(new Animated.Value(0)).current;
+  const textOpacity = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.sequence([
+      Animated.parallel([
+        Animated.timing(logoScale, { toValue: 1, duration: 500, easing: Easing.out(Easing.back(1.5)), useNativeDriver: true }),
+        Animated.timing(logoOpacity, { toValue: 1, duration: 400, useNativeDriver: true }),
+      ]),
+      Animated.timing(textOpacity, { toValue: 1, duration: 300, useNativeDriver: true }),
+    ]).start();
+  }, []);
+
+  return (
+    <LinearGradient
+      colors={[c.primary, c.primaryPressed, '#062D25']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={splashStyles.container}
+    >
+      <View style={splashStyles.decorCircle1} />
+      <View style={splashStyles.decorCircle2} />
+      <Animated.View style={[splashStyles.logoWrap, { opacity: logoOpacity, transform: [{ scale: logoScale }] }]}>
+        <View style={splashStyles.logoMark}>
+          <Ionicons name="compass" size={40} color={c.primary} />
+        </View>
+      </Animated.View>
+      <Animated.View style={[splashStyles.textWrap, { opacity: textOpacity }]}>
+        <Text variant="title" color="#FFFFFF">HaulScout</Text>
+        <Text variant="caption" color="rgba(255,255,255,0.6)">Resale command center</Text>
+      </Animated.View>
+      <Animated.View style={[splashStyles.loader, { opacity: textOpacity }]}>
+        <ActivityIndicator size="small" color="rgba(255,255,255,0.5)" />
+      </Animated.View>
+    </LinearGradient>
+  );
+}
+
+const splashStyles = StyleSheet.create({
+  container: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.lg,
+  },
+  decorCircle1: {
+    position: 'absolute',
+    width: 260,
+    height: 260,
+    borderRadius: 130,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    top: -60,
+    right: -80,
+  },
+  decorCircle2: {
+    position: 'absolute',
+    width: 160,
+    height: 160,
+    borderRadius: 80,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    bottom: -30,
+    left: -40,
+  },
+  logoWrap: {
+    alignItems: 'center',
+  },
+  logoMark: {
+    width: 80,
+    height: 80,
+    borderRadius: 24,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  textWrap: {
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  loader: {
+    position: 'absolute',
+    bottom: 80,
+  },
+});
 
 function RootStack() {
   const c = useColors();
@@ -93,19 +187,19 @@ function StartupGate() {
   }, []);
 
   if (!isReady) {
-    return (
-      <View style={{ flex: 1, backgroundColor: '#1e1b4b', alignItems: 'center', justifyContent: 'center', gap: spacing.md }}>
-        <Ionicons name="compass" size={56} color="#f59e0b" />
-        <Text variant="bodyBold" color="#fbbf24">ScoutHaul</Text>
-        <ActivityIndicator size="small" color="#f59e0b" />
-      </View>
-    );
+    return <BrandedSplash />;
   }
 
   return <RootStack />;
 }
 
 export default function RootLayout() {
+  const { fontsLoaded, fontError } = useAppFonts();
+
+  if (!fontsLoaded && !fontError) {
+    return null;
+  }
+
   return (
     <ThemeProvider>
       <StartupGate />

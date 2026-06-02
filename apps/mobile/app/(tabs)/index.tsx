@@ -1,7 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api } from '../../src/api/client';
 import { IconButton } from '../../src/components/Button';
 import { authStore } from '../../src/services/auth';
@@ -9,6 +11,7 @@ import { ActionCard } from '../../src/components/ActionCard';
 import { Card } from '../../src/components/Card';
 import { ErrorBanner } from '../../src/components/ErrorBanner';
 import { LoadingState } from '../../src/components/LoadingState';
+import { AnimatedEntry } from '../../src/components/AnimatedEntry';
 import { MetricCard } from '../../src/components/MetricCard';
 import { OfflineBanner } from '../../src/components/OfflineBanner';
 import { Screen } from '../../src/components/Screen';
@@ -60,29 +63,40 @@ export default function DashboardScreen() {
   const unlisted = summary?.unlistedInventoryCount ?? 0;
   const stale = summary?.staleInventoryCount ?? 0;
 
+  const insets = useSafeAreaInsets();
+
   return (
     <Screen
       refreshing={refreshing}
       onRefresh={() => void refresh(true)}
-      edges={['top', 'left', 'right']}
+      edges={['left', 'right']}
     >
-      <View style={styles.header}>
-        <View style={{ flex: 1 }}>
-          <Text variant="title">{workspaceProfile?.workspaceName ?? 'ScoutHaul'}</Text>
-          <Text variant="caption">
-            {workspaceProfile?.usageMode === 'team'
-              ? 'Team resale command center'
-              : workspaceProfile?.usageMode === 'join'
-                ? 'Team member command center'
-                : 'Your resale command center'}
-          </Text>
+      <LinearGradient
+        colors={[c.primary, c.primaryPressed]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={[styles.heroGradient, { paddingTop: insets.top + spacing.md }]}
+      >
+        <View style={styles.heroDecor1} />
+        <View style={styles.heroDecor2} />
+        <View style={styles.header}>
+          <View style={{ flex: 1 }}>
+            <Text variant="title" color="#FFFFFF">{workspaceProfile?.workspaceName ?? 'HaulScout'}</Text>
+            <Text variant="caption" color="rgba(255,255,255,0.7)">
+              {workspaceProfile?.usageMode === 'team'
+                ? 'Team resale command center'
+                : workspaceProfile?.usageMode === 'join'
+                  ? 'Team member command center'
+                  : 'Your resale command center'}
+            </Text>
+          </View>
+          <IconButton icon="search-outline" label="Search" color="rgba(255,255,255,0.9)" onPress={() => router.push('/search')} />
+          <StatusPill
+            label={connectivity.label}
+            tone={connectivity.isOnline ? 'success' : 'warning'}
+          />
         </View>
-        <IconButton icon="search-outline" label="Search" onPress={() => router.push('/search')} />
-        <StatusPill
-          label={connectivity.label}
-          tone={connectivity.isOnline ? 'success' : 'warning'}
-        />
-      </View>
+      </LinearGradient>
 
       {!connectivity.isOnline ? <OfflineBanner /> : null}
       {error ? <ErrorBanner message={error} onRetry={() => void refresh()} /> : null}
@@ -91,35 +105,39 @@ export default function DashboardScreen() {
         <LoadingState message="Loading dashboard..." />
       ) : (
         <>
-          <View style={styles.metricsRow}>
-            <MetricCard
-              label="Inventory"
-              value={String(summary?.currentInventoryCount ?? 0)}
-              icon="cube-outline"
-              onPress={() => router.push('/(tabs)/inventory')}
-            />
-            <MetricCard
-              label="Net Profit"
-              value={formatMoney(summary?.netProfit)}
-              icon="trending-up-outline"
-              tone={summary?.netProfit && summary.netProfit > 0 ? 'success' : undefined}
-            />
-          </View>
+          <AnimatedEntry delay={0}>
+            <View style={styles.metricsRow}>
+              <MetricCard
+                label="Inventory"
+                value={String(summary?.currentInventoryCount ?? 0)}
+                icon="cube-outline"
+                onPress={() => router.push('/(tabs)/inventory')}
+              />
+              <MetricCard
+                label="Net Profit"
+                value={formatMoney(summary?.netProfit)}
+                icon="trending-up-outline"
+                tone={summary?.netProfit && summary.netProfit > 0 ? 'success' : undefined}
+              />
+            </View>
+          </AnimatedEntry>
 
-          <View style={styles.metricsRow}>
-            <MetricCard
-              label="Cash Deployed"
-              value={formatMoney(summary?.cashDeployed)}
-              icon="wallet-outline"
-              onPress={() => router.push('/budget')}
-            />
-            <MetricCard
-              label="Active Listings"
-              value={String(summary?.activeListingsCount ?? 0)}
-              icon="pricetags-outline"
-              onPress={() => router.push('/listing-queue')}
-            />
-          </View>
+          <AnimatedEntry delay={80}>
+            <View style={styles.metricsRow}>
+              <MetricCard
+                label="Cash Deployed"
+                value={formatMoney(summary?.cashDeployed)}
+                icon="wallet-outline"
+                onPress={() => router.push('/budget')}
+              />
+              <MetricCard
+                label="Active Listings"
+                value={String(summary?.activeListingsCount ?? 0)}
+                icon="pricetags-outline"
+                onPress={() => router.push('/listing-queue')}
+              />
+            </View>
+          </AnimatedEntry>
 
           <SectionHeader title="Needs Attention" />
 
@@ -197,6 +215,33 @@ export default function DashboardScreen() {
 }
 
 const styles = StyleSheet.create({
+  heroGradient: {
+    marginHorizontal: -spacing.lg,
+    marginTop: -spacing.lg,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.xl,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+    overflow: 'hidden',
+  },
+  heroDecor1: {
+    position: 'absolute',
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    top: -60,
+    right: -50,
+  },
+  heroDecor2: {
+    position: 'absolute',
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    bottom: -20,
+    left: -30,
+  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',

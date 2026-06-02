@@ -355,8 +355,9 @@ export default function BudgetScreen() {
 }
 
 function HealthMetric({ label, value }: { label: string; value: string }) {
+  const c = useColors();
   return (
-    <View style={styles.healthMetric}>
+    <View style={[styles.healthMetric, { backgroundColor: c.surfaceAlt }]}>
       <Text variant="label">{label}</Text>
       <Text variant="bodyBold">{value}</Text>
     </View>
@@ -414,7 +415,6 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: radius.md,
     padding: spacing.md,
-    backgroundColor: 'rgba(148, 163, 184, 0.12)',
     gap: spacing.xs,
   },
   planHeader: {
