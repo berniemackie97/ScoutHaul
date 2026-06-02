@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { api } from '../src/api/client';
+import { api } from '../src/api';
 import { Button } from '../src/components/Button';
 import { ErrorBanner } from '../src/components/ErrorBanner';
 import { ExpandableSection } from '../src/components/ExpandableSection';

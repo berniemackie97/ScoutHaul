@@ -4,6 +4,7 @@ import { Stack, usePathname, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, Easing, StyleSheet, View } from 'react-native';
 import { getPendingSyncCount, getWorkspaceProfile, initializeLocalDatabase, processSyncQueue } from '../src/db/localStore';
+import { ErrorBoundary } from '../src/components/ErrorBoundary';
 import { Text } from '../src/components/Text';
 import { spacing } from '../src/components/theme';
 import { ThemeProvider, useColors } from '../src/context/ThemeContext';
@@ -29,7 +30,7 @@ function BrandedSplash() {
 
   return (
     <LinearGradient
-      colors={[c.primary, c.primaryPressed, '#062D25']}
+      colors={[c.primary, c.primaryPressed, c.primaryDeep]}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={splashStyles.container}
@@ -201,8 +202,10 @@ export default function RootLayout() {
   }
 
   return (
-    <ThemeProvider>
-      <StartupGate />
-    </ThemeProvider>
+    <ErrorBoundary>
+      <ThemeProvider>
+        <StartupGate />
+      </ThemeProvider>
+    </ErrorBoundary>
   );
 }

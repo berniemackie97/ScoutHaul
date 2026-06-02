@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
-import { api } from '../../src/api/client';
+import { api } from '../../src/api';
 import { Button } from '../../src/components/Button';
 import { Card } from '../../src/components/Card';
 import { Divider } from '../../src/components/Divider';
@@ -79,7 +79,7 @@ export default function TripDetailScreen() {
         notes: notes || null,
         phone: null,
         url: null,
-        plannedOrder: null,
+        plannedOrder: 0,
         plannedArrivalAt: parseRouteTime(route, plannedArrival),
         estimatedDurationMinutes,
         priority,

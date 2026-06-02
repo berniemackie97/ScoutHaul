@@ -10,7 +10,7 @@ import { Screen } from '../src/components/Screen';
 import { StatusPill } from '../src/components/StatusPill';
 import { Text } from '../src/components/Text';
 import { TextField } from '../src/components/TextField';
-import { api } from '../src/api/client';
+import { api } from '../src/api';
 import { radius, spacing, type ToneKey } from '../src/components/theme';
 import { useAppTheme } from '../src/context/ThemeContext';
 import { saveWorkspaceProfile, type WorkspacePlanIntent, type WorkspaceUsageMode } from '../src/db/localStore';

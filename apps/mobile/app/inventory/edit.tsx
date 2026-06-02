@@ -4,7 +4,8 @@ import * as ImagePicker from 'expo-image-picker';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { api } from '../../src/api/client';
+import { ActivityIndicator } from 'react-native';
+import { api } from '../../src/api';
 import { Button } from '../../src/components/Button';
 import { ErrorBanner } from '../../src/components/ErrorBanner';
 import { ExpandableSection } from '../../src/components/ExpandableSection';
@@ -18,6 +19,7 @@ import { radius, spacing } from '../../src/components/theme';
 import { useAppTheme } from '../../src/context/ThemeContext';
 import { useHaptics } from '../../src/hooks/useHaptics';
 import { enqueueOperation } from '../../src/db/localStore';
+import { identifyFromPhoto, type IdentifyResult } from '../../src/features/scanner/photoIdentify';
 import {
   categoryAttributeFields,
   categoryOptions,
@@ -84,6 +86,8 @@ export default function EditInventoryScreen() {
   const [error, setError] = useState<string | null>(null);
   const [titleTouched, setTitleTouched] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isIdentifying, setIsIdentifying] = useState(false);
+  const [identifyResult, setIdentifyResult] = useState<IdentifyResult | null>(null);
 
   // Dynamic category attribute fields
   const categoryFields = useMemo(
@@ -248,6 +252,59 @@ export default function EditInventoryScreen() {
     setPhotos((prev) => prev.map((p, i) => ({ ...p, isHero: i === index })));
   }
 
+  async function identifyItem() {
+    const perm = await ImagePicker.requestCameraPermissionsAsync();
+    if (!perm.granted) return;
+    const result = await ImagePicker.launchCameraAsync({ quality: 0.85 });
+    if (result.canceled) return;
+
+    const photoUri = result.assets[0].uri;
+    setIsIdentifying(true);
+    haptics.medium();
+
+    try {
+      const identified = await identifyFromPhoto(photoUri);
+      setIdentifyResult(identified);
+
+      // Auto-add photo to gallery as hero if no photos yet
+      const newPhoto: LocalPhoto = { uri: photoUri, isHero: photos.length === 0 };
+      setPhotos((prev) => [...prev, newPhoto]);
+
+      // Pre-fill only fields that are currently empty and identified with confidence
+      if (identified.title && !title.trim()) setTitle(identified.title);
+      if (identified.brand && !brand.trim()) setBrand(identified.brand);
+      if (identified.model && !model.trim()) setModel(identified.model);
+      if (identified.category && !category) setCategory(identified.category);
+      if (identified.barcode && !barcode.trim()) setBarcode(identified.barcode);
+
+      haptics.success();
+    } catch {
+      haptics.error();
+      setError('Photo identification failed. Photo was still added.');
+      // Still add the photo even if identification fails
+      const newPhoto: LocalPhoto = { uri: photoUri, isHero: photos.length === 0 };
+      setPhotos((prev) => [...prev, newPhoto]);
+    } finally {
+      setIsIdentifying(false);
+    }
+  }
+
+  function applyIdentifyField(field: keyof IdentifyResult, value: string | null) {
+    if (!value) return;
+    switch (field) {
+      case 'title': setTitle(value); break;
+      case 'brand': setBrand(value); break;
+      case 'model': setModel(value); break;
+      case 'category': setCategory(value); break;
+      case 'barcode': setBarcode(value); break;
+    }
+    haptics.selection();
+  }
+
+  function dismissIdentifyResult() {
+    setIdentifyResult(null);
+  }
+
   async function save() {
     setTitleTouched(true);
     if (!title.trim()) {
@@ -378,11 +435,23 @@ export default function EditInventoryScreen() {
       {/* ── Photo Management ── */}
       <PhotoManager
         photos={photos}
+        isIdentifying={isIdentifying}
         onTake={() => void takePhoto()}
         onPick={() => void pickPhotos()}
+        onIdentify={() => void identifyItem()}
         onRemove={removePhoto}
         onSetHero={setHero}
       />
+
+      {/* ── Identify Results Banner ── */}
+      {identifyResult ? (
+        <IdentifyBanner
+          result={identifyResult}
+          currentValues={{ title, brand, model, category, barcode }}
+          onApply={applyIdentifyField}
+          onDismiss={dismissIdentifyResult}
+        />
+      ) : null}
 
       {/* ── Essentials — always expanded ── */}
       <ExpandableSection
@@ -662,14 +731,18 @@ export default function EditInventoryScreen() {
 
 function PhotoManager({
   photos,
+  isIdentifying,
   onTake,
   onPick,
+  onIdentify,
   onRemove,
   onSetHero,
 }: {
   photos: LocalPhoto[];
+  isIdentifying: boolean;
   onTake: () => void;
   onPick: () => void;
+  onIdentify: () => void;
   onRemove: (index: number) => void;
   onSetHero: (index: number) => void;
 }) {
@@ -697,6 +770,19 @@ function PhotoManager({
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.photoScroll}
       >
+        <Pressable
+          onPress={onIdentify}
+          disabled={isIdentifying}
+          style={[styles.addPhotoBtn, styles.addPhotoPrimary, { backgroundColor: c.accentLight, borderColor: c.accent }]}
+          accessibilityLabel="Photo identify item"
+        >
+          {isIdentifying ? (
+            <ActivityIndicator size="small" color={c.accent} />
+          ) : (
+            <Ionicons name="eye-outline" size={24} color={c.accent} />
+          )}
+          <Text variant="label" color={c.accent}>{isIdentifying ? 'Reading...' : 'Identify'}</Text>
+        </Pressable>
         <Pressable
           onPress={onTake}
           style={[styles.addPhotoBtn, styles.addPhotoPrimary, { backgroundColor: c.primaryLight, borderColor: c.primary }]}
@@ -751,6 +837,89 @@ function PhotoManager({
           </Text>
         </View>
       ) : null}
+    </View>
+  );
+}
+
+// ── Identify Banner ──
+
+type IdentifyField = { key: keyof IdentifyResult; label: string; icon: keyof typeof Ionicons.glyphMap };
+const IDENTIFY_FIELDS: IdentifyField[] = [
+  { key: 'title', label: 'Title', icon: 'text-outline' },
+  { key: 'brand', label: 'Brand', icon: 'pricetag-outline' },
+  { key: 'model', label: 'Model', icon: 'barcode-outline' },
+  { key: 'category', label: 'Category', icon: 'grid-outline' },
+  { key: 'barcode', label: 'Barcode', icon: 'scan-outline' },
+];
+
+function IdentifyBanner({
+  result,
+  currentValues,
+  onApply,
+  onDismiss,
+}: {
+  result: IdentifyResult;
+  currentValues: Record<string, string>;
+  onApply: (field: keyof IdentifyResult, value: string | null) => void;
+  onDismiss: () => void;
+}) {
+  const { colors: c, shadows: s } = useAppTheme();
+  const detectedFields = IDENTIFY_FIELDS.filter((f) => result[f.key]);
+
+  return (
+    <View style={[styles.identifyBanner, { backgroundColor: c.surface, borderColor: c.accent, ...s.md }]}>
+      <View style={styles.identifyHeader}>
+        <View style={[styles.identifyIcon, { backgroundColor: c.accentLight }]}>
+          <Ionicons name="eye" size={18} color={c.accent} />
+        </View>
+        <View style={styles.identifyHeaderText}>
+          <Text variant="bodyBold">Photo Identification</Text>
+          <StatusPill
+            label={result.confidence === 'high' ? 'High confidence' : result.confidence === 'medium' ? 'Partial match' : 'Low confidence'}
+            tone={result.confidence === 'high' ? 'success' : result.confidence === 'medium' ? 'warning' : 'neutral'}
+            size="sm"
+          />
+        </View>
+        <Pressable onPress={onDismiss} hitSlop={8}>
+          <Ionicons name="close" size={22} color={c.textMuted} />
+        </Pressable>
+      </View>
+
+      {detectedFields.length > 0 ? (
+        <View style={styles.identifyFields}>
+          {detectedFields.map((field) => {
+            const value = result[field.key] as string;
+            const alreadySet = currentValues[field.key]?.trim() === value.trim();
+            return (
+              <View key={field.key} style={[styles.identifyField, { backgroundColor: alreadySet ? c.successLight : c.surfaceAlt }]}>
+                <Ionicons name={field.icon} size={16} color={alreadySet ? c.success : c.textSecondary} />
+                <View style={styles.identifyFieldText}>
+                  <Text variant="label" color={c.textMuted}>{field.label}</Text>
+                  <Text variant="bodyBold" numberOfLines={1}>{value}</Text>
+                </View>
+                {alreadySet ? (
+                  <Ionicons name="checkmark-circle" size={20} color={c.success} />
+                ) : (
+                  <Pressable
+                    onPress={() => onApply(field.key, value)}
+                    style={[styles.applyBtn, { backgroundColor: c.primary }]}
+                    hitSlop={4}
+                  >
+                    <Text variant="label" color={c.textInverse}>Apply</Text>
+                  </Pressable>
+                )}
+              </View>
+            );
+          })}
+        </View>
+      ) : (
+        <View style={[styles.identifyEmpty, { backgroundColor: c.surfaceAlt }]}>
+          <Ionicons name="information-circle-outline" size={16} color={c.textMuted} />
+          <Text variant="caption" color={c.textMuted}>
+            No product information detected. Try positioning the label or packaging more clearly.
+          </Text>
+        </View>
+      )}
     </View>
   );
 }
@@ -930,5 +1099,55 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     padding: spacing.md,
     borderRadius: radius.md,
+  },
+
+  // Identify banner
+  identifyBanner: {
+    borderRadius: radius.lg,
+    borderWidth: 1.5,
+    padding: spacing.lg,
+    gap: spacing.md,
+  },
+  identifyHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  identifyIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  identifyHeaderText: {
+    flex: 1,
+    gap: spacing.xs,
+  },
+  identifyFields: {
+    gap: spacing.sm,
+  },
+  identifyField: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    padding: spacing.sm,
+    borderRadius: radius.md,
+  },
+  identifyFieldText: {
+    flex: 1,
+    gap: spacing.xxs,
+  },
+  applyBtn: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.sm,
+  },
+  identifyEmpty: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    padding: spacing.md,
+    borderRadius: radius.sm,
   },
 });

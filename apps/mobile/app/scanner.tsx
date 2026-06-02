@@ -2,87 +2,37 @@ import { Ionicons } from '@expo/vector-icons';
 import { recognizeText } from '@infinitered/react-native-mlkit-text-recognition';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Image } from 'expo-image';
+import * as Linking from 'expo-linking';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, Easing, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { api } from '../src/api/client';
+import {
+  ActivityIndicator,
+  Animated,
+  Easing,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+} from 'react-native';
+import { api } from '../src/api';
 import { Button } from '../src/components/Button';
-import { useHaptics } from '../src/hooks/useHaptics';
 import { Card } from '../src/components/Card';
 import { Screen } from '../src/components/Screen';
-import { StatusPill } from '../src/components/StatusPill';
 import { Text } from '../src/components/Text';
 import { TextField } from '../src/components/TextField';
+import { ScanResults } from '../src/features/scanner/ScanResults';
 import { radius, spacing } from '../src/components/theme';
 import { useAppTheme } from '../src/context/ThemeContext';
-import type { MarketplaceListing } from '../src/domain/types';
-import { formatMoney } from '../src/utils/money';
-
-type ScanState =
-  | { phase: 'scanning' }
-  | { phase: 'searching'; barcode: string }
-  | { phase: 'ocr-processing' }
-  | { phase: 'ocr-review'; extractedText: string; ocrQuery: string }
-  | {
-      phase: 'done';
-      barcode: string;
-      listings: MarketplaceListing[];
-      avgPrice: number | null;
-      lowPrice: number | null;
-      highPrice: number | null;
-      totalResults: number;
-      error: string | null;
-      productTitle: string | null;
-      productBrand: string | null;
-      productImageUrl: string | null;
-      productCategory: string | null;
-      productIdentityId: string | null;
-      savedObservationCount: number;
-      providersUsed: string[];
-      providerWarnings: string[];
-    };
-
-/** Get best product name — prefer barcode provider, fall back to first listing title */
-function resolveProductName(state: Extract<ScanState, { phase: 'done' }>): string | null {
-  if (state.productTitle) return state.productTitle;
-  if (state.listings.length === 0) return null;
-  const raw = state.listings[0].title;
-  return raw
-    .replace(/\s*-\s*(New|Used|Open Box|Sealed|Free Shipping|Fast Ship|US Seller|Brand New).*/i, '')
-    .replace(/\s*\(.*\)\s*$/, '')
-    .trim() || raw;
-}
-
-/** Get best product image — prefer barcode provider, fall back to first listing image */
-function resolveProductImage(state: Extract<ScanState, { phase: 'done' }>): string | null {
-  return state.productImageUrl ?? state.listings[0]?.imageUrl ?? null;
-}
-
-/**
- * Build a search query from raw OCR text.
- * Prefers lines that look like product names (longer, mixed case, no URLs).
- * Falls back to first meaningful chunk.
- */
-function buildOcrQuery(raw: string): string {
-  const lines = raw
-    .split('\n')
-    .map((l) => l.trim())
-    .filter((l) => l.length > 2 && !l.match(/^https?:\/\//i) && !l.match(/^\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}$/));
-
-  // Score lines: prefer longer, mixed-case, no all-caps short fragments
-  const scored = lines.map((line) => {
-    let score = line.length;
-    if (line.length > 8 && line.length < 80) score += 20;
-    if (/[a-z]/.test(line) && /[A-Z]/.test(line)) score += 10; // mixed case
-    if (/^\d+$/.test(line)) score -= 50; // pure numbers
-    if (/^[A-Z\s]{1,6}$/.test(line)) score -= 20; // short all-caps
-    return { line, score };
-  });
-
-  scored.sort((a, b) => b.score - a.score);
-  const best = scored.slice(0, 3).map((s) => s.line);
-  return best.join(' ').slice(0, 120).trim();
-}
+import type { ScanMode, ScanState } from '../src/features/scanner/types';
+import {
+  buildSearchQuery,
+  makeDoneError,
+  makeDoneFromResult,
+  resolveProductName,
+} from '../src/features/scanner/types';
+import { useHaptics } from '../src/hooks/useHaptics';
 
 export default function BarcodeScannerScreen() {
   const { colors: c } = useAppTheme();
@@ -90,6 +40,7 @@ export default function BarcodeScannerScreen() {
   const routeParams = useLocalSearchParams<{ sourcingTripId?: string; sourcingTripStopId?: string }>();
   const [permission, requestPermission] = useCameraPermissions();
   const [state, setState] = useState<ScanState>({ phase: 'scanning' });
+  const [mode, setMode] = useState<ScanMode>('barcode');
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -99,7 +50,7 @@ export default function BarcodeScannerScreen() {
   const isScanning = state.phase === 'scanning';
 
   useEffect(() => {
-    if (!isScanning) return;
+    if (!isScanning || mode !== 'barcode') return;
     const anim = Animated.loop(
       Animated.sequence([
         Animated.timing(scanLine, { toValue: 1, duration: 2000, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
@@ -108,121 +59,86 @@ export default function BarcodeScannerScreen() {
     );
     anim.start();
     return () => anim.stop();
-  }, [isScanning, scanLine]);
+  }, [isScanning, mode, scanLine]);
 
   async function lookupBarcode(barcode: string) {
     haptics.success();
     setState({ phase: 'searching', barcode });
     try {
       const result = await api.lookupBarcode(barcode);
-      setState({
-        phase: 'done',
-        barcode,
-        listings: result.listings,
-        avgPrice: result.averageSoldPrice ?? null,
-        lowPrice: result.lowestPrice ?? null,
-        highPrice: result.highestPrice ?? null,
-        totalResults: result.totalResults,
-        error: null,
-        productTitle: result.productTitle ?? null,
-        productBrand: result.productBrand ?? null,
-        productImageUrl: result.productImageUrl ?? null,
-        productCategory: result.productCategory ?? null,
-        productIdentityId: result.productIdentityId ?? null,
-        savedObservationCount: result.savedObservationCount ?? 0,
-        providersUsed: result.providersUsed ?? [],
-        providerWarnings: result.providerWarnings ?? [],
-      });
+      setState(makeDoneFromResult(barcode, result));
     } catch (e) {
-      setState({
-        phase: 'done',
-        barcode,
-        listings: [],
-        avgPrice: null,
-        lowPrice: null,
-        highPrice: null,
-        totalResults: 0,
-        error: e instanceof Error ? e.message : 'Lookup failed',
-        productTitle: null,
-        productBrand: null,
-        productImageUrl: null,
-        productCategory: null,
-        productIdentityId: null,
-        savedObservationCount: 0,
-        providersUsed: [],
-        providerWarnings: [],
-      });
+      setState(makeDoneError(barcode, e));
     }
   }
 
-  async function captureAndOcr() {
+  async function capturePhoto() {
     if (!cameraRef.current) return;
-    setState({ phase: 'ocr-processing' });
+    setState({ phase: 'capturing' });
+    haptics.medium();
     try {
-      const photo = await cameraRef.current.takePictureAsync({ quality: 0.8, skipProcessing: true });
+      const photo = await cameraRef.current.takePictureAsync({ quality: 0.85 });
       if (!photo?.uri) {
         setState({ phase: 'scanning' });
         return;
       }
-      const result = await recognizeText(photo.uri);
-      const raw = result.text.trim();
-      if (!raw) {
-        setState({ phase: 'scanning' });
-        return;
+
+      setState({ phase: 'identifying', photoUri: photo.uri, ocrText: null });
+
+      let ocrText = '';
+      try {
+        const ocrResult = await recognizeText(photo.uri);
+        ocrText = ocrResult.text.trim();
+      } catch {
+        // OCR failed — still allow manual query
       }
-      // Build a smart query: take first ~120 chars, prefer lines that look like product names
-      const query = buildOcrQuery(raw);
-      setState({ phase: 'ocr-review', extractedText: raw, ocrQuery: query });
-    } catch (e) {
-      console.warn('OCR failed:', e);
+
+      if (ocrText) {
+        const query = buildSearchQuery(ocrText);
+        setState({ phase: 'photo-review', photoUri: photo.uri, ocrText, query });
+      } else {
+        setState({
+          phase: 'photo-review',
+          photoUri: photo.uri,
+          ocrText: '',
+          query: '',
+        });
+      }
+    } catch {
       setState({ phase: 'scanning' });
     }
   }
 
-  async function searchOcrText(query: string) {
+  async function searchQuery(query: string, photoUri?: string) {
     const q = query.trim();
     if (!q) return;
-    setState({ phase: 'searching', barcode: `OCR: ${q.slice(0, 40)}` });
+    setState({ phase: 'searching', barcode: q });
     try {
       const result = await api.lookupSearch(q);
-      setState({
-        phase: 'done',
-        barcode: q,
-        listings: result.listings,
-        avgPrice: result.averageSoldPrice ?? null,
-        lowPrice: result.lowestPrice ?? null,
-        highPrice: result.highestPrice ?? null,
-        totalResults: result.totalResults,
-        error: null,
-        productTitle: result.productTitle ?? null,
-        productBrand: result.productBrand ?? null,
-        productImageUrl: result.productImageUrl ?? null,
-        productCategory: result.productCategory ?? null,
-        productIdentityId: result.productIdentityId ?? null,
-        savedObservationCount: result.savedObservationCount ?? 0,
-        providersUsed: result.providersUsed ?? [],
-        providerWarnings: result.providerWarnings ?? [],
-      });
+      setState(makeDoneFromResult(q, result, photoUri));
     } catch (e) {
-      setState({
-        phase: 'done',
-        barcode: q,
-        listings: [],
-        avgPrice: null,
-        lowPrice: null,
-        highPrice: null,
-        totalResults: 0,
-        error: e instanceof Error ? e.message : 'Search failed',
-        productTitle: null,
-        productBrand: null,
-        productImageUrl: null,
-        productCategory: null,
-        productIdentityId: null,
-        savedObservationCount: 0,
-        providersUsed: [],
-        providerWarnings: [],
-      });
+      setState(makeDoneError(q, e));
     }
+  }
+
+  function openGoogleLens(photoUri: string) {
+    // Google Lens intent — opens the image in Google Lens for visual identification.
+    // User identifies the product, comes back, types the name in the query field.
+    if (Platform.OS === 'android') {
+      Linking.openURL('https://lens.google.com');
+    } else {
+      Linking.openURL('https://lens.google.com');
+    }
+  }
+
+  function resetToScanning() {
+    setEditing(false);
+    setState({ phase: 'scanning' });
+  }
+
+  function switchMode(newMode: ScanMode) {
+    setMode(newMode);
+    resetToScanning();
   }
 
   function continueToSearch() {
@@ -276,10 +192,7 @@ export default function BarcodeScannerScreen() {
   async function saveProduct() {
     if (state.phase !== 'done') return;
     const title = editForm.title.trim();
-    if (!title) {
-      setSaveError('Product title is required.');
-      return;
-    }
+    if (!title) { setSaveError('Product title is required.'); return; }
 
     setSaving(true);
     setSaveError(null);
@@ -296,21 +209,12 @@ export default function BarcodeScannerScreen() {
 
       let savedId: string;
       if (state.productIdentityId) {
-        const updated = await api.updateProductIdentity(state.productIdentityId, body);
-        savedId = updated.id;
+        savedId = (await api.updateProductIdentity(state.productIdentityId, body)).id;
       } else {
-        const created = await api.createProductIdentity(body);
-        savedId = created.id;
+        savedId = (await api.createProductIdentity(body)).id;
       }
 
-      // Update scan state with corrected product info
-      setState({
-        ...state,
-        productTitle: title,
-        productBrand: body.brand,
-        productCategory: body.category,
-        productIdentityId: savedId,
-      });
+      setState({ ...state, productTitle: title, productBrand: body.brand, productCategory: body.category, productIdentityId: savedId });
       setEditing(false);
     } catch (e) {
       setSaveError(e instanceof Error ? e.message : 'Save failed');
@@ -329,7 +233,7 @@ export default function BarcodeScannerScreen() {
             <View style={styles.permContent}>
               <Ionicons name="camera-outline" size={48} color={c.textMuted} />
               <Text variant="bodyBold">Camera Access Required</Text>
-              <Text variant="caption">Camera permission is needed to scan barcodes.</Text>
+              <Text variant="caption">Camera permission is needed to scan barcodes and identify items.</Text>
               <Button label="Allow Camera" icon="camera-outline" size="lg" fullWidth onPress={() => void requestPermission()} />
             </View>
           </Card>
@@ -339,23 +243,23 @@ export default function BarcodeScannerScreen() {
   }
 
   const scanLineY = scanLine.interpolate({ inputRange: [0, 1], outputRange: [0, 120] });
-  const hasResults = state.phase === 'done' && (state.listings.length > 0 || state.productTitle != null);
-  const cornerColor = hasResults ? c.success : state.phase === 'done' ? c.warning : c.primary;
-  const productName = state.phase === 'done' ? resolveProductName(state) : null;
-  const heroImage = state.phase === 'done' ? resolveProductImage(state) : null;
+  const doneState = state.phase === 'done' ? state : null;
+  const cornerColor = doneState
+    ? (doneState.listings.length > 0 || doneState.productTitle ? c.success : c.warning)
+    : c.primary;
 
   return (
-    <Screen scroll={false} edges={['bottom']}>
+    <Screen scroll={false} edges={['bottom']} keyboardAvoiding={false}>
       <View style={styles.container}>
         <CameraView
           ref={cameraRef}
           style={styles.camera}
           facing="back"
-          barcodeScannerSettings={{
+          barcodeScannerSettings={mode === 'barcode' ? {
             barcodeTypes: ['upc_a', 'upc_e', 'ean13', 'ean8', 'code128', 'code39', 'qr'],
-          }}
+          } : undefined}
           onBarcodeScanned={
-            isScanning
+            isScanning && mode === 'barcode'
               ? (result) => { if (result.data) void lookupBarcode(result.data); }
               : undefined
           }
@@ -366,12 +270,17 @@ export default function BarcodeScannerScreen() {
           <View style={styles.dimTop} />
           <View style={styles.middleRow}>
             <View style={styles.dimSide} />
-            <View style={styles.viewfinder}>
+            <View style={[styles.viewfinder, mode === 'photo-identify' && styles.viewfinderPhoto]}>
               {(['TL', 'TR', 'BL', 'BR'] as const).map((pos) => (
-                <View key={pos} style={[styles.corner, styles[`corner${pos}`], { borderColor: cornerColor }]} />
+                <View key={pos} style={[styles.corner, styles[`corner${pos}`], { borderColor: mode === 'photo-identify' ? c.accent : cornerColor }]} />
               ))}
-              {isScanning ? (
+              {isScanning && mode === 'barcode' ? (
                 <Animated.View style={[styles.scanLine, { backgroundColor: c.primary, transform: [{ translateY: scanLineY }] }]} />
+              ) : null}
+              {mode === 'photo-identify' && isScanning ? (
+                <View style={styles.photoTargetCenter}>
+                  <Ionicons name="add" size={32} color={c.accent} style={{ opacity: 0.5 }} />
+                </View>
               ) : null}
             </View>
             <View style={styles.dimSide} />
@@ -379,77 +288,143 @@ export default function BarcodeScannerScreen() {
           <View style={styles.dimBottom} />
         </View>
 
+        {/* Mode toggle — floating above panel */}
+        {isScanning ? (
+          <View style={[styles.modeToggle, { backgroundColor: c.surface }]}>
+            <Pressable
+              onPress={() => switchMode('barcode')}
+              style={[styles.modeTab, mode === 'barcode' && [styles.modeTabActive, { backgroundColor: c.primary }]]}
+            >
+              <Ionicons name="barcode-outline" size={18} color={mode === 'barcode' ? c.textInverse : c.textMuted} />
+              <Text variant="caption" color={mode === 'barcode' ? c.textInverse : c.textMuted}>Barcode</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => switchMode('photo-identify')}
+              style={[styles.modeTab, mode === 'photo-identify' && [styles.modeTabActive, { backgroundColor: c.accent }]]}
+            >
+              <Ionicons name="camera-outline" size={18} color={mode === 'photo-identify' ? c.textInverse : c.textMuted} />
+              <Text variant="caption" color={mode === 'photo-identify' ? c.textInverse : c.textMuted}>Photo ID</Text>
+            </Pressable>
+          </View>
+        ) : null}
+
         {/* Results panel */}
         <KeyboardAvoidingView
           style={[styles.panel, { backgroundColor: c.surface }]}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           keyboardVerticalOffset={0}
         >
-          {state.phase === 'scanning' ? (
+          {/* ── Scanning state ── */}
+          {state.phase === 'scanning' && mode === 'barcode' ? (
             <View style={styles.panelInner}>
               <Text variant="bodyBold">Point at a barcode</Text>
               <Text variant="caption" color={c.textMuted}>UPC, EAN, ISBN, Code 128, or QR</Text>
-              <View style={styles.ocrDivider}>
-                <View style={[styles.ocrDividerLine, { backgroundColor: c.border }]} />
-                <Text variant="label" color={c.textMuted}>or</Text>
-                <View style={[styles.ocrDividerLine, { backgroundColor: c.border }]} />
-              </View>
+            </View>
+          ) : state.phase === 'scanning' && mode === 'photo-identify' ? (
+            <View style={styles.panelInner}>
+              <Text variant="bodyBold">Aim at the item</Text>
+              <Text variant="caption" color={c.textMuted}>
+                Center the product in the viewfinder. Works best with labels, boxes, or clear product shots.
+              </Text>
               <Pressable
-                onPress={() => void captureAndOcr()}
-                style={[styles.ocrBtn, { backgroundColor: c.primaryLight }]}
+                onPress={() => void capturePhoto()}
+                style={[styles.captureBtn, { backgroundColor: c.accent }]}
               >
-                <Ionicons name="text-outline" size={20} color={c.primary} />
-                <Text variant="bodyBold" color={c.primary}>Photo Scan (OCR)</Text>
-                <Text variant="label" color={c.textMuted}>Read text from label or packaging</Text>
+                <Ionicons name="camera" size={24} color={c.textInverse} />
+                <Text variant="bodyBold" color={c.textInverse}>Capture & Identify</Text>
               </Pressable>
             </View>
-          ) : state.phase === 'ocr-processing' ? (
+
+          /* ── Capturing / Processing ── */
+          ) : state.phase === 'capturing' ? (
             <View style={styles.panelInner}>
               <View style={styles.searchingRow}>
-                <ActivityIndicator size="small" color={c.primary} />
-                <Text variant="bodyBold" color={c.primary}>Reading text from image...</Text>
+                <ActivityIndicator size="small" color={c.accent} />
+                <Text variant="bodyBold" color={c.accent}>Capturing...</Text>
               </View>
             </View>
-          ) : state.phase === 'ocr-review' ? (
+          ) : state.phase === 'identifying' ? (
+            <View style={styles.panelInner}>
+              <View style={styles.identifyRow}>
+                {state.photoUri ? (
+                  <Image source={{ uri: state.photoUri }} style={styles.identifyThumb} contentFit="cover" />
+                ) : null}
+                <View style={styles.identifyText}>
+                  <View style={styles.searchingRow}>
+                    <ActivityIndicator size="small" color={c.primary} />
+                    <Text variant="bodyBold" color={c.primary}>Reading text...</Text>
+                  </View>
+                  <Text variant="caption" color={c.textMuted}>Extracting product info from image</Text>
+                </View>
+              </View>
+            </View>
+
+          /* ── Photo Review ── */
+          ) : state.phase === 'photo-review' ? (
             <ScrollView style={styles.panelScroll} showsVerticalScrollIndicator={false} bounces={false}>
               <View style={styles.panelInner}>
-                <View style={styles.editHeader}>
-                  <View style={{ flex: 1 }}>
-                    <Text variant="bodyBold">Text detected — review & search</Text>
-                    <Text variant="label" color={c.textMuted}>Edit query before searching</Text>
+                <View style={styles.identifyRow}>
+                  {state.photoUri ? (
+                    <Image source={{ uri: state.photoUri }} style={styles.reviewThumb} contentFit="cover" />
+                  ) : null}
+                  <View style={styles.identifyText}>
+                    <View style={styles.editHeader}>
+                      <Text variant="bodyBold">
+                        {state.ocrText ? 'Text detected' : 'No text found'}
+                      </Text>
+                      <Pressable onPress={resetToScanning} hitSlop={8}>
+                        <Ionicons name="close" size={22} color={c.textMuted} />
+                      </Pressable>
+                    </View>
+                    {state.ocrText ? (
+                      <Text variant="caption" color={c.textSecondary} numberOfLines={2}>
+                        {state.ocrText.slice(0, 80)}{state.ocrText.length > 80 ? '...' : ''}
+                      </Text>
+                    ) : (
+                      <Text variant="caption" color={c.textMuted}>
+                        Type a product name below, or use Google Lens to identify visually.
+                      </Text>
+                    )}
                   </View>
-                  <Pressable onPress={() => setState({ phase: 'scanning' })} hitSlop={8}>
-                    <Ionicons name="close" size={22} color={c.textMuted} />
-                  </Pressable>
-                </View>
-                <View style={[styles.ocrTextBox, { backgroundColor: c.surfaceAlt, borderColor: c.border }]}>
-                  <Text variant="label" color={c.textMuted}>Raw OCR text:</Text>
-                  <Text variant="caption" color={c.textSecondary} numberOfLines={4}>{state.extractedText}</Text>
                 </View>
                 <TextField
-                  label="Search query"
-                  value={state.ocrQuery}
-                  onChangeText={(v) => setState({ ...state, ocrQuery: v })}
+                  label="Search marketplace"
+                  value={state.query}
+                  onChangeText={(v) => setState({ ...state, query: v })}
                   placeholder="Product name, brand, model..."
                   returnKeyType="search"
-                  onSubmitEditing={() => void searchOcrText(state.ocrQuery)}
+                  onSubmitEditing={() => void searchQuery(state.query, state.photoUri)}
                 />
-                <View style={styles.editActions}>
-                  <Button label="Back" variant="ghost" size="sm" onPress={() => setState({ phase: 'scanning' })} />
-                  <Button
-                    label="Search"
-                    icon="search-outline"
-                    variant="primary"
-                    size="sm"
-                    onPress={() => void searchOcrText(state.ocrQuery)}
-                  />
+                <Button
+                  label="Search Marketplaces"
+                  icon="search-outline"
+                  size="lg"
+                  fullWidth
+                  disabled={!state.query.trim()}
+                  onPress={() => void searchQuery(state.query, state.photoUri)}
+                />
+                <View style={styles.altActions}>
+                  <Pressable
+                    onPress={() => openGoogleLens(state.photoUri)}
+                    style={[styles.lensBtn, { backgroundColor: c.surfaceAlt, borderColor: c.border }]}
+                  >
+                    <Ionicons name="eye-outline" size={20} color={c.textSecondary} />
+                    <View style={styles.lensBtnText}>
+                      <Text variant="bodyBold">Open Google Lens</Text>
+                      <Text variant="caption" color={c.textMuted}>Visual identify, then type name above</Text>
+                    </View>
+                    <Ionicons name="open-outline" size={16} color={c.textMuted} />
+                  </Pressable>
+                  <Button label="Retake" variant="ghost" size="sm" icon="camera-outline" onPress={resetToScanning} />
                 </View>
               </View>
             </ScrollView>
+
+          /* ── Searching ── */
           ) : state.phase === 'searching' ? (
             <View style={styles.panelInner}>
               <View style={styles.barcodeRow}>
-                <Ionicons name={state.barcode.startsWith('OCR:') ? 'text-outline' : 'barcode-outline'} size={20} color={c.primary} />
+                <Ionicons name="search-outline" size={20} color={c.primary} />
                 <Text variant="bodyBold" style={styles.mono} numberOfLines={1}>{state.barcode}</Text>
               </View>
               <View style={styles.searchingRow}>
@@ -457,223 +432,24 @@ export default function BarcodeScannerScreen() {
                 <Text variant="caption" color={c.info}>Checking pricing sources...</Text>
               </View>
             </View>
-          ) : (
-            <ScrollView style={styles.panelScroll} showsVerticalScrollIndicator={false} bounces={false}>
-              <View style={styles.panelInner}>
-                {/* Product identity — hero image + resolved name */}
-                {hasResults ? (
-                  <View style={styles.productHero}>
-                    {heroImage ? (
-                      <Image source={{ uri: heroImage }} style={styles.heroImage} contentFit="cover" />
-                    ) : (
-                      <View style={[styles.heroImage, styles.heroPlaceholder, { backgroundColor: c.borderLight }]}>
-                        <Ionicons name="image-outline" size={32} color={c.textMuted} />
-                      </View>
-                    )}
-                    <View style={styles.heroInfo}>
-                      <Text variant="bodyBold" numberOfLines={2}>{productName}</Text>
-                      {state.productBrand || state.productCategory ? (
-                        <Text variant="caption" color={c.textSecondary} numberOfLines={1}>
-                          {[state.productBrand, state.productCategory].filter(Boolean).join(' · ')}
-                        </Text>
-                      ) : null}
-                      <View style={styles.barcodeRow}>
-                        <Ionicons name="barcode-outline" size={14} color={c.textMuted} />
-                        <Text variant="label" style={styles.mono} color={c.textMuted}>{state.barcode}</Text>
-                      </View>
-                      {state.totalResults > 0 ? (
-                        <StatusPill label={`${state.totalResults} signals`} tone="success" size="sm" />
-                      ) : (
-                        <StatusPill label="Product found" tone="info" size="sm" />
-                      )}
-                      {state.providersUsed.length > 0 ? (
-                        <Text variant="label" color={c.textMuted} numberOfLines={2}>
-                          {state.providersUsed.join(' · ')}
-                          {state.savedObservationCount > 0 ? ` · ${state.savedObservationCount} saved` : ''}
-                        </Text>
-                      ) : null}
-                      {state.providerWarnings.length > 0 ? (
-                        <Text variant="label" color={c.warning} numberOfLines={2}>
-                          {state.providerWarnings[0]}
-                        </Text>
-                      ) : null}
-                    </View>
-                  </View>
-                ) : (
-                  <View style={styles.barcodeRow}>
-                    <Ionicons name="barcode-outline" size={18} color={c.warning} />
-                    <Text variant="caption" style={styles.mono} color={c.textMuted}>{state.barcode}</Text>
-                  </View>
-                )}
 
-                {/* Price summary bar */}
-                {state.avgPrice != null ? (
-                  <View style={[styles.priceSummary, { backgroundColor: c.primaryLight }]}>
-                    <View style={styles.priceCol}>
-                      <Text variant="label" color={c.textMuted}>LOW</Text>
-                      <Text variant="bodyBold" color={c.text}>{formatMoney(state.lowPrice)}</Text>
-                    </View>
-                    <View style={[styles.priceCol, styles.priceColCenter]}>
-                      <Text variant="label" color={c.primary}>AVG</Text>
-                      <Text variant="metricSmall" color={c.primary}>{formatMoney(state.avgPrice)}</Text>
-                    </View>
-                    <View style={styles.priceCol}>
-                      <Text variant="label" color={c.textMuted}>HIGH</Text>
-                      <Text variant="bodyBold" color={c.text}>{formatMoney(state.highPrice)}</Text>
-                    </View>
-                  </View>
-                ) : state.error ? (
-                  <View style={[styles.noPriceBox, { backgroundColor: c.dangerLight, borderColor: c.danger }]}>
-                    <Ionicons name="alert-circle-outline" size={18} color={c.danger} />
-                    <Text variant="caption" color={c.danger} style={{ flex: 1 }}>{state.error}</Text>
-                  </View>
-                ) : (
-                  <View style={[styles.noPriceBox, { backgroundColor: c.warningLight, borderColor: c.warning }]}>
-                    <Ionicons name="information-circle-outline" size={18} color={c.warning} />
-                    <View style={{ flex: 1 }}>
-                      <Text variant="caption" color={c.text}>No pricing data found</Text>
-                      <Text variant="label" color={c.textMuted}>
-                        {state.productTitle
-                          ? 'Product identified but no marketplace listings matched.'
-                          : 'Barcode not recognized. Try searching by name instead.'}
-                      </Text>
-                    </View>
-                  </View>
-                )}
-
-                {/* Listing cards */}
-                {state.listings.length > 0 ? (
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.listingsScroll} contentContainerStyle={styles.listingsContent}>
-                    {state.listings.slice(0, 8).map((listing, i) => (
-                      <View key={i} style={[styles.listingCard, { backgroundColor: c.surfaceAlt, borderColor: c.borderLight }]}>
-                        {listing.imageUrl ? (
-                          <Image source={{ uri: listing.imageUrl }} style={styles.listingImage} contentFit="cover" />
-                        ) : (
-                          <View style={[styles.listingImage, styles.listingNoImage, { backgroundColor: c.borderLight }]}>
-                            <Ionicons name="image-outline" size={24} color={c.textMuted} />
-                          </View>
-                        )}
-                        <View style={styles.listingInfo}>
-                          <Text variant="caption" numberOfLines={2} style={styles.listingTitle}>{listing.title}</Text>
-                          <Text variant="bodyBold" color={c.primary}>{formatMoney(listing.price)}</Text>
-                          <Text variant="label" color={c.textMuted}>{listing.condition}</Text>
-                        </View>
-                      </View>
-                    ))}
-                  </ScrollView>
-                ) : null}
-
-                {/* Actions */}
-                <View style={styles.actions}>
-                  <Pressable
-                    onPress={() => { setEditing(false); setState({ phase: 'scanning' }); }}
-                    style={[styles.iconBtn, { backgroundColor: c.surfaceAlt }]}
-                    accessibilityLabel="Rescan"
-                  >
-                    <Ionicons name="refresh-outline" size={22} color={c.textSecondary} />
-                  </Pressable>
-                  <Pressable
-                    onPress={openEditForm}
-                    style={[styles.iconBtn, { backgroundColor: c.primaryLight }]}
-                    accessibilityLabel={state.productIdentityId ? 'Correct product info' : 'Add product info'}
-                  >
-                    <Ionicons name={state.productIdentityId ? 'create-outline' : 'add-outline'} size={22} color={c.primary} />
-                  </Pressable>
-                  <Pressable
-                    onPress={addToInventory}
-                    style={[styles.iconBtn, { backgroundColor: c.successLight }]}
-                    accessibilityLabel="Quick add to inventory"
-                  >
-                    <Ionicons name="add-circle-outline" size={22} color={c.success} />
-                  </Pressable>
-                  <Pressable onPress={continueToSearch} style={[styles.continueBtn, { backgroundColor: c.primary }]}>
-                    <Text variant="bodyBold" color={c.textInverse}>Research</Text>
-                    <Ionicons name="arrow-forward" size={20} color={c.textInverse} />
-                  </Pressable>
-                </View>
-
-                {/* Inline product edit form */}
-                {editing ? (
-                  <View style={[styles.editSection, { borderColor: c.border }]}>
-                    <View style={styles.editHeader}>
-                      <View style={{ flex: 1 }}>
-                        <Text variant="bodyBold">
-                          {state.productIdentityId ? 'Correct Product' : 'Add Product'}
-                        </Text>
-                        <Text variant="label" color={c.textMuted}>
-                          Saved as verified data for future scans
-                        </Text>
-                      </View>
-                      <Pressable onPress={() => setEditing(false)} hitSlop={8}>
-                        <Ionicons name="close" size={22} color={c.textMuted} />
-                      </Pressable>
-                    </View>
-                    <TextField
-                      label="Title *"
-                      value={editForm.title}
-                      onChangeText={(v) => setEditForm((f) => ({ ...f, title: v }))}
-                      placeholder="e.g. Ranch Dressing 16oz"
-                      returnKeyType="next"
-                      error={saveError && !editForm.title.trim() ? 'Required' : null}
-                    />
-                    <TextField
-                      label="Brand"
-                      value={editForm.brand}
-                      onChangeText={(v) => setEditForm((f) => ({ ...f, brand: v }))}
-                      placeholder="e.g. Hidden Valley"
-                    />
-                    <TextField
-                      label="Model"
-                      value={editForm.model}
-                      onChangeText={(v) => setEditForm((f) => ({ ...f, model: v }))}
-                      placeholder="Optional"
-                    />
-                    <TextField
-                      label="Category"
-                      value={editForm.category}
-                      onChangeText={(v) => setEditForm((f) => ({ ...f, category: v }))}
-                      placeholder="e.g. Food & Beverage"
-                    />
-                    <View style={styles.editRow}>
-                      <TextField
-                        label="UPC"
-                        value={editForm.upc}
-                        onChangeText={(v) => setEditForm((f) => ({ ...f, upc: v }))}
-                        keyboardType="number-pad"
-                        containerStyle={{ flex: 1 }}
-                      />
-                      <TextField
-                        label="EAN"
-                        value={editForm.ean}
-                        onChangeText={(v) => setEditForm((f) => ({ ...f, ean: v }))}
-                        keyboardType="number-pad"
-                        containerStyle={{ flex: 1 }}
-                      />
-                    </View>
-                    {saveError && editForm.title.trim() ? (
-                      <Text variant="caption" color={c.danger}>{saveError}</Text>
-                    ) : null}
-                    <View style={styles.editActions}>
-                      <Button
-                        label="Cancel"
-                        variant="ghost"
-                        size="sm"
-                        onPress={() => setEditing(false)}
-                      />
-                      <Button
-                        label={saving ? 'Saving...' : 'Save Product'}
-                        icon={saving ? undefined : 'checkmark-outline'}
-                        variant="primary"
-                        size="sm"
-                        disabled={saving}
-                        onPress={() => void saveProduct()}
-                      />
-                    </View>
-                  </View>
-                ) : null}
-              </View>
-            </ScrollView>
-          )}
+          /* ── Results ── */
+          ) : state.phase === 'done' ? (
+            <ScanResults
+              state={state}
+              editing={editing}
+              editForm={editForm}
+              saving={saving}
+              saveError={saveError}
+              onEditForm={setEditForm}
+              onRescan={resetToScanning}
+              onEdit={openEditForm}
+              onAddInventory={addToInventory}
+              onResearch={continueToSearch}
+              onSaveProduct={() => void saveProduct()}
+              onCancelEdit={() => setEditing(false)}
+            />
+          ) : null}
         </KeyboardAvoidingView>
       </View>
     </Screen>
@@ -695,107 +471,71 @@ const styles = StyleSheet.create({
   middleRow: { flexDirection: 'row', height: VF * 0.55 },
   dimSide: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)' },
   viewfinder: { width: VF, height: '100%', overflow: 'hidden' },
+  viewfinderPhoto: { width: VF * 1.1, height: '120%' },
   corner: { position: 'absolute', width: CS, height: CS },
   cornerTL: { top: 0, left: 0, borderTopWidth: CW, borderLeftWidth: CW, borderTopLeftRadius: radius.sm },
   cornerTR: { top: 0, right: 0, borderTopWidth: CW, borderRightWidth: CW, borderTopRightRadius: radius.sm },
   cornerBL: { bottom: 0, left: 0, borderBottomWidth: CW, borderLeftWidth: CW, borderBottomLeftRadius: radius.sm },
   cornerBR: { bottom: 0, right: 0, borderBottomWidth: CW, borderRightWidth: CW, borderBottomRightRadius: radius.sm },
   scanLine: { position: 'absolute', left: spacing.md, right: spacing.md, height: 2, borderRadius: 1, top: 8 },
+  photoTargetCenter: { position: 'absolute', top: '50%', left: '50%', marginTop: -16, marginLeft: -16 },
+
+  modeToggle: {
+    position: 'absolute',
+    bottom: '35%',
+    alignSelf: 'center',
+    flexDirection: 'row',
+    borderRadius: radius.full,
+    padding: 3,
+    gap: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  modeTab: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.full,
+  },
+  modeTabActive: {},
+
   panel: { borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, maxHeight: '65%' },
   panelScroll: { paddingHorizontal: spacing.lg, paddingTop: spacing.lg },
-  panelInner: { gap: spacing.md, paddingBottom: spacing.xl },
-  productHero: { flexDirection: 'row', gap: spacing.md, alignItems: 'center' },
-  heroImage: { width: 72, height: 72, borderRadius: radius.md },
-  heroPlaceholder: { alignItems: 'center', justifyContent: 'center' },
-  heroInfo: { flex: 1, gap: spacing.xs },
+  panelInner: { gap: spacing.md, paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.xl },
+
+  captureBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.md,
+    borderRadius: radius.lg,
+    marginTop: spacing.xs,
+  },
+
+  identifyRow: { flexDirection: 'row', gap: spacing.md, alignItems: 'center' },
+  identifyThumb: { width: 56, height: 56, borderRadius: radius.md },
+  reviewThumb: { width: 72, height: 72, borderRadius: radius.md },
+  identifyText: { flex: 1, gap: spacing.xs },
+
+  altActions: { gap: spacing.sm, paddingTop: spacing.xs },
+  lensBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    padding: spacing.md,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+  },
+  lensBtnText: { flex: 1, gap: spacing.xxs },
+
   barcodeRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   searchingRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   mono: { fontVariant: ['tabular-nums'], letterSpacing: 0.5 },
-  priceSummary: {
-    flexDirection: 'row',
-    borderRadius: radius.lg,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-  },
-  priceCol: { flex: 1, alignItems: 'center', gap: spacing.xxs },
-  priceColCenter: { borderLeftWidth: 1, borderRightWidth: 1, borderColor: 'rgba(0,0,0,0.06)' },
-  listingsScroll: { marginHorizontal: -spacing.lg },
-  listingsContent: { paddingHorizontal: spacing.lg, gap: spacing.sm },
-  listingCard: {
-    width: 140,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    overflow: 'hidden',
-  },
-  listingImage: { width: '100%', height: 100 },
-  listingNoImage: { alignItems: 'center', justifyContent: 'center' },
-  listingInfo: { padding: spacing.sm, gap: spacing.xxs },
-  listingTitle: { lineHeight: 16 },
-  noPriceBox: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing.sm,
-    padding: spacing.md,
-    borderRadius: radius.md,
-    borderWidth: 1,
-  },
-  actions: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  iconBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  continueBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    height: 44,
-    borderRadius: radius.md,
-  },
-  ocrDivider: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    paddingVertical: spacing.xs,
-  },
-  ocrDividerLine: {
-    flex: 1,
-    height: 1,
-  },
-  ocrBtn: {
-    alignItems: 'center',
-    gap: spacing.xs,
-    paddingVertical: spacing.md,
-    borderRadius: radius.lg,
-  },
-  ocrTextBox: {
-    gap: spacing.xs,
-    padding: spacing.sm,
-    borderRadius: radius.md,
-    borderWidth: 1,
-  },
-  editSection: {
-    gap: spacing.sm,
-    borderTopWidth: 1,
-    paddingTop: spacing.md,
-  },
-  editHeader: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing.sm,
-  },
-  editRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  editActions: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: spacing.sm,
-    paddingTop: spacing.xs,
-  },
+  editHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
 });

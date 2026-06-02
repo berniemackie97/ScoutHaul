@@ -15,17 +15,18 @@ export function useConnectivity(): ConnectivityState {
     async function check() {
       const state = await Network.getNetworkStateAsync();
       const reachable = state.isInternetReachable ?? state.isConnected ?? false;
-      if (isMounted) {
-        setIsOnline(Boolean(reachable));
-      }
+      if (isMounted) setIsOnline(Boolean(reachable));
     }
 
     void check();
-    const intervalId = setInterval(check, 10000);
+
+    const subscription = Network.addNetworkStateListener((state) => {
+      if (isMounted) setIsOnline(Boolean(state.isInternetReachable ?? state.isConnected ?? false));
+    });
 
     return () => {
       isMounted = false;
-      clearInterval(intervalId);
+      subscription.remove();
     };
   }, []);
 

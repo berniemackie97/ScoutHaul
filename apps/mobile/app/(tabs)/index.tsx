@@ -4,7 +4,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { api } from '../../src/api/client';
+import { api } from '../../src/api';
 import { IconButton } from '../../src/components/Button';
 import { authStore } from '../../src/services/auth';
 import { ActionCard } from '../../src/components/ActionCard';

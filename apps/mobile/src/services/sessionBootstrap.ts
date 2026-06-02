@@ -1,4 +1,4 @@
-import { api } from '../api/client';
+import { api } from '../api';
 import { getWorkspaceProfile, saveWorkspaceProfile } from '../db/localStore';
 import type { SessionBootstrap } from '../domain/types';
 import { authStore } from './auth';

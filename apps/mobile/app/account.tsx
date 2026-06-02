@@ -14,7 +14,8 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from '../src/components/Text';
-import { api } from '../src/api/client';
+import { api } from '../src/api';
+import { InvitePanel } from '../src/features/account/InvitePanel';
 import { radius, spacing } from '../src/components/theme';
 import { appConfig } from '../src/config';
 import { useAppTheme } from '../src/context/ThemeContext';
@@ -251,60 +252,13 @@ export default function AccountScreen() {
 
   function renderInvitePanel() {
     return (
-      <View style={[styles.joinCard, { backgroundColor: c.surface, borderColor: c.border }]}>
-        <View style={styles.joinHeader}>
-          <View style={styles.joinIcon}>
-            <Ionicons name="enter-outline" size={18} color={c.primary} />
-          </View>
-          <View style={styles.joinText}>
-            <Text variant="bodyBold">Join a team</Text>
-            <Text variant="caption" color={c.textMuted}>
-              Paste an invite code from your owner or manager.
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.fieldBlock}>
-          <Text variant="caption" color={c.textSecondary} style={styles.fieldLabel}>
-            Team invite code
-          </Text>
-          <View style={[styles.inputContainer, { borderColor: c.border, backgroundColor: c.surfaceAlt }]}>
-            <Ionicons name="key-outline" size={18} color={c.textMuted} style={styles.inputIcon} />
-            <TextInput
-              value={inviteCode}
-              onChangeText={setInviteCode}
-              placeholder="SH-ABCD-1234-EF56"
-              placeholderTextColor={c.textMuted}
-              autoCapitalize="characters"
-              autoCorrect={false}
-              style={[styles.textInput, { color: c.text }]}
-            />
-          </View>
-        </View>
-
-        <Pressable
-          accessibilityRole="button"
-          disabled={isJoiningTeam}
-          onPress={() => void joinTeamFromInviteCode()}
-          style={({ pressed }) => [
-            styles.joinButton,
-            { backgroundColor: c.primary },
-            pressed && { backgroundColor: c.primaryPressed },
-            isJoiningTeam && styles.submitDisabled,
-          ]}
-        >
-          {isJoiningTeam ? (
-            <ActivityIndicator size="small" color="#FFFFFF" />
-          ) : (
-            <View style={styles.submitInner}>
-              <Text variant="bodyBold" color="#FFFFFF">
-                {authStore.isAuthenticated ? 'Join Team' : 'Save Code & Sign In'}
-              </Text>
-              <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
-            </View>
-          )}
-        </Pressable>
-      </View>
+      <InvitePanel
+        inviteCode={inviteCode}
+        onChangeCode={setInviteCode}
+        isJoining={isJoiningTeam}
+        isAuthenticated={authStore.isAuthenticated}
+        onJoin={() => void joinTeamFromInviteCode()}
+      />
     );
   }
 

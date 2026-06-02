@@ -1,6 +1,6 @@
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
 import { useEffect, useMemo, useState } from 'react';
-import { api } from '../../api/client';
+import { api } from '../../api';
 import { Button } from '../../components/Button';
 import { Card } from '../../components/Card';
 import { Divider } from '../../components/Divider';
