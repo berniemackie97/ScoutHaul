@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Button } from '../../components/Button';
 import { StatusPill } from '../../components/StatusPill';
 import { Text } from '../../components/Text';
@@ -148,6 +148,50 @@ export function ScanResults({
           </ScrollView>
         ) : null}
 
+        {/* Web matches from Cloud Vision */}
+        {state.webMatches.length > 0 ? (
+          <View style={styles.webMatchesSection}>
+            <View style={styles.webMatchesHeader}>
+              <Ionicons name="globe-outline" size={16} color={c.info} />
+              <Text variant="bodyBold" color={c.textSecondary}>Found on the web</Text>
+              <Text variant="label" color={c.textMuted}>{state.webMatches.length}</Text>
+            </View>
+            {state.webMatches.slice(0, 5).map((match, i) => (
+              <Pressable
+                key={i}
+                onPress={() => void Linking.openURL(match.url)}
+                style={({ pressed }) => [
+                  styles.webMatchItem,
+                  { borderColor: c.borderLight },
+                  pressed && { backgroundColor: c.surfaceAlt },
+                ]}
+              >
+                <View style={[styles.webMatchIcon, { backgroundColor: c.infoLight }]}>
+                  <Ionicons
+                    name={
+                      match.source.includes('ebay') ? 'pricetag-outline'
+                      : match.source.includes('amazon') ? 'cart-outline'
+                      : match.source.includes('walmart') ? 'storefront-outline'
+                      : 'link-outline'
+                    }
+                    size={16}
+                    color={c.info}
+                  />
+                </View>
+                <View style={styles.webMatchText}>
+                  <Text variant="caption" numberOfLines={2} color={c.text}>
+                    {match.title ?? match.url}
+                  </Text>
+                  <Text variant="label" color={c.textMuted} numberOfLines={1}>
+                    {match.source}
+                  </Text>
+                </View>
+                <Ionicons name="open-outline" size={14} color={c.textMuted} />
+              </Pressable>
+            ))}
+          </View>
+        ) : null}
+
         {/* Actions */}
         <View style={styles.actions}>
           <Pressable onPress={onRescan} style={[styles.iconBtn, { backgroundColor: c.surfaceAlt }]} accessibilityLabel="Rescan">
@@ -224,4 +268,25 @@ const styles = StyleSheet.create({
   editHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
   editRow: { flexDirection: 'row', gap: spacing.sm },
   editActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.sm, paddingTop: spacing.xs },
+
+  // Web matches
+  webMatchesSection: { gap: spacing.sm },
+  webMatchesHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  webMatchItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    borderWidth: 1,
+    borderRadius: radius.md,
+  },
+  webMatchIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: radius.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  webMatchText: { flex: 1, gap: spacing.xxs },
 });

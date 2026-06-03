@@ -99,30 +99,44 @@ export default function ScoutScreen() {
         </View>
       </LinearGradient>
 
-      {/* Hero scan button */}
-      <Pressable
-        onPress={() => router.push('/scanner')}
-        style={({ pressed }) => [
-          styles.scanHero,
-          { backgroundColor: c.primary, ...s.lg },
-          pressed && { backgroundColor: c.primaryPressed, transform: [{ scale: 0.98 }] },
-        ]}
-        accessibilityRole="button"
-        accessibilityLabel="Scan barcode"
-      >
-        <View style={styles.scanContent}>
+      {/* Hero scan buttons — two distinct entry points */}
+      <View style={styles.heroRow}>
+        <Pressable
+          onPress={() => router.push({ pathname: '/scanner', params: { mode: 'barcode' } })}
+          style={({ pressed }) => [
+            styles.scanHero,
+            styles.scanHeroLeft,
+            { backgroundColor: c.primary, ...s.lg },
+            pressed && { backgroundColor: c.primaryPressed, transform: [{ scale: 0.98 }] },
+          ]}
+          accessibilityRole="button"
+          accessibilityLabel="Scan barcode"
+        >
           <View style={[styles.scanIconRing, { borderColor: 'rgba(255,255,255,0.25)' }]}>
-            <Ionicons name="scan" size={36} color={c.textInverse} />
+            <Ionicons name="barcode-outline" size={28} color={c.textInverse} />
           </View>
-          <View style={styles.scanText}>
-            <Text variant="subtitle" color={c.textInverse}>Scan Barcode</Text>
-            <Text variant="caption" color="rgba(255,255,255,0.7)">
-              UPC, EAN, ISBN, QR — instant pricing
-            </Text>
+          <Text variant="bodyBold" color={c.textInverse}>Scan Barcode</Text>
+          <Text variant="caption" color="rgba(255,255,255,0.6)">UPC, EAN, ISBN, QR</Text>
+        </Pressable>
+
+        <Pressable
+          onPress={() => router.push({ pathname: '/scanner', params: { mode: 'photo-identify' } })}
+          style={({ pressed }) => [
+            styles.scanHero,
+            styles.scanHeroRight,
+            { backgroundColor: c.accent, ...s.lg },
+            pressed && { opacity: 0.9, transform: [{ scale: 0.98 }] },
+          ]}
+          accessibilityRole="button"
+          accessibilityLabel="Photo identify"
+        >
+          <View style={[styles.scanIconRing, { borderColor: 'rgba(255,255,255,0.25)' }]}>
+            <Ionicons name="camera-outline" size={28} color={c.textInverse} />
           </View>
-        </View>
-        <Ionicons name="arrow-forward" size={24} color="rgba(255,255,255,0.6)" />
-      </Pressable>
+          <Text variant="bodyBold" color={c.textInverse}>Photo ID</Text>
+          <Text variant="caption" color="rgba(255,255,255,0.6)">AI visual search</Text>
+        </Pressable>
+      </View>
 
       {/* Quick search */}
       <SearchBar
@@ -254,31 +268,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.md,
   },
-  scanHero: {
+  heroRow: {
     flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  scanHero: {
+    flex: 1,
     alignItems: 'center',
-    justifyContent: 'space-between',
     borderRadius: radius.xl,
     padding: spacing.lg,
-    gap: spacing.md,
+    gap: spacing.sm,
   },
-  scanContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.lg,
-    flex: 1,
-  },
+  scanHeroLeft: {},
+  scanHeroRight: {},
   scanIconRing: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  scanText: {
-    flex: 1,
-    gap: spacing.xxs,
   },
   actionGrid: {
     flexDirection: 'row',

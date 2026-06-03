@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
@@ -23,38 +23,73 @@ import { StatusPill } from '../src/components/StatusPill';
 import { Text } from '../src/components/Text';
 import { TextField } from '../src/components/TextField';
 import { ScanResults } from '../src/features/scanner/ScanResults';
+import type { IdentifyResult } from '../src/features/scanner/photoIdentify';
 import { identifyFromPhoto } from '../src/features/scanner/photoIdentify';
 import { radius, spacing } from '../src/components/theme';
 import { useAppTheme } from '../src/context/ThemeContext';
-import type { ScanMode, ScanState } from '../src/features/scanner/types';
+import type { ScanMode, ScanState, WebMatch } from '../src/features/scanner/types';
 import {
+  extractWebMatches,
   makeDoneError,
   makeDoneFromResult,
   resolveProductName,
 } from '../src/features/scanner/types';
 import { useHaptics } from '../src/hooks/useHaptics';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const BARCODE_VF = 260;
 const PHOTO_VF = SCREEN_WIDTH - 48;
-const CS = 24;
-const CW = 3;
+
+// Barcode: thin precision corners. Photo: bold AI-lens brackets.
+const BARCODE_CS = 20;
+const BARCODE_CW = 2;
+const PHOTO_CS = 28;
+const PHOTO_CW = 3.5;
 
 export default function BarcodeScannerScreen() {
   const { colors: c } = useAppTheme();
   const haptics = useHaptics();
-  const routeParams = useLocalSearchParams<{ sourcingTripId?: string; sourcingTripStopId?: string }>();
+  const routeParams = useLocalSearchParams<{ sourcingTripId?: string; sourcingTripStopId?: string; mode?: ScanMode }>();
   const [permission, requestPermission] = useCameraPermissions();
   const [state, setState] = useState<ScanState>({ phase: 'scanning' });
-  const [mode, setMode] = useState<ScanMode>('barcode');
+  const [mode, setMode] = useState<ScanMode>(routeParams.mode === 'photo-identify' ? 'photo-identify' : 'barcode');
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({ title: '', brand: '', model: '', category: '', upc: '', ean: '' });
   const cameraRef = useRef<CameraView>(null);
   const scanLine = useRef(new Animated.Value(0)).current;
+  const shutterFlash = useRef(new Animated.Value(0)).current;
+  const processingPulse = useRef(new Animated.Value(0)).current;
+  const [capturedPhotoUri, setCapturedPhotoUri] = useState<string | null>(null);
+  const identifyResultRef = useRef<IdentifyResult | null>(null);
+  const insets = useSafeAreaInsets();
   const isScanning = state.phase === 'scanning';
   const isPhotoMode = mode === 'photo-identify';
+  const showPhotoOverlay = !!capturedPhotoUri && state.phase !== 'scanning' && state.phase !== 'photo-review';
+  const modeColor = isPhotoMode ? c.accent : c.primary;
+
+  // Clear photo overlay when reaching results
+  useEffect(() => {
+    if (state.phase === 'done' || state.phase === 'photo-review') {
+      setCapturedPhotoUri(null);
+    }
+  }, [state.phase]);
+
+  // Processing pulse animation — runs during capturing/identifying/searching
+  useEffect(() => {
+    if (state.phase === 'capturing' || state.phase === 'identifying' || (state.phase === 'searching' && capturedPhotoUri)) {
+      const anim = Animated.loop(
+        Animated.sequence([
+          Animated.timing(processingPulse, { toValue: 1, duration: 1500, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+          Animated.timing(processingPulse, { toValue: 0, duration: 1500, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        ]),
+      );
+      anim.start();
+      return () => anim.stop();
+    }
+  }, [state.phase, capturedPhotoUri, processingPulse]);
 
   useEffect(() => {
     if (!isScanning || isPhotoMode) return;
@@ -79,32 +114,96 @@ export default function BarcodeScannerScreen() {
     }
   }
 
-  // ── Photo identify — Cloud Vision + OCR in parallel, then auto-search ──
+  // ── Shutter flash effect ──
+  const fireShutter = useCallback(() => {
+    shutterFlash.setValue(1);
+    Animated.timing(shutterFlash, {
+      toValue: 0,
+      duration: 250,
+      easing: Easing.out(Easing.ease),
+      useNativeDriver: true,
+    }).start();
+  }, [shutterFlash]);
+
+  // ── Multi-query marketplace search with retry ──
+  async function searchWithRetry(
+    primary: string,
+    alternates: string[],
+    photoUri: string,
+    webMatches: WebMatch[],
+  ) {
+    setState({ phase: 'searching', barcode: primary, photoUri, step: 'Searching marketplaces...' });
+
+    // Try primary query
+    try {
+      const result = await api.lookupSearch(primary);
+      if (result.totalResults > 0 || result.productTitle) {
+        setState(makeDoneFromResult(primary, result, photoUri, webMatches));
+        return;
+      }
+    } catch { /* try alternates */ }
+
+    // Retry with alternate queries
+    for (const alt of alternates) {
+      setState({ phase: 'searching', barcode: alt, photoUri, step: `Trying "${alt.slice(0, 30)}${alt.length > 30 ? '...' : ''}"` });
+      try {
+        const result = await api.lookupSearch(alt);
+        if (result.totalResults > 0 || result.productTitle) {
+          setState(makeDoneFromResult(alt, result, photoUri, webMatches));
+          return;
+        }
+      } catch { /* continue to next */ }
+    }
+
+    // All queries exhausted — show what we have (web matches may still be useful)
+    try {
+      const result = await api.lookupSearch(primary);
+      setState(makeDoneFromResult(primary, result, photoUri, webMatches));
+    } catch (e) {
+      setState(makeDoneError(primary, e, webMatches));
+    }
+  }
+
+  // ── Photo identify — Cloud Vision + OCR, then auto-search with retries ──
   async function captureAndIdentify() {
     if (!cameraRef.current) return;
     setState({ phase: 'capturing' });
     haptics.medium();
+    fireShutter();
 
     try {
       const photo = await cameraRef.current.takePictureAsync({ quality: 0.85 });
       if (!photo?.uri) { setState({ phase: 'scanning' }); return; }
 
-      setState({ phase: 'identifying', photoUri: photo.uri, ocrText: null });
+      setCapturedPhotoUri(photo.uri);
+      setState({ phase: 'identifying', photoUri: photo.uri, ocrText: null, step: 'Analyzing image...' });
 
       const identified = await identifyFromPhoto(photo.uri);
+      identifyResultRef.current = identified;
+      const webMatches = extractWebMatches(identified.matchingPages);
+
+      setState({ phase: 'identifying', photoUri: photo.uri, ocrText: null, step: 'Identifying product...' });
 
       if (identified.confidence === 'high' && identified.searchQuery) {
-        // High confidence — auto-search immediately
         haptics.success();
-        setState({ phase: 'searching', barcode: identified.searchQuery });
-        try {
-          const result = await api.lookupSearch(identified.searchQuery);
-          setState(makeDoneFromResult(identified.searchQuery, result, photo.uri));
-        } catch (e) {
-          setState(makeDoneError(identified.searchQuery, e));
-        }
+        await searchWithRetry(
+          identified.searchQuery,
+          identified.alternateQueries,
+          photo.uri,
+          webMatches,
+        );
+      } else if (identified.confidence === 'medium' && identified.searchQuery) {
+        // Medium confidence with matching pages — still auto-search but keep review as fallback
+        haptics.medium();
+        await searchWithRetry(
+          identified.searchQuery,
+          identified.alternateQueries,
+          photo.uri,
+          webMatches,
+        );
       } else {
-        // Show review with pre-filled query for user confirmation
+        // Low confidence — show review for user confirmation
+        setCapturedPhotoUri(null);
         setState({
           phase: 'photo-review',
           photoUri: photo.uri,
@@ -114,24 +213,49 @@ export default function BarcodeScannerScreen() {
         });
       }
     } catch {
+      setCapturedPhotoUri(null);
       setState({ phase: 'scanning' });
     }
   }
 
   // ── Manual search from review ──
-  async function searchQuery(query: string, photoUri?: string) {
+  async function searchManual(query: string, photoUri?: string) {
     const q = query.trim();
     if (!q) return;
-    setState({ phase: 'searching', barcode: q });
+    const identified = identifyResultRef.current;
+    const webMatches = identified ? extractWebMatches(identified.matchingPages) : [];
+    setCapturedPhotoUri(photoUri ?? null);
+    setState({ phase: 'searching', barcode: q, photoUri, step: 'Searching marketplaces...' });
     try {
-      setState(makeDoneFromResult(q, await api.lookupSearch(q), photoUri));
+      const result = await api.lookupSearch(q);
+      if (result.totalResults > 0 || result.productTitle) {
+        setState(makeDoneFromResult(q, result, photoUri, webMatches));
+        return;
+      }
+      // No results — try alternates if available
+      if (identified?.alternateQueries) {
+        for (const alt of identified.alternateQueries) {
+          if (alt === q) continue;
+          setState({ phase: 'searching', barcode: alt, photoUri, step: `Trying "${alt.slice(0, 30)}..."` });
+          try {
+            const altResult = await api.lookupSearch(alt);
+            if (altResult.totalResults > 0 || altResult.productTitle) {
+              setState(makeDoneFromResult(alt, altResult, photoUri, webMatches));
+              return;
+            }
+          } catch { /* continue */ }
+        }
+      }
+      setState(makeDoneFromResult(q, result, photoUri, webMatches));
     } catch (e) {
-      setState(makeDoneError(q, e));
+      setState(makeDoneError(q, e, webMatches));
     }
   }
 
   function resetToScanning() {
     setEditing(false);
+    setCapturedPhotoUri(null);
+    identifyResultRef.current = null;
     setState({ phase: 'scanning' });
   }
 
@@ -244,8 +368,6 @@ export default function BarcodeScannerScreen() {
   const cornerColor = doneState
     ? (doneState.listings.length > 0 || doneState.productTitle ? c.success : c.warning)
     : c.primary;
-  const vfWidth = isPhotoMode ? PHOTO_VF : BARCODE_VF;
-
   return (
     <Screen scroll={false} edges={['bottom']} keyboardAvoiding={false}>
       <View style={styles.container}>
@@ -263,47 +385,122 @@ export default function BarcodeScannerScreen() {
           }
         />
 
-        {/* Viewfinder overlay */}
+        {/* Viewfinder overlay — distinct per mode */}
         <View style={styles.overlay} pointerEvents="none">
-          <View style={isPhotoMode ? styles.dimTopPhoto : styles.dimTop} />
-          <View style={[styles.middleRow, isPhotoMode && styles.middleRowPhoto]}>
-            <View style={isPhotoMode ? styles.dimSidePhoto : styles.dimSide} />
-            <View style={[styles.viewfinder, { width: vfWidth }]}>
-              {(['TL', 'TR', 'BL', 'BR'] as const).map((pos) => (
-                <View key={pos} style={[styles.corner, styles[`corner${pos}`], { borderColor: isPhotoMode ? c.accent : cornerColor }]} />
-              ))}
-              {isScanning && !isPhotoMode ? (
-                <Animated.View style={[styles.scanLine, { backgroundColor: c.primary, transform: [{ translateY: scanLineY }] }]} />
-              ) : null}
-              {isPhotoMode && isScanning ? (
-                <View style={styles.crosshair}>
-                  <View style={[styles.crosshairH, { backgroundColor: c.accent }]} />
-                  <View style={[styles.crosshairV, { backgroundColor: c.accent }]} />
+          {isPhotoMode ? (
+            <>
+              <View style={styles.dimTopPhoto} />
+              <View style={styles.middleRowPhoto}>
+                <View style={styles.dimSidePhoto} />
+                <View style={[styles.viewfinder, { width: PHOTO_VF }]}>
+                  {(['TL', 'TR', 'BL', 'BR'] as const).map((pos) => (
+                    <View key={pos} style={[styles.cornerPhoto, photoCornerStyles[pos], { borderColor: c.accent }]} />
+                  ))}
+                  {isScanning ? (
+                    <View style={styles.crosshair}>
+                      <View style={[styles.crosshairH, { backgroundColor: c.accent }]} />
+                      <View style={[styles.crosshairV, { backgroundColor: c.accent }]} />
+                    </View>
+                  ) : null}
                 </View>
-              ) : null}
-            </View>
-            <View style={isPhotoMode ? styles.dimSidePhoto : styles.dimSide} />
-          </View>
-          <View style={isPhotoMode ? styles.dimBottomPhoto : styles.dimBottom} />
+                <View style={styles.dimSidePhoto} />
+              </View>
+              <View style={styles.dimBottomPhoto} />
+            </>
+          ) : (
+            <>
+              <View style={styles.dimTop} />
+              <View style={styles.middleRow}>
+                <View style={styles.dimSide} />
+                <View style={[styles.viewfinder, { width: BARCODE_VF }]}>
+                  {(['TL', 'TR', 'BL', 'BR'] as const).map((pos) => (
+                    <View key={pos} style={[styles.cornerBarcode, barcodeCornerStyles[pos], { borderColor: cornerColor }]} />
+                  ))}
+                  {isScanning ? (
+                    <Animated.View style={[styles.scanLine, { backgroundColor: c.primary, transform: [{ translateY: scanLineY }] }]} />
+                  ) : null}
+                </View>
+                <View style={styles.dimSide} />
+              </View>
+              <View style={styles.dimBottom} />
+            </>
+          )}
         </View>
 
-        {/* Mode toggle */}
-        {isScanning ? (
-          <View style={[styles.modeToggle, { backgroundColor: c.surface }]}>
+        {/* Top header — mode identity + subtle switch */}
+        <View style={[styles.topBar, { paddingTop: insets.top + spacing.xs }]}>
+          <Pressable onPress={() => router.back()} hitSlop={12} style={styles.topBackBtn}>
+            <Ionicons name="chevron-back" size={22} color="#fff" />
+          </Pressable>
+          <View style={styles.topTitleRow}>
+            <Ionicons
+              name={isPhotoMode ? 'scan-outline' : 'barcode-outline'}
+              size={16}
+              color={isPhotoMode ? c.accent : c.primary}
+            />
+            <Text variant="caption" color="#fff">
+              {isPhotoMode ? 'Visual Search' : 'Barcode Scanner'}
+            </Text>
+          </View>
+          {isScanning ? (
             <Pressable
-              onPress={() => switchMode('barcode')}
-              style={[styles.modeTab, !isPhotoMode && [styles.modeTabActive, { backgroundColor: c.primary }]]}
+              onPress={() => switchMode(isPhotoMode ? 'barcode' : 'photo-identify')}
+              style={[styles.switchPill, { borderColor: 'rgba(255,255,255,0.25)' }]}
+              hitSlop={8}
             >
-              <Ionicons name="barcode-outline" size={18} color={!isPhotoMode ? c.textInverse : c.textMuted} />
-              <Text variant="caption" color={!isPhotoMode ? c.textInverse : c.textMuted}>Barcode</Text>
+              <Ionicons
+                name={isPhotoMode ? 'barcode-outline' : 'camera-outline'}
+                size={14}
+                color="rgba(255,255,255,0.7)"
+              />
+              <Text variant="label" color="rgba(255,255,255,0.7)" style={{ textTransform: 'none', letterSpacing: 0 }}>
+                {isPhotoMode ? 'Barcode' : 'Photo ID'}
+              </Text>
             </Pressable>
-            <Pressable
-              onPress={() => switchMode('photo-identify')}
-              style={[styles.modeTab, isPhotoMode && [styles.modeTabActive, { backgroundColor: c.accent }]]}
-            >
-              <Ionicons name="eye-outline" size={18} color={isPhotoMode ? c.textInverse : c.textMuted} />
-              <Text variant="caption" color={isPhotoMode ? c.textInverse : c.textMuted}>Identify</Text>
-            </Pressable>
+          ) : <View style={{ width: 70 }} />}
+        </View>
+
+        {/* Shutter flash */}
+        <Animated.View
+          style={[styles.shutterFlash, { opacity: shutterFlash }]}
+          pointerEvents="none"
+        />
+
+        {/* Captured photo overlay — freezes view during processing */}
+        {showPhotoOverlay ? (
+          <View style={styles.photoOverlay}>
+            <Image source={{ uri: capturedPhotoUri! }} style={styles.photoOverlayImage} contentFit="cover" />
+            <Animated.View
+              style={[
+                styles.photoOverlayGradient,
+                {
+                  opacity: processingPulse.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0.3, 0.5],
+                  }),
+                },
+              ]}
+            />
+            <Animated.View
+              style={[
+                styles.photoScanLine,
+                {
+                  backgroundColor: c.accent,
+                  transform: [{
+                    translateY: processingPulse.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0, Dimensions.get('window').height * 0.5],
+                    }),
+                  }],
+                },
+              ]}
+            />
+            {(state.phase === 'identifying' || state.phase === 'searching') && 'step' in state && state.step ? (
+              <View style={[styles.processingBadge, { backgroundColor: c.surface }]}>
+                <ActivityIndicator size="small" color={c.accent} />
+                <Text variant="caption" color={c.accent}>{state.step}</Text>
+              </View>
+            ) : null}
           </View>
         ) : null}
 
@@ -313,58 +510,69 @@ export default function BarcodeScannerScreen() {
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           keyboardVerticalOffset={0}
         >
-          {/* Barcode scanning */}
+          {/* Barcode scanning — clinical, focused */}
           {state.phase === 'scanning' && !isPhotoMode ? (
             <View style={styles.panelInner}>
-              <Text variant="bodyBold">Point at a barcode</Text>
-              <Text variant="caption" color={c.textMuted}>UPC, EAN, ISBN, Code 128, or QR</Text>
+              <View style={styles.barcodePanelRow}>
+                <View style={[styles.barcodeIndicator, { backgroundColor: c.primaryLight }]}>
+                  <View style={[styles.barcodeIndicatorDot, { backgroundColor: c.primary }]} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text variant="bodyBold">Ready to scan</Text>
+                  <Text variant="caption" color={c.textMuted}>Point at any barcode — auto-detects format</Text>
+                </View>
+              </View>
+              <View style={styles.barcodeFormats}>
+                {['UPC', 'EAN', 'ISBN', 'QR', 'Code 128'].map((fmt) => (
+                  <View key={fmt} style={[styles.formatChip, { backgroundColor: c.surfaceAlt }]}>
+                    <Text variant="label" color={c.textMuted}>{fmt}</Text>
+                  </View>
+                ))}
+              </View>
             </View>
 
-          /* Photo identify — scanning */
+          /* Photo identify — premium AI lens */
           ) : state.phase === 'scanning' && isPhotoMode ? (
             <View style={styles.panelInner}>
-              <View style={styles.photoModeHeader}>
-                <Ionicons name="eye" size={22} color={c.accent} />
-                <Text variant="bodyBold">Visual Product Identification</Text>
-              </View>
-              <Text variant="caption" color={c.textMuted}>
-                Center the product, label, or packaging. AI reads text and identifies the item visually.
+              <Text variant="caption" color={c.textMuted} style={{ textAlign: 'center' }}>
+                Center the product, label, or packaging
               </Text>
               <Pressable
                 onPress={() => void captureAndIdentify()}
-                style={[styles.captureBtn, { backgroundColor: c.accent }]}
+                style={({ pressed }) => [
+                  styles.captureBtn,
+                  { backgroundColor: c.accent },
+                  pressed && { opacity: 0.9, transform: [{ scale: 0.98 }] },
+                ]}
               >
-                <View style={[styles.captureDot, { borderColor: c.textInverse }]}>
-                  <Ionicons name="camera" size={28} color={c.textInverse} />
+                <View style={[styles.captureDot, { borderColor: 'rgba(255,255,255,0.4)' }]}>
+                  <Ionicons name="scan" size={26} color={c.textInverse} />
                 </View>
-                <Text variant="bodyBold" color={c.textInverse}>Capture & Identify</Text>
+                <View>
+                  <Text variant="bodyBold" color={c.textInverse}>Identify Product</Text>
+                  <Text variant="label" color="rgba(255,255,255,0.6)" style={{ textTransform: 'none', letterSpacing: 0 }}>AI reads text, logos & visuals</Text>
+                </View>
               </Pressable>
             </View>
 
-          /* Capturing */
-          ) : state.phase === 'capturing' ? (
+          /* Capturing / Identifying / Searching (photo mode with overlay active) */
+          ) : (state.phase === 'capturing' || state.phase === 'identifying') ? (
             <View style={styles.panelInner}>
-              <View style={styles.processingRow}>
-                <ActivityIndicator size="small" color={c.accent} />
-                <Text variant="bodyBold" color={c.accent}>Capturing...</Text>
+              <View style={styles.stepIndicator}>
+                <StepDot active={state.phase === 'capturing'} done={state.phase === 'identifying'} color={c.accent} />
+                <View style={[styles.stepLine, { backgroundColor: state.phase === 'identifying' ? c.accent : c.borderLight }]} />
+                <StepDot active={state.phase === 'identifying'} done={false} color={c.accent} />
+                <View style={[styles.stepLine, { backgroundColor: c.borderLight }]} />
+                <StepDot active={false} done={false} color={c.accent} />
               </View>
-            </View>
-
-          /* Identifying — ML Kit running */
-          ) : state.phase === 'identifying' ? (
-            <View style={styles.panelInner}>
-              <View style={styles.identifyRow}>
-                {state.photoUri ? (
-                  <Image source={{ uri: state.photoUri }} style={styles.identifyThumb} contentFit="cover" />
-                ) : null}
-                <View style={styles.identifyText}>
-                  <View style={styles.processingRow}>
-                    <ActivityIndicator size="small" color={c.primary} />
-                    <Text variant="bodyBold" color={c.primary}>Identifying item...</Text>
-                  </View>
-                  <Text variant="caption" color={c.textMuted}>Reading text and identifying product</Text>
-                </View>
+              <View style={styles.stepLabels}>
+                <Text variant="label" color={state.phase === 'capturing' ? c.accent : c.textMuted}>Capture</Text>
+                <Text variant="label" color={state.phase === 'identifying' ? c.accent : c.textMuted}>Analyze</Text>
+                <Text variant="label" color={c.textMuted}>Search</Text>
               </View>
+              <Text variant="caption" color={c.textMuted} style={{ textAlign: 'center' }}>
+                {state.phase === 'capturing' ? 'Taking photo...' : 'AI is reading text and identifying the product'}
+              </Text>
             </View>
 
           /* Photo review — show what was found, let user edit/confirm */
@@ -432,7 +640,7 @@ export default function BarcodeScannerScreen() {
                   onChangeText={(v) => setState({ ...state, query: v })}
                   placeholder="Product name, brand, model..."
                   returnKeyType="search"
-                  onSubmitEditing={() => void searchQuery(state.query, state.photoUri)}
+                  onSubmitEditing={() => void searchManual(state.query, state.photoUri)}
                 />
                 <Button
                   label="Search Marketplaces"
@@ -440,7 +648,7 @@ export default function BarcodeScannerScreen() {
                   size="lg"
                   fullWidth
                   disabled={!state.query.trim()}
-                  onPress={() => void searchQuery(state.query, state.photoUri)}
+                  onPress={() => void searchManual(state.query, state.photoUri)}
                 />
                 <Button label="Retake" variant="ghost" size="sm" icon="camera-outline" onPress={resetToScanning} />
               </View>
@@ -449,17 +657,35 @@ export default function BarcodeScannerScreen() {
           /* Searching */
           ) : state.phase === 'searching' ? (
             <View style={styles.panelInner}>
+              {capturedPhotoUri ? (
+                <>
+                  <View style={styles.stepIndicator}>
+                    <StepDot active={false} done color={c.accent} />
+                    <View style={[styles.stepLine, { backgroundColor: c.accent }]} />
+                    <StepDot active={false} done color={c.accent} />
+                    <View style={[styles.stepLine, { backgroundColor: c.accent }]} />
+                    <StepDot active done={false} color={c.accent} />
+                  </View>
+                  <View style={styles.stepLabels}>
+                    <Text variant="label" color={c.textMuted}>Capture</Text>
+                    <Text variant="label" color={c.textMuted}>Analyze</Text>
+                    <Text variant="label" color={c.accent}>Search</Text>
+                  </View>
+                </>
+              ) : null}
               <View style={styles.processingRow}>
                 <Ionicons name="search-outline" size={20} color={c.primary} />
                 <Text variant="bodyBold" style={styles.mono} numberOfLines={1}>{state.barcode}</Text>
               </View>
               <View style={styles.processingRow}>
                 <ActivityIndicator size="small" color={c.info} />
-                <Text variant="caption" color={c.info}>Checking pricing sources...</Text>
+                <Text variant="caption" color={c.info}>
+                  {state.step ?? 'Checking pricing sources...'}
+                </Text>
               </View>
             </View>
 
-          /* Results */
+          /* Results — clear photo overlay */
           ) : state.phase === 'done' ? (
             <ScanResults
               state={state}
@@ -482,6 +708,54 @@ export default function BarcodeScannerScreen() {
   );
 }
 
+function StepDot({ active, done, color }: { active: boolean; done: boolean; color: string }) {
+  const { colors: c } = useAppTheme();
+  return (
+    <View
+      style={[
+        stepStyles.dot,
+        done && { backgroundColor: color, borderColor: color },
+        active && { borderColor: color, borderWidth: 2.5 },
+        !done && !active && { borderColor: c.borderLight },
+      ]}
+    >
+      {done ? <Ionicons name="checkmark" size={10} color="#fff" /> : null}
+      {active ? <View style={[stepStyles.dotInner, { backgroundColor: color }]} /> : null}
+    </View>
+  );
+}
+
+const stepStyles = StyleSheet.create({
+  dot: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dotInner: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+});
+
+// Mode-specific corner styles
+const barcodeCornerStyles = StyleSheet.create({
+  TL: { top: 0, left: 0, borderTopWidth: BARCODE_CW, borderLeftWidth: BARCODE_CW, borderTopLeftRadius: 4 },
+  TR: { top: 0, right: 0, borderTopWidth: BARCODE_CW, borderRightWidth: BARCODE_CW, borderTopRightRadius: 4 },
+  BL: { bottom: 0, left: 0, borderBottomWidth: BARCODE_CW, borderLeftWidth: BARCODE_CW, borderBottomLeftRadius: 4 },
+  BR: { bottom: 0, right: 0, borderBottomWidth: BARCODE_CW, borderRightWidth: BARCODE_CW, borderBottomRightRadius: 4 },
+});
+
+const photoCornerStyles = StyleSheet.create({
+  TL: { top: 0, left: 0, borderTopWidth: PHOTO_CW, borderLeftWidth: PHOTO_CW, borderTopLeftRadius: radius.md },
+  TR: { top: 0, right: 0, borderTopWidth: PHOTO_CW, borderRightWidth: PHOTO_CW, borderTopRightRadius: radius.md },
+  BL: { bottom: 0, left: 0, borderBottomWidth: PHOTO_CW, borderLeftWidth: PHOTO_CW, borderBottomLeftRadius: radius.md },
+  BR: { bottom: 0, right: 0, borderBottomWidth: PHOTO_CW, borderRightWidth: PHOTO_CW, borderBottomRightRadius: radius.md },
+});
+
 const styles = StyleSheet.create({
   container: { flex: 1 },
   center: { flex: 1, justifyContent: 'center' },
@@ -489,80 +763,113 @@ const styles = StyleSheet.create({
   camera: { flex: 1, backgroundColor: '#000' },
   overlay: { ...StyleSheet.absoluteFillObject },
 
-  // Barcode mode — small viewfinder, heavy dim
-  dimTop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)' },
-  dimBottom: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)' },
-  dimSide: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)' },
+  // Barcode mode — tight, clinical, heavy dim
+  dimTop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)' },
+  dimBottom: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)' },
+  dimSide: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)' },
   middleRow: { flexDirection: 'row', height: BARCODE_VF * 0.55 },
 
-  // Photo mode — large viewfinder, light dim
-  dimTopPhoto: { flex: 0.5, backgroundColor: 'rgba(0,0,0,0.35)' },
-  dimBottomPhoto: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)' },
-  dimSidePhoto: { width: 24, backgroundColor: 'rgba(0,0,0,0.35)' },
+  // Photo mode — expansive, warmer, lighter dim
+  dimTopPhoto: { flex: 0.4, backgroundColor: 'rgba(0,0,0,0.3)' },
+  dimBottomPhoto: { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)' },
+  dimSidePhoto: { width: 24, backgroundColor: 'rgba(0,0,0,0.3)' },
   middleRowPhoto: { flexDirection: 'row', height: PHOTO_VF * 0.85 },
 
   viewfinder: { height: '100%', overflow: 'hidden' },
-  corner: { position: 'absolute', width: CS, height: CS },
-  cornerTL: { top: 0, left: 0, borderTopWidth: CW, borderLeftWidth: CW, borderTopLeftRadius: radius.sm },
-  cornerTR: { top: 0, right: 0, borderTopWidth: CW, borderRightWidth: CW, borderTopRightRadius: radius.sm },
-  cornerBL: { bottom: 0, left: 0, borderBottomWidth: CW, borderLeftWidth: CW, borderBottomLeftRadius: radius.sm },
-  cornerBR: { bottom: 0, right: 0, borderBottomWidth: CW, borderRightWidth: CW, borderBottomRightRadius: radius.sm },
+  cornerBarcode: { position: 'absolute', width: BARCODE_CS, height: BARCODE_CS },
+  cornerPhoto: { position: 'absolute', width: PHOTO_CS, height: PHOTO_CS },
   scanLine: { position: 'absolute', left: spacing.md, right: spacing.md, height: 2, borderRadius: 1, top: 8 },
 
-  crosshair: { position: 'absolute', top: '50%', left: '50%', width: 40, height: 40, marginTop: -20, marginLeft: -20 },
-  crosshairH: { position: 'absolute', top: 19, left: 4, right: 4, height: 2, borderRadius: 1, opacity: 0.4 },
-  crosshairV: { position: 'absolute', left: 19, top: 4, bottom: 4, width: 2, borderRadius: 1, opacity: 0.4 },
+  crosshair: { position: 'absolute', top: '50%', left: '50%', width: 44, height: 44, marginTop: -22, marginLeft: -22 },
+  crosshairH: { position: 'absolute', top: 21, left: 4, right: 4, height: 1.5, borderRadius: 1, opacity: 0.35 },
+  crosshairV: { position: 'absolute', left: 21, top: 4, bottom: 4, width: 1.5, borderRadius: 1, opacity: 0.35 },
 
-  modeToggle: {
+  // Top header bar
+  topBar: {
     position: 'absolute',
-    bottom: '35%',
-    alignSelf: 'center',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 8,
     flexDirection: 'row',
-    borderRadius: radius.full,
-    padding: 3,
-    gap: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 5,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.sm,
   },
-  modeTab: {
+  topBackBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  topTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  switchPill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     borderRadius: radius.full,
+    borderWidth: 1,
   },
-  modeTabActive: {},
 
   panel: { borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, maxHeight: '55%' },
   panelScroll: { paddingHorizontal: spacing.lg, paddingTop: spacing.lg },
   panelInner: { gap: spacing.md, paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.xl },
 
-  photoModeHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  // Barcode panel
+  barcodePanelRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  barcodeIndicator: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  barcodeIndicatorDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  barcodeFormats: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+  },
+  formatChip: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.sm,
+  },
 
+  // Photo capture button
   captureBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.md,
-    paddingVertical: spacing.lg,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
     borderRadius: radius.xl,
   },
   captureDot: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    borderWidth: 3,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 2.5,
     alignItems: 'center',
     justifyContent: 'center',
   },
 
   processingRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   identifyRow: { flexDirection: 'row', gap: spacing.md, alignItems: 'center' },
-  identifyThumb: { width: 56, height: 56, borderRadius: radius.md },
   reviewThumb: { width: 72, height: 72, borderRadius: radius.md },
   identifyText: { flex: 1, gap: spacing.xs },
   reviewHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
@@ -577,4 +884,65 @@ const styles = StyleSheet.create({
   detectedField: { gap: spacing.xxs },
 
   mono: { fontVariant: ['tabular-nums'], letterSpacing: 0.5 },
+
+  // Shutter flash
+  shutterFlash: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#fff',
+    zIndex: 10,
+  },
+
+  // Captured photo overlay
+  photoOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 5,
+  },
+  photoOverlayImage: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  photoOverlayGradient: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#000',
+  },
+  photoScanLine: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: 2,
+    opacity: 0.6,
+  },
+  processingBadge: {
+    position: 'absolute',
+    top: '40%',
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderRadius: radius.full,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+
+  // Step indicator
+  stepIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 0,
+  },
+  stepLine: {
+    height: 2,
+    width: 40,
+    borderRadius: 1,
+  },
+  stepLabels: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.xl,
+  },
 });

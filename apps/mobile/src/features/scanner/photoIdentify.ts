@@ -1,5 +1,5 @@
 import { recognizeText } from '@infinitered/react-native-mlkit-text-recognition';
-import { File } from 'expo-file-system';
+import { readAsStringAsync } from 'expo-file-system';
 import { api } from '../../api';
 import type { VisionIdentifyResult } from '../../api/marketplace';
 
@@ -12,6 +12,7 @@ export type IdentifyResult = {
   rawText: string;
   confidence: 'high' | 'medium' | 'low';
   searchQuery: string;
+  alternateQueries: string[];
   visionLabels: string[];
   webEntities: { description: string; score: number }[];
   matchingPages: { url: string; title: string | null }[];
@@ -84,11 +85,12 @@ export async function identifyFromPhoto(photoUri: string): Promise<IdentifyResul
 function buildFromVision(vision: VisionIdentifyResult): IdentifyResult {
   const rawText = vision.detectedText ?? '';
 
-  // Brand: logos > web entities > OCR text
+  // Brand: logos > web entities > matching page titles > OCR text
   const logoBrand = vision.detectedLogos.length > 0 ? vision.detectedLogos[0] : null;
   const entityBrand = extractBrandFromEntities(vision.webEntities, vision.bestGuessLabel);
+  const pageBrand = extractBrandFromPageTitles(vision.matchingPages);
   const textBrand = rawText ? extractBrandFromText(rawText) : null;
-  const brand = logoBrand ?? entityBrand ?? textBrand;
+  const brand = logoBrand ?? entityBrand ?? pageBrand ?? textBrand;
 
   // Model: from OCR text (Cloud Vision text detection)
   const model = rawText ? extractModel(rawText) : null;
@@ -99,16 +101,29 @@ function buildFromVision(vision: VisionIdentifyResult): IdentifyResult {
   // Barcode: from OCR text
   const barcode = rawText ? extractBarcode(rawText) : null;
 
-  // Title: bestGuessLabel is the strongest
-  const title = vision.bestGuessLabel ?? buildTitleFallback(brand, model, vision.webEntities);
+  // Title: bestGuessLabel > matching page product name > entity fallback
+  const pageProductName = extractProductFromPageTitles(vision.matchingPages);
+  const title = vision.bestGuessLabel ?? pageProductName ?? buildTitleFallback(brand, model, vision.webEntities);
 
-  // Search query
+  // Primary search query — bestGuessLabel is strongest signal
   const searchQuery = vision.searchQuery ?? title ?? '';
 
-  // Confidence
+  // Alternate queries — ranked strategies for retry when primary returns no results
+  const alternateQueries = buildAlternateQueries(
+    searchQuery, brand, model, category,
+    vision.webEntities, vision.matchingPages, vision.bestGuessLabel,
+  );
+
+  // Confidence — factor in matching pages (Google already found this product somewhere)
   const hasVisionId = !!vision.bestGuessLabel;
   const hasEntities = vision.webEntities.length > 0;
-  const confidence: IdentifyResult['confidence'] = hasVisionId ? 'high' : hasEntities ? 'medium' : 'low';
+  const hasPages = vision.matchingPages.length > 0;
+  const confidence: IdentifyResult['confidence'] =
+    hasVisionId ? 'high'
+    : (hasEntities && hasPages) ? 'high'
+    : hasEntities ? 'medium'
+    : hasPages ? 'medium'
+    : 'low';
 
   return {
     title,
@@ -119,11 +134,105 @@ function buildFromVision(vision: VisionIdentifyResult): IdentifyResult {
     rawText,
     confidence,
     searchQuery,
+    alternateQueries,
     visionLabels: vision.labels,
     webEntities: vision.webEntities,
     matchingPages: vision.matchingPages,
     bestGuessLabel: vision.bestGuessLabel,
   };
+}
+
+// ── Alternate query generation ──
+// When primary query returns no marketplace results, try these in order.
+
+function buildAlternateQueries(
+  primary: string,
+  brand: string | null,
+  model: string | null,
+  category: string | null,
+  entities: { description: string; score: number }[],
+  pages: { url: string; title: string | null }[],
+  bestGuess: string | null,
+): string[] {
+  const seen = new Set<string>();
+  const alts: string[] = [];
+  const norm = (s: string) => s.toLowerCase().trim();
+
+  const add = (q: string | null | undefined) => {
+    if (!q) return;
+    const trimmed = q.trim();
+    if (trimmed.length < 3) return;
+    const key = norm(trimmed);
+    if (seen.has(key) || key === norm(primary)) return;
+    seen.add(key);
+    alts.push(trimmed);
+  };
+
+  // Strategy 1: brand + model (very specific)
+  if (brand && model) add(`${brand} ${model}`);
+
+  // Strategy 2: product name from matching page titles
+  const pageProduct = extractProductFromPageTitles(pages);
+  add(pageProduct);
+
+  // Strategy 3: bestGuessLabel alone (if primary was built differently)
+  add(bestGuess);
+
+  // Strategy 4: top web entities by score (these are Google's product guesses)
+  const topEntities = entities
+    .filter((e) => e.description.length > 3 && e.score > 0.3)
+    .sort((a, b) => b.score - a.score);
+  if (topEntities.length >= 2) {
+    add(`${topEntities[0].description} ${topEntities[1].description}`);
+  }
+  if (topEntities.length >= 1) {
+    add(topEntities[0].description);
+  }
+
+  // Strategy 5: brand + category (broadest useful search)
+  if (brand && category) add(`${brand} ${category}`);
+
+  // Strategy 6: brand alone
+  if (brand) add(brand);
+
+  return alts.slice(0, 4);
+}
+
+function extractProductFromPageTitles(
+  pages: { url: string; title: string | null }[],
+): string | null {
+  // Matching page titles from marketplace sites often contain the actual product name.
+  // E.g. "Sony WH-1000XM5 Wireless Headphones - eBay" → "Sony WH-1000XM5 Wireless Headphones"
+  const SITE_SUFFIXES = /\s*[-–|·]\s*(eBay|Amazon|Walmart|Target|Best Buy|Mercari|Poshmark|Etsy|Wayfair|Home Depot|Lowe's|AliExpress|Wish|StockX|GOAT|Facebook Marketplace|Craigslist|Offerup|Depop|Grailed|Nordstrom|Macy's|Newegg|B&H|Costco|Sam's Club|Google Shopping|Shopping|Search Results?|Price Comparison).*$/i;
+  const JUNK = /\s*[-–|]\s*(New|Used|Pre-?Owned|Refurbished|Like New|Good|Fair|Poor|Open Box|Sealed|Free Shipping|Fast Ship).*$/i;
+  const TOO_GENERIC = /^(shop|buy|sell|search|find|compare|results|home|page|\d+)/i;
+
+  for (const page of pages) {
+    if (!page.title) continue;
+    let cleaned = page.title
+      .replace(SITE_SUFFIXES, '')
+      .replace(JUNK, '')
+      .replace(/\s*\((\d+|[^)]{0,15})\)\s*$/, '')
+      .replace(/\s*\[\d+\]\s*$/, '')
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+
+    if (cleaned.length >= 8 && cleaned.length <= 120 && !TOO_GENERIC.test(cleaned)) {
+      return cleaned;
+    }
+  }
+  return null;
+}
+
+function extractBrandFromPageTitles(
+  pages: { url: string; title: string | null }[],
+): string | null {
+  for (const page of pages) {
+    if (!page.title) continue;
+    const match = page.title.match(BRAND_PATTERN);
+    if (match) return normalizeCase(match[1]);
+  }
+  return null;
 }
 
 // ── Fallback: on-device OCR only ──
@@ -145,6 +254,10 @@ async function buildFromOcrOnly(photoUri: string): Promise<IdentifyResult> {
   const title = buildOcrTitle(rawText, brand, model);
   const searchQuery = brand && model ? `${brand} ${model}` : title ?? '';
   const fieldCount = [brand, model, title].filter(Boolean).length;
+  const alternateQueries: string[] = [];
+  if (brand && model && searchQuery !== `${brand} ${model}`) alternateQueries.push(`${brand} ${model}`);
+  if (title && title !== searchQuery) alternateQueries.push(title);
+  if (brand && brand !== searchQuery) alternateQueries.push(brand);
 
   return {
     title,
@@ -155,6 +268,7 @@ async function buildFromOcrOnly(photoUri: string): Promise<IdentifyResult> {
     rawText,
     confidence: fieldCount >= 2 ? 'medium' : fieldCount >= 1 ? 'medium' : 'low',
     searchQuery,
+    alternateQueries,
     visionLabels: [],
     webEntities: [],
     matchingPages: [],
@@ -166,22 +280,18 @@ async function buildFromOcrOnly(photoUri: string): Promise<IdentifyResult> {
 
 async function callCloudVision(photoUri: string): Promise<VisionIdentifyResult | null> {
   try {
-    const file = new File(photoUri);
-    const buffer = await file.arrayBuffer();
-    const base64 = uint8ToBase64(new Uint8Array(buffer));
-    return await api.visionIdentify(base64);
-  } catch {
+    const base64 = await readAsStringAsync(photoUri, { encoding: 'base64' });
+    if (!base64 || base64.length < 100) {
+      console.warn('[Vision] Base64 too short, skipping:', base64?.length);
+      return null;
+    }
+    const result = await api.visionIdentify(base64);
+    console.log('[Vision] Response:', result.bestGuessLabel, result.webEntities.length, 'entities', result.labels.length, 'labels');
+    return result;
+  } catch (error) {
+    console.warn('[Vision] Cloud Vision call failed:', error instanceof Error ? error.message : error);
     return null;
   }
-}
-
-function uint8ToBase64(bytes: Uint8Array): string {
-  const CHUNK = 8192;
-  const chunks: string[] = [];
-  for (let i = 0; i < bytes.length; i += CHUNK) {
-    chunks.push(String.fromCharCode(...bytes.subarray(i, Math.min(i + CHUNK, bytes.length))));
-  }
-  return btoa(chunks.join(''));
 }
 
 // ── Extractors ──
@@ -274,7 +384,7 @@ function normalizeCase(text: string): string {
 function emptyResult(): IdentifyResult {
   return {
     title: null, brand: null, model: null, category: null, barcode: null,
-    rawText: '', confidence: 'low', searchQuery: '',
+    rawText: '', confidence: 'low', searchQuery: '', alternateQueries: [],
     visionLabels: [], webEntities: [], matchingPages: [], bestGuessLabel: null,
   };
 }

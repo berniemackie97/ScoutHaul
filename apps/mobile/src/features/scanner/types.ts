@@ -2,11 +2,17 @@ import type { MarketplaceListing } from '../../domain/types';
 
 export type ScanMode = 'barcode' | 'photo-identify';
 
+export type WebMatch = {
+  url: string;
+  title: string | null;
+  source: string;
+};
+
 export type ScanState =
   | { phase: 'scanning' }
-  | { phase: 'searching'; barcode: string }
+  | { phase: 'searching'; barcode: string; photoUri?: string | null; step?: string }
   | { phase: 'capturing' }
-  | { phase: 'identifying'; photoUri: string; ocrText: string | null }
+  | { phase: 'identifying'; photoUri: string; ocrText: string | null; step?: string }
   | { phase: 'photo-review'; photoUri: string; ocrText: string; query: string; identifyResult?: import('./photoIdentify').IdentifyResult }
   | ScanDoneState;
 
@@ -28,6 +34,7 @@ export type ScanDoneState = {
   savedObservationCount: number;
   providersUsed: string[];
   providerWarnings: string[];
+  webMatches: WebMatch[];
 };
 
 export function resolveProductName(state: ScanDoneState): string | null {
@@ -72,7 +79,7 @@ export function buildSearchQuery(raw: string): string {
   return scored.slice(0, 3).map((s) => s.line).join(' ').slice(0, 120).trim();
 }
 
-export function makeDoneError(query: string, error: unknown): ScanDoneState {
+export function makeDoneError(query: string, error: unknown, webMatches: WebMatch[] = []): ScanDoneState {
   return {
     phase: 'done',
     barcode: query,
@@ -90,6 +97,7 @@ export function makeDoneError(query: string, error: unknown): ScanDoneState {
     savedObservationCount: 0,
     providersUsed: [],
     providerWarnings: [],
+    webMatches,
   };
 }
 
@@ -97,6 +105,7 @@ export function makeDoneFromResult(
   query: string,
   result: import('../../domain/types').MarketplaceLookupResult,
   photoUri?: string | null,
+  webMatches: WebMatch[] = [],
 ): ScanDoneState {
   return {
     phase: 'done',
@@ -116,5 +125,24 @@ export function makeDoneFromResult(
     savedObservationCount: result.savedObservationCount ?? 0,
     providersUsed: result.providersUsed ?? [],
     providerWarnings: result.providerWarnings ?? [],
+    webMatches,
   };
+}
+
+export function extractWebMatches(
+  pages: { url: string; title: string | null }[],
+): WebMatch[] {
+  return pages
+    .filter((p) => p.url && !p.url.includes('google.com/imgres'))
+    .map((p) => {
+      let source: string;
+      try {
+        const host = new URL(p.url).hostname.replace(/^www\./, '');
+        source = host;
+      } catch {
+        source = 'Web';
+      }
+      return { url: p.url, title: p.title, source };
+    })
+    .slice(0, 8);
 }
