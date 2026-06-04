@@ -124,15 +124,19 @@ export default function BarcodeScannerScreen() {
     }
   }
 
-  // ── Shutter flash effect ──
+  // ── Shutter flash — holds white until overlay is ready, then fades ──
   const fireShutter = useCallback(() => {
     shutterFlash.setValue(1);
-    Animated.timing(shutterFlash, {
-      toValue: 0,
-      duration: 250,
-      easing: Easing.out(Easing.ease),
-      useNativeDriver: true,
-    }).start();
+    // Hold white for 400ms (covers takePictureAsync latency), then fade
+    Animated.sequence([
+      Animated.delay(400),
+      Animated.timing(shutterFlash, {
+        toValue: 0,
+        duration: 300,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: true,
+      }),
+    ]).start();
   }, [shutterFlash]);
 
   // ── Build empty marketplace result shell (no API call needed) ──

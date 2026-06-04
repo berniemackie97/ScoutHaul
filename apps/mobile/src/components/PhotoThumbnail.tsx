@@ -19,7 +19,7 @@ export function PhotoThumbnail({ uri, size = 56, onPress, placeholder }: PhotoTh
     return (
       <Pressable
         onPress={onPress}
-        style={[styles.placeholder, { width: size, height: size, backgroundColor: c.surfaceAlt, borderColor: c.border }]}
+        style={[styles.placeholder, { width: size, height: size, backgroundColor: c.borderLight, borderColor: c.border }]}
         accessibilityLabel={onPress ? 'Add photo' : 'No photo'}
         accessibilityRole={onPress ? 'button' : 'image'}
       >
