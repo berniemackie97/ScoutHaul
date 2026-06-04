@@ -8,3 +8,8 @@
 *.user
 *.suo
 .DS_Store
+
+# Secrets — never enter the build context. Config comes from platform env vars.
+.env
+.env.*
+!.env.example
