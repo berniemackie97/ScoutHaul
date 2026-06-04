@@ -5,11 +5,19 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens;
+using ScoutHaul.Api.Configuration;
 using ScoutHaul.Api.Middleware;
 using ScoutHaul.Api.Services;
 using ScoutHaul.Application;
 using ScoutHaul.Infrastructure;
 using ScoutHaul.Infrastructure.Persistence;
+
+// Load .env into environment variables for local dev BEFORE the config builder reads them.
+// No-op in production (no .env file present); never overrides platform-provided vars.
+if (!string.Equals(Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT"), "Production", StringComparison.OrdinalIgnoreCase))
+{
+    DotEnv.LoadForDevelopment(Directory.GetCurrentDirectory());
+}
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 

@@ -492,7 +492,8 @@ public sealed record VisionIdentifyResult(
     IReadOnlyList<string> Labels,
     IReadOnlyList<string> DetectedLogos,
     string? DetectedText,
-    string? SearchQuery);
+    string? SearchQuery,
+    ProductIdentification? Product = null);
 
 public sealed record VisionWebEntity(
     string Description,
@@ -504,3 +505,20 @@ public sealed record VisionMatchingPage(
 
 public sealed record VisionSimilarImage(
     string Url);
+
+/// <summary>
+/// Structured product identification from a multimodal model (Gemini).
+/// This is the primary signal — far richer than reverse-image labels.
+/// </summary>
+public sealed record ProductIdentification(
+    string? Name,
+    string? Brand,
+    string? Model,
+    string? Category,
+    string? Color,
+    string? Condition,
+    decimal? EstimatedResaleLow,
+    decimal? EstimatedResaleHigh,
+    string? IdentifyingText,
+    IReadOnlyList<string> SearchKeywords,
+    string Confidence);

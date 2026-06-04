@@ -22,6 +22,11 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    # Secrets & provider keys (Gemini, Cloud Vision, etc.) come from services/api/.env
+    # which is gitignored. The explicit `environment:` block below overrides any
+    # overlapping keys with container-network-correct values (e.g. Postgres host).
+    env_file:
+      - ./services/api/.env
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_HTTP_PORTS: 8080

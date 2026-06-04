@@ -101,4 +101,19 @@ export type VisionIdentifyResult = {
   detectedLogos: string[];
   detectedText: string | null;
   searchQuery: string | null;
+  product: ProductIdentification | null;
+};
+
+export type ProductIdentification = {
+  name: string | null;
+  brand: string | null;
+  model: string | null;
+  category: string | null;
+  color: string | null;
+  condition: string | null;
+  estimatedResaleLow: number | null;
+  estimatedResaleHigh: number | null;
+  identifyingText: string | null;
+  searchKeywords: string[];
+  confidence: 'high' | 'medium' | 'low';
 };

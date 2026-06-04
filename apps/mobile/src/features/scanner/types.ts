@@ -24,10 +24,14 @@ export type ScanDoneState = {
   avgPrice: number | null;
   lowPrice: number | null;
   highPrice: number | null;
+  priceSource: 'market' | 'estimate' | null;
   totalResults: number;
   error: string | null;
   productTitle: string | null;
   productBrand: string | null;
+  productModel: string | null;
+  productColor: string | null;
+  productCondition: string | null;
   productImageUrl: string | null;
   productCategory: string | null;
   productIdentityId: string | null;
@@ -59,10 +63,14 @@ export function makeDoneError(query: string, error: unknown, webMatches: WebMatc
     avgPrice: null,
     lowPrice: null,
     highPrice: null,
+    priceSource: null,
     totalResults: 0,
     error: error instanceof Error ? error.message : 'Search failed',
     productTitle: null,
     productBrand: null,
+    productModel: null,
+    productColor: null,
+    productCondition: null,
     productImageUrl: null,
     productCategory: null,
     productIdentityId: null,
@@ -75,8 +83,13 @@ export function makeDoneError(query: string, error: unknown, webMatches: WebMatc
 
 export type VisionOverrides = {
   brand?: string | null;
+  model?: string | null;
   category?: string | null;
+  color?: string | null;
+  condition?: string | null;
   title?: string | null;
+  estimatedResaleLow?: number | null;
+  estimatedResaleHigh?: number | null;
 };
 
 export function makeDoneFromResult(
@@ -84,22 +97,39 @@ export function makeDoneFromResult(
   result: import('../../domain/types').MarketplaceLookupResult,
   photoUri?: string | null,
   webMatches: WebMatch[] = [],
-  visionOverrides?: VisionOverrides,
+  v?: VisionOverrides,
 ): ScanDoneState {
+  // Real marketplace data wins. Otherwise fall back to Gemini's resale estimate so the
+  // user always sees a value, even with no marketplace providers configured.
+  const hasMarket = (result.averageSoldPrice ?? null) != null;
+  const estLow = v?.estimatedResaleLow ?? null;
+  const estHigh = v?.estimatedResaleHigh ?? null;
+  const hasEstimate = estLow != null || estHigh != null;
+  const estMid = hasEstimate ? Math.round((((estLow ?? estHigh)! + (estHigh ?? estLow)!) / 2)) : null;
+
+  const avgPrice = hasMarket ? result.averageSoldPrice! : estMid;
+  const lowPrice = hasMarket ? (result.lowestPrice ?? null) : estLow;
+  const highPrice = hasMarket ? (result.highestPrice ?? null) : estHigh;
+  const priceSource: ScanDoneState['priceSource'] = hasMarket ? 'market' : hasEstimate ? 'estimate' : null;
+
   return {
     phase: 'done',
     barcode: query,
     photoUri,
     listings: result.listings,
-    avgPrice: result.averageSoldPrice ?? null,
-    lowPrice: result.lowestPrice ?? null,
-    highPrice: result.highestPrice ?? null,
+    avgPrice,
+    lowPrice,
+    highPrice,
+    priceSource,
     totalResults: result.totalResults,
     error: null,
-    productTitle: result.productTitle ?? visionOverrides?.title ?? null,
-    productBrand: result.productBrand ?? visionOverrides?.brand ?? null,
+    productTitle: result.productTitle ?? v?.title ?? null,
+    productBrand: result.productBrand ?? v?.brand ?? null,
+    productModel: v?.model ?? null,
+    productColor: v?.color ?? null,
+    productCondition: v?.condition ?? null,
     productImageUrl: result.productImageUrl ?? null,
-    productCategory: result.productCategory ?? visionOverrides?.category ?? null,
+    productCategory: result.productCategory ?? v?.category ?? null,
     productIdentityId: result.productIdentityId ?? null,
     savedObservationCount: result.savedObservationCount ?? 0,
     providersUsed: result.providersUsed ?? [],

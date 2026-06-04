@@ -26,6 +26,7 @@ type ScanResultsProps = {
   onEdit: () => void;
   onAddInventory: () => void;
   onResearch: () => void;
+  onRefine: (query: string) => void;
   onSaveProduct: () => void;
   onCancelEdit: () => void;
 };
@@ -41,6 +42,7 @@ export function ScanResults({
   onEdit,
   onAddInventory,
   onResearch,
+  onRefine,
   onSaveProduct,
   onCancelEdit,
 }: ScanResultsProps) {
@@ -51,6 +53,9 @@ export function ScanResults({
   const hasListings = state.listings.length > 0;
   const hasWebMatches = state.webMatches.length > 0;
   const hasAnyResults = hasIdentification || hasListings || hasWebMatches;
+
+  const [refining, setRefining] = useState(false);
+  const [refineQuery, setRefineQuery] = useState(productName ?? state.barcode ?? '');
 
   return (
     <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false} bounces={false}>
@@ -71,9 +76,14 @@ export function ScanResults({
             ) : (
               <Text variant="bodyBold" color={c.textMuted}>Unidentified item</Text>
             )}
-            {(state.productBrand || state.productCategory) ? (
+            {(state.productBrand || state.productModel || state.productCategory) ? (
               <Text variant="caption" color={c.textSecondary} numberOfLines={1}>
-                {[state.productBrand, state.productCategory].filter(Boolean).join(' · ')}
+                {[state.productBrand, state.productModel, state.productCategory].filter(Boolean).join(' · ')}
+              </Text>
+            ) : null}
+            {(state.productColor || state.productCondition) ? (
+              <Text variant="label" color={c.textMuted} numberOfLines={1}>
+                {[state.productColor, state.productCondition].filter(Boolean).join(' · ')}
               </Text>
             ) : null}
             <View style={styles.heroMeta}>
@@ -91,24 +101,90 @@ export function ScanResults({
           </View>
         </View>
 
-        {/* ── Price Range (Google Lens "Typically $X–$Y" style) ── */}
-        {state.avgPrice != null ? (
-          <View style={[styles.priceCard, { backgroundColor: c.primaryLight, borderColor: c.primary + '20' }]}>
-            <View style={styles.priceHeader}>
-              <Ionicons name="pricetags" size={16} color={c.primary} />
-              <Text variant="bodyBold" color={c.primary}>Compare Prices</Text>
-            </View>
-            <View style={styles.priceRange}>
-              <Text variant="caption" color={c.textSecondary}>Typically</Text>
-              <Text variant="metricSmall" color={c.primary}>
-                {formatMoney(state.lowPrice)} – {formatMoney(state.highPrice)}
-              </Text>
-            </View>
-            <View style={styles.priceAvg}>
-              <Text variant="label" color={c.textMuted}>AVG MARKET VALUE</Text>
-              <Text variant="bodyBold" color={c.primary}>{formatMoney(state.avgPrice)}</Text>
+        {/* ── Refine — correct a wrong/generic identification and search again ── */}
+        {refining ? (
+          <View style={[styles.refineBox, { backgroundColor: c.surfaceAlt, borderColor: c.border }]}>
+            <Text variant="label" color={c.textMuted}>Correct the product, then search again</Text>
+            <TextField
+              label=""
+              value={refineQuery}
+              onChangeText={setRefineQuery}
+              placeholder="e.g. Sony WH-1000XM4 headphones"
+              autoFocus
+              returnKeyType="search"
+              onSubmitEditing={() => { if (refineQuery.trim()) { setRefining(false); onRefine(refineQuery.trim()); } }}
+            />
+            <View style={styles.refineActions}>
+              <Button label="Cancel" variant="ghost" size="sm" onPress={() => setRefining(false)} />
+              <Button
+                label="Search Again"
+                icon="search-outline"
+                size="sm"
+                disabled={!refineQuery.trim()}
+                onPress={() => { setRefining(false); onRefine(refineQuery.trim()); }}
+              />
             </View>
           </View>
+        ) : (
+          <Pressable
+            onPress={() => { setRefineQuery(productName ?? state.barcode ?? ''); setRefining(true); }}
+            style={styles.refineTrigger}
+            accessibilityRole="button"
+            accessibilityLabel="Refine identification and search again"
+          >
+            <Ionicons name="pencil-outline" size={14} color={c.textMuted} />
+            <Text variant="label" color={c.textSecondary}>
+              {hasIdentification ? 'Not quite right? Refine & search again' : 'Enter product name manually'}
+            </Text>
+          </Pressable>
+        )}
+
+        {/* ── Price Range — market data (green) or AI estimate (accent) ── */}
+        {state.avgPrice != null ? (
+          state.priceSource === 'estimate' ? (
+            <View
+              style={[styles.priceCard, { backgroundColor: c.accentLight, borderColor: c.accent + '30' }]}
+              accessible
+              accessibilityRole="text"
+              accessibilityLabel={`AI resale estimate: ${formatMoney(state.lowPrice)} to ${formatMoney(state.highPrice)}, estimated from the photo`}
+            >
+              <View style={styles.priceHeader}>
+                <Ionicons name="sparkles" size={16} color={c.accent} />
+                <Text variant="bodyBold" color={c.accent}>AI Resale Estimate</Text>
+              </View>
+              <View style={styles.priceRange}>
+                <Text variant="caption" color={c.textSecondary}>Likely sells for</Text>
+                <Text variant="metricSmall" color={c.accent}>
+                  {formatMoney(state.lowPrice)} – {formatMoney(state.highPrice)}
+                </Text>
+              </View>
+              <Text variant="label" color={c.textMuted}>
+                Estimated from the photo · confirm with comps
+              </Text>
+            </View>
+          ) : (
+            <View
+              style={[styles.priceCard, { backgroundColor: c.primaryLight, borderColor: c.primary + '20' }]}
+              accessible
+              accessibilityRole="text"
+              accessibilityLabel={`Market value: typically ${formatMoney(state.lowPrice)} to ${formatMoney(state.highPrice)}, average ${formatMoney(state.avgPrice)}`}
+            >
+              <View style={styles.priceHeader}>
+                <Ionicons name="pricetags" size={16} color={c.primary} />
+                <Text variant="bodyBold" color={c.primary}>Compare Prices</Text>
+              </View>
+              <View style={styles.priceRange}>
+                <Text variant="caption" color={c.textSecondary}>Typically</Text>
+                <Text variant="metricSmall" color={c.primary}>
+                  {formatMoney(state.lowPrice)} – {formatMoney(state.highPrice)}
+                </Text>
+              </View>
+              <View style={styles.priceAvg}>
+                <Text variant="label" color={c.textMuted}>AVG MARKET VALUE</Text>
+                <Text variant="bodyBold" color={c.primary}>{formatMoney(state.avgPrice)}</Text>
+              </View>
+            </View>
+          )
         ) : state.error ? (
           <View style={[styles.alertBox, { backgroundColor: c.dangerLight, borderColor: c.danger + '30' }]}>
             <Ionicons name="alert-circle" size={18} color={c.danger} />
@@ -282,6 +358,8 @@ function ListingRow({ listing, productIdentityId }: { listing: MarketplaceListin
         onPress={() => listing.itemUrl ? void Linking.openURL(listing.itemUrl) : undefined}
         style={styles.listingMain}
         disabled={!listing.itemUrl}
+        accessibilityRole="link"
+        accessibilityLabel={`${listing.title}, ${formatMoney(totalPrice)}${listing.isSold ? ', sold' : ''} on ${listing.source}`}
       >
         {listing.imageUrl ? (
           <Image source={{ uri: listing.imageUrl }} style={styles.listingThumb} contentFit="cover" />
@@ -345,6 +423,8 @@ function WebMatchRow({ match }: { match: WebMatch }) {
   return (
     <Pressable
       onPress={() => void Linking.openURL(match.url)}
+      accessibilityRole="link"
+      accessibilityLabel={`${match.title ?? 'Web result'} on ${match.source}`}
       style={({ pressed }) => [
         styles.webRow,
         { borderColor: c.borderLight },
@@ -402,6 +482,26 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     padding: spacing.md,
     borderRadius: radius.md,
+  },
+
+  // Refine
+  refineTrigger: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    paddingVertical: spacing.xs,
+  },
+  refineBox: {
+    gap: spacing.sm,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+  },
+  refineActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: spacing.sm,
   },
 
   // Sections

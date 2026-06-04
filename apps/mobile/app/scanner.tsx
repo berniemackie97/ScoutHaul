@@ -213,19 +213,46 @@ export default function BarcodeScannerScreen() {
       }
 
       setCapturedPhotoUri(photo.uri);
-      setState({ phase: 'identifying', photoUri: photo.uri, ocrText: null, step: 'Analyzing image...' });
+      setState({ phase: 'identifying', photoUri: photo.uri, ocrText: null, step: 'Analyzing image…' });
 
-      const identified = await identifyFromPhoto(photo.uri);
+      // Min display time so the analyze step feels deliberate, never a flash.
+      const analyzeStart = Date.now();
+      const MIN_ANALYZE_MS = 1600;
+
+      // Cycle the step label while the model works (gives a sense of progress).
+      const stepTimer = setTimeout(() => {
+        setState((s) => s.phase === 'identifying'
+          ? { ...s, step: 'Reading text & details…' }
+          : s);
+      }, 700);
+
+      let identified: IdentifyResult;
+      try {
+        identified = await identifyFromPhoto(photo.uri);
+      } finally {
+        clearTimeout(stepTimer);
+      }
       identifyResultRef.current = identified;
       const webMatches = extractWebMatches(identified.matchingPages);
 
-      setState({ phase: 'identifying', photoUri: photo.uri, ocrText: null, step: 'Identifying product...' });
+      setState({ phase: 'identifying', photoUri: photo.uri, ocrText: null, step: 'Identifying product…' });
+
+      // Hold until min display reached — smooth, not abrupt.
+      const elapsed = Date.now() - analyzeStart;
+      if (elapsed < MIN_ANALYZE_MS) {
+        await new Promise((r) => setTimeout(r, MIN_ANALYZE_MS - elapsed));
+      }
 
       // Vision metadata to carry through to results (even if marketplace doesn't resolve them)
       const overrides: VisionOverrides = {
         brand: identified.brand,
+        model: identified.model,
         category: identified.category,
+        color: identified.color,
+        condition: identified.condition,
         title: identified.title,
+        estimatedResaleLow: identified.estimatedResaleLow,
+        estimatedResaleHigh: identified.estimatedResaleHigh,
       };
 
       if (identified.confidence === 'high' && identified.searchQuery) {
@@ -272,7 +299,16 @@ export default function BarcodeScannerScreen() {
     const identified = identifyResultRef.current;
     const webMatches = identified ? extractWebMatches(identified.matchingPages) : [];
     const overrides: VisionOverrides | undefined = identified
-      ? { brand: identified.brand, category: identified.category, title: identified.title }
+      ? {
+          brand: identified.brand,
+          model: identified.model,
+          category: identified.category,
+          color: identified.color,
+          condition: identified.condition,
+          title: identified.title,
+          estimatedResaleLow: identified.estimatedResaleLow,
+          estimatedResaleHigh: identified.estimatedResaleHigh,
+        }
       : undefined;
     setCapturedPhotoUri(photoUri ?? null);
 
@@ -359,14 +395,18 @@ export default function BarcodeScannerScreen() {
       params.barcode = state.barcode;
     }
 
-    // Pricing from marketplace results
+    // Pricing — marketplace avg or Gemini resale estimate
     if (state.avgPrice != null) params.estimatedSalePrice = String(state.avgPrice);
-    if (firstListing?.condition) params.condition = firstListing.condition;
 
-    // Vision-identified metadata — pre-fill brand, category, model
+    // Condition — marketplace listing, else Gemini's read of the photo
+    const condition = firstListing?.condition ?? identified?.condition ?? state.productCondition;
+    if (condition) params.condition = condition;
+
+    // Vision-identified metadata — pre-fill everything Gemini saw
     if (identified?.brand ?? state.productBrand) params.brand = (identified?.brand ?? state.productBrand)!;
     if (identified?.category ?? state.productCategory) params.category = (identified?.category ?? state.productCategory)!;
-    if (identified?.model) params.model = identified.model;
+    if (identified?.model ?? state.productModel) params.model = (identified?.model ?? state.productModel)!;
+    if (identified?.color ?? state.productColor) params.color = (identified?.color ?? state.productColor)!;
 
     // Captured photo — will be auto-added as hero in edit screen
     if (state.photoUri) params.photoUri = state.photoUri;
@@ -786,6 +826,7 @@ export default function BarcodeScannerScreen() {
               onEdit={openEditForm}
               onAddInventory={addToInventory}
               onResearch={continueToSearch}
+              onRefine={(q) => void searchManual(q, state.photoUri ?? undefined)}
               onSaveProduct={() => void saveProduct()}
               onCancelEdit={() => setEditing(false)}
             />

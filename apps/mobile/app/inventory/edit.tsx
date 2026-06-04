@@ -52,6 +52,7 @@ export default function EditInventoryScreen() {
     brand?: string;
     model?: string;
     category?: string;
+    color?: string;
     photoUri?: string;
     productIdentityId?: string;
     estimatedSalePrice?: string;
@@ -67,7 +68,7 @@ export default function EditInventoryScreen() {
   const [category, setCategory] = useState(params.category ?? '');
   const [brand, setBrand] = useState(params.brand ?? '');
   const [model, setModel] = useState(params.model ?? '');
-  const [color, setColor] = useState('');
+  const [color, setColor] = useState(params.color ?? '');
   const [sizeSystem, setSizeSystem] = useState('');
   const [sizeValue, setSizeValue] = useState('');
   const [attributes, setAttributes] = useState<AttributeMap>({});
@@ -283,12 +284,20 @@ export default function EditInventoryScreen() {
       const newPhoto: LocalPhoto = { uri: photoUri, isHero: photos.length === 0 };
       setPhotos((prev) => [...prev, newPhoto]);
 
-      // Pre-fill only fields that are currently empty and identified with confidence
+      // Pre-fill only fields that are currently empty (don't overwrite user input)
       if (identified.title && !title.trim()) setTitle(identified.title);
       if (identified.brand && !brand.trim()) setBrand(identified.brand);
       if (identified.model && !model.trim()) setModel(identified.model);
       if (identified.category && !category) setCategory(identified.category);
+      if (identified.color && !color.trim()) setColor(identified.color);
+      if (identified.condition && !condition) setCondition(identified.condition);
       if (identified.barcode && !barcode.trim()) setBarcode(identified.barcode);
+      // Estimated resale midpoint → sale price, if empty
+      if (!estimatedSalePrice.trim() && (identified.estimatedResaleLow || identified.estimatedResaleHigh)) {
+        const lo = identified.estimatedResaleLow ?? identified.estimatedResaleHigh!;
+        const hi = identified.estimatedResaleHigh ?? identified.estimatedResaleLow!;
+        setEstimatedSalePrice(String(Math.round((lo + hi) / 2)));
+      }
 
       haptics.success();
     } catch {
@@ -309,9 +318,29 @@ export default function EditInventoryScreen() {
       case 'brand': setBrand(value); break;
       case 'model': setModel(value); break;
       case 'category': setCategory(value); break;
+      case 'color': setColor(value); break;
+      case 'condition': setCondition(value); break;
       case 'barcode': setBarcode(value); break;
     }
     haptics.selection();
+  }
+
+  function applyAllIdentifyFields() {
+    const r = identifyResult;
+    if (!r) return;
+    if (r.title) setTitle(r.title);
+    if (r.brand) setBrand(r.brand);
+    if (r.model) setModel(r.model);
+    if (r.category) setCategory(r.category);
+    if (r.color) setColor(r.color);
+    if (r.condition) setCondition(r.condition);
+    if (r.barcode) setBarcode(r.barcode);
+    if (r.estimatedResaleLow || r.estimatedResaleHigh) {
+      const lo = r.estimatedResaleLow ?? r.estimatedResaleHigh!;
+      const hi = r.estimatedResaleHigh ?? r.estimatedResaleLow!;
+      setEstimatedSalePrice(String(Math.round((lo + hi) / 2)));
+    }
+    haptics.success();
   }
 
   function dismissIdentifyResult() {
@@ -460,8 +489,9 @@ export default function EditInventoryScreen() {
       {identifyResult ? (
         <IdentifyBanner
           result={identifyResult}
-          currentValues={{ title, brand, model, category, barcode }}
+          currentValues={{ title, brand, model, category, color, condition, barcode }}
           onApply={applyIdentifyField}
+          onApplyAll={applyAllIdentifyFields}
           onDismiss={dismissIdentifyResult}
         />
       ) : null}
@@ -862,6 +892,8 @@ const IDENTIFY_FIELDS: IdentifyField[] = [
   { key: 'brand', label: 'Brand', icon: 'pricetag-outline' },
   { key: 'model', label: 'Model', icon: 'barcode-outline' },
   { key: 'category', label: 'Category', icon: 'grid-outline' },
+  { key: 'color', label: 'Color', icon: 'color-palette-outline' },
+  { key: 'condition', label: 'Condition', icon: 'sparkles-outline' },
   { key: 'barcode', label: 'Barcode', icon: 'scan-outline' },
 ];
 
@@ -869,62 +901,90 @@ function IdentifyBanner({
   result,
   currentValues,
   onApply,
+  onApplyAll,
   onDismiss,
 }: {
   result: IdentifyResult;
   currentValues: Record<string, string>;
   onApply: (field: keyof IdentifyResult, value: string | null) => void;
+  onApplyAll: () => void;
   onDismiss: () => void;
 }) {
   const { colors: c, shadows: s } = useAppTheme();
   const detectedFields = IDENTIFY_FIELDS.filter((f) => result[f.key]);
+  const hasEstimate = result.estimatedResaleLow != null || result.estimatedResaleHigh != null;
+  const unappliedCount = detectedFields.filter((f) => currentValues[f.key]?.trim() !== String(result[f.key]).trim()).length;
 
   return (
     <View style={[styles.identifyBanner, { backgroundColor: c.surface, borderColor: c.accent, ...s.md }]}>
       <View style={styles.identifyHeader}>
         <View style={[styles.identifyIcon, { backgroundColor: c.accentLight }]}>
-          <Ionicons name="eye" size={18} color={c.accent} />
+          <Ionicons name="sparkles" size={18} color={c.accent} />
         </View>
         <View style={styles.identifyHeaderText}>
-          <Text variant="bodyBold">Photo Identification</Text>
+          <Text variant="bodyBold">AI Identification</Text>
           <StatusPill
             label={result.confidence === 'high' ? 'High confidence' : result.confidence === 'medium' ? 'Partial match' : 'Low confidence'}
             tone={result.confidence === 'high' ? 'success' : result.confidence === 'medium' ? 'warning' : 'neutral'}
             size="sm"
           />
         </View>
-        <Pressable onPress={onDismiss} hitSlop={8}>
+        <Pressable onPress={onDismiss} hitSlop={8} accessibilityLabel="Dismiss identification">
           <Ionicons name="close" size={22} color={c.textMuted} />
         </Pressable>
       </View>
 
-      {detectedFields.length > 0 ? (
-        <View style={styles.identifyFields}>
-          {detectedFields.map((field) => {
-            const value = result[field.key] as string;
-            const alreadySet = currentValues[field.key]?.trim() === value.trim();
-            return (
-              <View key={field.key} style={[styles.identifyField, { backgroundColor: alreadySet ? c.successLight : c.surfaceAlt }]}>
-                <Ionicons name={field.icon} size={16} color={alreadySet ? c.success : c.textSecondary} />
-                <View style={styles.identifyFieldText}>
-                  <Text variant="label" color={c.textMuted}>{field.label}</Text>
-                  <Text variant="bodyBold" numberOfLines={1}>{value}</Text>
-                </View>
-                {alreadySet ? (
-                  <Ionicons name="checkmark-circle" size={20} color={c.success} />
-                ) : (
-                  <Pressable
-                    onPress={() => onApply(field.key, value)}
-                    style={[styles.applyBtn, { backgroundColor: c.primary }]}
-                    hitSlop={4}
-                  >
-                    <Text variant="label" color={c.textInverse}>Apply</Text>
-                  </Pressable>
-                )}
-              </View>
-            );
-          })}
+      {/* Resale estimate — shown prominently when present */}
+      {hasEstimate ? (
+        <View style={[styles.identifyEstimate, { backgroundColor: c.accentLight }]}>
+          <Ionicons name="cash-outline" size={16} color={c.accent} />
+          <Text variant="caption" color={c.textSecondary} style={{ flex: 1 }}>Est. resale value</Text>
+          <Text variant="bodyBold" color={c.accent}>
+            {result.estimatedResaleLow != null ? `$${result.estimatedResaleLow}` : '?'} – {result.estimatedResaleHigh != null ? `$${result.estimatedResaleHigh}` : '?'}
+          </Text>
         </View>
+      ) : null}
+
+      {detectedFields.length > 0 ? (
+        <>
+          {unappliedCount > 1 ? (
+            <Pressable
+              onPress={onApplyAll}
+              style={[styles.applyAllBtn, { backgroundColor: c.primary }]}
+              accessibilityLabel={`Apply all ${unappliedCount} detected fields`}
+            >
+              <Ionicons name="checkmark-done-outline" size={18} color={c.textInverse} />
+              <Text variant="bodyBold" color={c.textInverse}>Apply All ({unappliedCount})</Text>
+            </Pressable>
+          ) : null}
+          <View style={styles.identifyFields}>
+            {detectedFields.map((field) => {
+              const value = result[field.key] as string;
+              const alreadySet = currentValues[field.key]?.trim() === value.trim();
+              return (
+                <View key={field.key} style={[styles.identifyField, { backgroundColor: alreadySet ? c.successLight : c.surfaceAlt }]}>
+                  <Ionicons name={field.icon} size={16} color={alreadySet ? c.success : c.textSecondary} />
+                  <View style={styles.identifyFieldText}>
+                    <Text variant="label" color={c.textMuted}>{field.label}</Text>
+                    <Text variant="bodyBold" numberOfLines={1}>{value}</Text>
+                  </View>
+                  {alreadySet ? (
+                    <Ionicons name="checkmark-circle" size={20} color={c.success} />
+                  ) : (
+                    <Pressable
+                      onPress={() => onApply(field.key, value)}
+                      style={[styles.applyBtn, { backgroundColor: c.primary }]}
+                      hitSlop={4}
+                      accessibilityLabel={`Apply ${field.label}: ${value}`}
+                    >
+                      <Text variant="label" color={c.textInverse}>Apply</Text>
+                    </Pressable>
+                  )}
+                </View>
+              );
+            })}
+          </View>
+        </>
       ) : (
         <View style={[styles.identifyEmpty, { backgroundColor: c.surfaceAlt }]}>
           <Ionicons name="information-circle-outline" size={16} color={c.textMuted} />
@@ -1154,6 +1214,22 @@ const styles = StyleSheet.create({
   applyBtn: {
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
+    borderRadius: radius.sm,
+  },
+  applyAllBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.md,
+    borderRadius: radius.md,
+  },
+  identifyEstimate: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
     borderRadius: radius.sm,
   },
   identifyEmpty: {

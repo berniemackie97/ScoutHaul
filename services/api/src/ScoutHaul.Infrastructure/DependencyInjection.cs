@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using ScoutHaul.Application.Services;
 using ScoutHaul.Infrastructure.Marketplace;
 using ScoutHaul.Infrastructure.Persistence;
+using ScoutHaul.Infrastructure.Vision;
 
 namespace ScoutHaul.Infrastructure;
 
@@ -27,8 +28,16 @@ public static class DependencyInjection
         services.AddHttpClient<IBarcodeLookupProvider, OpenFoodFactsBarcodeLookupProvider>(ConfigureJsonClient);
         services.AddHttpClient<IBarcodeLookupProvider, UpcItemDbLookupService>(ConfigureJsonClient);
 
-        // Vision — Google Cloud Vision for visual product identification
-        services.AddHttpClient<IVisionIdentificationService, GoogleCloudVisionService>(ConfigureJsonClient);
+        // Vision — Gemini multimodal is the primary product identifier (reasons about the
+        // item, returns specific name/brand/model/value). Cloud Vision adds reverse-image web
+        // matches. Composite orchestrates both. Gemini needs a longer timeout than JSON APIs.
+        services.AddHttpClient<IProductIdentifier, GeminiProductVisionService>(client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(30);
+            client.DefaultRequestHeaders.Add("Accept", "application/json");
+        });
+        services.AddHttpClient<IWebImageMatcher, GoogleCloudVisionMatcher>(ConfigureJsonClient);
+        services.AddScoped<IVisionIdentificationService, CompositeVisionIdentificationService>();
 
         // Marketplace pricing — tried in order. PriceCharting for collectibles (free token),
         // Keepa for Amazon price history, SerpApi for Google Shopping. All need API keys.
