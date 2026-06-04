@@ -7,6 +7,7 @@ namespace ScoutHaul.Infrastructure.Marketplace;
 internal sealed class CompositeMarketplaceLookupService(
     IBarcodeLookupService barcodeLookupService,
     IEnumerable<IMarketplacePricingProvider> providers,
+    IResaleEstimator resaleEstimator,
     ILogger<CompositeMarketplaceLookupService> logger) : IMarketplaceLookupService
 {
     public async Task<MarketplaceLookupResult> SearchByBarcodeAsync(string barcode, CancellationToken cancellationToken = default)
@@ -16,7 +17,17 @@ internal sealed class CompositeMarketplaceLookupService(
         string pricingQuery = BuildPricingQuery(cleanBarcode, product);
         var request = new MarketplacePricingRequest(pricingQuery, cleanBarcode, product);
         ProviderLookup providerLookup = await RunProviders(request, isBarcodeLookup: true, cancellationToken);
-        return BuildResult(cleanBarcode, product, providerLookup);
+
+        // No live comps but we know what the product is → AI resale estimate so the scan still
+        // surfaces a value. Only when the barcode actually resolved to a named product.
+        ResaleEstimate? estimate = null;
+        if (providerLookup.Listings.Count == 0 && !string.IsNullOrWhiteSpace(product?.Title))
+        {
+            string description = string.Join(' ', product.Brand, product.Title, product.Category).Trim();
+            estimate = await TryEstimateAsync(description, cancellationToken);
+        }
+
+        return BuildResult(cleanBarcode, product, providerLookup, estimate);
     }
 
     public async Task<MarketplaceLookupResult> SearchByKeywordAsync(string keyword, CancellationToken cancellationToken = default)
@@ -24,7 +35,31 @@ internal sealed class CompositeMarketplaceLookupService(
         string query = keyword.Trim();
         var request = new MarketplacePricingRequest(query, Barcode: null, Product: null);
         ProviderLookup providerLookup = await RunProviders(request, isBarcodeLookup: false, cancellationToken);
-        return BuildResult(query, product: null, providerLookup);
+
+        // Manual/keyword search with no comps → estimate from the query text. (Photo identify
+        // already carries its own vision estimate, so this mainly helps typed searches.)
+        ResaleEstimate? estimate = providerLookup.Listings.Count == 0
+            ? await TryEstimateAsync(query, cancellationToken)
+            : null;
+
+        return BuildResult(query, product: null, providerLookup, estimate);
+    }
+
+    private async Task<ResaleEstimate?> TryEstimateAsync(string description, CancellationToken cancellationToken)
+    {
+        if (!resaleEstimator.IsConfigured || string.IsNullOrWhiteSpace(description))
+        {
+            return null;
+        }
+        try
+        {
+            return await resaleEstimator.EstimateAsync(description, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Resale estimate failed for {Description}", description);
+            return null;
+        }
     }
 
     private async Task<ProviderLookup> RunProviders(
@@ -62,7 +97,8 @@ internal sealed class CompositeMarketplaceLookupService(
         return new ProviderLookup(Deduplicate(listings), providersUsed.Distinct().ToArray(), warnings.Distinct().ToArray());
     }
 
-    private static MarketplaceLookupResult BuildResult(string query, BarcodeLookupResult? product, ProviderLookup providerLookup)
+    private static MarketplaceLookupResult BuildResult(
+        string query, BarcodeLookupResult? product, ProviderLookup providerLookup, ResaleEstimate? estimate)
     {
         decimal[] prices = providerLookup.Listings
             .Where(listing => listing.Price > 0)
@@ -81,7 +117,11 @@ internal sealed class CompositeMarketplaceLookupService(
             ProductImageUrl: product?.ImageUrl,
             ProductCategory: product?.Category,
             ProvidersUsed: providerLookup.ProvidersUsed,
-            ProviderWarnings: providerLookup.Warnings);
+            ProviderWarnings: providerLookup.Warnings,
+            EstimatedResaleLow: estimate?.Low,
+            EstimatedResaleHigh: estimate?.High,
+            EstimateSource: estimate is not null ? "ai" : null,
+            EstimateRationale: estimate?.Rationale);
     }
 
     private static string BuildPricingQuery(string barcode, BarcodeLookupResult? product)

@@ -64,6 +64,24 @@ public sealed class CompositeMarketplaceLookupTests
             throw new HttpRequestException("Simulated failure");
     }
 
+    // Default: estimator disabled, so existing pricing assertions are unaffected.
+    private sealed class NoEstimator : IResaleEstimator
+    {
+        public bool IsConfigured => false;
+        public Task<ResaleEstimate?> EstimateAsync(string d, CancellationToken ct) => Task.FromResult<ResaleEstimate?>(null);
+    }
+
+    private sealed class StubEstimator(ResaleEstimate? estimate) : IResaleEstimator
+    {
+        public bool IsConfigured => true;
+        public int CallCount { get; private set; }
+        public Task<ResaleEstimate?> EstimateAsync(string d, CancellationToken ct)
+        {
+            CallCount++;
+            return Task.FromResult(estimate);
+        }
+    }
+
     private static MarketplaceListingDto MakeListing(
         string title, decimal price, string source = "eBay", string? itemUrl = null) =>
         new(title, price, null, null, itemUrl ?? $"https://example.com/{title}", "Used", source, false, null);
@@ -79,6 +97,7 @@ public sealed class CompositeMarketplaceLookupTests
         var barcodeLookup = new StubBarcodeLookupService(MakeProduct("123", "Ranch Cup", "Hidden Valley"));
         var provider = new StubPricingProvider("eBay", true);
         var sut = new CompositeMarketplaceLookupService(barcodeLookup, [provider],
+            new NoEstimator(),
             NullLogger<CompositeMarketplaceLookupService>.Instance);
 
         await sut.SearchByBarcodeAsync("123");
@@ -93,6 +112,7 @@ public sealed class CompositeMarketplaceLookupTests
         var barcodeLookup = new StubBarcodeLookupService(MakeProduct("123", "Ranch Cup", "Hidden Valley"));
         var provider = new StubPricingProvider("eBay", true);
         var sut = new CompositeMarketplaceLookupService(barcodeLookup, [provider],
+            new NoEstimator(),
             NullLogger<CompositeMarketplaceLookupService>.Instance);
 
         await sut.SearchByBarcodeAsync("123");
@@ -109,6 +129,7 @@ public sealed class CompositeMarketplaceLookupTests
         var barcodeLookup = new StubBarcodeLookupService(null);
         var provider = new StubPricingProvider("eBay", true);
         var sut = new CompositeMarketplaceLookupService(barcodeLookup, [provider],
+            new NoEstimator(),
             NullLogger<CompositeMarketplaceLookupService>.Instance);
 
         await sut.SearchByBarcodeAsync("070038643951");
@@ -124,6 +145,7 @@ public sealed class CompositeMarketplaceLookupTests
         var barcodeLookup = new StubBarcodeLookupService(
             MakeProduct("123", "Ranch Cup", "Hidden Valley"));
         var sut = new CompositeMarketplaceLookupService(barcodeLookup, [],
+            new NoEstimator(),
             NullLogger<CompositeMarketplaceLookupService>.Instance);
 
         MarketplaceLookupResult result = await sut.SearchByBarcodeAsync("123");
@@ -142,6 +164,7 @@ public sealed class CompositeMarketplaceLookupTests
             barcodeListings: [MakeListing("Amazon Item", 30.00m, "Amazon")]);
 
         var sut = new CompositeMarketplaceLookupService(barcodeLookup, [ebay, amazon],
+            new NoEstimator(),
             NullLogger<CompositeMarketplaceLookupService>.Instance);
 
         MarketplaceLookupResult result = await sut.SearchByBarcodeAsync("123");
@@ -164,6 +187,7 @@ public sealed class CompositeMarketplaceLookupTests
             ]);
 
         var sut = new CompositeMarketplaceLookupService(barcodeLookup, [provider],
+            new NoEstimator(),
             NullLogger<CompositeMarketplaceLookupService>.Instance);
 
         MarketplaceLookupResult result = await sut.SearchByBarcodeAsync("123");
@@ -178,6 +202,7 @@ public sealed class CompositeMarketplaceLookupTests
     {
         var barcodeLookup = new StubBarcodeLookupService(null);
         var sut = new CompositeMarketplaceLookupService(barcodeLookup, [],
+            new NoEstimator(),
             NullLogger<CompositeMarketplaceLookupService>.Instance);
 
         MarketplaceLookupResult result = await sut.SearchByBarcodeAsync("123");
@@ -197,6 +222,7 @@ public sealed class CompositeMarketplaceLookupTests
             barcodeListings: [MakeListing("Survived", 15.00m)]);
 
         var sut = new CompositeMarketplaceLookupService(barcodeLookup, [broken, good],
+            new NoEstimator(),
             NullLogger<CompositeMarketplaceLookupService>.Instance);
 
         MarketplaceLookupResult result = await sut.SearchByBarcodeAsync("123");
@@ -215,6 +241,7 @@ public sealed class CompositeMarketplaceLookupTests
             barcodeListings: [MakeListing("Should Appear", 10.00m)]);
 
         var sut = new CompositeMarketplaceLookupService(barcodeLookup, [unconfigured, configured],
+            new NoEstimator(),
             NullLogger<CompositeMarketplaceLookupService>.Instance);
 
         MarketplaceLookupResult result = await sut.SearchByBarcodeAsync("123");
@@ -233,6 +260,7 @@ public sealed class CompositeMarketplaceLookupTests
             barcodeListings: [MakeListing("Same Item", 20.00m, "eBay", "https://ebay.com/item/123")]);
 
         var sut = new CompositeMarketplaceLookupService(barcodeLookup, [p1, p2],
+            new NoEstimator(),
             NullLogger<CompositeMarketplaceLookupService>.Instance);
 
         MarketplaceLookupResult result = await sut.SearchByBarcodeAsync("123");
@@ -250,6 +278,7 @@ public sealed class CompositeMarketplaceLookupTests
             keywordListings: [MakeListing("Keyword Result", 12.00m)]);
 
         var sut = new CompositeMarketplaceLookupService(barcodeLookup, [provider],
+            new NoEstimator(),
             NullLogger<CompositeMarketplaceLookupService>.Instance);
 
         MarketplaceLookupResult result = await sut.SearchByKeywordAsync("ranch dressing cup");
@@ -267,6 +296,7 @@ public sealed class CompositeMarketplaceLookupTests
             keywordListings: [MakeListing("Keyword Hit", 10.00m)]);
 
         var sut = new CompositeMarketplaceLookupService(barcodeLookup, [provider],
+            new NoEstimator(),
             NullLogger<CompositeMarketplaceLookupService>.Instance);
 
         await sut.SearchByKeywordAsync("test query");
@@ -287,6 +317,7 @@ public sealed class CompositeMarketplaceLookupTests
             barcodeListings: [listing]);
 
         var sut = new CompositeMarketplaceLookupService(barcodeLookup, [provider],
+            new NoEstimator(),
             NullLogger<CompositeMarketplaceLookupService>.Instance);
 
         MarketplaceLookupResult result = await sut.SearchByBarcodeAsync("123");
@@ -306,11 +337,81 @@ public sealed class CompositeMarketplaceLookupTests
             ]);
 
         var sut = new CompositeMarketplaceLookupService(barcodeLookup, [provider],
+            new NoEstimator(),
             NullLogger<CompositeMarketplaceLookupService>.Instance);
 
         MarketplaceLookupResult result = await sut.SearchByBarcodeAsync("123");
 
         Assert.Equal(1, result.TotalResults); // zero-price excluded
         Assert.Equal(25.00m, result.AverageSoldPrice);
+    }
+
+    // ── AI resale estimate fallback ──────────────────────────────────
+
+    [Fact]
+    public async Task Barcode_with_no_comps_uses_ai_estimate_when_product_resolved()
+    {
+        var barcodeLookup = new StubBarcodeLookupService(MakeProduct("123", "Ranch Cup", "Hidden Valley"));
+        var estimator = new StubEstimator(new ResaleEstimate(8m, 15m, "Common kitchen item"));
+
+        var sut = new CompositeMarketplaceLookupService(barcodeLookup, [], // no pricing providers
+            estimator, NullLogger<CompositeMarketplaceLookupService>.Instance);
+
+        MarketplaceLookupResult result = await sut.SearchByBarcodeAsync("123");
+
+        Assert.Equal(1, estimator.CallCount);
+        Assert.Equal(8m, result.EstimatedResaleLow);
+        Assert.Equal(15m, result.EstimatedResaleHigh);
+        Assert.Equal("ai", result.EstimateSource);
+        Assert.Equal("Common kitchen item", result.EstimateRationale);
+        Assert.Null(result.AverageSoldPrice); // estimate does not masquerade as market data
+    }
+
+    [Fact]
+    public async Task Barcode_with_comps_does_not_call_estimator()
+    {
+        var barcodeLookup = new StubBarcodeLookupService(MakeProduct("123", "Ranch Cup"));
+        var estimator = new StubEstimator(new ResaleEstimate(8m, 15m, null));
+        var provider = new StubPricingProvider("eBay", true, barcodeListings: [MakeListing("Cup", 12m)]);
+
+        var sut = new CompositeMarketplaceLookupService(barcodeLookup, [provider],
+            estimator, NullLogger<CompositeMarketplaceLookupService>.Instance);
+
+        MarketplaceLookupResult result = await sut.SearchByBarcodeAsync("123");
+
+        Assert.Equal(0, estimator.CallCount); // market data present → no estimate
+        Assert.Null(result.EstimateSource);
+        Assert.Equal(12m, result.AverageSoldPrice);
+    }
+
+    [Fact]
+    public async Task Barcode_with_no_product_does_not_estimate()
+    {
+        var barcodeLookup = new StubBarcodeLookupService(null); // unresolved barcode
+        var estimator = new StubEstimator(new ResaleEstimate(8m, 15m, null));
+
+        var sut = new CompositeMarketplaceLookupService(barcodeLookup, [],
+            estimator, NullLogger<CompositeMarketplaceLookupService>.Instance);
+
+        MarketplaceLookupResult result = await sut.SearchByBarcodeAsync("999999999");
+
+        Assert.Equal(0, estimator.CallCount); // nothing to estimate from a bare barcode
+        Assert.Null(result.EstimateSource);
+    }
+
+    [Fact]
+    public async Task Keyword_with_no_comps_estimates_from_query()
+    {
+        var barcodeLookup = new StubBarcodeLookupService(null);
+        var estimator = new StubEstimator(new ResaleEstimate(40m, 90m, "Used furniture"));
+
+        var sut = new CompositeMarketplaceLookupService(barcodeLookup, [],
+            estimator, NullLogger<CompositeMarketplaceLookupService>.Instance);
+
+        MarketplaceLookupResult result = await sut.SearchByKeywordAsync("wooden rocking chair");
+
+        Assert.Equal(1, estimator.CallCount);
+        Assert.Equal(40m, result.EstimatedResaleLow);
+        Assert.Equal("ai", result.EstimateSource);
     }
 }

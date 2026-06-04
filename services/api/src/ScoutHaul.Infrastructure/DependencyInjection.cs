@@ -39,6 +39,14 @@ public static class DependencyInjection
         services.AddHttpClient<IWebImageMatcher, GoogleCloudVisionMatcher>(ConfigureJsonClient);
         services.AddScoped<IVisionIdentificationService, CompositeVisionIdentificationService>();
 
+        // Text-only resale estimator (Gemini) — gives barcode/keyword lookups a value estimate
+        // when no live marketplace comps exist. Reuses the Gemini key.
+        services.AddHttpClient<IResaleEstimator, GeminiResaleEstimator>(client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(20);
+            client.DefaultRequestHeaders.Add("Accept", "application/json");
+        });
+
         // Marketplace pricing — tried in order. PriceCharting for collectibles (free token),
         // Keepa for Amazon price history, SerpApi for Google Shopping. All need API keys.
         services.AddScoped<IMarketplaceLookupService, CompositeMarketplaceLookupService>();

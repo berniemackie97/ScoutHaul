@@ -25,6 +25,7 @@ export type ScanDoneState = {
   lowPrice: number | null;
   highPrice: number | null;
   priceSource: 'market' | 'estimate' | null;
+  priceRationale: string | null;
   totalResults: number;
   error: string | null;
   productTitle: string | null;
@@ -64,6 +65,7 @@ export function makeDoneError(query: string, error: unknown, webMatches: WebMatc
     lowPrice: null,
     highPrice: null,
     priceSource: null,
+    priceRationale: null,
     totalResults: 0,
     error: error instanceof Error ? error.message : 'Search failed',
     productTitle: null,
@@ -99,11 +101,11 @@ export function makeDoneFromResult(
   webMatches: WebMatch[] = [],
   v?: VisionOverrides,
 ): ScanDoneState {
-  // Real marketplace data wins. Otherwise fall back to Gemini's resale estimate so the
-  // user always sees a value, even with no marketplace providers configured.
+  // Real marketplace data wins. Otherwise fall back to an AI resale estimate so the user always
+  // sees a value. Estimate source priority: server (barcode/keyword) → vision override (photo).
   const hasMarket = (result.averageSoldPrice ?? null) != null;
-  const estLow = v?.estimatedResaleLow ?? null;
-  const estHigh = v?.estimatedResaleHigh ?? null;
+  const estLow = result.estimatedResaleLow ?? v?.estimatedResaleLow ?? null;
+  const estHigh = result.estimatedResaleHigh ?? v?.estimatedResaleHigh ?? null;
   const hasEstimate = estLow != null || estHigh != null;
   const estMid = hasEstimate ? Math.round((((estLow ?? estHigh)! + (estHigh ?? estLow)!) / 2)) : null;
 
@@ -111,6 +113,7 @@ export function makeDoneFromResult(
   const lowPrice = hasMarket ? (result.lowestPrice ?? null) : estLow;
   const highPrice = hasMarket ? (result.highestPrice ?? null) : estHigh;
   const priceSource: ScanDoneState['priceSource'] = hasMarket ? 'market' : hasEstimate ? 'estimate' : null;
+  const priceRationale = !hasMarket && hasEstimate ? (result.estimateRationale ?? null) : null;
 
   return {
     phase: 'done',
@@ -120,6 +123,7 @@ export function makeDoneFromResult(
     avgPrice,
     lowPrice,
     highPrice,
+    priceRationale,
     priceSource,
     totalResults: result.totalResults,
     error: null,

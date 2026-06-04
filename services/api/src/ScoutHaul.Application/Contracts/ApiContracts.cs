@@ -312,7 +312,19 @@ public sealed record MarketplaceLookupResult(
     Guid? ProductIdentityId = null,
     int SavedObservationCount = 0,
     IReadOnlyList<string>? ProvidersUsed = null,
-    IReadOnlyList<string>? ProviderWarnings = null);
+    IReadOnlyList<string>? ProviderWarnings = null,
+    // AI resale estimate — filled when no live marketplace data is available, so barcode and
+    // keyword lookups still surface a value (parity with photo identification).
+    decimal? EstimatedResaleLow = null,
+    decimal? EstimatedResaleHigh = null,
+    string? EstimateSource = null,
+    string? EstimateRationale = null);
+
+/// <summary>AI-generated used-resale price estimate for a product (text-only, no live comps).</summary>
+public sealed record ResaleEstimate(
+    decimal Low,
+    decimal High,
+    string? Rationale);
 
 public sealed record CreateSourcingTripRequest(
     string Name,

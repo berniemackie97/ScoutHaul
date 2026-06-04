@@ -159,7 +159,7 @@ export function ScanResults({
                 </Text>
               </View>
               <Text variant="label" color={c.textMuted}>
-                Estimated from the photo · confirm with comps
+                {state.priceRationale ?? 'AI estimate · confirm with comps'}
               </Text>
             </View>
           ) : (

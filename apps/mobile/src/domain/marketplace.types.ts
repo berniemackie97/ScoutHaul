@@ -131,6 +131,11 @@ export type MarketplaceLookupResult = {
   savedObservationCount: number;
   providersUsed?: string[] | null;
   providerWarnings?: string[] | null;
+  // AI resale estimate — present when no live comps were available.
+  estimatedResaleLow?: number | null;
+  estimatedResaleHigh?: number | null;
+  estimateSource?: string | null;
+  estimateRationale?: string | null;
 };
 
 export type BarcodeLookupResult = {
