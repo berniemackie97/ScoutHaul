@@ -4,6 +4,7 @@ using ScoutHaul.Api.Authorization;
 using ScoutHaul.Api.Mapping;
 using ScoutHaul.Api.Services;
 using ScoutHaul.Application.Contracts;
+using static ScoutHaul.Api.Helpers.StringHelpers;
 using ScoutHaul.Domain;
 using ScoutHaul.Domain.Entities;
 using ScoutHaul.Infrastructure.Persistence;
@@ -373,7 +374,7 @@ public sealed class SourcingTripsController(ScoutHaulDbContext db, ICurrentUserC
     [HttpPost("{id:guid}/stops/{stopId:guid}/navigate")]
     public async Task<ActionResult<SourcingRouteDetailDto>> NavigateStop(Guid id, Guid stopId, CancellationToken cancellationToken)
     {
-        var trip = await LoadRoute(id, cancellationToken);
+        var trip = await LoadRouteSlim(id, cancellationToken);
         var stop = FindStop(trip, stopId);
 
         if (trip is null || stop is null)
@@ -390,7 +391,7 @@ public sealed class SourcingTripsController(ScoutHaulDbContext db, ICurrentUserC
     [HttpPost("{id:guid}/stops/{stopId:guid}/arrive")]
     public async Task<ActionResult<SourcingRouteDetailDto>> ArriveAtStop(Guid id, Guid stopId, CancellationToken cancellationToken)
     {
-        var trip = await LoadRoute(id, cancellationToken);
+        var trip = await LoadRouteSlim(id, cancellationToken);
         var stop = FindStop(trip, stopId);
 
         if (trip is null || stop is null)
@@ -408,7 +409,7 @@ public sealed class SourcingTripsController(ScoutHaulDbContext db, ICurrentUserC
     [HttpPost("{id:guid}/stops/{stopId:guid}/complete")]
     public async Task<ActionResult<SourcingRouteDetailDto>> CompleteStop(Guid id, Guid stopId, CompleteSourcingStopRequest request, CancellationToken cancellationToken)
     {
-        var trip = await LoadRoute(id, cancellationToken);
+        var trip = await LoadRouteSlim(id, cancellationToken);
         var stop = FindStop(trip, stopId);
 
         if (trip is null || stop is null)
@@ -440,7 +441,7 @@ public sealed class SourcingTripsController(ScoutHaulDbContext db, ICurrentUserC
     [HttpPost("{id:guid}/stops/{stopId:guid}/skip")]
     public async Task<ActionResult<SourcingRouteDetailDto>> SkipStop(Guid id, Guid stopId, SkipSourcingStopRequest request, CancellationToken cancellationToken)
     {
-        var trip = await LoadRoute(id, cancellationToken);
+        var trip = await LoadRouteSlim(id, cancellationToken);
         var stop = FindStop(trip, stopId);
 
         if (trip is null || stop is null)
@@ -504,7 +505,7 @@ public sealed class SourcingTripsController(ScoutHaulDbContext db, ICurrentUserC
         UpdateChecklistItemRequest request,
         CancellationToken cancellationToken)
     {
-        var trip = await LoadRoute(id, cancellationToken);
+        var trip = await LoadRouteSlim(id, cancellationToken);
         var stop = FindStop(trip, stopId);
         var checklistItem = stop?.ChecklistItems.SingleOrDefault(item => item.Id == checklistItemId);
 
@@ -527,6 +528,16 @@ public sealed class SourcingTripsController(ScoutHaulDbContext db, ICurrentUserC
             .Include(item => item.Items)
             .Include(item => item.Stops)
                 .ThenInclude(item => item.Items)
+            .Include(item => item.Stops)
+                .ThenInclude(item => item.ChecklistItems)
+            .SingleOrDefaultAsync(cancellationToken);
+
+    /// <summary>
+    /// Lightweight route load that skips inventory items on both the trip and its stops.
+    /// Use for actions that only need stops and their checklists (navigate, arrive, complete, skip, checklist-update).
+    /// </summary>
+    private Task<SourcingTrip?> LoadRouteSlim(Guid id, CancellationToken cancellationToken) =>
+        FindTrip(id)
             .Include(item => item.Stops)
                 .ThenInclude(item => item.ChecklistItems)
             .SingleOrDefaultAsync(cancellationToken);
@@ -739,5 +750,4 @@ public sealed class SourcingTripsController(ScoutHaulDbContext db, ICurrentUserC
             ]
         };
 
-    private static string? TrimToNull(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }

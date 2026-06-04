@@ -9,6 +9,7 @@ public sealed class RequireOrganizationPermissionAttribute(string permission) : 
     public async Task OnAuthorizationAsync(AuthorizationFilterContext context)
     {
         var currentUser = context.HttpContext.RequestServices.GetRequiredService<ICurrentUserContext>();
+        await currentUser.ResolveAsync();
         var access = context.HttpContext.RequestServices.GetRequiredService<OrganizationAccessService>();
         await access.RequirePermission(currentUser.OrganizationId, permission, context.HttpContext.RequestAborted);
     }

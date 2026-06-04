@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Text } from './Text';
 import { radius, spacing, type ColorPalette } from './theme';
@@ -53,8 +54,8 @@ export function DecisionCard({
   pricingBasis,
   warnings,
 }: DecisionCardProps) {
-  const { colors: c, shadows: s } = useAppTheme();
-  const themes = buildDecisionThemes(c);
+  const { colors: c, shadows: s, isDark } = useAppTheme();
+  const themes = useMemo(() => buildDecisionThemes(c), [isDark]);
   const theme = themes[decision];
   const hasProfit = expectedNetProfit !== null && expectedNetProfit !== undefined;
 

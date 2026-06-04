@@ -81,6 +81,15 @@ export const marketplaceApi = {
 
   visionIdentify: (imageBase64: string) =>
     apiRequest<VisionIdentifyResult>('/api/vision/identify', { method: 'POST', body: { imageBase64 } }),
+
+  providerStatus: () =>
+    apiRequest<MarketplaceProviderStatus>('/api/marketplace-lookup/status'),
+};
+
+export type MarketplaceProviderStatus = {
+  configuredProviders: string[];
+  hasProviders: boolean;
+  visionConfigured: boolean;
 };
 
 export type VisionIdentifyResult = {

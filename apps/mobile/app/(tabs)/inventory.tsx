@@ -14,12 +14,13 @@ import { SkeletonList } from '../../src/components/Skeleton';
 import { StatusPill } from '../../src/components/StatusPill';
 import { Text } from '../../src/components/Text';
 import { TextField } from '../../src/components/TextField';
-import { radius, spacing, type ToneKey } from '../../src/components/theme';
+import { radius, spacing } from '../../src/components/theme';
 import { useAppTheme } from '../../src/context/ThemeContext';
 import type { InventoryItem, InventoryStatus } from '../../src/domain/types';
 import { formatMoney } from '../../src/utils/money';
 import { getHeroPhoto } from '../../src/utils/photos';
 import { resolvePhotoUrl } from '../../src/utils/photoUrl';
+import { statusTone } from '../../src/utils/statusTone';
 
 type StatusFilter = 'All' | 'Active' | 'NeedsWork' | 'Listed' | 'Sold';
 
@@ -35,13 +36,6 @@ const needsWorkStatuses: InventoryStatus[] = [
   'NeedsCleaning', 'NeedsTesting', 'NeedsPhotos', 'ReadyToList', 'Researching',
 ];
 
-function statusTone(status: InventoryStatus): ToneKey {
-  if (status === 'Sold' || status === 'Delivered') return 'success';
-  if (status === 'Listed') return 'info';
-  if (needsWorkStatuses.includes(status)) return 'warning';
-  if (status === 'Draft' || status === 'Watchlist') return 'neutral';
-  return 'neutral';
-}
 
 function formatStatus(status: InventoryStatus): string {
   const map: Partial<Record<InventoryStatus, string>> = {
@@ -53,21 +47,28 @@ function formatStatus(status: InventoryStatus): string {
   return map[status] ?? status;
 }
 
-function useHeroUri(item: InventoryItem) {
-  const [uri, setUri] = useState<string | null>(null);
-  useEffect(() => {
-    const typedHero = item.photos?.find((photo) => photo.isHero) ?? item.photos?.[0];
-    const remoteHero = resolvePhotoUrl(
-      item.heroPhotoThumbnailUrl ?? typedHero?.thumbnailUrl ?? item.photoUrls?.[0],
-    );
-    if (remoteHero) {
-      setUri(remoteHero);
-      return;
-    }
+// Shared cache for local hero photo URIs — survives across renders, prevents DB thrash
+const heroUriCache = new Map<string, string | null>();
 
-    void getHeroPhoto(item.id).then(setUri);
-  }, [item.id, item.heroPhotoThumbnailUrl, item.photoUrls, item.photos]);
-  return uri;
+function useHeroUri(item: InventoryItem) {
+  // Fast path: resolve from API data synchronously (no DB call needed)
+  const typedHero = item.photos?.find((photo) => photo.isHero) ?? item.photos?.[0];
+  const remoteHero = resolvePhotoUrl(
+    item.heroPhotoThumbnailUrl ?? typedHero?.thumbnailUrl ?? item.photoUrls?.[0],
+  );
+  const [localUri, setLocalUri] = useState<string | null>(() => heroUriCache.get(item.id) ?? null);
+
+  useEffect(() => {
+    if (remoteHero) return; // remote available, skip local lookup
+    if (heroUriCache.has(item.id)) { setLocalUri(heroUriCache.get(item.id)!); return; }
+
+    void getHeroPhoto(item.id).then((uri) => {
+      heroUriCache.set(item.id, uri);
+      setLocalUri(uri);
+    });
+  }, [item.id, remoteHero]);
+
+  return remoteHero ?? localUri;
 }
 
 function ItemCard({
@@ -215,17 +216,19 @@ export default function InventoryListScreen() {
     return result;
   }, [items, filter, search]);
 
-  const renderItem = useCallback(({ item }: { item: InventoryItem }) => (
-    <View style={styles.listItem}>
-      <ItemCard
-        item={item}
-        onPress={() => router.push(`/inventory/${item.id}`)}
-        onAnalyze={() => router.push({ pathname: '/deal-analyzer', params: { inventoryItemId: item.id } })}
-        onCreateListing={() => void createDraftListing(item)}
-        onArchive={() => confirmArchiveItem(item)}
-      />
-    </View>
-  ), [c]);
+  function renderItem({ item }: { item: InventoryItem }) {
+    return (
+      <View style={styles.listItem}>
+        <ItemCard
+          item={item}
+          onPress={() => router.push(`/inventory/${item.id}`)}
+          onAnalyze={() => router.push({ pathname: '/deal-analyzer', params: { inventoryItemId: item.id } })}
+          onCreateListing={() => void createDraftListing(item)}
+          onArchive={() => confirmArchiveItem(item)}
+        />
+      </View>
+    );
+  }
 
   const listHeader = useMemo(() => (
     <View style={styles.listHeader}>

@@ -6,6 +6,7 @@ using ScoutHaul.Api.Services;
 using ScoutHaul.Application.Contracts;
 using ScoutHaul.Domain.Entities;
 using ScoutHaul.Infrastructure.Persistence;
+using static ScoutHaul.Api.Helpers.StringHelpers;
 
 namespace ScoutHaul.Api.Controllers;
 
@@ -73,13 +74,13 @@ public sealed class ProductIdentitiesController(ScoutHaulDbContext db, ICurrentU
 
         if (!string.IsNullOrWhiteSpace(search))
         {
-            var normalized = search.Trim().ToLowerInvariant();
+            var pattern = $"%{search.Trim()}%";
             query = query.Where(item =>
-                item.Title.ToLower().Contains(normalized)
-                || (item.Brand != null && item.Brand.ToLower().Contains(normalized))
-                || (item.Model != null && item.Model.ToLower().Contains(normalized))
-                || (item.Upc != null && item.Upc.ToLower().Contains(normalized))
-                || (item.SearchQuery != null && item.SearchQuery.ToLower().Contains(normalized)));
+                EF.Functions.ILike(item.Title, pattern)
+                || (item.Brand != null && EF.Functions.ILike(item.Brand, pattern))
+                || (item.Model != null && EF.Functions.ILike(item.Model, pattern))
+                || (item.Upc != null && EF.Functions.ILike(item.Upc, pattern))
+                || (item.SearchQuery != null && EF.Functions.ILike(item.SearchQuery, pattern)));
         }
 
         var products = await query
@@ -122,5 +123,4 @@ public sealed class ProductIdentitiesController(ScoutHaulDbContext db, ICurrentU
         product.DataSource = "user"; // user-submitted = trusted, overrides external API data
     }
 
-    private static string? TrimToNull(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }

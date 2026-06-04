@@ -3,6 +3,7 @@ using ScoutHaul.Api.Authorization;
 using ScoutHaul.Api.Services;
 using ScoutHaul.Application.Contracts;
 using ScoutHaul.Application.Services;
+using ScoutHaul.Infrastructure.Marketplace;
 
 namespace ScoutHaul.Api.Controllers;
 
@@ -11,8 +12,9 @@ namespace ScoutHaul.Api.Controllers;
 [RequireOrganizationPermission(ScoutHaulPermissions.ManageInventory)]
 public sealed class MarketplaceLookupController(
     IMarketplaceLookupService lookupService,
-    IBarcodeLookupService barcodeLookupService,
-    MarketplaceLookupPersistenceService persistenceService) : ControllerBase
+    MarketplaceLookupPersistenceService persistenceService,
+    IEnumerable<IMarketplacePricingProvider> pricingProviders,
+    IVisionIdentificationService visionService) : ControllerBase
 {
     /// <summary>
     /// Lookup barcode: runs product identification, pricing providers, and saves reusable comp observations.
@@ -41,22 +43,24 @@ public sealed class MarketplaceLookupController(
     }
 
     /// <summary>
-    /// Product identification only (no pricing). Uses the configured barcode provider chain.
+    /// Returns the configured and available marketplace pricing providers and vision service status.
     /// </summary>
-    [HttpGet("product/{barcode}")]
-    public async Task<ActionResult<BarcodeLookupResult>> LookupProduct(string barcode, CancellationToken cancellationToken)
+    [HttpGet("status")]
+    public ActionResult<MarketplaceProviderStatusDto> Status()
     {
-        if (string.IsNullOrWhiteSpace(barcode))
-        {
-            return BadRequest("Barcode is required.");
-        }
+        var configuredProviders = pricingProviders
+            .Where(provider => provider.IsConfigured)
+            .Select(provider => provider.Name)
+            .ToList();
 
-        var result = await barcodeLookupService.LookupAsync(barcode, cancellationToken);
-        if (result is null)
-        {
-            return NotFound("No product found for this barcode.");
-        }
-
-        return result;
+        return new MarketplaceProviderStatusDto(
+            configuredProviders,
+            configuredProviders.Count > 0,
+            visionService.IsConfigured);
     }
 }
+
+public sealed record MarketplaceProviderStatusDto(
+    IReadOnlyList<string> ConfiguredProviders,
+    bool HasProviders,
+    bool HasVisionService);

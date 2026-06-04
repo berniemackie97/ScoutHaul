@@ -6,8 +6,7 @@ export { sourcingApi } from './sourcing';
 export { commerceApi } from './commerce';
 export { tasksApi } from './tasks';
 
-// Backward-compatible `api` object for incremental migration.
-// New code should import domain-specific APIs directly.
+// Unified API surface. All screens import from this object.
 import { inventoryApi } from './inventory';
 import { organizationApi } from './organization';
 import { marketplaceApi } from './marketplace';
@@ -74,6 +73,7 @@ export const api = {
   comps: marketplaceApi.comps,
   analyze: marketplaceApi.analyze,
   visionIdentify: marketplaceApi.visionIdentify,
+  providerStatus: marketplaceApi.providerStatus,
 
   // Sourcing
   trips: sourcingApi.trips,

@@ -16,32 +16,61 @@ public sealed class DashboardController(ScoutHaulDbContext db, ICurrentUserConte
     [HttpGet("summary")]
     public async Task<ActionResult<DashboardSummaryDto>> Summary(CancellationToken cancellationToken)
     {
-        var inventory = await db.InventoryItems
-            .Where(item => item.OrganizationId == currentUser.OrganizationId && !item.IsArchived)
-            .ToListAsync(cancellationToken);
+        Guid organizationId = currentUser.OrganizationId;
 
-        var listings = await db.Listings
-            .Where(item => item.OrganizationId == currentUser.OrganizationId)
-            .ToListAsync(cancellationToken);
+        var currentInventoryStatuses = new[]
+        {
+            InventoryStatus.Draft,
+            InventoryStatus.Researching,
+            InventoryStatus.Watchlist,
+            InventoryStatus.Purchased,
+            InventoryStatus.NeedsCleaning,
+            InventoryStatus.NeedsTesting,
+            InventoryStatus.NeedsPhotos,
+            InventoryStatus.ReadyToList,
+            InventoryStatus.Listed,
+            InventoryStatus.Packed
+        };
 
-        var sales = await db.Sales
-            .Where(item => item.OrganizationId == currentUser.OrganizationId)
-            .ToListAsync(cancellationToken);
+        var unlistedStatuses = new[]
+        {
+            InventoryStatus.Purchased,
+            InventoryStatus.NeedsCleaning,
+            InventoryStatus.NeedsTesting,
+            InventoryStatus.NeedsPhotos,
+            InventoryStatus.ReadyToList
+        };
 
-        var currentInventory = inventory.Where(item => InventoryStatusRules.IsCurrentInventory(item.Status)).ToList();
+        var currentInventoryQuery = db.InventoryItems
+            .Where(item => item.OrganizationId == organizationId && !item.IsArchived && currentInventoryStatuses.Contains(item.Status));
 
         var staleCutoff = DateTimeOffset.UtcNow.AddDays(-60);
-        var staleInventoryCount = currentInventory.Count(item => item.CreatedAt <= staleCutoff && item.Status != InventoryStatus.Listed);
+
+        var currentInventoryCountTask = currentInventoryQuery.CountAsync(cancellationToken);
+        var activeListingsCountTask = db.Listings.CountAsync(item => item.OrganizationId == organizationId && item.Status == ListingStatus.Active, cancellationToken);
+        var totalInventoryCostTask = currentInventoryQuery.SumAsync(item => (decimal?)(item.PurchasePrice ?? 0) ?? 0, cancellationToken);
+        var estimatedInventoryValueTask = currentInventoryQuery.SumAsync(item => (decimal?)(item.EstimatedSalePrice ?? 0) ?? 0, cancellationToken);
+        var grossSalesTask = db.Sales.Where(item => item.OrganizationId == organizationId).SumAsync(item => (decimal?)item.SoldPrice ?? 0, cancellationToken);
+        var netProfitTask = db.Sales.Where(item => item.OrganizationId == organizationId).SumAsync(item => (decimal?)item.NetProfit ?? 0, cancellationToken);
+        var cashDeployedTask = currentInventoryQuery.SumAsync(item => (decimal?)(item.PurchasePrice ?? item.SellerAskingPrice ?? 0) ?? 0, cancellationToken);
+        var unlistedCountTask = currentInventoryQuery.CountAsync(item => unlistedStatuses.Contains(item.Status), cancellationToken);
+        var staleCountTask = currentInventoryQuery.CountAsync(item => item.CreatedAt <= staleCutoff && item.Status != InventoryStatus.Listed, cancellationToken);
+
+        await Task.WhenAll(
+            currentInventoryCountTask, activeListingsCountTask,
+            totalInventoryCostTask, estimatedInventoryValueTask,
+            grossSalesTask, netProfitTask, cashDeployedTask,
+            unlistedCountTask, staleCountTask);
 
         return new DashboardSummaryDto(
-            currentInventory.Count,
-            listings.Count(item => item.Status == ListingStatus.Active),
-            currentInventory.Sum(item => item.PurchasePrice ?? 0),
-            currentInventory.Sum(item => item.EstimatedSalePrice ?? 0),
-            sales.Sum(item => item.SoldPrice),
-            sales.Sum(item => item.NetProfit),
-            currentInventory.Sum(item => item.PurchasePrice ?? item.SellerAskingPrice ?? 0),
-            currentInventory.Count(item => InventoryStatusRules.IsUnlistedInventory(item.Status)),
-            staleInventoryCount);
+            await currentInventoryCountTask,
+            await activeListingsCountTask,
+            await totalInventoryCostTask,
+            await estimatedInventoryValueTask,
+            await grossSalesTask,
+            await netProfitTask,
+            await cashDeployedTask,
+            await unlistedCountTask,
+            await staleCountTask);
     }
 }

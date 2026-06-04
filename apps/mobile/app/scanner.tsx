@@ -65,6 +65,14 @@ export default function BarcodeScannerScreen() {
   const [capturedPhotoUri, setCapturedPhotoUri] = useState<string | null>(null);
   const [showCaptureOverlay, setShowCaptureOverlay] = useState(false);
   const identifyResultRef = useRef<IdentifyResult | null>(null);
+  const hasProvidersRef = useRef<boolean | null>(null);
+
+  // Check provider status once on mount — cached for session
+  useEffect(() => {
+    api.providerStatus()
+      .then((s) => { hasProvidersRef.current = s.hasProviders; })
+      .catch(() => { hasProvidersRef.current = false; });
+  }, []);
   const insets = useSafeAreaInsets();
   const isScanning = state.phase === 'scanning';
   const isPhotoMode = mode === 'photo-identify';
@@ -127,7 +135,17 @@ export default function BarcodeScannerScreen() {
     }).start();
   }, [shutterFlash]);
 
-  // ── Marketplace search — tries primary, retries with alternates if providers exist ──
+  // ── Build empty marketplace result shell (no API call needed) ──
+  function makeEmptyResult(query: string): import('../src/domain/types').MarketplaceLookupResult {
+    return {
+      query, listings: [], totalResults: 0,
+      averageSoldPrice: null, lowestPrice: null, highestPrice: null,
+      productTitle: null, productBrand: null, productImageUrl: null, productCategory: null,
+      productIdentityId: null, savedObservationCount: 0, providersUsed: [], providerWarnings: [],
+    };
+  }
+
+  // ── Marketplace search — skips entirely when no providers configured ──
   async function searchWithRetry(
     primary: string,
     alternates: string[],
@@ -135,35 +153,29 @@ export default function BarcodeScannerScreen() {
     webMatches: WebMatch[],
     overrides?: VisionOverrides,
   ) {
+    // No providers → skip API call entirely, go straight to results with Vision data
+    if (hasProvidersRef.current === false) {
+      setState(makeDoneFromResult(primary, makeEmptyResult(primary), photoUri, webMatches, overrides));
+      return;
+    }
+
     setState({ phase: 'searching', barcode: primary, photoUri, step: 'Searching marketplaces...' });
 
     // Try primary query
     let primaryResult: Awaited<ReturnType<typeof api.lookupSearch>> | null = null;
     try {
       primaryResult = await api.lookupSearch(primary);
-      if (primaryResult.totalResults > 0 || primaryResult.productTitle) {
-        setState(makeDoneFromResult(primary, primaryResult, photoUri, webMatches, overrides));
-        return;
-      }
-      // No providers configured → skip retries, show Vision results immediately
-      if (!primaryResult.providersUsed?.length) {
+      if (primaryResult.totalResults > 0 || primaryResult.productTitle || !primaryResult.providersUsed?.length) {
         setState(makeDoneFromResult(primary, primaryResult, photoUri, webMatches, overrides));
         return;
       }
     } catch {
-      // API call failed (auth, network) — show Vision-only results
-      setState({
-        ...makeDoneError(primary, null, webMatches),
-        error: null, // suppress error — Vision results are still useful
-        productTitle: overrides?.title ?? null,
-        productBrand: overrides?.brand ?? null,
-        productCategory: overrides?.category ?? null,
-        photoUri,
-      });
+      // API failed — show Vision-only results
+      setState(makeDoneFromResult(primary, makeEmptyResult(primary), photoUri, webMatches, overrides));
       return;
     }
 
-    // Providers exist but returned nothing — retry with alternate queries
+    // Providers exist but returned nothing — retry with alternates
     for (const alt of alternates) {
       setState({ phase: 'searching', barcode: alt, photoUri, step: `Trying "${alt.slice(0, 30)}${alt.length > 30 ? '...' : ''}"` });
       try {
@@ -172,10 +184,9 @@ export default function BarcodeScannerScreen() {
           setState(makeDoneFromResult(alt, result, photoUri, webMatches, overrides));
           return;
         }
-      } catch { /* continue to next */ }
+      } catch { /* continue */ }
     }
 
-    // All queries exhausted — show primary result with Vision data
     setState(makeDoneFromResult(primary, primaryResult, photoUri, webMatches, overrides));
   }
 
@@ -260,6 +271,13 @@ export default function BarcodeScannerScreen() {
       ? { brand: identified.brand, category: identified.category, title: identified.title }
       : undefined;
     setCapturedPhotoUri(photoUri ?? null);
+
+    // No providers → skip API call
+    if (hasProvidersRef.current === false) {
+      setState(makeDoneFromResult(q, makeEmptyResult(q), photoUri, webMatches, overrides));
+      return;
+    }
+
     setState({ phase: 'searching', barcode: q, photoUri, step: 'Searching marketplaces...' });
     try {
       const result = await api.lookupSearch(q);
@@ -283,15 +301,7 @@ export default function BarcodeScannerScreen() {
       }
       setState(makeDoneFromResult(q, result, photoUri, webMatches, overrides));
     } catch {
-      // API failed — show Vision-only results
-      setState({
-        ...makeDoneError(q, null, webMatches),
-        error: null,
-        productTitle: overrides?.title ?? null,
-        productBrand: overrides?.brand ?? null,
-        productCategory: overrides?.category ?? null,
-        photoUri,
-      });
+      setState(makeDoneFromResult(q, makeEmptyResult(q), photoUri, webMatches, overrides));
     }
   }
 

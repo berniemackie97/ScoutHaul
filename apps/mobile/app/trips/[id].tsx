@@ -6,6 +6,7 @@ import { api } from '../../src/api';
 import { Button } from '../../src/components/Button';
 import { Card } from '../../src/components/Card';
 import { Divider } from '../../src/components/Divider';
+import { EmptyState } from '../../src/components/EmptyState';
 import { ErrorBanner } from '../../src/components/ErrorBanner';
 import { LoadingState } from '../../src/components/LoadingState';
 import { ProgressBar } from '../../src/components/ProgressBar';
@@ -203,7 +204,13 @@ export default function TripDetailScreen() {
     return (
       <Screen>
         {error ? <ErrorBanner message={error} onRetry={() => void load()} /> : null}
-        <Text variant="body">Route not found.</Text>
+        <EmptyState
+          icon="alert-circle-outline"
+          title="Route not found"
+          message="This route may have been deleted or you don't have access."
+          actionLabel="Go Back"
+          onAction={() => router.back()}
+        />
       </Screen>
     );
   }

@@ -51,34 +51,6 @@ export function resolveProductImage(state: ScanDoneState): string | null {
   return state.productImageUrl ?? state.photoUri ?? state.listings[0]?.imageUrl ?? null;
 }
 
-export function buildSearchQuery(raw: string): string {
-  const lines = raw
-    .split('\n')
-    .map((l) => l.trim())
-    .filter((l) =>
-      l.length > 2 &&
-      !l.match(/^https?:\/\//i) &&
-      !l.match(/^\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}$/) &&
-      !l.match(/^\$?\d+\.?\d*$/) &&
-      !l.match(/^[©®™]/) &&
-      !l.match(/^(WARNING|CAUTION|DIRECTIONS|INGREDIENTS|NET WT)/i),
-    );
-
-  const scored = lines.map((line) => {
-    let score = line.length;
-    if (line.length > 8 && line.length < 80) score += 20;
-    if (/[a-z]/.test(line) && /[A-Z]/.test(line)) score += 10;
-    if (/^\d+$/.test(line)) score -= 50;
-    if (/^[A-Z\s]{1,6}$/.test(line)) score -= 20;
-    if (/model|series|edition/i.test(line)) score += 15;
-    if (/\d{3,}/.test(line) && /[a-zA-Z]/.test(line)) score += 10;
-    return { line, score };
-  });
-
-  scored.sort((a, b) => b.score - a.score);
-  return scored.slice(0, 3).map((s) => s.line).join(' ').slice(0, 120).trim();
-}
-
 export function makeDoneError(query: string, error: unknown, webMatches: WebMatch[] = []): ScanDoneState {
   return {
     phase: 'done',

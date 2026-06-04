@@ -11,19 +11,22 @@ public sealed class JwtCurrentUserContext(IHttpContextAccessor httpContextAccess
     private const string OrganizationHeader = "X-ScoutHaul-Organization-Id";
     private ResolvedUserContext? resolved;
 
-    public Guid OrganizationId => Resolve().OrganizationId;
-    public Guid UserId => Resolve().UserId;
+    public Guid OrganizationId => resolved?.OrganizationId
+        ?? throw new InvalidOperationException("ResolveAsync must be called before accessing OrganizationId.");
+
+    public Guid UserId => resolved?.UserId
+        ?? throw new InvalidOperationException("ResolveAsync must be called before accessing UserId.");
 
     public static bool HasAuthenticatedPrincipal(ClaimsPrincipal? user)
     {
         return user?.Identity?.IsAuthenticated == true;
     }
 
-    private ResolvedUserContext Resolve()
+    public async Task ResolveAsync()
     {
         if (resolved is not null)
         {
-            return resolved;
+            return;
         }
 
         ClaimsPrincipal claims = httpContextAccessor.HttpContext?.User
@@ -38,29 +41,28 @@ public sealed class JwtCurrentUserContext(IHttpContextAccessor httpContextAccess
         string email = NormalizeEmail(ReadClaim(claims, ClaimTypes.Email, "email"), externalSubject);
         string displayName = TrimTo(ReadClaim(claims, ClaimTypes.Name, "name", "full_name") ?? email.Split('@')[0], 160);
 
-        AppUser appUser = ResolveUser(externalSubject, email, displayName);
+        AppUser appUser = await ResolveUserAsync(externalSubject, email, displayName);
         Guid? requestedOrganizationId = ReadGuidHeader(OrganizationHeader);
-        OrganizationMember membership = ResolveMembership(appUser, requestedOrganizationId);
+        OrganizationMember membership = await ResolveMembershipAsync(appUser, requestedOrganizationId);
 
-        db.SaveChanges();
+        await db.SaveChangesAsync();
         resolved = new ResolvedUserContext(membership.OrganizationId, appUser.Id);
-        return resolved;
     }
 
-    private AppUser ResolveUser(string externalSubject, string email, string displayName)
+    private async Task<AppUser> ResolveUserAsync(string externalSubject, string email, string displayName)
     {
         string providerSubject = $"supabase:{externalSubject}";
-        AppUser? appUser = db.Users
+        AppUser? appUser = await db.Users
             .Include(item => item.ExternalAccounts)
-            .SingleOrDefault(item => item.ExternalSubject == providerSubject);
+            .SingleOrDefaultAsync(item => item.ExternalSubject == providerSubject);
 
-        appUser ??= db.ExternalAuthAccounts
+        appUser ??= await db.ExternalAuthAccounts
             .Include(item => item.User)
             .Where(item => item.Provider == "supabase" && item.ProviderAccountId == externalSubject)
             .Select(item => item.User)
-            .SingleOrDefault();
+            .SingleOrDefaultAsync();
 
-        appUser ??= db.Users.SingleOrDefault(item => item.Email == email);
+        appUser ??= await db.Users.SingleOrDefaultAsync(item => item.Email == email);
 
         if (appUser is null)
         {
@@ -79,7 +81,7 @@ public sealed class JwtCurrentUserContext(IHttpContextAccessor httpContextAccess
             appUser.DisplayName = displayName;
         }
 
-        bool hasAccount = db.ExternalAuthAccounts.Any(item =>
+        bool hasAccount = await db.ExternalAuthAccounts.AnyAsync(item =>
             item.Provider == "supabase" && item.ProviderAccountId == externalSubject);
 
         if (!hasAccount)
@@ -97,11 +99,11 @@ public sealed class JwtCurrentUserContext(IHttpContextAccessor httpContextAccess
         return appUser;
     }
 
-    private OrganizationMember ResolveMembership(AppUser appUser, Guid? requestedOrganizationId)
+    private async Task<OrganizationMember> ResolveMembershipAsync(AppUser appUser, Guid? requestedOrganizationId)
     {
         if (requestedOrganizationId is not null)
         {
-            OrganizationMember? requestedMembership = db.OrganizationMembers.SingleOrDefault(item =>
+            OrganizationMember? requestedMembership = await db.OrganizationMembers.SingleOrDefaultAsync(item =>
                 item.OrganizationId == requestedOrganizationId.Value && item.UserId == appUser.Id);
 
             if (requestedMembership is null)
@@ -112,10 +114,10 @@ public sealed class JwtCurrentUserContext(IHttpContextAccessor httpContextAccess
             return requestedMembership;
         }
 
-        OrganizationMember? existingMembership = db.OrganizationMembers
+        OrganizationMember? existingMembership = await db.OrganizationMembers
             .Where(item => item.UserId == appUser.Id)
             .OrderBy(item => item.JoinedAt)
-            .FirstOrDefault();
+            .FirstOrDefaultAsync();
 
         if (existingMembership is not null)
         {

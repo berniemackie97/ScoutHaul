@@ -172,37 +172,31 @@ function buildFromVision(vision: VisionIdentifyResult): IdentifyResult {
 
 // ── Label-based fallbacks (for items with no text/brand/entities — just visual labels) ──
 
+const GENERIC_LABELS = new Set([
+  'product', 'material', 'rectangle', 'font', 'design', 'pattern',
+  'art', 'electric blue', 'graphics', 'brand', 'logo', 'illustration',
+  'circle', 'symbol', 'line', 'parallel', 'symmetry', 'technology',
+]);
+
+function filterUsefulLabels(labels: string[]): string[] {
+  return labels.filter((l) => !GENERIC_LABELS.has(l.toLowerCase()) && l.length > 2);
+}
+
 function buildTitleFromLabels(labels: string[]): string | null {
-  // Use top 2-3 most specific labels as a title
-  // Filter out very generic ones like "Product", "Material", "Rectangle"
-  const GENERIC_LABELS = new Set([
-    'product', 'material', 'rectangle', 'font', 'design', 'pattern',
-    'art', 'electric blue', 'graphics', 'brand', 'logo', 'illustration',
-    'circle', 'symbol', 'line', 'parallel', 'symmetry', 'technology',
-  ]);
-  const useful = labels.filter((l) => !GENERIC_LABELS.has(l.toLowerCase()) && l.length > 2);
-  if (useful.length === 0) return null;
-  return useful.slice(0, 2).join(' ');
+  const useful = filterUsefulLabels(labels);
+  return useful.length > 0 ? useful.slice(0, 2).join(' ') : null;
 }
 
 function buildSearchFromLabels(
   labels: string[],
   brand: string | null,
-  category: string | null,
+  _category: string | null,
 ): string | null {
-  const GENERIC_LABELS = new Set([
-    'product', 'material', 'rectangle', 'font', 'design', 'pattern',
-    'art', 'electric blue', 'graphics', 'brand', 'logo', 'illustration',
-    'circle', 'symbol', 'line', 'parallel', 'symmetry', 'technology',
-  ]);
-  const useful = labels.filter((l) => !GENERIC_LABELS.has(l.toLowerCase()) && l.length > 2);
+  const useful = filterUsefulLabels(labels);
   if (useful.length === 0) return null;
-
-  // Combine brand (if detected) with top labels for better search
   const parts: string[] = [];
   if (brand) parts.push(brand);
   parts.push(...useful.slice(0, brand ? 2 : 3));
-
   const query = parts.join(' ').trim();
   return query.length >= 3 ? query : null;
 }

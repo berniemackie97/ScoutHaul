@@ -5,6 +5,7 @@ import {
   Modal,
   Pressable,
   StyleSheet,
+  TextInput,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -176,16 +177,16 @@ function SelectModal({
         {searchable ? (
           <View style={[styles.searchRow, { backgroundColor: c.surfaceAlt, borderColor: c.border }]}>
             <Ionicons name="search-outline" size={18} color={c.textMuted} />
-            <View style={styles.searchInputWrap}>
-              <Text
-                variant="body"
-                color={c.textMuted}
-                style={styles.searchInput}
-                onPress={() => {}}
-              >
-                {search || 'Search...'}
-              </Text>
-            </View>
+            <TextInput
+              style={[styles.searchInput, { color: c.text }]}
+              value={search}
+              onChangeText={setSearch}
+              placeholder="Search..."
+              placeholderTextColor={c.textMuted}
+              autoFocus
+              returnKeyType="search"
+              clearButtonMode="while-editing"
+            />
           </View>
         ) : null}
 
@@ -321,11 +322,10 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     borderWidth: 1,
   },
-  searchInputWrap: {
-    flex: 1,
-  },
   searchInput: {
+    flex: 1,
     fontSize: 15,
+    paddingVertical: spacing.xs,
   },
   optionList: {
     paddingHorizontal: spacing.md,

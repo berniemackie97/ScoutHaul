@@ -8,6 +8,7 @@ using ScoutHaul.Domain;
 using ScoutHaul.Domain.Entities;
 using ScoutHaul.Infrastructure.Persistence;
 using System.Text.Json;
+using static ScoutHaul.Api.Helpers.StringHelpers;
 
 namespace ScoutHaul.Api.Controllers;
 
@@ -669,8 +670,6 @@ public sealed class InventoryController(
         item.Barcode = TrimToNull(request.Barcode);
         item.Notes = TrimToNull(request.Notes);
     }
-
-    private static string? TrimToNull(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     private static string? NormalizeJsonObject(string? value)
     {

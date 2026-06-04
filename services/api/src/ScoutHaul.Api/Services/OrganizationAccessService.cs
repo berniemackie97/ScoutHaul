@@ -13,6 +13,7 @@ public sealed class OrganizationAccessService(ScoutHaulDbContext db, ICurrentUse
         string permission,
         CancellationToken cancellationToken)
     {
+        await currentUser.ResolveAsync();
         OrganizationMember? membership = await db.OrganizationMembers
             .Include(item => item.RoleDefinition)
                 .ThenInclude(role => role!.Permissions)

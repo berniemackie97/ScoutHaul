@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { Pressable, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from './Text';
 import { radius, spacing } from './theme';
 import { useAppTheme } from '../context/ThemeContext';
@@ -14,9 +15,10 @@ type BadgeCounts = {
 export function CustomTabBar({ state, descriptors, navigation, badgeCounts }: BottomTabBarProps & { badgeCounts?: BadgeCounts }) {
   const { colors: c, shadows: s } = useAppTheme();
   const haptics = useHaptics();
+  const insets = useSafeAreaInsets();
 
   return (
-    <View style={[styles.container, { backgroundColor: c.surface, borderTopColor: c.borderLight, ...s.sm }]}>
+    <View style={[styles.container, { backgroundColor: c.surface, borderTopColor: c.borderLight, paddingBottom: Math.max(insets.bottom, 8), ...s.sm }]}>
       {state.routes.map((route, index) => {
         const { options } = descriptors[route.key];
         const isFocused = state.index === index;
@@ -106,9 +108,7 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     borderTopWidth: 1,
-    height: 84,
     paddingTop: 6,
-    paddingBottom: 20,
   },
   tab: {
     flex: 1,

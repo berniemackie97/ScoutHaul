@@ -6,7 +6,9 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api } from '../../src/api';
 import { Card } from '../../src/components/Card';
+import { ErrorBanner } from '../../src/components/ErrorBanner';
 import { Screen } from '../../src/components/Screen';
+import { SkeletonList } from '../../src/components/Skeleton';
 import { SearchBar } from '../../src/components/SearchBar';
 import { StatusPill } from '../../src/components/StatusPill';
 import { Text } from '../../src/components/Text';
@@ -15,6 +17,7 @@ import { useAppTheme } from '../../src/context/ThemeContext';
 import type { InventoryItem } from '../../src/domain/types';
 import { useConnectivity } from '../../src/hooks/useConnectivity';
 import { formatMoney } from '../../src/utils/money';
+import { statusTone } from '../../src/utils/statusTone';
 
 type ActionTile = {
   icon: keyof typeof Ionicons.glyphMap;
@@ -30,14 +33,18 @@ export default function ScoutScreen() {
   const connectivity = useConnectivity();
   const [searchQuery, setSearchQuery] = useState('');
   const [recentItems, setRecentItems] = useState<InventoryItem[]>([]);
+  const [recentLoading, setRecentLoading] = useState(false);
+  const [recentError, setRecentError] = useState<string | null>(null);
 
   useFocusEffect(
     useCallback(() => {
       if (!connectivity.isOnline) return;
+      setRecentLoading(true);
       api
         .inventory()
-        .then((items) => setRecentItems(items.slice(0, 5)))
-        .catch(() => {});
+        .then((items) => { setRecentItems(items.slice(0, 5)); setRecentError(null); })
+        .catch((e: unknown) => setRecentError(e instanceof Error ? e.message : 'Failed to load recent items'))
+        .finally(() => setRecentLoading(false));
     }, [connectivity.isOnline]),
   );
 
@@ -170,6 +177,8 @@ export default function ScoutScreen() {
       </View>
 
       {/* Recent inventory */}
+      {recentError ? <ErrorBanner message={recentError} /> : null}
+      {recentLoading && recentItems.length === 0 ? <SkeletonList count={2} /> : null}
       {recentItems.length > 0 ? (
         <>
           <View style={styles.sectionRow}>
@@ -220,28 +229,6 @@ export default function ScoutScreen() {
   );
 }
 
-function statusTone(status: string): 'success' | 'warning' | 'danger' | 'info' | 'neutral' | 'primary' {
-  switch (status) {
-    case 'Listed':
-    case 'Sold':
-    case 'Shipped':
-    case 'Delivered':
-      return 'success';
-    case 'Researching':
-    case 'NeedsCleaning':
-    case 'NeedsTesting':
-    case 'NeedsPhotos':
-      return 'warning';
-    case 'ReadyToList':
-    case 'Purchased':
-      return 'info';
-    case 'Returned':
-    case 'Disposed':
-      return 'danger';
-    default:
-      return 'neutral';
-  }
-}
 
 const styles = StyleSheet.create({
   heroGradient: {

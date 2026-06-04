@@ -50,7 +50,6 @@ builder.Services
         };
     });
 
-builder.Services.AddScoped<JwtCurrentUserContext>();
 builder.Services.AddScoped<OrganizationAccessService>();
 builder.Services.AddScoped<MarketplaceLookupPersistenceService>();
 builder.Services.AddScoped<InventoryPhotoStorageService>();
@@ -69,14 +68,21 @@ builder.Services.AddRateLimiter(options =>
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 
     options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
-        RateLimitPartition.GetFixedWindowLimiter(
-            partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "anonymous",
+    {
+        string partitionKey = context.User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+            ?? context.User?.FindFirst("sub")?.Value
+            ?? context.Connection.RemoteIpAddress?.ToString()
+            ?? "anonymous";
+
+        return RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: partitionKey,
             factory: _ => new FixedWindowRateLimiterOptions
             {
                 PermitLimit = builder.Configuration.GetValue("RateLimiting:PermitLimit", 100),
                 Window = TimeSpan.FromSeconds(builder.Configuration.GetValue("RateLimiting:WindowSeconds", 60)),
                 QueueLimit = 0,
-            }));
+            });
+    });
 });
 
 // ── CORS ─────────────────────────────────────────────────────────
@@ -160,13 +166,18 @@ app.Use(async (context, next) =>
     catch (UnauthorizedAccessException exception) when (!context.Response.HasStarted)
     {
         bool isAuthenticated = context.User.Identity?.IsAuthenticated == true;
-        context.Response.StatusCode = isAuthenticated
+        int statusCode = isAuthenticated
             ? StatusCodes.Status403Forbidden
             : StatusCodes.Status401Unauthorized;
-        await context.Response.WriteAsJsonAsync(new
+        context.Response.StatusCode = statusCode;
+        await context.Response.WriteAsJsonAsync(new Microsoft.AspNetCore.Mvc.ProblemDetails
         {
-            title = isAuthenticated ? "Forbidden" : "Unauthorized",
-            detail = exception.Message
+            Status = statusCode,
+            Title = isAuthenticated ? "Forbidden" : "Unauthorized",
+            Detail = exception.Message,
+            Type = isAuthenticated
+                ? "https://tools.ietf.org/html/rfc9110#section-15.5.4"
+                : "https://tools.ietf.org/html/rfc9110#section-15.5.2"
         });
     }
 });

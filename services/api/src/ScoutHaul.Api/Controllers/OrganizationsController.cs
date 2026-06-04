@@ -23,6 +23,7 @@ public sealed class OrganizationsController(
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<OrganizationDto>>> ListMine(CancellationToken cancellationToken)
     {
+        await currentUser.ResolveAsync();
         var memberships = await db.OrganizationMembers
             .Include(member => member.Organization)
             .Where(member => member.UserId == currentUser.UserId)
@@ -44,22 +45,14 @@ public sealed class OrganizationsController(
     [HttpPost]
     public async Task<ActionResult<OrganizationDto>> Create(CreateOrganizationRequest request, CancellationToken cancellationToken)
     {
+        await currentUser.ResolveAsync();
         if (string.IsNullOrWhiteSpace(request.Name))
         {
             return BadRequest("Organization name is required.");
         }
 
-        var user = await db.Users.FindAsync([currentUser.UserId], cancellationToken);
-        if (user is null)
-        {
-            user = new AppUser
-            {
-                Id = currentUser.UserId,
-                Email = $"owner-{currentUser.UserId:N}@scouthaul.local",
-                DisplayName = "Owner"
-            };
-            db.Users.Add(user);
-        }
+        var user = await db.Users.FindAsync([currentUser.UserId], cancellationToken)
+            ?? throw new InvalidOperationException("User must be resolved before creating an organization.");
 
         var organization = new Organization { Name = request.Name.Trim() };
         db.Organizations.Add(organization);
@@ -324,6 +317,7 @@ public sealed class OrganizationsController(
         RedeemOrganizationInviteCodeRequest request,
         CancellationToken cancellationToken)
     {
+        await currentUser.ResolveAsync();
         if (string.IsNullOrWhiteSpace(request.Code)) return BadRequest("Invite code is required.");
 
         string codeHash = HashInviteCode(request.Code);
@@ -339,23 +333,14 @@ public sealed class OrganizationsController(
         }
 
         if (!inviteCode.IsActive
-            || inviteCode.ExpiresAt <= DateTimeOffset.UtcNow
+            || (inviteCode.ExpiresAt.HasValue && inviteCode.ExpiresAt.Value <= DateTimeOffset.UtcNow)
             || inviteCode.MaxUses <= inviteCode.UseCount)
         {
             return BadRequest("Invite code is expired or inactive.");
         }
 
-        var user = await db.Users.FindAsync([currentUser.UserId], cancellationToken);
-        if (user is null)
-        {
-            user = new AppUser
-            {
-                Id = currentUser.UserId,
-                Email = $"member-{currentUser.UserId:N}@scouthaul.local",
-                DisplayName = "Member"
-            };
-            db.Users.Add(user);
-        }
+        var user = await db.Users.FindAsync([currentUser.UserId], cancellationToken)
+            ?? throw new InvalidOperationException("User must be resolved before creating an organization.");
 
         var member = await db.OrganizationMembers
             .Include(item => item.User)

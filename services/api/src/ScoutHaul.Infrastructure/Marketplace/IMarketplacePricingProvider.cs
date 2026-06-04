@@ -2,12 +2,12 @@ using ScoutHaul.Application.Contracts;
 
 namespace ScoutHaul.Infrastructure.Marketplace;
 
-internal sealed record MarketplacePricingRequest(
+public sealed record MarketplacePricingRequest(
     string Query,
     string? Barcode,
     BarcodeLookupResult? Product);
 
-internal interface IMarketplacePricingProvider
+public interface IMarketplacePricingProvider
 {
     string Name { get; }
     bool IsConfigured { get; }

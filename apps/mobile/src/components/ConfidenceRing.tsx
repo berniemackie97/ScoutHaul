@@ -26,7 +26,11 @@ export function ConfidenceRing({ score, size = 56 }: ConfidenceRingProps) {
   const borderWidth = 4;
 
   return (
-    <View style={styles.container}>
+    <View
+      style={styles.container}
+      accessibilityRole="text"
+      accessibilityLabel={`Confidence: ${score} – ${scoreLabel(score)}`}
+    >
       <View
         style={[
           styles.ring,

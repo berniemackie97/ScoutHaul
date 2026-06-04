@@ -443,7 +443,7 @@ export default function EditInventoryScreen() {
 
   return (
     <Screen>
-      {error ? <ErrorBanner message={error} /> : null}
+      {error ? <ErrorBanner message={error} onRetry={() => void save()} /> : null}
 
       {/* ── Photo Management ── */}
       <PhotoManager

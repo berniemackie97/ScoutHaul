@@ -142,10 +142,6 @@ public sealed class MarketAnalysisController(
             recommendation with { Warnings = combinedWarnings });
     }
 
-    [HttpPost("recommendation")]
-    public Task<ActionResult<MarketAnalysisResponse>> CalculateRecommendation(MarketAnalysisRequest request, CancellationToken cancellationToken) =>
-        Calculate(request, cancellationToken);
-
     private async Task<List<MarketObservation>> LoadRelevantObservations(MarketAnalysisRequest request, InventoryItem? item, CancellationToken cancellationToken)
     {
         var query = db.MarketObservations.Where(observation =>

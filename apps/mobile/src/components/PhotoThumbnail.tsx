@@ -51,8 +51,8 @@ export function PhotoStrip({ photos, onAdd, size = 64 }: PhotoStripProps) {
   const c = useColors();
   return (
     <View style={styles.strip}>
-      {photos.map((uri, i) => (
-        <PhotoThumbnail key={i} uri={uri} size={size} />
+      {photos.map((uri) => (
+        <PhotoThumbnail key={uri} uri={uri} size={size} />
       ))}
       {onAdd ? (
         <PhotoThumbnail size={size} onPress={onAdd} placeholder />

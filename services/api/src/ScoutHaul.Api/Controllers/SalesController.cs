@@ -5,6 +5,7 @@ using ScoutHaul.Api.Mapping;
 using ScoutHaul.Api.Services;
 using ScoutHaul.Application.Contracts;
 using ScoutHaul.Application.Services;
+using static ScoutHaul.Api.Helpers.StringHelpers;
 using ScoutHaul.Domain;
 using ScoutHaul.Domain.Entities;
 using ScoutHaul.Infrastructure.Persistence;
@@ -211,5 +212,4 @@ public sealed class SalesController(ScoutHaulDbContext db, ICurrentUserContext c
         return sale.ToDto();
     }
 
-    private static string? TrimToNull(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }

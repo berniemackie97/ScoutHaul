@@ -4,6 +4,7 @@ using ScoutHaul.Api.Authorization;
 using ScoutHaul.Api.Mapping;
 using ScoutHaul.Api.Services;
 using ScoutHaul.Application.Contracts;
+using static ScoutHaul.Api.Helpers.StringHelpers;
 using ScoutHaul.Domain;
 using ScoutHaul.Domain.Entities;
 using ScoutHaul.Infrastructure.Persistence;
@@ -143,5 +144,4 @@ public sealed class ListingsController(ScoutHaulDbContext db, ICurrentUserContex
             .Include(item => item.InventoryItem)
             .SingleOrDefaultAsync(item => item.Id == id && item.OrganizationId == currentUser.OrganizationId, cancellationToken);
 
-    private static string? TrimToNull(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }

@@ -14,21 +14,36 @@ public sealed class SessionController(ScoutHaulDbContext db, ICurrentUserContext
     [HttpGet("bootstrap")]
     public async Task<ActionResult<SessionBootstrapDto>> Bootstrap(CancellationToken cancellationToken)
     {
-        var user = await db.Users.SingleAsync(item => item.Id == currentUser.UserId, cancellationToken);
-        var organizations = await db.OrganizationMembers
+        await currentUser.ResolveAsync();
+
+        Guid userId = currentUser.UserId;
+        Guid organizationId = currentUser.OrganizationId;
+
+        var userTask = db.Users.SingleAsync(item => item.Id == userId, cancellationToken);
+        var organizationsTask = db.OrganizationMembers
             .Include(item => item.Organization)
-            .Where(item => item.UserId == currentUser.UserId)
+            .Where(item => item.UserId == userId)
             .OrderBy(item => item.Organization!.Name)
             .Select(item => item.Organization!.ToDto())
             .ToListAsync(cancellationToken);
 
-        Guid organizationId = currentUser.OrganizationId;
+        var inventoryCountTask = db.InventoryItems.CountAsync(item => item.OrganizationId == organizationId && !item.IsArchived, cancellationToken);
+        var budgetsCountTask = db.Budgets.CountAsync(item => item.OrganizationId == organizationId, cancellationToken);
+        var observationsCountTask = db.MarketObservations.CountAsync(item => item.OrganizationId == organizationId && !item.IsArchived, cancellationToken);
+        var listingsCountTask = db.Listings.CountAsync(item => item.OrganizationId == organizationId, cancellationToken);
+        var tasksCountTask = db.Tasks.CountAsync(item => item.OrganizationId == organizationId, cancellationToken);
+
+        await Task.WhenAll(userTask, organizationsTask, inventoryCountTask, budgetsCountTask, observationsCountTask, listingsCountTask, tasksCountTask);
+
+        var user = await userTask;
+        var organizations = await organizationsTask;
+
         var counts = new SessionRemoteCountsDto(
-            InventoryItems: await db.InventoryItems.CountAsync(item => item.OrganizationId == organizationId && !item.IsArchived, cancellationToken),
-            Budgets: await db.Budgets.CountAsync(item => item.OrganizationId == organizationId, cancellationToken),
-            MarketObservations: await db.MarketObservations.CountAsync(item => item.OrganizationId == organizationId && !item.IsArchived, cancellationToken),
-            Listings: await db.Listings.CountAsync(item => item.OrganizationId == organizationId, cancellationToken),
-            Tasks: await db.Tasks.CountAsync(item => item.OrganizationId == organizationId, cancellationToken),
+            InventoryItems: await inventoryCountTask,
+            Budgets: await budgetsCountTask,
+            MarketObservations: await observationsCountTask,
+            Listings: await listingsCountTask,
+            Tasks: await tasksCountTask,
             PendingSyncOperations: 0);
 
         return new SessionBootstrapDto(
