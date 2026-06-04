@@ -1,14 +1,18 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useState } from 'react';
+import { Alert, Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { api } from '../../api';
 import { Button } from '../../components/Button';
 import { StatusPill } from '../../components/StatusPill';
 import { Text } from '../../components/Text';
 import { TextField } from '../../components/TextField';
 import { radius, spacing } from '../../components/theme';
 import { useAppTheme } from '../../context/ThemeContext';
+import { useHaptics } from '../../hooks/useHaptics';
 import { formatMoney } from '../../utils/money';
-import type { ScanDoneState } from './types';
+import type { MarketplaceListing } from '../../domain/types';
+import type { ScanDoneState, WebMatch } from './types';
 import { resolveProductImage, resolveProductName } from './types';
 
 type ScanResultsProps = {
@@ -41,181 +45,180 @@ export function ScanResults({
   onCancelEdit,
 }: ScanResultsProps) {
   const { colors: c } = useAppTheme();
-  const hasResults = state.listings.length > 0 || state.productTitle != null;
   const productName = resolveProductName(state);
   const heroImage = resolveProductImage(state);
+  const hasIdentification = !!productName || !!state.productBrand || !!state.productCategory;
+  const hasListings = state.listings.length > 0;
+  const hasWebMatches = state.webMatches.length > 0;
+  const hasAnyResults = hasIdentification || hasListings || hasWebMatches;
 
   return (
-    <ScrollView style={styles.panelScroll} showsVerticalScrollIndicator={false} bounces={false}>
-      <View style={styles.panelInner}>
-        {hasResults ? (
-          <View style={styles.productHero}>
-            {heroImage ? (
-              <Image source={{ uri: heroImage }} style={styles.heroImage} contentFit="cover" />
-            ) : (
-              <View style={[styles.heroImage, styles.heroPlaceholder, { backgroundColor: c.borderLight }]}>
-                <Ionicons name="image-outline" size={32} color={c.textMuted} />
-              </View>
-            )}
-            <View style={styles.heroInfo}>
+    <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false} bounces={false}>
+      <View style={styles.content}>
+
+        {/* ── Product Identification Hero ── */}
+        <View style={styles.hero}>
+          {heroImage ? (
+            <Image source={{ uri: heroImage }} style={styles.heroImage} contentFit="cover" />
+          ) : (
+            <View style={[styles.heroImage, styles.heroPlaceholder, { backgroundColor: c.surfaceAlt }]}>
+              <Ionicons name={state.photoUri ? 'camera-outline' : 'cube-outline'} size={28} color={c.textMuted} />
+            </View>
+          )}
+          <View style={styles.heroInfo}>
+            {productName ? (
               <Text variant="bodyBold" numberOfLines={2}>{productName}</Text>
-              {state.productBrand || state.productCategory ? (
-                <Text variant="caption" color={c.textSecondary} numberOfLines={1}>
-                  {[state.productBrand, state.productCategory].filter(Boolean).join(' · ')}
-                </Text>
-              ) : null}
-              <View style={styles.barcodeRow}>
-                <Ionicons name={state.photoUri ? 'camera-outline' : 'barcode-outline'} size={14} color={c.textMuted} />
-                <Text variant="label" style={styles.mono} color={c.textMuted} numberOfLines={1}>
-                  {state.barcode.length > 30 ? state.barcode.slice(0, 30) + '...' : state.barcode}
-                </Text>
-              </View>
-              {state.totalResults > 0 ? (
-                <StatusPill label={`${state.totalResults} signals`} tone="success" size="sm" />
+            ) : (
+              <Text variant="bodyBold" color={c.textMuted}>Unidentified item</Text>
+            )}
+            {(state.productBrand || state.productCategory) ? (
+              <Text variant="caption" color={c.textSecondary} numberOfLines={1}>
+                {[state.productBrand, state.productCategory].filter(Boolean).join(' · ')}
+              </Text>
+            ) : null}
+            <View style={styles.heroMeta}>
+              {hasIdentification ? (
+                <StatusPill label="Identified" tone="success" size="sm" />
+              ) : hasWebMatches ? (
+                <StatusPill label="Partial match" tone="warning" size="sm" />
               ) : (
-                <StatusPill label="Product found" tone="info" size="sm" />
+                <StatusPill label="No match" tone="neutral" size="sm" />
               )}
               {state.providersUsed.length > 0 ? (
-                <Text variant="label" color={c.textMuted} numberOfLines={2}>
-                  {state.providersUsed.join(' · ')}
-                  {state.savedObservationCount > 0 ? ` · ${state.savedObservationCount} saved` : ''}
-                </Text>
-              ) : null}
-              {state.providerWarnings.length > 0 ? (
-                <Text variant="label" color={c.warning} numberOfLines={2}>{state.providerWarnings[0]}</Text>
+                <Text variant="label" color={c.textMuted}>{state.providersUsed.join(' · ')}</Text>
               ) : null}
             </View>
           </View>
-        ) : (
-          <View style={styles.barcodeRow}>
-            <Ionicons name={state.photoUri ? 'camera-outline' : 'barcode-outline'} size={18} color={c.warning} />
-            <Text variant="caption" style={styles.mono} color={c.textMuted} numberOfLines={1}>{state.barcode}</Text>
-          </View>
-        )}
+        </View>
 
-        {/* Price summary */}
+        {/* ── Price Range (Google Lens "Typically $X–$Y" style) ── */}
         {state.avgPrice != null ? (
-          <View style={[styles.priceSummary, { backgroundColor: c.primaryLight }]}>
-            <View style={styles.priceCol}>
-              <Text variant="label" color={c.textMuted}>LOW</Text>
-              <Text variant="bodyBold" color={c.text}>{formatMoney(state.lowPrice)}</Text>
+          <View style={[styles.priceCard, { backgroundColor: c.primaryLight, borderColor: c.primary + '20' }]}>
+            <View style={styles.priceHeader}>
+              <Ionicons name="pricetags" size={16} color={c.primary} />
+              <Text variant="bodyBold" color={c.primary}>Compare Prices</Text>
             </View>
-            <View style={[styles.priceCol, styles.priceColCenter, { borderColor: c.border }]}>
-              <Text variant="label" color={c.primary}>AVG</Text>
-              <Text variant="metricSmall" color={c.primary}>{formatMoney(state.avgPrice)}</Text>
+            <View style={styles.priceRange}>
+              <Text variant="caption" color={c.textSecondary}>Typically</Text>
+              <Text variant="metricSmall" color={c.primary}>
+                {formatMoney(state.lowPrice)} – {formatMoney(state.highPrice)}
+              </Text>
             </View>
-            <View style={styles.priceCol}>
-              <Text variant="label" color={c.textMuted}>HIGH</Text>
-              <Text variant="bodyBold" color={c.text}>{formatMoney(state.highPrice)}</Text>
+            <View style={styles.priceAvg}>
+              <Text variant="label" color={c.textMuted}>AVG MARKET VALUE</Text>
+              <Text variant="bodyBold" color={c.primary}>{formatMoney(state.avgPrice)}</Text>
             </View>
           </View>
         ) : state.error ? (
-          <View style={[styles.noPriceBox, { backgroundColor: c.dangerLight, borderColor: c.danger }]}>
-            <Ionicons name="alert-circle-outline" size={18} color={c.danger} />
+          <View style={[styles.alertBox, { backgroundColor: c.dangerLight, borderColor: c.danger + '30' }]}>
+            <Ionicons name="alert-circle" size={18} color={c.danger} />
             <Text variant="caption" color={c.danger} style={{ flex: 1 }}>{state.error}</Text>
           </View>
-        ) : (
-          <View style={[styles.noPriceBox, { backgroundColor: c.warningLight, borderColor: c.warning }]}>
-            <Ionicons name="information-circle-outline" size={18} color={c.warning} />
+        ) : hasIdentification && !hasListings ? (
+          <View style={[styles.infoBox, { backgroundColor: c.surfaceAlt }]}>
+            <Ionicons name="information-circle-outline" size={18} color={c.textMuted} />
             <View style={{ flex: 1 }}>
-              <Text variant="caption" color={c.text}>No pricing data found</Text>
-              <Text variant="label" color={c.textMuted}>
-                {state.productTitle ? 'Product identified but no marketplace listings matched.' : 'Try searching by name instead.'}
+              <Text variant="caption" color={c.text}>
+                {hasWebMatches
+                  ? 'Product identified — check web results below for pricing.'
+                  : 'Product identified — add to inventory and research pricing later.'}
               </Text>
             </View>
           </View>
-        )}
-
-        {/* Listing cards */}
-        {state.listings.length > 0 ? (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.listingsScroll} contentContainerStyle={styles.listingsContent}>
-            {state.listings.slice(0, 8).map((listing, i) => (
-              <View key={i} style={[styles.listingCard, { backgroundColor: c.surfaceAlt, borderColor: c.borderLight }]}>
-                {listing.imageUrl ? (
-                  <Image source={{ uri: listing.imageUrl }} style={styles.listingImage} contentFit="cover" />
-                ) : (
-                  <View style={[styles.listingImage, styles.listingNoImage, { backgroundColor: c.borderLight }]}>
-                    <Ionicons name="image-outline" size={24} color={c.textMuted} />
-                  </View>
-                )}
-                <View style={styles.listingInfo}>
-                  <Text variant="caption" numberOfLines={2} style={styles.listingTitle}>{listing.title}</Text>
-                  <Text variant="bodyBold" color={c.primary}>{formatMoney(listing.price)}</Text>
-                  <Text variant="label" color={c.textMuted}>{listing.condition}</Text>
-                </View>
-              </View>
-            ))}
-          </ScrollView>
         ) : null}
 
-        {/* Web matches from Cloud Vision */}
-        {state.webMatches.length > 0 ? (
-          <View style={styles.webMatchesSection}>
-            <View style={styles.webMatchesHeader}>
-              <Ionicons name="globe-outline" size={16} color={c.info} />
-              <Text variant="bodyBold" color={c.textSecondary}>Found on the web</Text>
-              <Text variant="label" color={c.textMuted}>{state.webMatches.length}</Text>
+        {/* ── Marketplace Listings (Google Lens "Compare Prices" list style) ── */}
+        {hasListings ? (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text variant="bodyBold" color={c.textSecondary}>
+                {state.listings.some((l) => l.isSold) ? 'Sold & Active Listings' : 'Active Listings'}
+              </Text>
+              <Text variant="label" color={c.textMuted}>{state.listings.length}</Text>
             </View>
-            {state.webMatches.slice(0, 5).map((match, i) => (
-              <Pressable
-                key={i}
-                onPress={() => void Linking.openURL(match.url)}
-                style={({ pressed }) => [
-                  styles.webMatchItem,
-                  { borderColor: c.borderLight },
-                  pressed && { backgroundColor: c.surfaceAlt },
-                ]}
-              >
-                <View style={[styles.webMatchIcon, { backgroundColor: c.infoLight }]}>
-                  <Ionicons
-                    name={
-                      match.source.includes('ebay') ? 'pricetag-outline'
-                      : match.source.includes('amazon') ? 'cart-outline'
-                      : match.source.includes('walmart') ? 'storefront-outline'
-                      : 'link-outline'
-                    }
-                    size={16}
-                    color={c.info}
-                  />
-                </View>
-                <View style={styles.webMatchText}>
-                  <Text variant="caption" numberOfLines={2} color={c.text}>
-                    {match.title ?? match.url}
-                  </Text>
-                  <Text variant="label" color={c.textMuted} numberOfLines={1}>
-                    {match.source}
-                  </Text>
-                </View>
-                <Ionicons name="open-outline" size={14} color={c.textMuted} />
-              </Pressable>
+            {state.listings.slice(0, 10).map((listing, i) => (
+              <ListingRow key={i} listing={listing} productIdentityId={state.productIdentityId} />
             ))}
           </View>
         ) : null}
 
-        {/* Actions */}
+        {/* ── Web Matches from Cloud Vision (Google found these product pages) ── */}
+        {hasWebMatches ? (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+                <Ionicons name="globe-outline" size={16} color={c.info} />
+                <Text variant="bodyBold" color={c.textSecondary}>Found Online</Text>
+              </View>
+              <Text variant="label" color={c.textMuted}>{state.webMatches.length}</Text>
+            </View>
+            {!hasListings ? (
+              <Text variant="caption" color={c.textMuted}>
+                No marketplace pricing available. These web results may help with research.
+              </Text>
+            ) : null}
+            {state.webMatches.slice(0, 6).map((match, i) => (
+              <WebMatchRow key={i} match={match} />
+            ))}
+          </View>
+        ) : null}
+
+        {/* ── No Results State ── */}
+        {!hasAnyResults ? (
+          <View style={[styles.emptyState, { backgroundColor: c.surfaceAlt }]}>
+            <Ionicons name="search-outline" size={32} color={c.textMuted} />
+            <Text variant="bodyBold" color={c.textSecondary}>No results found</Text>
+            <Text variant="caption" color={c.textMuted} style={{ textAlign: 'center' }}>
+              Try taking a clearer photo with visible branding, text, or packaging.
+              You can also add this item to inventory manually.
+            </Text>
+          </View>
+        ) : null}
+
+        {/* ── Primary Actions ── */}
         <View style={styles.actions}>
-          <Pressable onPress={onRescan} style={[styles.iconBtn, { backgroundColor: c.surfaceAlt }]} accessibilityLabel="Rescan">
-            <Ionicons name="refresh-outline" size={22} color={c.textSecondary} />
-          </Pressable>
-          <Pressable onPress={onEdit} style={[styles.iconBtn, { backgroundColor: c.primaryLight }]} accessibilityLabel="Edit product">
-            <Ionicons name={state.productIdentityId ? 'create-outline' : 'add-outline'} size={22} color={c.primary} />
-          </Pressable>
-          <Pressable onPress={onAddInventory} style={[styles.iconBtn, { backgroundColor: c.successLight }]} accessibilityLabel="Add to inventory">
-            <Ionicons name="add-circle-outline" size={22} color={c.success} />
-          </Pressable>
-          <Pressable onPress={onResearch} style={[styles.continueBtn, { backgroundColor: c.primary }]}>
-            <Text variant="bodyBold" color={c.textInverse}>Research</Text>
-            <Ionicons name="arrow-forward" size={20} color={c.textInverse} />
-          </Pressable>
+          <Button
+            label="Add to Inventory"
+            icon="add-circle-outline"
+            size="lg"
+            fullWidth
+            onPress={onAddInventory}
+          />
+          <View style={styles.secondaryActions}>
+            <Pressable
+              onPress={onResearch}
+              style={[styles.secondaryBtn, { borderColor: c.borderLight }]}
+              accessibilityLabel="Research more"
+            >
+              <Ionicons name="search-outline" size={18} color={c.primary} />
+              <Text variant="caption" color={c.primary}>Research</Text>
+            </Pressable>
+            <Pressable
+              onPress={onEdit}
+              style={[styles.secondaryBtn, { borderColor: c.borderLight }]}
+              accessibilityLabel="Edit product identity"
+            >
+              <Ionicons name="create-outline" size={18} color={c.primary} />
+              <Text variant="caption" color={c.primary}>{state.productIdentityId ? 'Edit' : 'Save'} Product</Text>
+            </Pressable>
+            <Pressable
+              onPress={onRescan}
+              style={[styles.secondaryBtn, { borderColor: c.borderLight }]}
+              accessibilityLabel="Scan again"
+            >
+              <Ionicons name="camera-outline" size={18} color={c.textMuted} />
+              <Text variant="caption" color={c.textMuted}>Retake</Text>
+            </Pressable>
+          </View>
         </View>
 
-        {/* Product edit form */}
+        {/* ── Product Edit Form (inline) ── */}
         {editing ? (
           <View style={[styles.editSection, { borderColor: c.border }]}>
             <View style={styles.editHeader}>
               <View style={{ flex: 1 }}>
-                <Text variant="bodyBold">{state.productIdentityId ? 'Correct Product' : 'Add Product'}</Text>
-                <Text variant="label" color={c.textMuted}>Saved as verified data for future scans</Text>
+                <Text variant="bodyBold">{state.productIdentityId ? 'Correct Product' : 'Save Product'}</Text>
+                <Text variant="label" color={c.textMuted}>Stored for future scans of this item</Text>
               </View>
               <Pressable onPress={onCancelEdit} hitSlop={8}>
                 <Ionicons name="close" size={22} color={c.textMuted} />
@@ -241,38 +244,203 @@ export function ScanResults({
   );
 }
 
+// ── Listing Row (Google Lens "Compare Prices" style) ──
+
+function ListingRow({ listing, productIdentityId }: { listing: MarketplaceListing; productIdentityId: string | null }) {
+  const { colors: c } = useAppTheme();
+  const haptics = useHaptics();
+  const [savedAsComp, setSavedAsComp] = useState(false);
+
+  async function saveAsComp() {
+    try {
+      await api.addComp({
+        productIdentityId: productIdentityId ?? null,
+        inventoryItemId: null,
+        observationType: listing.isSold ? 'Sold' : 'ActiveListing',
+        source: listing.source,
+        sourceUrl: listing.itemUrl ?? null,
+        title: listing.title,
+        price: listing.price,
+        shippingPrice: listing.shippingCost ?? null,
+        condition: listing.condition ?? null,
+        observedAt: new Date().toISOString(),
+        soldAt: listing.soldDate ?? null,
+        notes: null,
+      });
+      setSavedAsComp(true);
+      haptics.success();
+    } catch {
+      Alert.alert('Save Failed', 'Could not save this listing as a comp.');
+    }
+  }
+
+  const totalPrice = listing.price + (listing.shippingCost ?? 0);
+
+  return (
+    <View style={[styles.listingRow, { borderColor: c.borderLight }]}>
+      <Pressable
+        onPress={() => listing.itemUrl ? void Linking.openURL(listing.itemUrl) : undefined}
+        style={styles.listingMain}
+        disabled={!listing.itemUrl}
+      >
+        {listing.imageUrl ? (
+          <Image source={{ uri: listing.imageUrl }} style={styles.listingThumb} contentFit="cover" />
+        ) : (
+          <View style={[styles.listingThumb, { backgroundColor: c.surfaceAlt, alignItems: 'center', justifyContent: 'center' }]}>
+            <Ionicons name="image-outline" size={16} color={c.textMuted} />
+          </View>
+        )}
+        <View style={styles.listingContent}>
+          <Text variant="caption" numberOfLines={2}>{listing.title}</Text>
+          <View style={styles.listingMeta}>
+            <Text variant="label" color={c.textMuted}>{listing.source}</Text>
+            {listing.isSold ? (
+              <StatusPill label="SOLD" tone="success" size="sm" />
+            ) : (
+              <Text variant="label" color={c.textMuted}>{listing.condition}</Text>
+            )}
+          </View>
+        </View>
+        <View style={styles.listingPrice}>
+          <Text variant="bodyBold" color={listing.isSold ? c.success : c.primary}>
+            {formatMoney(totalPrice)}
+          </Text>
+          {listing.shippingCost != null && listing.shippingCost > 0 ? (
+            <Text variant="label" color={c.textMuted}>+{formatMoney(listing.shippingCost)} ship</Text>
+          ) : listing.shippingCost === 0 ? (
+            <Text variant="label" color={c.success}>Free ship</Text>
+          ) : null}
+        </View>
+      </Pressable>
+      {/* Save as comp button */}
+      <Pressable
+        onPress={savedAsComp ? undefined : () => void saveAsComp()}
+        hitSlop={6}
+        style={[styles.compBtn, savedAsComp && { opacity: 0.5 }]}
+        accessibilityLabel={savedAsComp ? 'Saved as comp' : 'Save as comp'}
+      >
+        <Ionicons
+          name={savedAsComp ? 'checkmark-circle' : 'bookmark-outline'}
+          size={16}
+          color={savedAsComp ? c.success : c.textMuted}
+        />
+      </Pressable>
+    </View>
+  );
+}
+
+// ── Web Match Row ──
+
+function WebMatchRow({ match }: { match: WebMatch }) {
+  const { colors: c } = useAppTheme();
+
+  const iconName: keyof typeof Ionicons.glyphMap =
+    match.source.includes('ebay') ? 'pricetag-outline'
+    : match.source.includes('amazon') ? 'cart-outline'
+    : match.source.includes('walmart') ? 'storefront-outline'
+    : match.source.includes('target') ? 'locate-outline'
+    : match.source.includes('mercari') ? 'bag-outline'
+    : 'link-outline';
+
+  return (
+    <Pressable
+      onPress={() => void Linking.openURL(match.url)}
+      style={({ pressed }) => [
+        styles.webRow,
+        { borderColor: c.borderLight },
+        pressed && { backgroundColor: c.surfaceAlt },
+      ]}
+    >
+      <View style={[styles.webIcon, { backgroundColor: c.infoLight }]}>
+        <Ionicons name={iconName} size={14} color={c.info} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text variant="caption" numberOfLines={1}>{match.title ?? match.url}</Text>
+        <Text variant="label" color={c.textMuted}>{match.source}</Text>
+      </View>
+      <Ionicons name="open-outline" size={14} color={c.textMuted} />
+    </Pressable>
+  );
+}
+
+// ── Styles ──
+
 const styles = StyleSheet.create({
-  panelScroll: { paddingHorizontal: spacing.lg, paddingTop: spacing.lg },
-  panelInner: { gap: spacing.md, paddingBottom: spacing.xl },
-  productHero: { flexDirection: 'row', gap: spacing.md, alignItems: 'center' },
+  scroll: { paddingHorizontal: spacing.lg, paddingTop: spacing.lg },
+  content: { gap: spacing.md, paddingBottom: spacing.xxl },
+
+  // Hero
+  hero: { flexDirection: 'row', gap: spacing.md, alignItems: 'center' },
   heroImage: { width: 72, height: 72, borderRadius: radius.md },
   heroPlaceholder: { alignItems: 'center', justifyContent: 'center' },
   heroInfo: { flex: 1, gap: spacing.xs },
-  barcodeRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  mono: { fontVariant: ['tabular-nums'], letterSpacing: 0.5 },
-  priceSummary: { flexDirection: 'row', borderRadius: radius.lg, paddingVertical: spacing.md, paddingHorizontal: spacing.lg },
-  priceCol: { flex: 1, alignItems: 'center', gap: spacing.xxs },
-  priceColCenter: { borderLeftWidth: 1, borderRightWidth: 1 },
-  listingsScroll: { marginHorizontal: -spacing.lg },
-  listingsContent: { paddingHorizontal: spacing.lg, gap: spacing.sm },
-  listingCard: { width: 140, borderRadius: radius.lg, borderWidth: 1, overflow: 'hidden' },
-  listingImage: { width: '100%', height: 100 },
-  listingNoImage: { alignItems: 'center', justifyContent: 'center' },
-  listingInfo: { padding: spacing.sm, gap: spacing.xxs },
-  listingTitle: { lineHeight: 16 },
-  noPriceBox: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, padding: spacing.md, borderRadius: radius.md, borderWidth: 1 },
-  actions: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  iconBtn: { width: 44, height: 44, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
-  continueBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, height: 44, borderRadius: radius.md },
-  editSection: { gap: spacing.sm, borderTopWidth: 1, paddingTop: spacing.md },
-  editHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
-  editRow: { flexDirection: 'row', gap: spacing.sm },
-  editActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.sm, paddingTop: spacing.xs },
+  heroMeta: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexWrap: 'wrap' },
+
+  // Price card
+  priceCard: {
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+    borderWidth: 1,
+    gap: spacing.sm,
+  },
+  priceHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  priceRange: { flexDirection: 'row', alignItems: 'baseline', gap: spacing.sm },
+  priceAvg: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+
+  // Alert / Info
+  alertBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+  },
+  infoBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+    padding: spacing.md,
+    borderRadius: radius.md,
+  },
+
+  // Sections
+  section: { gap: spacing.sm },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+
+  // Listing rows (Google Lens style)
+  listingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: radius.md,
+    overflow: 'hidden',
+  },
+  listingMain: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
+    paddingLeft: spacing.sm,
+  },
+  listingThumb: { width: 44, height: 44, borderRadius: radius.sm },
+  listingContent: { flex: 1, gap: spacing.xxs },
+  listingMeta: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  listingPrice: { alignItems: 'flex-end', paddingRight: spacing.xs },
+  compBtn: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.md,
+    alignSelf: 'stretch',
+    justifyContent: 'center',
+  },
 
   // Web matches
-  webMatchesSection: { gap: spacing.sm },
-  webMatchesHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  webMatchItem: {
+  webRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
@@ -281,12 +449,39 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: radius.md,
   },
-  webMatchIcon: {
-    width: 32,
-    height: 32,
+  webIcon: {
+    width: 28,
+    height: 28,
     borderRadius: radius.sm,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  webMatchText: { flex: 1, gap: spacing.xxs },
+
+  // Empty state
+  emptyState: {
+    alignItems: 'center',
+    gap: spacing.md,
+    padding: spacing.xl,
+    borderRadius: radius.lg,
+  },
+
+  // Actions
+  actions: { gap: spacing.sm },
+  secondaryActions: { flexDirection: 'row', gap: spacing.sm },
+  secondaryBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    paddingVertical: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+  },
+
+  // Edit form
+  editSection: { gap: spacing.sm, borderTopWidth: 1, paddingTop: spacing.md },
+  editHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
+  editRow: { flexDirection: 'row', gap: spacing.sm },
+  editActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.sm, paddingTop: spacing.xs },
 });

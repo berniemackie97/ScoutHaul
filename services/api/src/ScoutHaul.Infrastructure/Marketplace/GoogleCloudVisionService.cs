@@ -71,9 +71,20 @@ internal sealed class GoogleCloudVisionService(
             }
 
             using Stream stream = await response.Content.ReadAsStreamAsync(cancellationToken);
-            using JsonDocument doc = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
-
-            return ParseResponse(doc);
+            JsonDocument doc;
+            try
+            {
+                doc = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
+            }
+            catch (JsonException ex)
+            {
+                logger.LogWarning(ex, "Failed to parse Google Cloud Vision response as JSON");
+                return EmptyResult();
+            }
+            using (doc)
+            {
+                return ParseResponse(doc);
+            }
         }
     }
 
@@ -195,15 +206,32 @@ internal sealed class GoogleCloudVisionService(
             detectedText = GetString(textAnnotations[0], "description")?.Trim();
         }
 
-        // Build search query — best guess label is strongest signal
+        // Build search query — cascading: bestGuessLabel > entities > labels
         string? searchQuery = bestGuessLabel;
         if (string.IsNullOrWhiteSpace(searchQuery) && webEntities.Count > 0)
         {
-            // Combine top 2 web entities as search query
             searchQuery = string.Join(" ", webEntities
                 .OrderByDescending(e => e.Score)
                 .Take(2)
                 .Select(e => e.Description));
+        }
+        if (string.IsNullOrWhiteSpace(searchQuery) && labels.Count > 0)
+        {
+            // Fallback to labels — filter out overly generic ones
+            HashSet<string> genericLabels = ["Product", "Material", "Rectangle", "Font",
+                "Design", "Pattern", "Art", "Electric blue", "Graphics", "Brand",
+                "Logo", "Illustration", "Circle", "Symbol", "Line", "Parallel",
+                "Symmetry", "Technology", "Event", "Room", "Gadget"];
+
+            string[] useful = labels
+                .Where(l => !genericLabels.Contains(l) && l.Length > 2)
+                .Take(3)
+                .ToArray();
+
+            if (useful.Length > 0)
+            {
+                searchQuery = string.Join(" ", useful);
+            }
         }
 
         return new VisionIdentifyResult(

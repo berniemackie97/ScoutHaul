@@ -101,11 +101,18 @@ export function makeDoneError(query: string, error: unknown, webMatches: WebMatc
   };
 }
 
+export type VisionOverrides = {
+  brand?: string | null;
+  category?: string | null;
+  title?: string | null;
+};
+
 export function makeDoneFromResult(
   query: string,
   result: import('../../domain/types').MarketplaceLookupResult,
   photoUri?: string | null,
   webMatches: WebMatch[] = [],
+  visionOverrides?: VisionOverrides,
 ): ScanDoneState {
   return {
     phase: 'done',
@@ -117,10 +124,10 @@ export function makeDoneFromResult(
     highPrice: result.highestPrice ?? null,
     totalResults: result.totalResults,
     error: null,
-    productTitle: result.productTitle ?? null,
-    productBrand: result.productBrand ?? null,
+    productTitle: result.productTitle ?? visionOverrides?.title ?? null,
+    productBrand: result.productBrand ?? visionOverrides?.brand ?? null,
     productImageUrl: result.productImageUrl ?? null,
-    productCategory: result.productCategory ?? null,
+    productCategory: result.productCategory ?? visionOverrides?.category ?? null,
     productIdentityId: result.productIdentityId ?? null,
     savedObservationCount: result.savedObservationCount ?? 0,
     providersUsed: result.providersUsed ?? [],

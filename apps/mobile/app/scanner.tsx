@@ -27,7 +27,7 @@ import type { IdentifyResult } from '../src/features/scanner/photoIdentify';
 import { identifyFromPhoto } from '../src/features/scanner/photoIdentify';
 import { radius, spacing } from '../src/components/theme';
 import { useAppTheme } from '../src/context/ThemeContext';
-import type { ScanMode, ScanState, WebMatch } from '../src/features/scanner/types';
+import type { ScanMode, ScanState, VisionOverrides, WebMatch } from '../src/features/scanner/types';
 import {
   extractWebMatches,
   makeDoneError,
@@ -63,17 +63,19 @@ export default function BarcodeScannerScreen() {
   const shutterFlash = useRef(new Animated.Value(0)).current;
   const processingPulse = useRef(new Animated.Value(0)).current;
   const [capturedPhotoUri, setCapturedPhotoUri] = useState<string | null>(null);
+  const [showCaptureOverlay, setShowCaptureOverlay] = useState(false);
   const identifyResultRef = useRef<IdentifyResult | null>(null);
   const insets = useSafeAreaInsets();
   const isScanning = state.phase === 'scanning';
   const isPhotoMode = mode === 'photo-identify';
-  const showPhotoOverlay = !!capturedPhotoUri && state.phase !== 'scanning' && state.phase !== 'photo-review';
+  const showPhotoOverlay = (showCaptureOverlay || !!capturedPhotoUri) && state.phase !== 'scanning' && state.phase !== 'photo-review';
   const modeColor = isPhotoMode ? c.accent : c.primary;
 
   // Clear photo overlay when reaching results
   useEffect(() => {
     if (state.phase === 'done' || state.phase === 'photo-review') {
       setCapturedPhotoUri(null);
+      setShowCaptureOverlay(false);
     }
   }, [state.phase]);
 
@@ -125,55 +127,75 @@ export default function BarcodeScannerScreen() {
     }).start();
   }, [shutterFlash]);
 
-  // ── Multi-query marketplace search with retry ──
+  // ── Marketplace search — tries primary, retries with alternates if providers exist ──
   async function searchWithRetry(
     primary: string,
     alternates: string[],
     photoUri: string,
     webMatches: WebMatch[],
+    overrides?: VisionOverrides,
   ) {
     setState({ phase: 'searching', barcode: primary, photoUri, step: 'Searching marketplaces...' });
 
     // Try primary query
+    let primaryResult: Awaited<ReturnType<typeof api.lookupSearch>> | null = null;
     try {
-      const result = await api.lookupSearch(primary);
-      if (result.totalResults > 0 || result.productTitle) {
-        setState(makeDoneFromResult(primary, result, photoUri, webMatches));
+      primaryResult = await api.lookupSearch(primary);
+      if (primaryResult.totalResults > 0 || primaryResult.productTitle) {
+        setState(makeDoneFromResult(primary, primaryResult, photoUri, webMatches, overrides));
         return;
       }
-    } catch { /* try alternates */ }
+      // No providers configured → skip retries, show Vision results immediately
+      if (!primaryResult.providersUsed?.length) {
+        setState(makeDoneFromResult(primary, primaryResult, photoUri, webMatches, overrides));
+        return;
+      }
+    } catch {
+      // API call failed (auth, network) — show Vision-only results
+      setState({
+        ...makeDoneError(primary, null, webMatches),
+        error: null, // suppress error — Vision results are still useful
+        productTitle: overrides?.title ?? null,
+        productBrand: overrides?.brand ?? null,
+        productCategory: overrides?.category ?? null,
+        photoUri,
+      });
+      return;
+    }
 
-    // Retry with alternate queries
+    // Providers exist but returned nothing — retry with alternate queries
     for (const alt of alternates) {
       setState({ phase: 'searching', barcode: alt, photoUri, step: `Trying "${alt.slice(0, 30)}${alt.length > 30 ? '...' : ''}"` });
       try {
         const result = await api.lookupSearch(alt);
         if (result.totalResults > 0 || result.productTitle) {
-          setState(makeDoneFromResult(alt, result, photoUri, webMatches));
+          setState(makeDoneFromResult(alt, result, photoUri, webMatches, overrides));
           return;
         }
       } catch { /* continue to next */ }
     }
 
-    // All queries exhausted — show what we have (web matches may still be useful)
-    try {
-      const result = await api.lookupSearch(primary);
-      setState(makeDoneFromResult(primary, result, photoUri, webMatches));
-    } catch (e) {
-      setState(makeDoneError(primary, e, webMatches));
-    }
+    // All queries exhausted — show primary result with Vision data
+    setState(makeDoneFromResult(primary, primaryResult, photoUri, webMatches, overrides));
   }
 
   // ── Photo identify — Cloud Vision + OCR, then auto-search with retries ──
   async function captureAndIdentify() {
     if (!cameraRef.current) return;
+
+    // Immediately show overlay — don't wait for photo to save to disk
+    setShowCaptureOverlay(true);
     setState({ phase: 'capturing' });
     haptics.medium();
     fireShutter();
 
     try {
-      const photo = await cameraRef.current.takePictureAsync({ quality: 0.85 });
-      if (!photo?.uri) { setState({ phase: 'scanning' }); return; }
+      const photo = await cameraRef.current.takePictureAsync({ quality: 0.8 });
+      if (!photo?.uri) {
+        setShowCaptureOverlay(false);
+        setState({ phase: 'scanning' });
+        return;
+      }
 
       setCapturedPhotoUri(photo.uri);
       setState({ phase: 'identifying', photoUri: photo.uri, ocrText: null, step: 'Analyzing image...' });
@@ -184,6 +206,13 @@ export default function BarcodeScannerScreen() {
 
       setState({ phase: 'identifying', photoUri: photo.uri, ocrText: null, step: 'Identifying product...' });
 
+      // Vision metadata to carry through to results (even if marketplace doesn't resolve them)
+      const overrides: VisionOverrides = {
+        brand: identified.brand,
+        category: identified.category,
+        title: identified.title,
+      };
+
       if (identified.confidence === 'high' && identified.searchQuery) {
         haptics.success();
         await searchWithRetry(
@@ -191,19 +220,21 @@ export default function BarcodeScannerScreen() {
           identified.alternateQueries,
           photo.uri,
           webMatches,
+          overrides,
         );
       } else if (identified.confidence === 'medium' && identified.searchQuery) {
-        // Medium confidence with matching pages — still auto-search but keep review as fallback
         haptics.medium();
         await searchWithRetry(
           identified.searchQuery,
           identified.alternateQueries,
           photo.uri,
           webMatches,
+          overrides,
         );
       } else {
         // Low confidence — show review for user confirmation
         setCapturedPhotoUri(null);
+        setShowCaptureOverlay(false);
         setState({
           phase: 'photo-review',
           photoUri: photo.uri,
@@ -214,6 +245,7 @@ export default function BarcodeScannerScreen() {
       }
     } catch {
       setCapturedPhotoUri(null);
+      setShowCaptureOverlay(false);
       setState({ phase: 'scanning' });
     }
   }
@@ -224,15 +256,18 @@ export default function BarcodeScannerScreen() {
     if (!q) return;
     const identified = identifyResultRef.current;
     const webMatches = identified ? extractWebMatches(identified.matchingPages) : [];
+    const overrides: VisionOverrides | undefined = identified
+      ? { brand: identified.brand, category: identified.category, title: identified.title }
+      : undefined;
     setCapturedPhotoUri(photoUri ?? null);
     setState({ phase: 'searching', barcode: q, photoUri, step: 'Searching marketplaces...' });
     try {
       const result = await api.lookupSearch(q);
-      if (result.totalResults > 0 || result.productTitle) {
-        setState(makeDoneFromResult(q, result, photoUri, webMatches));
+      if (result.totalResults > 0 || result.productTitle || !result.providersUsed?.length) {
+        setState(makeDoneFromResult(q, result, photoUri, webMatches, overrides));
         return;
       }
-      // No results — try alternates if available
+      // Providers returned nothing — try alternates
       if (identified?.alternateQueries) {
         for (const alt of identified.alternateQueries) {
           if (alt === q) continue;
@@ -240,21 +275,30 @@ export default function BarcodeScannerScreen() {
           try {
             const altResult = await api.lookupSearch(alt);
             if (altResult.totalResults > 0 || altResult.productTitle) {
-              setState(makeDoneFromResult(alt, altResult, photoUri, webMatches));
+              setState(makeDoneFromResult(alt, altResult, photoUri, webMatches, overrides));
               return;
             }
           } catch { /* continue */ }
         }
       }
-      setState(makeDoneFromResult(q, result, photoUri, webMatches));
-    } catch (e) {
-      setState(makeDoneError(q, e, webMatches));
+      setState(makeDoneFromResult(q, result, photoUri, webMatches, overrides));
+    } catch {
+      // API failed — show Vision-only results
+      setState({
+        ...makeDoneError(q, null, webMatches),
+        error: null,
+        productTitle: overrides?.title ?? null,
+        productBrand: overrides?.brand ?? null,
+        productCategory: overrides?.category ?? null,
+        photoUri,
+      });
     }
   }
 
   function resetToScanning() {
     setEditing(false);
     setCapturedPhotoUri(null);
+    setShowCaptureOverlay(false);
     identifyResultRef.current = null;
     setState({ phase: 'scanning' });
   }
@@ -267,14 +311,17 @@ export default function BarcodeScannerScreen() {
   function continueToSearch() {
     if (state.phase !== 'done') return;
     const productName = resolveProductName(state);
+    const identified = identifyResultRef.current;
     router.push({
       pathname: '/manual-search',
       params: {
         query: productName ?? state.barcode,
-        barcode: state.barcode,
+        barcode: identified?.barcode ?? ((/^\d{8,14}$/.test(state.barcode)) ? state.barcode : ''),
         ...(productName ? { productName } : {}),
         ...(state.avgPrice != null ? { avgPrice: String(state.avgPrice) } : {}),
         ...(state.productIdentityId ? { productIdentityId: state.productIdentityId } : {}),
+        ...(state.productBrand ? { brand: state.productBrand } : {}),
+        ...(state.productCategory ? { category: state.productCategory } : {}),
         ...(routeParams.sourcingTripId ? { sourcingTripId: routeParams.sourcingTripId } : {}),
         ...(routeParams.sourcingTripStopId ? { sourcingTripStopId: routeParams.sourcingTripStopId } : {}),
       },
@@ -285,13 +332,36 @@ export default function BarcodeScannerScreen() {
     if (state.phase !== 'done') return;
     const productName = resolveProductName(state);
     const firstListing = state.listings[0];
-    const params: Record<string, string> = { barcode: state.barcode };
+    const identified = identifyResultRef.current;
+    const params: Record<string, string> = {};
+
+    // Title — product name from marketplace or Vision identification
     if (productName) params.title = productName;
+
+    // Barcode — prefer real barcode from OCR, fall back to search query
+    if (identified?.barcode) {
+      params.barcode = identified.barcode;
+    } else if (state.barcode && /^\d{8,14}$/.test(state.barcode)) {
+      params.barcode = state.barcode;
+    }
+
+    // Pricing from marketplace results
     if (state.avgPrice != null) params.estimatedSalePrice = String(state.avgPrice);
-    if (state.productIdentityId) params.productIdentityId = state.productIdentityId;
     if (firstListing?.condition) params.condition = firstListing.condition;
+
+    // Vision-identified metadata — pre-fill brand, category, model
+    if (identified?.brand ?? state.productBrand) params.brand = (identified?.brand ?? state.productBrand)!;
+    if (identified?.category ?? state.productCategory) params.category = (identified?.category ?? state.productCategory)!;
+    if (identified?.model) params.model = identified.model;
+
+    // Captured photo — will be auto-added as hero in edit screen
+    if (state.photoUri) params.photoUri = state.photoUri;
+
+    // IDs
+    if (state.productIdentityId) params.productIdentityId = state.productIdentityId;
     if (routeParams.sourcingTripId) params.sourcingTripId = routeParams.sourcingTripId;
     if (routeParams.sourcingTripStopId) params.sourcingTripStopId = routeParams.sourcingTripStopId;
+
     router.push({ pathname: '/inventory/edit', params });
   }
 
@@ -469,7 +539,11 @@ export default function BarcodeScannerScreen() {
         {/* Captured photo overlay — freezes view during processing */}
         {showPhotoOverlay ? (
           <View style={styles.photoOverlay}>
-            <Image source={{ uri: capturedPhotoUri! }} style={styles.photoOverlayImage} contentFit="cover" />
+            {capturedPhotoUri ? (
+              <Image source={{ uri: capturedPhotoUri }} style={styles.photoOverlayImage} contentFit="cover" />
+            ) : (
+              <View style={styles.photoOverlaySolid} />
+            )}
             <Animated.View
               style={[
                 styles.photoOverlayGradient,
@@ -820,7 +894,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
 
-  panel: { borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, maxHeight: '55%' },
+  panel: { borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, maxHeight: '65%' },
   panelScroll: { paddingHorizontal: spacing.lg, paddingTop: spacing.lg },
   panelInner: { gap: spacing.md, paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.xl },
 
@@ -899,6 +973,10 @@ const styles = StyleSheet.create({
   },
   photoOverlayImage: {
     ...StyleSheet.absoluteFillObject,
+  },
+  photoOverlaySolid: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#1a1a1a',
   },
   photoOverlayGradient: {
     ...StyleSheet.absoluteFillObject,

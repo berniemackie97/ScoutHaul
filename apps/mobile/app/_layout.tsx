@@ -120,7 +120,7 @@ function RootStack() {
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="onboarding" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
       <Stack.Screen name="account" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
-      <Stack.Screen name="scanner" options={{ title: 'Scan Barcode', presentation: 'fullScreenModal' }} />
+      <Stack.Screen name="scanner" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
       <Stack.Screen name="manual-search" options={{ title: 'Search' }} />
       <Stack.Screen name="marketplace-links" options={{ title: 'Marketplace Search' }} />
       <Stack.Screen name="comp-capture" options={{ title: 'Add Comp' }} />

@@ -49,6 +49,10 @@ export default function EditInventoryScreen() {
     id?: string;
     title?: string;
     barcode?: string;
+    brand?: string;
+    model?: string;
+    category?: string;
+    photoUri?: string;
     productIdentityId?: string;
     estimatedSalePrice?: string;
     condition?: string;
@@ -60,9 +64,9 @@ export default function EditInventoryScreen() {
   const [isLoading, setIsLoading] = useState(isEdit);
   const [title, setTitle] = useState(params.title ?? '');
   const [condition, setCondition] = useState(params.condition ?? '');
-  const [category, setCategory] = useState('');
-  const [brand, setBrand] = useState('');
-  const [model, setModel] = useState('');
+  const [category, setCategory] = useState(params.category ?? '');
+  const [brand, setBrand] = useState(params.brand ?? '');
+  const [model, setModel] = useState(params.model ?? '');
   const [color, setColor] = useState('');
   const [sizeSystem, setSizeSystem] = useState('');
   const [sizeValue, setSizeValue] = useState('');
@@ -152,6 +156,15 @@ export default function EditInventoryScreen() {
     const pct = ((profit / sale) * 100).toFixed(0);
     return { profit, pct, positive: profit > 0 };
   }, [purchasePrice, estimatedSalePrice]);
+
+  // Seed photo gallery from scanner's captured image
+  useFocusEffect(
+    useCallback(() => {
+      if (params.photoUri && photos.length === 0) {
+        setPhotos([{ uri: params.photoUri, isHero: true }]);
+      }
+    }, [params.photoUri]),
+  );
 
   useFocusEffect(
     useCallback(() => {

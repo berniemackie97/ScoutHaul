@@ -101,12 +101,19 @@ function buildFromVision(vision: VisionIdentifyResult): IdentifyResult {
   // Barcode: from OCR text
   const barcode = rawText ? extractBarcode(rawText) : null;
 
-  // Title: bestGuessLabel > matching page product name > entity fallback
+  // Title: bestGuessLabel > matching page product name > entity fallback > label fallback
   const pageProductName = extractProductFromPageTitles(vision.matchingPages);
-  const title = vision.bestGuessLabel ?? pageProductName ?? buildTitleFallback(brand, model, vision.webEntities);
+  const labelTitle = buildTitleFromLabels(vision.labels);
+  const title = vision.bestGuessLabel
+    ?? pageProductName
+    ?? buildTitleFallback(brand, model, vision.webEntities)
+    ?? labelTitle;
 
-  // Primary search query — bestGuessLabel is strongest signal
-  const searchQuery = vision.searchQuery ?? title ?? '';
+  // Primary search query — bestGuessLabel > entities > LABELS as last resort
+  const searchQuery = vision.searchQuery
+    ?? title
+    ?? buildSearchFromLabels(vision.labels, brand, category)
+    ?? '';
 
   // Alternate queries — ranked strategies for retry when primary returns no results
   const alternateQueries = buildAlternateQueries(
@@ -114,16 +121,37 @@ function buildFromVision(vision: VisionIdentifyResult): IdentifyResult {
     vision.webEntities, vision.matchingPages, vision.bestGuessLabel,
   );
 
-  // Confidence — factor in matching pages (Google already found this product somewhere)
+  // Also add label-based query as alternate if not already primary
+  const labelQuery = buildSearchFromLabels(vision.labels, brand, category);
+  if (labelQuery && labelQuery !== searchQuery && !alternateQueries.includes(labelQuery)) {
+    alternateQueries.push(labelQuery);
+  }
+
+  // Confidence — ANY signal from Vision = at least medium. Labels always present = always try.
   const hasVisionId = !!vision.bestGuessLabel;
   const hasEntities = vision.webEntities.length > 0;
   const hasPages = vision.matchingPages.length > 0;
+  const hasLabels = vision.labels.length > 0;
   const confidence: IdentifyResult['confidence'] =
     hasVisionId ? 'high'
     : (hasEntities && hasPages) ? 'high'
     : hasEntities ? 'medium'
     : hasPages ? 'medium'
+    : hasLabels ? 'medium'
     : 'low';
+
+  console.log('[Vision] Built result:', {
+    confidence,
+    searchQuery,
+    alternateQueries: alternateQueries.length,
+    title,
+    brand,
+    category,
+    labels: vision.labels.slice(0, 5),
+    entities: vision.webEntities.slice(0, 3).map((e) => e.description),
+    pages: vision.matchingPages.length,
+    bestGuess: vision.bestGuessLabel,
+  });
 
   return {
     title,
@@ -140,6 +168,43 @@ function buildFromVision(vision: VisionIdentifyResult): IdentifyResult {
     matchingPages: vision.matchingPages,
     bestGuessLabel: vision.bestGuessLabel,
   };
+}
+
+// ── Label-based fallbacks (for items with no text/brand/entities — just visual labels) ──
+
+function buildTitleFromLabels(labels: string[]): string | null {
+  // Use top 2-3 most specific labels as a title
+  // Filter out very generic ones like "Product", "Material", "Rectangle"
+  const GENERIC_LABELS = new Set([
+    'product', 'material', 'rectangle', 'font', 'design', 'pattern',
+    'art', 'electric blue', 'graphics', 'brand', 'logo', 'illustration',
+    'circle', 'symbol', 'line', 'parallel', 'symmetry', 'technology',
+  ]);
+  const useful = labels.filter((l) => !GENERIC_LABELS.has(l.toLowerCase()) && l.length > 2);
+  if (useful.length === 0) return null;
+  return useful.slice(0, 2).join(' ');
+}
+
+function buildSearchFromLabels(
+  labels: string[],
+  brand: string | null,
+  category: string | null,
+): string | null {
+  const GENERIC_LABELS = new Set([
+    'product', 'material', 'rectangle', 'font', 'design', 'pattern',
+    'art', 'electric blue', 'graphics', 'brand', 'logo', 'illustration',
+    'circle', 'symbol', 'line', 'parallel', 'symmetry', 'technology',
+  ]);
+  const useful = labels.filter((l) => !GENERIC_LABELS.has(l.toLowerCase()) && l.length > 2);
+  if (useful.length === 0) return null;
+
+  // Combine brand (if detected) with top labels for better search
+  const parts: string[] = [];
+  if (brand) parts.push(brand);
+  parts.push(...useful.slice(0, brand ? 2 : 3));
+
+  const query = parts.join(' ').trim();
+  return query.length >= 3 ? query : null;
 }
 
 // ── Alternate query generation ──
@@ -285,11 +350,38 @@ async function callCloudVision(photoUri: string): Promise<VisionIdentifyResult |
       console.warn('[Vision] Base64 too short, skipping:', base64?.length);
       return null;
     }
+    console.log('[Vision] Sending image to Cloud Vision API...', Math.round(base64.length / 1024), 'KB');
     const result = await api.visionIdentify(base64);
-    console.log('[Vision] Response:', result.bestGuessLabel, result.webEntities.length, 'entities', result.labels.length, 'labels');
+    console.log('[Vision] Response:', {
+      bestGuessLabel: result.bestGuessLabel,
+      entities: result.webEntities.length,
+      labels: result.labels.length,
+      pages: result.matchingPages.length,
+      logos: result.detectedLogos.length,
+      hasText: !!result.detectedText,
+      searchQuery: result.searchQuery,
+    });
+
+    // Check if result is effectively empty (API returned but found nothing)
+    const isEmpty = !result.bestGuessLabel
+      && result.webEntities.length === 0
+      && result.labels.length === 0
+      && result.matchingPages.length === 0;
+
+    if (isEmpty) {
+      console.warn('[Vision] Cloud Vision returned empty result — API may not be configured or image unrecognizable');
+    }
+
     return result;
   } catch (error) {
-    console.warn('[Vision] Cloud Vision call failed:', error instanceof Error ? error.message : error);
+    const msg = error instanceof Error ? error.message : String(error);
+    if (msg.includes('503') || msg.includes('not configured')) {
+      console.error('[Vision] Cloud Vision API NOT CONFIGURED — falling back to OCR-only. Configure GoogleCloudVision:ApiKey in backend.');
+    } else if (msg.includes('Sign in')) {
+      console.error('[Vision] Auth required — user not signed in, cannot call Vision API');
+    } else {
+      console.error('[Vision] Cloud Vision call failed:', msg);
+    }
     return null;
   }
 }
