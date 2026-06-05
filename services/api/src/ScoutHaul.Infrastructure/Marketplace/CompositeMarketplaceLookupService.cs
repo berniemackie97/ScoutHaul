@@ -148,7 +148,11 @@ internal sealed class CompositeMarketplaceLookupService(
         }
 
         return result
-            .OrderByDescending(listing => listing.IsSold)
+            // Resale priority: sold-secondhand → active-secondhand → retail, then most recent,
+            // then cheapest total. Gives the reseller realized comps first, freshest first.
+            .OrderBy(listing => MarketTiers.Rank(listing.MarketTier))
+            .ThenByDescending(listing => listing.SoldDate ?? listing.ListedDate ?? DateTimeOffset.MinValue)
+            .ThenByDescending(listing => listing.IsSold)
             .ThenBy(listing => listing.Price + (listing.ShippingCost ?? 0))
             .Take(40)
             .ToList();

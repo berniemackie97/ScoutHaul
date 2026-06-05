@@ -12,6 +12,7 @@ import { useAppTheme } from '../../context/ThemeContext';
 import { useHaptics } from '../../hooks/useHaptics';
 import { formatMoney } from '../../utils/money';
 import type { MarketplaceListing } from '../../domain/types';
+import { CompSourcesPanel } from './CompSourcesPanel';
 import type { ScanDoneState, WebMatch } from './types';
 import { resolveProductImage, resolveProductName } from './types';
 
@@ -56,6 +57,10 @@ export function ScanResults({
 
   const [refining, setRefining] = useState(false);
   const [refineQuery, setRefineQuery] = useState(productName ?? state.barcode ?? '');
+
+  // Comp search query — product name preferred; skip bare unresolved barcode numbers.
+  const compQuery = productName
+    ?? (/^\d{8,14}$/.test(state.barcode) ? '' : state.barcode);
 
   return (
     <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false} bounces={false}>
@@ -190,18 +195,10 @@ export function ScanResults({
             <Ionicons name="alert-circle" size={18} color={c.danger} />
             <Text variant="caption" color={c.danger} style={{ flex: 1 }}>{state.error}</Text>
           </View>
-        ) : hasIdentification && !hasListings ? (
-          <View style={[styles.infoBox, { backgroundColor: c.surfaceAlt }]}>
-            <Ionicons name="information-circle-outline" size={18} color={c.textMuted} />
-            <View style={{ flex: 1 }}>
-              <Text variant="caption" color={c.text}>
-                {hasWebMatches
-                  ? 'Product identified — check web results below for pricing.'
-                  : 'Product identified — add to inventory and research pricing later.'}
-              </Text>
-            </View>
-          </View>
         ) : null}
+
+        {/* ── Find Comps — deep-links to real sold/active resale sources (the live workflow) ── */}
+        {compQuery ? <CompSourcesPanel query={compQuery} /> : null}
 
         {/* ── Marketplace Listings (Google Lens "Compare Prices" list style) ── */}
         {hasListings ? (
@@ -322,6 +319,16 @@ export function ScanResults({
 
 // ── Listing Row (Google Lens "Compare Prices" style) ──
 
+// "Sold Jun 2" for realized comps, "Listed Jun 1" for active — the recency a reseller needs.
+function compDateLabel(listing: MarketplaceListing): string | null {
+  const iso = listing.isSold ? listing.soldDate : listing.listedDate;
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  const when = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  return `${listing.isSold ? 'Sold' : 'Listed'} ${when}`;
+}
+
 function ListingRow({ listing, productIdentityId }: { listing: MarketplaceListing; productIdentityId: string | null }) {
   const { colors: c } = useAppTheme();
   const haptics = useHaptics();
@@ -377,6 +384,9 @@ function ListingRow({ listing, productIdentityId }: { listing: MarketplaceListin
             ) : (
               <Text variant="label" color={c.textMuted}>{listing.condition}</Text>
             )}
+            {compDateLabel(listing) ? (
+              <Text variant="label" color={c.textMuted}>· {compDateLabel(listing)}</Text>
+            ) : null}
           </View>
         </View>
         <View style={styles.listingPrice}>

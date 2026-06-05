@@ -296,7 +296,26 @@ public sealed record MarketplaceListingDto(
     string Condition,
     string Source,
     bool IsSold,
-    DateTimeOffset? SoldDate);
+    DateTimeOffset? SoldDate,
+    // Provenance for ranking: which resale tier this came from and when it was listed (if active).
+    string? MarketTier = null, // "sold-secondhand" | "active-secondhand" | "retail"
+    DateTimeOffset? ListedDate = null);
+
+public static class MarketTiers
+{
+    public const string SoldSecondhand = "sold-secondhand";
+    public const string ActiveSecondhand = "active-secondhand";
+    public const string Retail = "retail";
+
+    /// <summary>Lower = higher priority. Sold realized comps rank above active, above retail.</summary>
+    public static int Rank(string? tier) => tier switch
+    {
+        SoldSecondhand => 0,
+        ActiveSecondhand => 1,
+        Retail => 2,
+        _ => 3,
+    };
+}
 
 public sealed record MarketplaceLookupResult(
     string Query,

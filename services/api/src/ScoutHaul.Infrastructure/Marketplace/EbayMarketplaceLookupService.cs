@@ -107,7 +107,8 @@ internal sealed class EbayMarketplaceLookupService : IMarketplacePricingProvider
                 Condition: item.Condition ?? "Unknown",
                 Source: "eBay",
                 IsSold: false,
-                SoldDate: null
+                SoldDate: null,
+                MarketTier: MarketTiers.ActiveSecondhand // Browse API returns active listings
             )).ToList();
         }
         catch (Exception ex)

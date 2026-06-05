@@ -400,6 +400,27 @@ public sealed class CompositeMarketplaceLookupTests
     }
 
     [Fact]
+    public async Task Listings_ranked_sold_then_active_then_retail()
+    {
+        var barcodeLookup = new StubBarcodeLookupService(null);
+        // Intentionally out of order: retail (cheap), active, sold.
+        var retail = new MarketplaceListingDto("Retail", 50m, null, null, "https://x/retail", "New", "Google Shopping", false, null, MarketTiers.Retail);
+        var active = new MarketplaceListingDto("Active", 80m, null, null, "https://x/active", "Used", "eBay", false, null, MarketTiers.ActiveSecondhand);
+        var sold = new MarketplaceListingDto("Sold", 70m, null, null, "https://x/sold", "Used", "eBay", true, DateTimeOffset.UtcNow, MarketTiers.SoldSecondhand);
+        var provider = new StubPricingProvider("Mixed", true, barcodeListings: [retail, active, sold]);
+
+        var sut = new CompositeMarketplaceLookupService(barcodeLookup, [provider],
+            new NoEstimator(), NullLogger<CompositeMarketplaceLookupService>.Instance);
+
+        MarketplaceLookupResult result = await sut.SearchByBarcodeAsync("123");
+
+        Assert.Equal(3, result.TotalResults);
+        Assert.Equal("Sold", result.Listings[0].Title);   // sold-secondhand first
+        Assert.Equal("Active", result.Listings[1].Title);  // then active-secondhand
+        Assert.Equal("Retail", result.Listings[2].Title);  // retail last
+    }
+
+    [Fact]
     public async Task Keyword_with_no_comps_estimates_from_query()
     {
         var barcodeLookup = new StubBarcodeLookupService(null);

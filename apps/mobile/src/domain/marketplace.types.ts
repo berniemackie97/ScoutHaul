@@ -104,6 +104,8 @@ export type DashboardSummary = {
   staleInventoryCount: number;
 };
 
+export type MarketTier = 'sold-secondhand' | 'active-secondhand' | 'retail';
+
 export type MarketplaceListing = {
   title: string;
   price: number;
@@ -114,6 +116,8 @@ export type MarketplaceListing = {
   source: string;
   isSold: boolean;
   soldDate?: string | null;
+  listedDate?: string | null;
+  marketTier?: MarketTier | null;
 };
 
 export type MarketplaceLookupResult = {

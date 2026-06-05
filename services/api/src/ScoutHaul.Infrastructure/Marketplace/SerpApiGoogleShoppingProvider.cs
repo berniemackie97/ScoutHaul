@@ -87,7 +87,9 @@ internal sealed class SerpApiGoogleShoppingProvider(
                     ? "Google Shopping"
                     : $"Google Shopping: {TrimTo(source, 62)}",
                 IsSold: false,
-                SoldDate: null));
+                SoldDate: null,
+                // A second-hand condition means it's a used listing; otherwise treat as retail.
+                MarketTier: string.IsNullOrWhiteSpace(condition) ? MarketTiers.Retail : MarketTiers.ActiveSecondhand));
         }
 
         return listings;
