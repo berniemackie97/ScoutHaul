@@ -23,6 +23,7 @@ import { Text } from '../src/components/Text';
 import { ScanResults } from '../src/features/scanner/ScanResults';
 import type { IdentifyResult } from '../src/features/scanner/photoIdentify';
 import { identifyFromPhoto } from '../src/features/scanner/photoIdentify';
+import { setIdentifyHandoff } from '../src/features/scanner/identifyHandoff';
 import { radius, spacing } from '../src/components/theme';
 import { useAppTheme } from '../src/context/ThemeContext';
 import type { ScanMode, ScanState, VisionOverrides } from '../src/features/scanner/types';
@@ -47,7 +48,10 @@ const PHOTO_CW = 3.5;
 export default function BarcodeScannerScreen() {
   const { colors: c } = useAppTheme();
   const haptics = useHaptics();
-  const routeParams = useLocalSearchParams<{ sourcingTripId?: string; sourcingTripStopId?: string; mode?: ScanMode }>();
+  const routeParams = useLocalSearchParams<{ sourcingTripId?: string; sourcingTripStopId?: string; mode?: ScanMode; fill?: string }>();
+  // "fill" mode: launched from an existing form (e.g. inventory edit) that wants
+  // the identified fields handed *back* rather than pushed into a new record.
+  const isFillMode = routeParams.fill === '1';
   const [permission, requestPermission] = useCameraPermissions();
   const [state, setState] = useState<ScanState>({ phase: 'scanning' });
   const [mode, setMode] = useState<ScanMode>(routeParams.mode === 'photo-identify' ? 'photo-identify' : 'barcode');
@@ -421,6 +425,14 @@ export default function BarcodeScannerScreen() {
     if (state.productIdentityId) params.productIdentityId = state.productIdentityId;
     if (routeParams.sourcingTripId) params.sourcingTripId = routeParams.sourcingTripId;
     if (routeParams.sourcingTripStopId) params.sourcingTripStopId = routeParams.sourcingTripStopId;
+
+    // Fill mode: hand the resolved fields back to the caller form and pop, so we
+    // don't create a duplicate edit screen on top of the one that launched us.
+    if (isFillMode) {
+      setIdentifyHandoff(params);
+      router.back();
+      return;
+    }
 
     router.push({ pathname: '/inventory/edit', params });
   }
@@ -809,6 +821,8 @@ export default function BarcodeScannerScreen() {
               onRescan={resetToScanning}
               onEdit={openEditForm}
               onAddInventory={addToInventory}
+              addInventoryLabel={isFillMode ? 'Use These Details' : 'Add to Inventory'}
+              addInventoryIcon={isFillMode ? 'checkmark-circle-outline' : 'add-circle-outline'}
               onResearch={continueToSearch}
               onRefine={(q) => void searchManual(q, state.photoUri ?? undefined)}
               onSaveEstimate={saveEstimateAsComp}

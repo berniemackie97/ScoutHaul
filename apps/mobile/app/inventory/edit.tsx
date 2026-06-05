@@ -2,9 +2,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { ActivityIndicator } from 'react-native';
 import { api } from '../../src/api';
 import { Button } from '../../src/components/Button';
 import { ErrorBanner } from '../../src/components/ErrorBanner';
@@ -19,7 +18,7 @@ import { radius, spacing } from '../../src/components/theme';
 import { useAppTheme } from '../../src/context/ThemeContext';
 import { useHaptics } from '../../src/hooks/useHaptics';
 import { enqueueOperation } from '../../src/db/localStore';
-import { identifyFromPhoto, type IdentifyResult } from '../../src/features/scanner/photoIdentify';
+import { takeIdentifyHandoff } from '../../src/features/scanner/identifyHandoff';
 import {
   categoryAttributeFields,
   categoryOptions,
@@ -91,8 +90,9 @@ export default function EditInventoryScreen() {
   const [error, setError] = useState<string | null>(null);
   const [titleTouched, setTitleTouched] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [isIdentifying, setIsIdentifying] = useState(false);
-  const [identifyResult, setIdentifyResult] = useState<IdentifyResult | null>(null);
+  // Guards loadItem against re-running on every focus (which would clobber
+  // unsaved edits and any fields applied from the scanner handoff).
+  const hasLoadedRef = useRef(false);
 
   // Dynamic category attribute fields
   const categoryFields = useMemo(
@@ -169,9 +169,33 @@ export default function EditInventoryScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      if (!isEdit || !params.id) return;
+      if (!isEdit || !params.id || hasLoadedRef.current) return;
+      hasLoadedRef.current = true;
       void loadItem(params.id);
     }, [params.id]),
+  );
+
+  // Apply fields handed back by the scanner's photo-identify flow (fill mode).
+  // Functional updaters read the *current* value so we never clobber what the
+  // user (or loadItem) already filled in.
+  useFocusEffect(
+    useCallback(() => {
+      const h = takeIdentifyHandoff();
+      if (!h) return;
+      setTitle((cur) => (cur.trim() ? cur : h.title ?? cur));
+      setBrand((cur) => (cur.trim() ? cur : h.brand ?? cur));
+      setModel((cur) => (cur.trim() ? cur : h.model ?? cur));
+      setCategory((cur) => (cur ? cur : h.category ?? cur));
+      setColor((cur) => (cur.trim() ? cur : h.color ?? cur));
+      setCondition((cur) => (cur ? cur : h.condition ?? cur));
+      setBarcode((cur) => (cur.trim() ? cur : h.barcode ?? cur));
+      setEstimatedSalePrice((cur) => (cur.trim() ? cur : h.estimatedSalePrice ?? cur));
+      if (h.photoUri) {
+        const uri = h.photoUri;
+        setPhotos((prev) => (prev.some((p) => p.uri === uri) ? prev : [...prev, { uri, isHero: prev.length === 0 }]));
+      }
+      haptics.success();
+    }, []),
   );
 
   async function loadItem(id: string) {
@@ -266,85 +290,12 @@ export default function EditInventoryScreen() {
     setPhotos((prev) => prev.map((p, i) => ({ ...p, isHero: i === index })));
   }
 
-  async function identifyItem() {
-    const perm = await ImagePicker.requestCameraPermissionsAsync();
-    if (!perm.granted) return;
-    const result = await ImagePicker.launchCameraAsync({ quality: 0.85 });
-    if (result.canceled) return;
-
-    const photoUri = result.assets[0].uri;
-    setIsIdentifying(true);
+  // Photo-identify reuses the scanner's full flow (capture → analyze overlay →
+  // grounded comps). The scanner hands the resolved fields back here via the
+  // module handoff, which the focus effect above applies on return.
+  function identifyItem() {
     haptics.medium();
-
-    try {
-      const identified = await identifyFromPhoto(photoUri);
-      setIdentifyResult(identified);
-
-      // Auto-add photo to gallery as hero if no photos yet
-      const newPhoto: LocalPhoto = { uri: photoUri, isHero: photos.length === 0 };
-      setPhotos((prev) => [...prev, newPhoto]);
-
-      // Pre-fill only fields that are currently empty (don't overwrite user input)
-      if (identified.title && !title.trim()) setTitle(identified.title);
-      if (identified.brand && !brand.trim()) setBrand(identified.brand);
-      if (identified.model && !model.trim()) setModel(identified.model);
-      if (identified.category && !category) setCategory(identified.category);
-      if (identified.color && !color.trim()) setColor(identified.color);
-      if (identified.condition && !condition) setCondition(identified.condition);
-      if (identified.barcode && !barcode.trim()) setBarcode(identified.barcode);
-      // Estimated resale midpoint → sale price, if empty
-      if (!estimatedSalePrice.trim() && (identified.estimatedResaleLow || identified.estimatedResaleHigh)) {
-        const lo = identified.estimatedResaleLow ?? identified.estimatedResaleHigh!;
-        const hi = identified.estimatedResaleHigh ?? identified.estimatedResaleLow!;
-        setEstimatedSalePrice(String(Math.round((lo + hi) / 2)));
-      }
-
-      haptics.success();
-    } catch {
-      haptics.error();
-      setError('Photo identification failed. Photo was still added.');
-      // Still add the photo even if identification fails
-      const newPhoto: LocalPhoto = { uri: photoUri, isHero: photos.length === 0 };
-      setPhotos((prev) => [...prev, newPhoto]);
-    } finally {
-      setIsIdentifying(false);
-    }
-  }
-
-  function applyIdentifyField(field: keyof IdentifyResult, value: string | null) {
-    if (!value) return;
-    switch (field) {
-      case 'title': setTitle(value); break;
-      case 'brand': setBrand(value); break;
-      case 'model': setModel(value); break;
-      case 'category': setCategory(value); break;
-      case 'color': setColor(value); break;
-      case 'condition': setCondition(value); break;
-      case 'barcode': setBarcode(value); break;
-    }
-    haptics.selection();
-  }
-
-  function applyAllIdentifyFields() {
-    const r = identifyResult;
-    if (!r) return;
-    if (r.title) setTitle(r.title);
-    if (r.brand) setBrand(r.brand);
-    if (r.model) setModel(r.model);
-    if (r.category) setCategory(r.category);
-    if (r.color) setColor(r.color);
-    if (r.condition) setCondition(r.condition);
-    if (r.barcode) setBarcode(r.barcode);
-    if (r.estimatedResaleLow || r.estimatedResaleHigh) {
-      const lo = r.estimatedResaleLow ?? r.estimatedResaleHigh!;
-      const hi = r.estimatedResaleHigh ?? r.estimatedResaleLow!;
-      setEstimatedSalePrice(String(Math.round((lo + hi) / 2)));
-    }
-    haptics.success();
-  }
-
-  function dismissIdentifyResult() {
-    setIdentifyResult(null);
+    router.push({ pathname: '/scanner', params: { mode: 'photo-identify', fill: '1' } });
   }
 
   async function save() {
@@ -477,24 +428,12 @@ export default function EditInventoryScreen() {
       {/* ── Photo Management ── */}
       <PhotoManager
         photos={photos}
-        isIdentifying={isIdentifying}
         onTake={() => void takePhoto()}
         onPick={() => void pickPhotos()}
-        onIdentify={() => void identifyItem()}
+        onIdentify={identifyItem}
         onRemove={removePhoto}
         onSetHero={setHero}
       />
-
-      {/* ── Identify Results Banner ── */}
-      {identifyResult ? (
-        <IdentifyBanner
-          result={identifyResult}
-          currentValues={{ title, brand, model, category, color, condition, barcode }}
-          onApply={applyIdentifyField}
-          onApplyAll={applyAllIdentifyFields}
-          onDismiss={dismissIdentifyResult}
-        />
-      ) : null}
 
       {/* ── Essentials — always expanded ── */}
       <ExpandableSection
@@ -774,7 +713,6 @@ export default function EditInventoryScreen() {
 
 function PhotoManager({
   photos,
-  isIdentifying,
   onTake,
   onPick,
   onIdentify,
@@ -782,7 +720,6 @@ function PhotoManager({
   onSetHero,
 }: {
   photos: LocalPhoto[];
-  isIdentifying: boolean;
   onTake: () => void;
   onPick: () => void;
   onIdentify: () => void;
@@ -815,16 +752,11 @@ function PhotoManager({
       >
         <Pressable
           onPress={onIdentify}
-          disabled={isIdentifying}
           style={[styles.addPhotoBtn, styles.addPhotoPrimary, { backgroundColor: c.accentLight, borderColor: c.accent }]}
           accessibilityLabel="Photo identify item"
         >
-          {isIdentifying ? (
-            <ActivityIndicator size="small" color={c.accent} />
-          ) : (
-            <Ionicons name="eye-outline" size={24} color={c.accent} />
-          )}
-          <Text variant="label" color={c.accent}>{isIdentifying ? 'Reading...' : 'Identify'}</Text>
+          <Ionicons name="sparkles-outline" size={24} color={c.accent} />
+          <Text variant="label" color={c.accent}>Identify</Text>
         </Pressable>
         <Pressable
           onPress={onTake}
@@ -880,119 +812,6 @@ function PhotoManager({
           </Text>
         </View>
       ) : null}
-    </View>
-  );
-}
-
-// ── Identify Banner ──
-
-type IdentifyField = { key: keyof IdentifyResult; label: string; icon: keyof typeof Ionicons.glyphMap };
-const IDENTIFY_FIELDS: IdentifyField[] = [
-  { key: 'title', label: 'Title', icon: 'text-outline' },
-  { key: 'brand', label: 'Brand', icon: 'pricetag-outline' },
-  { key: 'model', label: 'Model', icon: 'barcode-outline' },
-  { key: 'category', label: 'Category', icon: 'grid-outline' },
-  { key: 'color', label: 'Color', icon: 'color-palette-outline' },
-  { key: 'condition', label: 'Condition', icon: 'sparkles-outline' },
-  { key: 'barcode', label: 'Barcode', icon: 'scan-outline' },
-];
-
-function IdentifyBanner({
-  result,
-  currentValues,
-  onApply,
-  onApplyAll,
-  onDismiss,
-}: {
-  result: IdentifyResult;
-  currentValues: Record<string, string>;
-  onApply: (field: keyof IdentifyResult, value: string | null) => void;
-  onApplyAll: () => void;
-  onDismiss: () => void;
-}) {
-  const { colors: c, shadows: s } = useAppTheme();
-  const detectedFields = IDENTIFY_FIELDS.filter((f) => result[f.key]);
-  const hasEstimate = result.estimatedResaleLow != null || result.estimatedResaleHigh != null;
-  const unappliedCount = detectedFields.filter((f) => currentValues[f.key]?.trim() !== String(result[f.key]).trim()).length;
-
-  return (
-    <View style={[styles.identifyBanner, { backgroundColor: c.surface, borderColor: c.accent, ...s.md }]}>
-      <View style={styles.identifyHeader}>
-        <View style={[styles.identifyIcon, { backgroundColor: c.accentLight }]}>
-          <Ionicons name="sparkles" size={18} color={c.accent} />
-        </View>
-        <View style={styles.identifyHeaderText}>
-          <Text variant="bodyBold">AI Identification</Text>
-          <StatusPill
-            label={result.confidence === 'high' ? 'High confidence' : result.confidence === 'medium' ? 'Partial match' : 'Low confidence'}
-            tone={result.confidence === 'high' ? 'success' : result.confidence === 'medium' ? 'warning' : 'neutral'}
-            size="sm"
-          />
-        </View>
-        <Pressable onPress={onDismiss} hitSlop={8} accessibilityLabel="Dismiss identification">
-          <Ionicons name="close" size={22} color={c.textMuted} />
-        </Pressable>
-      </View>
-
-      {/* Resale estimate — shown prominently when present */}
-      {hasEstimate ? (
-        <View style={[styles.identifyEstimate, { backgroundColor: c.accentLight }]}>
-          <Ionicons name="cash-outline" size={16} color={c.accent} />
-          <Text variant="caption" color={c.textSecondary} style={{ flex: 1 }}>Est. resale value</Text>
-          <Text variant="bodyBold" color={c.accent}>
-            {result.estimatedResaleLow != null ? `$${result.estimatedResaleLow}` : '?'} – {result.estimatedResaleHigh != null ? `$${result.estimatedResaleHigh}` : '?'}
-          </Text>
-        </View>
-      ) : null}
-
-      {detectedFields.length > 0 ? (
-        <>
-          {unappliedCount > 1 ? (
-            <Pressable
-              onPress={onApplyAll}
-              style={[styles.applyAllBtn, { backgroundColor: c.primary }]}
-              accessibilityLabel={`Apply all ${unappliedCount} detected fields`}
-            >
-              <Ionicons name="checkmark-done-outline" size={18} color={c.textInverse} />
-              <Text variant="bodyBold" color={c.textInverse}>Apply All ({unappliedCount})</Text>
-            </Pressable>
-          ) : null}
-          <View style={styles.identifyFields}>
-            {detectedFields.map((field) => {
-              const value = result[field.key] as string;
-              const alreadySet = currentValues[field.key]?.trim() === value.trim();
-              return (
-                <View key={field.key} style={[styles.identifyField, { backgroundColor: alreadySet ? c.successLight : c.surfaceAlt }]}>
-                  <Ionicons name={field.icon} size={16} color={alreadySet ? c.success : c.textSecondary} />
-                  <View style={styles.identifyFieldText}>
-                    <Text variant="label" color={c.textMuted}>{field.label}</Text>
-                    <Text variant="bodyBold" numberOfLines={1}>{value}</Text>
-                  </View>
-                  {alreadySet ? (
-                    <Ionicons name="checkmark-circle" size={20} color={c.success} />
-                  ) : (
-                    <Pressable
-                      onPress={() => onApply(field.key, value)}
-                      style={[styles.applyBtn, { backgroundColor: c.primary }]}
-                      hitSlop={4}
-                      accessibilityLabel={`Apply ${field.label}: ${value}`}
-                    >
-                      <Text variant="label" color={c.textInverse}>Apply</Text>
-                    </Pressable>
-                  )}
-                </View>
-              );
-            })}
-          </View>
-        </>
-      ) : (
-        <View style={[styles.identifyEmpty, { backgroundColor: c.surfaceAlt }]}>
-          <Ionicons name="information-circle-outline" size={16} color={c.textMuted} />
-          <Text variant="caption" color={c.textMuted}>
-            No product information detected. Try positioning the label or packaging more clearly.
-          </Text>
-        </View>
-      )}
     </View>
   );
 }
@@ -1172,71 +991,5 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     padding: spacing.md,
     borderRadius: radius.md,
-  },
-
-  // Identify banner
-  identifyBanner: {
-    borderRadius: radius.lg,
-    borderWidth: 1.5,
-    padding: spacing.lg,
-    gap: spacing.md,
-  },
-  identifyHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-  },
-  identifyIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  identifyHeaderText: {
-    flex: 1,
-    gap: spacing.xs,
-  },
-  identifyFields: {
-    gap: spacing.sm,
-  },
-  identifyField: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    padding: spacing.sm,
-    borderRadius: radius.md,
-  },
-  identifyFieldText: {
-    flex: 1,
-    gap: spacing.xxs,
-  },
-  applyBtn: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    borderRadius: radius.sm,
-  },
-  applyAllBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    paddingVertical: spacing.md,
-    borderRadius: radius.md,
-  },
-  identifyEstimate: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: radius.sm,
-  },
-  identifyEmpty: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    padding: spacing.md,
-    borderRadius: radius.sm,
   },
 });

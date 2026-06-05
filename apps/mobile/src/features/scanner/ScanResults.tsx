@@ -26,6 +26,8 @@ type ScanResultsProps = {
   onRescan: () => void;
   onEdit: () => void;
   onAddInventory: () => void;
+  addInventoryLabel?: string;
+  addInventoryIcon?: keyof typeof Ionicons.glyphMap;
   onResearch: () => void;
   onRefine: (query: string) => void;
   onSaveEstimate: () => Promise<boolean>;
@@ -43,6 +45,8 @@ export function ScanResults({
   onRescan,
   onEdit,
   onAddInventory,
+  addInventoryLabel = 'Add to Inventory',
+  addInventoryIcon = 'add-circle-outline',
   onResearch,
   onRefine,
   onSaveEstimate,
@@ -378,8 +382,8 @@ export function ScanResults({
         {/* ── Primary Actions ── */}
         <View style={styles.actions}>
           <Button
-            label="Add to Inventory"
-            icon="add-circle-outline"
+            label={addInventoryLabel}
+            icon={addInventoryIcon}
             size="lg"
             fullWidth
             onPress={onAddInventory}
