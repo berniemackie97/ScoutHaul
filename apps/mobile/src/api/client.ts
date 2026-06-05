@@ -6,6 +6,7 @@ type RequestOptions = {
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   body?: unknown;
   idempotencyKey?: string;
+  signal?: AbortSignal;
 };
 
 async function buildHeaders(includeContentType = true): Promise<Record<string, string>> {
@@ -43,6 +44,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
       ...(options.idempotencyKey ? { 'X-Idempotency-Key': options.idempotencyKey } : {}),
     },
     body: options.body === undefined ? undefined : JSON.stringify(options.body),
+    signal: options.signal,
   });
 
   if (!response.ok) {

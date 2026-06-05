@@ -6,7 +6,7 @@ export type ScanState =
   | { phase: 'scanning' }
   | { phase: 'searching'; barcode: string; photoUri?: string | null; step?: string }
   | { phase: 'capturing' }
-  | { phase: 'identifying'; photoUri: string; ocrText: string | null; step?: string }
+  | { phase: 'identifying'; photoUri: string; step?: string }
   | ScanDoneState;
 
 export type ScanDoneState = {

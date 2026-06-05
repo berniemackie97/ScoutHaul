@@ -45,6 +45,29 @@ const BARCODE_CW = 2;
 const PHOTO_CS = 28;
 const PHOTO_CW = 3.5;
 
+// Carry Gemini's photo-identify metadata into the shared results state (used by both the auto-search
+// and manual-refine paths, so it lives in one place).
+function toVisionOverrides(r: IdentifyResult): VisionOverrides {
+  return {
+    brand: r.brand,
+    model: r.model,
+    category: r.category,
+    color: r.color,
+    condition: r.condition,
+    title: r.title,
+    estimatedResaleLow: r.estimatedResaleLow,
+    estimatedResaleHigh: r.estimatedResaleHigh,
+    idConfidence: r.confidence,
+    valuationConfidence: r.valuationConfidence,
+    priceRangeType: r.priceRangeType,
+    keyValueFactors: r.keyValueFactors,
+    missingInformation: r.missingInformation,
+    recommendedNextSteps: r.recommendedNextSteps,
+    rationale: r.rationale,
+    comps: r.comps,
+  };
+}
+
 export default function BarcodeScannerScreen() {
   const { colors: c } = useAppTheme();
   const haptics = useHaptics();
@@ -208,7 +231,7 @@ export default function BarcodeScannerScreen() {
     setState(makeDoneFromResult(primary, primaryResult, photoUri, overrides));
   }
 
-  // ── Photo identify — Cloud Vision + OCR, then auto-search with retries ──
+  // ── Photo identify — Gemini multimodal, then auto-search with retries ──
   async function captureAndIdentify() {
     if (!cameraRef.current) return;
 
@@ -227,7 +250,7 @@ export default function BarcodeScannerScreen() {
       }
 
       setCapturedPhotoUri(photo.uri);
-      setState({ phase: 'identifying', photoUri: photo.uri, ocrText: null, step: 'Analyzing image…' });
+      setState({ phase: 'identifying', photoUri: photo.uri, step: 'Analyzing image…' });
 
       // Min display time so the analyze step feels deliberate, never a flash.
       const analyzeStart = Date.now();
@@ -242,16 +265,13 @@ export default function BarcodeScannerScreen() {
 
       let identified: IdentifyResult;
       try {
-        identified = await identifyFromPhoto(
-          photo.uri,
-          photo.width && photo.height ? { width: photo.width, height: photo.height } : undefined,
-        );
+        identified = await identifyFromPhoto(photo.uri);
       } finally {
         clearTimeout(stepTimer);
       }
       identifyResultRef.current = identified;
 
-      setState({ phase: 'identifying', photoUri: photo.uri, ocrText: null, step: 'Identifying product…' });
+      setState({ phase: 'identifying', photoUri: photo.uri, step: 'Identifying product…' });
 
       // Hold until min display reached — smooth, not abrupt.
       const elapsed = Date.now() - analyzeStart;
@@ -260,24 +280,7 @@ export default function BarcodeScannerScreen() {
       }
 
       // Gemini metadata carried through to results (id, value, confidences, factors).
-      const overrides: VisionOverrides = {
-        brand: identified.brand,
-        model: identified.model,
-        category: identified.category,
-        color: identified.color,
-        condition: identified.condition,
-        title: identified.title,
-        estimatedResaleLow: identified.estimatedResaleLow,
-        estimatedResaleHigh: identified.estimatedResaleHigh,
-        idConfidence: identified.confidence,
-        valuationConfidence: identified.valuationConfidence,
-        priceRangeType: identified.priceRangeType,
-        keyValueFactors: identified.keyValueFactors,
-        missingInformation: identified.missingInformation,
-        recommendedNextSteps: identified.recommendedNextSteps,
-        rationale: identified.rationale,
-        comps: identified.comps,
-      };
+      const overrides = toVisionOverrides(identified);
 
       // ALWAYS go to the rich results screen (comps, estimate, refine) — regardless of
       // confidence. Low confidence just shows a "Low" badge + the Refine control; users still
@@ -303,26 +306,7 @@ export default function BarcodeScannerScreen() {
     const q = query.trim();
     if (!q) return;
     const identified = identifyResultRef.current;
-    const overrides: VisionOverrides | undefined = identified
-      ? {
-          brand: identified.brand,
-          model: identified.model,
-          category: identified.category,
-          color: identified.color,
-          condition: identified.condition,
-          title: identified.title,
-          estimatedResaleLow: identified.estimatedResaleLow,
-          estimatedResaleHigh: identified.estimatedResaleHigh,
-          idConfidence: identified.confidence,
-          valuationConfidence: identified.valuationConfidence,
-          priceRangeType: identified.priceRangeType,
-          keyValueFactors: identified.keyValueFactors,
-          missingInformation: identified.missingInformation,
-          recommendedNextSteps: identified.recommendedNextSteps,
-          rationale: identified.rationale,
-          comps: identified.comps,
-        }
-      : undefined;
+    const overrides = identified ? toVisionOverrides(identified) : undefined;
     setCapturedPhotoUri(photoUri ?? null);
 
     // No providers → skip API call

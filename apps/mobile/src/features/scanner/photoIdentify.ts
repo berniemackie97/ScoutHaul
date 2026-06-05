@@ -1,42 +1,34 @@
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import { api } from '../../api';
-import { computeCenterCrop, shouldCrop } from './cropTarget';
-import type { ProductIdentification, ResaleComp, VisionIdentifyResult } from '../../api/marketplace';
+import type { ProductIdentification, VisionIdentifyResult } from '../../api/marketplace';
+import {
+  type IdentifyResult,
+  dedupeQueries,
+  emptyResult,
+  extractBarcode,
+  normConfidence,
+  normRangeType,
+} from './identifyHelpers';
 
-export type IdentifyResult = {
-  title: string | null;
-  brand: string | null;
-  model: string | null;
-  category: string | null;
-  color: string | null;
-  condition: string | null;
-  barcode: string | null;
-  estimatedResaleLow: number | null;
-  estimatedResaleHigh: number | null;
-  rawText: string;
-  // Identification confidence — ALWAYS from Gemini, never fabricated. null = not identified.
-  confidence: 'high' | 'medium' | 'low' | null;
-  valuationConfidence: 'high' | 'medium' | 'low' | null;
-  priceRangeType: 'tight' | 'moderate' | 'wide' | null;
-  keyValueFactors: string[];
-  missingInformation: string[];
-  recommendedNextSteps: string[];
-  rationale: string | null;
-  comps: ResaleComp[];
-  searchQuery: string;
-  alternateQueries: string[];
-  bestGuessLabel: string | null;
-};
+export type { IdentifyResult };
+
+// Gemini multimodal is the SOLE identifier: it reads the photo and reasons about the product,
+// returning a specific name/brand/model/category/condition, a conservative used-resale valuation,
+// and comp price points. There is no second identification system — if Gemini can't run we return a
+// clean "not identified" result and let the user refine manually (we never fabricate an identity).
+
+// Tuning knobs, all in one place.
+const TARGET_WIDTH = 1536;          // downscale width — good detail, ~400–700KB on the wire
+const JPEG_QUALITY = 0.6;           // recompress quality after resize
+const MIN_BASE64_LENGTH = 100;      // shorter than this means the encode produced nothing usable
+const REQUEST_TIMEOUT_MS = 30_000;  // hard ceiling so a stalled backend can't hang the UI
+
+const log = (...args: unknown[]) => { if (__DEV__) console.log('[Vision]', ...args); };
 
 // ── Main ──
-// Gemini multimodal is the SOLE identifier — it reads text/logos and reasons about the product.
-// Google Cloud Vision contributes ONLY reverse-image web-match links (never identity or confidence).
-// There is no second identification system: if Gemini can't run, we do not fabricate a guess.
 
-export type SourceDims = { width: number; height: number };
-
-export async function identifyFromPhoto(photoUri: string, sourceDims?: SourceDims): Promise<IdentifyResult> {
-  const vision = await callVisionApi(photoUri, sourceDims);
+export async function identifyFromPhoto(photoUri: string): Promise<IdentifyResult> {
+  const vision = await callVisionApi(photoUri);
   if (!vision) return emptyResult();
   return buildFromVision(vision);
 }
@@ -47,8 +39,8 @@ function buildFromVision(vision: VisionIdentifyResult): IdentifyResult {
   const product: ProductIdentification | null = vision.product;
   const barcode = vision.detectedText ? extractBarcode(vision.detectedText) : null;
 
-  // No Gemini identification (key unset or rate-limited after retry). Do NOT invent an identity
-  // or a confidence — return a clean unidentified result; the user refines manually.
+  // No Gemini identification (key unset or rate-limited after retries). Don't invent an identity or
+  // a confidence — return a clean unidentified result; the user refines manually.
   if (!product) {
     return {
       ...emptyResult(),
@@ -97,108 +89,45 @@ function buildFromVision(vision: VisionIdentifyResult): IdentifyResult {
 
 // ── Vision API call ──
 
-async function callVisionApi(photoUri: string, sourceDims?: SourceDims): Promise<VisionIdentifyResult | null> {
+async function callVisionApi(photoUri: string): Promise<VisionIdentifyResult | null> {
+  const base64 = await downscaleToBase64(photoUri);
+  if (!base64 || base64.length < MIN_BASE64_LENGTH) {
+    log('encode produced too few bytes, skipping:', base64?.length ?? 0);
+    return null;
+  }
+
+  // Hard timeout: a stalled network/backend must surface as a clean failure, never a frozen overlay.
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
-    const base64 = await downscaleToBase64(photoUri, sourceDims);
-    if (!base64 || base64.length < 100) {
-      console.warn('[Vision] Base64 too short, skipping:', base64?.length);
-      return null;
-    }
-    console.log('[Vision] Sending image…', Math.round(base64.length / 1024), 'KB');
-    const result = await api.visionIdentify(base64);
-    console.log('[Vision] Result:', {
-      product: result.product?.name ?? null,
-      idConfidence: result.product?.confidence ?? 'n/a',
-      valConfidence: result.product?.valuationConfidence ?? 'n/a',
-      rangeType: result.product?.priceRangeType ?? 'n/a',
-      resale: result.product ? `$${result.product.estimatedResaleLow}-${result.product.estimatedResaleHigh}` : null,
-      query: result.searchQuery,
-    });
+    log('sending image…', Math.round(base64.length / 1024), 'KB');
+    const result = await api.visionIdentify(base64, controller.signal);
+    log('result:', result.product?.name ?? '(not identified)', result.product?.confidence ?? '');
     return result;
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
-    if (msg.includes('Sign in')) {
-      console.error('[Vision] Auth required — user not signed in');
-    } else {
-      console.error('[Vision] call failed:', msg);
-    }
+    if (msg.includes('Sign in')) console.error('[Vision] auth required — user not signed in');
+    else if (controller.signal.aborted) console.error('[Vision] timed out after', REQUEST_TIMEOUT_MS, 'ms');
+    else console.error('[Vision] call failed:', msg);
     return null;
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
-// ── Helpers ──
+// ── Image prep ──
 
-// Resize the (whole) photo to this width before upload. Higher than a bare-minimum downscale so the
-// model gets good detail, still tiny on the wire (~400–700KB).
-const TARGET_WIDTH = 1536;
-
-// Center-crop is DELIBERATELY OFF (1 = full frame, no crop). A blind crop can clip an off-center or
-// frame-filling item and make identification *worse* — not worth the risk until it's validated on
-// real photos, ideally paired with a user-adjustable focus box (Phase 2). The crop math is fully
-// unit-tested (cropTarget.test.ts), so enabling later is a one-line change: set this < 1.
-const CROP_FRACTION = 1;
-
-// Prepare the captured photo for the model: downscale to TARGET_WIDTH + JPEG q0.6 (optionally
-// center-crop first, when enabled). Phone cameras shoot 12–48MP; a raw full-res JPEG base64-encodes
-// to 10–25MB, which is slow to upload and historically blew the API's request cap → silent
-// "not identified". This keeps every upload small and uniform. On failure we return null (fail
-// clean → user retakes) rather than sending the raw full-res file that breaks the upload.
-async function downscaleToBase64(uri: string, sourceDims?: SourceDims): Promise<string | null> {
+// Phone cameras shoot 12–48MP; a raw full-res JPEG base64-encodes to 10–25MB — slow to upload and
+// historically over the API's request cap → silent "not identified". Downscale to TARGET_WIDTH +
+// re-encode keeps every upload small and uniform. On failure return null (fail clean → user retakes)
+// rather than sending the raw full-res file that breaks the upload.
+async function downscaleToBase64(uri: string): Promise<string | null> {
   try {
-    let context = ImageManipulator.manipulate(uri);
-    if (sourceDims && CROP_FRACTION < 1) {
-      const crop = computeCenterCrop(sourceDims.width, sourceDims.height, CROP_FRACTION);
-      if (shouldCrop(crop, sourceDims.width, sourceDims.height)) {
-        context = context.crop(crop);
-      }
-    }
-    const ref = await context.resize({ width: TARGET_WIDTH }).renderAsync();
-    const out = await ref.saveAsync({ compress: 0.6, format: SaveFormat.JPEG, base64: true });
+    const ref = await ImageManipulator.manipulate(uri).resize({ width: TARGET_WIDTH }).renderAsync();
+    const out = await ref.saveAsync({ compress: JPEG_QUALITY, format: SaveFormat.JPEG, base64: true });
     return out.base64 ?? null;
   } catch (error) {
-    console.warn('[Vision] Image resize failed:', error);
+    console.warn('[Vision] image resize failed:', error);
     return null;
   }
-}
-
-const BARCODE_PATTERN = /\b(\d{8}|\d{12,14})\b/;
-
-function extractBarcode(text: string): string | null {
-  const clean = text.replace(/\s/g, '');
-  const match = clean.match(BARCODE_PATTERN);
-  if (!match) return null;
-  const len = match[1].length;
-  return (len === 8 || len === 12 || len === 13 || len === 14) ? match[1] : null;
-}
-
-function normConfidence(v: string | null | undefined): 'high' | 'medium' | 'low' | null {
-  return v === 'high' || v === 'medium' || v === 'low' ? v : null;
-}
-
-function normRangeType(v: string | null | undefined): 'tight' | 'moderate' | 'wide' | null {
-  return v === 'tight' || v === 'moderate' || v === 'wide' ? v : null;
-}
-
-function dedupeQueries(primary: string, candidates: string[]): string[] {
-  const seen = new Set<string>([primary.toLowerCase().trim()]);
-  const out: string[] = [];
-  for (const c of candidates) {
-    const trimmed = c?.trim();
-    if (!trimmed || trimmed.length < 3) continue;
-    const key = trimmed.toLowerCase();
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push(trimmed);
-  }
-  return out.slice(0, 4);
-}
-
-function emptyResult(): IdentifyResult {
-  return {
-    title: null, brand: null, model: null, category: null, color: null, condition: null,
-    barcode: null, estimatedResaleLow: null, estimatedResaleHigh: null,
-    rawText: '', confidence: null, valuationConfidence: null, priceRangeType: null,
-    keyValueFactors: [], missingInformation: [], recommendedNextSteps: [], rationale: null, comps: [],
-    searchQuery: '', alternateQueries: [], bestGuessLabel: null,
-  };
 }

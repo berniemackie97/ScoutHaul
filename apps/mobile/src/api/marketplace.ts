@@ -79,8 +79,8 @@ export const marketplaceApi = {
   comps: (params: string) => apiRequest<MarketObservation[]>(`/api/market-observations?${params}`),
   analyze: (body: AnalyzeRequest) => apiRequest<MarketAnalysisResponse>('/api/market-analysis/calculate', { method: 'POST', body }),
 
-  visionIdentify: (imageBase64: string) =>
-    apiRequest<VisionIdentifyResult>('/api/vision/identify', { method: 'POST', body: { imageBase64 } }),
+  visionIdentify: (imageBase64: string, signal?: AbortSignal) =>
+    apiRequest<VisionIdentifyResult>('/api/vision/identify', { method: 'POST', body: { imageBase64 }, signal }),
 
   providerStatus: () =>
     apiRequest<MarketplaceProviderStatus>('/api/marketplace-lookup/status'),
