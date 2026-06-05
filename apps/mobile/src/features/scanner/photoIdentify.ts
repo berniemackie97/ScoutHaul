@@ -1,5 +1,6 @@
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import { api } from '../../api';
+import { computeCenterCrop, shouldCrop } from './cropTarget';
 import type { ProductIdentification, ResaleComp, VisionIdentifyResult } from '../../api/marketplace';
 
 export type IdentifyResult = {
@@ -32,8 +33,10 @@ export type IdentifyResult = {
 // Google Cloud Vision contributes ONLY reverse-image web-match links (never identity or confidence).
 // There is no second identification system: if Gemini can't run, we do not fabricate a guess.
 
-export async function identifyFromPhoto(photoUri: string): Promise<IdentifyResult> {
-  const vision = await callVisionApi(photoUri);
+export type SourceDims = { width: number; height: number };
+
+export async function identifyFromPhoto(photoUri: string, sourceDims?: SourceDims): Promise<IdentifyResult> {
+  const vision = await callVisionApi(photoUri, sourceDims);
   if (!vision) return emptyResult();
   return buildFromVision(vision);
 }
@@ -94,9 +97,9 @@ function buildFromVision(vision: VisionIdentifyResult): IdentifyResult {
 
 // ── Vision API call ──
 
-async function callVisionApi(photoUri: string): Promise<VisionIdentifyResult | null> {
+async function callVisionApi(photoUri: string, sourceDims?: SourceDims): Promise<VisionIdentifyResult | null> {
   try {
-    const base64 = await downscaleToBase64(photoUri);
+    const base64 = await downscaleToBase64(photoUri, sourceDims);
     if (!base64 || base64.length < 100) {
       console.warn('[Vision] Base64 too short, skipping:', base64?.length);
       return null;
@@ -125,15 +128,31 @@ async function callVisionApi(photoUri: string): Promise<VisionIdentifyResult | n
 
 // ── Helpers ──
 
-// Phone cameras shoot 12–48MP. A raw full-res JPEG base64-encodes to several MB, which is slow to
-// upload (especially over adb-reverse) and can exceed the API's 12MB request cap → the identify
-// silently fails for EVERY photo while tiny barcode calls succeed. Downscale to 1280px wide + JPEG
-// q0.6 first: payload drops to ~150–350KB, uploads fast, and Gemini still resolves detail clearly.
-// On failure we return null (fail clean → user retakes) rather than sending the raw full-res file,
-// which is the very payload that breaks the upload.
-async function downscaleToBase64(uri: string): Promise<string | null> {
+// Resize the (whole) photo to this width before upload. Higher than a bare-minimum downscale so the
+// model gets good detail, still tiny on the wire (~400–700KB).
+const TARGET_WIDTH = 1536;
+
+// Center-crop is DELIBERATELY OFF (1 = full frame, no crop). A blind crop can clip an off-center or
+// frame-filling item and make identification *worse* — not worth the risk until it's validated on
+// real photos, ideally paired with a user-adjustable focus box (Phase 2). The crop math is fully
+// unit-tested (cropTarget.test.ts), so enabling later is a one-line change: set this < 1.
+const CROP_FRACTION = 1;
+
+// Prepare the captured photo for the model: downscale to TARGET_WIDTH + JPEG q0.6 (optionally
+// center-crop first, when enabled). Phone cameras shoot 12–48MP; a raw full-res JPEG base64-encodes
+// to 10–25MB, which is slow to upload and historically blew the API's request cap → silent
+// "not identified". This keeps every upload small and uniform. On failure we return null (fail
+// clean → user retakes) rather than sending the raw full-res file that breaks the upload.
+async function downscaleToBase64(uri: string, sourceDims?: SourceDims): Promise<string | null> {
   try {
-    const ref = await ImageManipulator.manipulate(uri).resize({ width: 1280 }).renderAsync();
+    let context = ImageManipulator.manipulate(uri);
+    if (sourceDims && CROP_FRACTION < 1) {
+      const crop = computeCenterCrop(sourceDims.width, sourceDims.height, CROP_FRACTION);
+      if (shouldCrop(crop, sourceDims.width, sourceDims.height)) {
+        context = context.crop(crop);
+      }
+    }
+    const ref = await context.resize({ width: TARGET_WIDTH }).renderAsync();
     const out = await ref.saveAsync({ compress: 0.6, format: SaveFormat.JPEG, base64: true });
     return out.base64 ?? null;
   } catch (error) {

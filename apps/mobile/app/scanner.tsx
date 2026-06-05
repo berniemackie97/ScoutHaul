@@ -242,7 +242,10 @@ export default function BarcodeScannerScreen() {
 
       let identified: IdentifyResult;
       try {
-        identified = await identifyFromPhoto(photo.uri);
+        identified = await identifyFromPhoto(
+          photo.uri,
+          photo.width && photo.height ? { width: photo.width, height: photo.height } : undefined,
+        );
       } finally {
         clearTimeout(stepTimer);
       }
