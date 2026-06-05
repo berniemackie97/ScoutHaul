@@ -82,9 +82,11 @@ public sealed class CompositeMarketplaceLookupTests
         }
     }
 
+    // Generic comp = a "Used" eBay listing → active-secondhand tier (real resale signal).
     private static MarketplaceListingDto MakeListing(
         string title, decimal price, string source = "eBay", string? itemUrl = null) =>
-        new(title, price, null, null, itemUrl ?? $"https://example.com/{title}", "Used", source, false, null);
+        new(title, price, null, null, itemUrl ?? $"https://example.com/{title}", "Used", source, false, null,
+            MarketTiers.ActiveSecondhand);
 
     private static BarcodeLookupResult MakeProduct(string barcode, string title, string? brand = null) =>
         new(barcode, title, brand, null, null, null, barcode, null);
@@ -312,7 +314,7 @@ public sealed class CompositeMarketplaceLookupTests
     {
         var barcodeLookup = new StubBarcodeLookupService(null);
         // Item: $10 + $5 shipping = $15 total
-        var listing = new MarketplaceListingDto("Item", 10.00m, 5.00m, null, "https://x.com/1", "New", "eBay", false, null);
+        var listing = new MarketplaceListingDto("Item", 10.00m, 5.00m, null, "https://x.com/1", "New", "eBay", false, null, MarketTiers.ActiveSecondhand);
         var provider = new StubPricingProvider("eBay", true,
             barcodeListings: [listing]);
 
@@ -397,6 +399,27 @@ public sealed class CompositeMarketplaceLookupTests
 
         Assert.Equal(0, estimator.CallCount); // nothing to estimate from a bare barcode
         Assert.Null(result.EstimateSource);
+    }
+
+    [Fact]
+    public async Task Retail_only_listings_still_estimate_and_do_not_count_as_sold_price()
+    {
+        // Free UPC providers return RETAIL reference links (Amazon / Google Shopping), never resale
+        // comps. Those must NOT block the grounded resale estimate, nor masquerade as a sold price.
+        var barcodeLookup = new StubBarcodeLookupService(MakeProduct("123", "Sony WH-1000XM4", "Sony"));
+        var estimator = new StubEstimator(new ResaleEstimate(120m, 180m, "Used resale"));
+        var retail = new MarketplaceListingDto("New at Amazon", 349m, null, null, "https://x/retail", "New", "Amazon", false, null, MarketTiers.Retail);
+        var provider = new StubPricingProvider("Amazon", true, barcodeListings: [retail]);
+
+        var sut = new CompositeMarketplaceLookupService(barcodeLookup, [provider],
+            estimator, NullLogger<CompositeMarketplaceLookupService>.Instance);
+
+        MarketplaceLookupResult result = await sut.SearchByBarcodeAsync("123");
+
+        Assert.Equal(1, estimator.CallCount);      // retail did NOT block the resale estimate
+        Assert.Equal(120m, result.EstimatedResaleLow);
+        Assert.Null(result.AverageSoldPrice);      // retail is NOT a sold comp
+        Assert.Single(result.Listings);            // retail still shown for reference
     }
 
     [Fact]

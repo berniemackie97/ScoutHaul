@@ -18,10 +18,13 @@ internal sealed class CompositeMarketplaceLookupService(
         var request = new MarketplacePricingRequest(pricingQuery, cleanBarcode, product);
         ProviderLookup providerLookup = await RunProviders(request, isBarcodeLookup: true, cancellationToken);
 
-        // No live comps but we know what the product is → AI resale estimate so the scan still
-        // surfaces a value. Only when the barcode actually resolved to a named product.
+        // The free UPC providers return retail/reference links (Amazon, Google Shopping), NOT resale
+        // sold comps. A reseller needs the RESALE value, so run the grounded estimate whenever we
+        // know the product and don't already have real secondhand comps (sold or active). This is
+        // what gives barcode scans the same price + comps the photo flow shows.
         ResaleEstimate? estimate = null;
-        if (providerLookup.Listings.Count == 0 && !string.IsNullOrWhiteSpace(product?.Title))
+        bool hasSecondhandComps = providerLookup.Listings.Any(IsSecondhand);
+        if (!hasSecondhandComps && !string.IsNullOrWhiteSpace(product?.Title))
         {
             string description = string.Join(' ', product.Brand, product.Title, product.Category).Trim();
             estimate = await TryEstimateAsync(description, cancellationToken);
@@ -36,9 +39,11 @@ internal sealed class CompositeMarketplaceLookupService(
         var request = new MarketplacePricingRequest(query, Barcode: null, Product: null);
         ProviderLookup providerLookup = await RunProviders(request, isBarcodeLookup: false, cancellationToken);
 
-        // Manual/keyword search with no comps → estimate from the query text. (Photo identify
-        // already carries its own vision estimate, so this mainly helps typed searches.)
-        ResaleEstimate? estimate = providerLookup.Listings.Count == 0
+        // Estimate unless we already have real secondhand comps. Retail/reference listings don't
+        // count — the reseller still needs a resale value. This also powers the photo flow, which
+        // calls keyword search to upgrade its vision estimate to grounded sold/active comps.
+        bool hasSecondhandComps = providerLookup.Listings.Any(IsSecondhand);
+        ResaleEstimate? estimate = !hasSecondhandComps
             ? await TryEstimateAsync(query, cancellationToken)
             : null;
 
@@ -100,8 +105,11 @@ internal sealed class CompositeMarketplaceLookupService(
     private static MarketplaceLookupResult BuildResult(
         string query, BarcodeLookupResult? product, ProviderLookup providerLookup, ResaleEstimate? estimate)
     {
+        // "Sold price" must reflect REAL resale signal only (sold or active secondhand). Retail /
+        // reference listings are shown for context but excluded here, so they can't masquerade as a
+        // sold comp or suppress the grounded resale estimate on the client.
         decimal[] prices = providerLookup.Listings
-            .Where(listing => listing.Price > 0)
+            .Where(listing => IsSecondhand(listing) && listing.Price > 0)
             .Select(listing => listing.Price + (listing.ShippingCost ?? 0))
             .ToArray();
 
@@ -127,6 +135,12 @@ internal sealed class CompositeMarketplaceLookupService(
             EstimateComps: estimate?.Comps,
             EstimateSources: estimate?.Sources);
     }
+
+    // Real resale signal: a realized sale, or an active secondhand listing. Retail/reference is not.
+    private static bool IsSecondhand(MarketplaceListingDto listing) =>
+        listing.IsSold
+        || listing.MarketTier == MarketTiers.SoldSecondhand
+        || listing.MarketTier == MarketTiers.ActiveSecondhand;
 
     private static string BuildPricingQuery(string barcode, BarcodeLookupResult? product)
     {

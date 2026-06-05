@@ -46,6 +46,9 @@ internal sealed class GeminiProductVisionService(
         "You are an expert reseller appraiser with strong visual product knowledge. From the photo, do " +
         "TWO separate jobs and keep their confidences separate: (1) IDENTIFY the main item, (2) ESTIMATE " +
         "its used resale value.\n\n" +
+        "FOCUS: if several objects are visible, identify the SINGLE most prominent item — the one centered " +
+        "in the frame and closest to the camera. That is what the user is pointing at; ignore background " +
+        "clutter, surfaces, and surrounding objects.\n\n" +
         "IDENTIFY — identify the item primarily from its VISUAL APPEARANCE: shape, form factor, materials, " +
         "color, proportions, distinctive design features, parts, and how it is built. Recognize the object " +
         "the way a knowledgeable human would at a glance, EVEN WHEN THERE IS NO VISIBLE TEXT, LOGO, OR " +
