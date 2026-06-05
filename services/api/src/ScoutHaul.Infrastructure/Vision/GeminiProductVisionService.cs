@@ -4,36 +4,74 @@ using System.Text.Json.Serialization;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using ScoutHaul.Application.Contracts;
+using ScoutHaul.Application.Services;
 
 namespace ScoutHaul.Infrastructure.Vision;
 
 /// <summary>
-/// Identifies products from photos using Gemini multimodal (free tier: 1,500 req/day).
-/// Unlike reverse-image search, the model reasons about the item and returns a specific
-/// product name, brand, model, category, and resale value estimate as structured JSON.
+/// THE product identifier. Gemini multimodal (free tier: 1,500 req/day) reads the photo, reasons
+/// about the item, and returns a specific product name, brand, model, category, condition, and a
+/// conservative used-resale valuation as structured JSON — identification and valuation confidence
+/// kept separate. No reverse-image search, no OCR: this is the single source of truth.
 /// </summary>
 internal sealed class GeminiProductVisionService(
     HttpClient httpClient,
     IConfiguration configuration,
-    ILogger<GeminiProductVisionService> logger) : IProductIdentifier
+    ILogger<GeminiProductVisionService> logger) : IVisionIdentificationService
 {
     // Free-tier model. Configurable so it can be bumped without a code change.
     private string Model => configuration["Gemini:Model"] ?? "gemini-2.5-flash";
 
     public bool IsConfigured => !string.IsNullOrWhiteSpace(configuration["Gemini:ApiKey"]);
 
-    private const string SystemPrompt =
-        "You are an expert reseller and product appraiser identifying secondhand items for resale " +
-        "(thrift, estate, garage sale sourcing). Examine the image and identify the single main product. " +
-        "Be as SPECIFIC as possible: prefer \"Sony WH-1000XM4 Wireless Headphones\" over \"headphones\", " +
-        "\"Pyrex 4-Cup Glass Measuring Cup\" over \"measuring cup\". Read any visible text, logos, model numbers, " +
-        "or tags to pin down the exact product. If you genuinely cannot tell the specific product, give the most " +
-        "specific category you can and set confidence to \"low\". " +
-        "Estimate a realistic USED resale price range in USD for the secondhand market (eBay sold / Facebook Marketplace), " +
-        "not retail. Provide 3-6 search keyword phrases a reseller would type to find comps. " +
-        "Respond ONLY with the JSON object matching the schema.";
+    public async Task<VisionIdentifyResult> IdentifyAsync(string imageBase64, CancellationToken cancellationToken)
+    {
+        ProductIdentification? product = await IdentifyProductAsync(imageBase64, cancellationToken);
+        return new VisionIdentifyResult(
+            Product: product,
+            SearchQuery: BuildSearchQuery(product),
+            DetectedText: product?.IdentifyingText);
+    }
 
-    public async Task<ProductIdentification?> IdentifyAsync(string imageBase64, CancellationToken cancellationToken)
+    private static string? BuildSearchQuery(ProductIdentification? p)
+    {
+        if (p is null) return null;
+        if (!string.IsNullOrWhiteSpace(p.Brand) && !string.IsNullOrWhiteSpace(p.Model))
+            return $"{p.Brand} {p.Model}".Trim();
+        if (!string.IsNullOrWhiteSpace(p.Name)) return p.Name;
+        return p.SearchKeywords.Count > 0 ? p.SearchKeywords[0] : null;
+    }
+
+    private const string SystemPrompt =
+        "You are an expert reseller appraiser. From the photo, do TWO separate jobs and keep their " +
+        "confidences separate: (1) IDENTIFY the main item, (2) ESTIMATE its used resale value.\n\n" +
+        "IDENTIFY: Name the single main product as specifically as the IMAGE actually supports — read " +
+        "visible text, logos, model numbers, and tags. NEVER invent model numbers, years, editions, sizes, " +
+        "certifications, or authenticity you cannot see; when unsure stay general and add the gap to " +
+        "missing_information. Set variant_confidence = certainty of the EXACT variant (high only when the " +
+        "specific edition/year/variant is clearly visible; otherwise medium or low).\n\n" +
+        "VALUE (used/secondhand resale ONLY — never retail, MSRP, replacement cost, or optimistic asking " +
+        "price): Reason from typical SOLD prices on resale markets (eBay sold, Facebook Marketplace, Mercari, " +
+        "Poshmark, StockX). You do NOT have live market data — never claim you checked listings. Assume typical " +
+        "USED condition unless the photo shows otherwise. low = quick-sale or lower-condition value; high = " +
+        "realistic private-party value in good used condition (NOT a rare-outlier price). Be CONSERVATIVE: do " +
+        "not assume the rare/high-value variant unless the image clearly proves it. Price damaged, incomplete, " +
+        "untested, counterfeit-risk, or missing-accessory items LOWER.\n\n" +
+        "RANGE WIDTH: Generic or variant-heavy items (e.g. iPhone, Nike Air Jordan 1, Pokemon card, Levi's " +
+        "jeans, Rolex watch) get a WIDE range unless the exact variant is clear. Use tight only when BOTH the " +
+        "product and its condition are clear; otherwise moderate or wide. price_range_type MUST match the width " +
+        "you chose. valuation_confidence = certainty of the price given the identification.\n\n" +
+        "If you cannot identify the item well enough, return a broad CATEGORY-level estimate and list the " +
+        "missing details. key_value_factors must name what drives value (variant, condition, year, model, size, " +
+        "edition, authenticity, completeness, accessories). recommended_next_steps tells the reseller how to " +
+        "narrow it down. Provide 3-6 search keyword phrases for finding comps.\n" +
+        "comps: give 3-6 REPRESENTATIVE comparable price points from your market knowledge — mix recent " +
+        "SOLD prices (status \"sold\") with current ACTIVE asking prices (status \"active\"), each with the " +
+        "condition it reflects and a short note. These are ESTIMATES from training knowledge, NOT live " +
+        "listings — never invent URLs, exact dates, or claim you checked current listings. " +
+        "Respond ONLY with valid JSON matching the schema.";
+
+    private async Task<ProductIdentification?> IdentifyProductAsync(string imageBase64, CancellationToken cancellationToken)
     {
         string? apiKey = configuration["Gemini:ApiKey"];
         if (string.IsNullOrWhiteSpace(apiKey))
@@ -148,11 +186,16 @@ internal sealed class GeminiProductVisionService(
                 return null;
             }
 
-            string confidence = (dto.Confidence ?? "low").ToLowerInvariant() switch
+            // variant_confidence is the identification confidence (kept as Confidence for compat);
+            // fall back to legacy single "confidence" if present.
+            string variantConfidence = NormalizeConfidence(dto.VariantConfidence ?? dto.Confidence);
+            string valuationConfidence = NormalizeConfidence(dto.ValuationConfidence ?? dto.VariantConfidence ?? dto.Confidence);
+            string priceRangeType = (dto.PriceRangeType ?? "").ToLowerInvariant() switch
             {
-                "high" => "high",
-                "medium" => "medium",
-                _ => "low",
+                "tight" => "tight",
+                "moderate" => "moderate",
+                "wide" => "wide",
+                _ => "moderate",
             };
 
             return new ProductIdentification(
@@ -165,12 +208,15 @@ internal sealed class GeminiProductVisionService(
                 EstimatedResaleLow: dto.EstimatedResaleLow > 0 ? dto.EstimatedResaleLow : null,
                 EstimatedResaleHigh: dto.EstimatedResaleHigh > 0 ? dto.EstimatedResaleHigh : null,
                 IdentifyingText: Clean(dto.IdentifyingText),
-                SearchKeywords: (dto.SearchKeywords ?? [])
-                    .Where(k => !string.IsNullOrWhiteSpace(k))
-                    .Select(k => k.Trim())
-                    .Take(6)
-                    .ToArray(),
-                Confidence: confidence);
+                SearchKeywords: CleanList(dto.SearchKeywords, 6),
+                Confidence: variantConfidence,
+                ValuationConfidence: valuationConfidence,
+                PriceRangeType: priceRangeType,
+                KeyValueFactors: CleanList(dto.KeyValueFactors, 6),
+                MissingInformation: CleanList(dto.MissingInformation, 6),
+                RecommendedNextSteps: CleanList(dto.RecommendedNextSteps, 5),
+                Rationale: Clean(dto.Rationale),
+                Comps: GeminiResaleEstimator.CleanComps(dto.Comps));
         }
         catch (JsonException ex)
         {
@@ -189,30 +235,68 @@ internal sealed class GeminiProductVisionService(
             : trimmed;
     }
 
+    private static string NormalizeConfidence(string? value) => (value ?? "low").ToLowerInvariant() switch
+    {
+        "high" => "high",
+        "medium" => "medium",
+        _ => "low",
+    };
+
+    private static IReadOnlyList<string> CleanList(List<string>? items, int max) =>
+        (items ?? [])
+            .Where(s => !string.IsNullOrWhiteSpace(s))
+            .Select(s => s.Trim())
+            .Take(max)
+            .ToArray();
+
     private static readonly JsonSerializerOptions JsonOpts = new()
     {
         PropertyNameCaseInsensitive = true,
     };
 
-    // Gemini structured-output schema (OpenAPI subset).
+    // Gemini structured-output schema (OpenAPI subset). Enforces the field set so the model
+    // cannot drift. Identification and valuation confidence are deliberately separate.
     private static readonly object ResponseSchema = new
     {
         type = "object",
         properties = new
         {
-            name = new { type = "string", description = "Specific product name" },
+            name = new { type = "string", description = "Specific identified item name, or category if unsure" },
             brand = new { type = "string" },
-            model = new { type = "string" },
+            model = new { type = "string", description = "Model or specific variant, only if visible" },
             category = new { type = "string" },
             color = new { type = "string" },
-            condition = new { type = "string", description = "Apparent condition from the photo" },
-            estimatedResaleLow = new { type = "number", description = "Low end of used resale price in USD" },
-            estimatedResaleHigh = new { type = "number", description = "High end of used resale price in USD" },
-            identifyingText = new { type = "string", description = "Any text/model numbers visible on the item" },
+            condition = new { type = "string", description = "Condition assumption from the photo" },
+            estimatedResaleLow = new { type = "number", description = "Quick-sale / lower-condition USED resale USD" },
+            estimatedResaleHigh = new { type = "number", description = "Good-used private-party resale USD (not an outlier)" },
+            identifyingText = new { type = "string", description = "Text/model numbers actually visible on the item" },
             searchKeywords = new { type = "array", items = new { type = "string" } },
-            confidence = new { type = "string", @enum = new[] { "high", "medium", "low" } },
+            variantConfidence = new { type = "string", @enum = new[] { "high", "medium", "low" }, description = "Certainty of the exact variant" },
+            valuationConfidence = new { type = "string", @enum = new[] { "high", "medium", "low" }, description = "Certainty of the price" },
+            priceRangeType = new { type = "string", @enum = new[] { "tight", "moderate", "wide" } },
+            keyValueFactors = new { type = "array", items = new { type = "string" }, description = "What drives this item's value" },
+            missingInformation = new { type = "array", items = new { type = "string" }, description = "Details needed to price it precisely" },
+            recommendedNextSteps = new { type = "array", items = new { type = "string" } },
+            rationale = new { type = "string", description = "One-to-two sentence valuation rationale" },
+            comps = new
+            {
+                type = "array",
+                description = "3-6 representative SOLD and ACTIVE comp price points from market knowledge (not live)",
+                items = new
+                {
+                    type = "object",
+                    properties = new
+                    {
+                        price = new { type = "number" },
+                        status = new { type = "string", @enum = new[] { "sold", "active" } },
+                        condition = new { type = "string" },
+                        note = new { type = "string" },
+                    },
+                    required = new[] { "price", "status" },
+                },
+            },
         },
-        required = new[] { "name", "category", "confidence", "searchKeywords" },
+        required = new[] { "name", "category", "variantConfidence", "valuationConfidence", "priceRangeType", "searchKeywords" },
     };
 
     private sealed class GeminiProductDto
@@ -227,6 +311,15 @@ internal sealed class GeminiProductVisionService(
         [JsonPropertyName("estimatedResaleHigh")] public decimal EstimatedResaleHigh { get; set; }
         [JsonPropertyName("identifyingText")] public string? IdentifyingText { get; set; }
         [JsonPropertyName("searchKeywords")] public List<string>? SearchKeywords { get; set; }
+        // Back-compat: older responses used a single "confidence"; new schema splits the two.
         [JsonPropertyName("confidence")] public string? Confidence { get; set; }
+        [JsonPropertyName("variantConfidence")] public string? VariantConfidence { get; set; }
+        [JsonPropertyName("valuationConfidence")] public string? ValuationConfidence { get; set; }
+        [JsonPropertyName("priceRangeType")] public string? PriceRangeType { get; set; }
+        [JsonPropertyName("keyValueFactors")] public List<string>? KeyValueFactors { get; set; }
+        [JsonPropertyName("missingInformation")] public List<string>? MissingInformation { get; set; }
+        [JsonPropertyName("recommendedNextSteps")] public List<string>? RecommendedNextSteps { get; set; }
+        [JsonPropertyName("rationale")] public string? Rationale { get; set; }
+        [JsonPropertyName("comps")] public List<GeminiResaleEstimator.CompDto>? Comps { get; set; }
     }
 }

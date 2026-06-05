@@ -14,6 +14,7 @@ public sealed class MarketplaceLookupController(
     IMarketplaceLookupService lookupService,
     MarketplaceLookupPersistenceService persistenceService,
     IEnumerable<IMarketplacePricingProvider> pricingProviders,
+    IResaleEstimator resaleEstimator,
     IVisionIdentificationService visionService) : ControllerBase
 {
     /// <summary>
@@ -52,6 +53,13 @@ public sealed class MarketplaceLookupController(
             .Where(provider => provider.IsConfigured)
             .Select(provider => provider.Name)
             .ToList();
+
+        // The Gemini grounded resale estimator is itself a real pricing source (live comps), so a
+        // lookup is worth running whenever it OR a marketplace provider is configured.
+        if (resaleEstimator.IsConfigured)
+        {
+            configuredProviders.Add("AI Comps (Gemini)");
+        }
 
         return new MarketplaceProviderStatusDto(
             configuredProviders,

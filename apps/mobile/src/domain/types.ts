@@ -32,6 +32,8 @@ export type {
   DashboardSummary,
   MarketplaceListing,
   MarketplaceLookupResult,
+  ResaleComp,
+  ResaleSource,
   BarcodeLookupResult,
 } from './marketplace.types';
 

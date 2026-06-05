@@ -52,6 +52,30 @@ public sealed class GeminiResaleEstimatorTests
     }
 
     [Fact]
+    public async Task Parses_sold_and_active_comps()
+    {
+        string inner = """
+        {
+          "low": 120, "high": 180, "priceRangeType": "moderate", "valuationConfidence": "medium",
+          "comps": [
+            { "price": 130, "status": "sold", "condition": "Good", "note": "recent eBay sold" },
+            { "price": 175, "status": "active", "condition": "Like new", "note": "current asking" },
+            { "price": 0, "status": "sold" }
+          ]
+        }
+        """;
+        var sut = Build(new CountingHandler(Envelope(inner)), new MemoryCache(new MemoryCacheOptions()));
+
+        ResaleEstimate? result = await sut.EstimateAsync("Sony WH-1000XM4", CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.NotNull(result.Comps);
+        Assert.Equal(2, result.Comps!.Count); // zero-price comp dropped
+        Assert.Contains(result.Comps, c => c.Status == "sold" && c.Price == 130m);
+        Assert.Contains(result.Comps, c => c.Status == "active" && c.Price == 175m);
+    }
+
+    [Fact]
     public async Task Caches_by_product_so_repeat_calls_hit_no_api()
     {
         var handler = new CountingHandler(Envelope("""{"low":10,"high":20}"""));

@@ -93,15 +93,9 @@ export type MarketplaceProviderStatus = {
 };
 
 export type VisionIdentifyResult = {
-  bestGuessLabel: string | null;
-  webEntities: { description: string; score: number }[];
-  matchingPages: { url: string; title: string | null }[];
-  similarImages: { url: string }[];
-  labels: string[];
-  detectedLogos: string[];
-  detectedText: string | null;
-  searchQuery: string | null;
   product: ProductIdentification | null;
+  searchQuery: string | null;
+  detectedText: string | null;
 };
 
 export type ProductIdentification = {
@@ -115,5 +109,20 @@ export type ProductIdentification = {
   estimatedResaleHigh: number | null;
   identifyingText: string | null;
   searchKeywords: string[];
-  confidence: 'high' | 'medium' | 'low';
+  confidence: 'high' | 'medium' | 'low';          // identification (variant) confidence
+  valuationConfidence?: 'high' | 'medium' | 'low' | null;
+  priceRangeType?: 'tight' | 'moderate' | 'wide' | null;
+  keyValueFactors?: string[];
+  missingInformation?: string[];
+  recommendedNextSteps?: string[];
+  rationale?: string | null;
+  comps?: ResaleComp[];
+};
+
+export type ResaleComp = {
+  price: number;
+  status: 'sold' | 'active';
+  condition?: string | null;
+  note?: string | null;
+  sourceUrl?: string | null;
 };

@@ -140,6 +140,23 @@ export type MarketplaceLookupResult = {
   estimatedResaleHigh?: number | null;
   estimateSource?: string | null;
   estimateRationale?: string | null;
+  estimatePriceRangeType?: string | null;
+  estimateValuationConfidence?: string | null;
+  estimateComps?: ResaleComp[] | null;
+  estimateSources?: ResaleSource[] | null;
+};
+
+export type ResaleComp = {
+  price: number;
+  status: 'sold' | 'active';
+  condition?: string | null;
+  note?: string | null;
+  sourceUrl?: string | null;
+};
+
+export type ResaleSource = {
+  url: string;
+  title?: string | null;
 };
 
 export type BarcodeLookupResult = {

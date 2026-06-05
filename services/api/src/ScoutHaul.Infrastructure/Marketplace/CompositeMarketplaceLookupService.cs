@@ -121,7 +121,11 @@ internal sealed class CompositeMarketplaceLookupService(
             EstimatedResaleLow: estimate?.Low,
             EstimatedResaleHigh: estimate?.High,
             EstimateSource: estimate is not null ? "ai" : null,
-            EstimateRationale: estimate?.Rationale);
+            EstimateRationale: estimate?.Rationale,
+            EstimatePriceRangeType: estimate?.PriceRangeType,
+            EstimateValuationConfidence: estimate?.ValuationConfidence,
+            EstimateComps: estimate?.Comps,
+            EstimateSources: estimate?.Sources);
     }
 
     private static string BuildPricingQuery(string barcode, BarcodeLookupResult? product)

@@ -25,7 +25,8 @@ public sealed class GeminiProductVisionTests
             config,
             NullLogger<GeminiProductVisionService>.Instance);
 
-        return await service.IdentifyAsync(new string('A', 200), CancellationToken.None);
+        // IdentifyAsync now returns a VisionIdentifyResult; tests assert on the Product it wraps.
+        return (await service.IdentifyAsync(new string('A', 200), CancellationToken.None)).Product;
     }
 
     private static string GeminiEnvelope(string innerJson)
@@ -77,7 +78,7 @@ public sealed class GeminiProductVisionTests
             (HttpStatusCode.TooManyRequests, """{"error":"rate limited"}"""),
             (HttpStatusCode.OK, ok));
 
-        ProductIdentification? result = await ServiceWith(handler).IdentifyAsync(new string('A', 200), CancellationToken.None);
+        ProductIdentification? result = (await ServiceWith(handler).IdentifyAsync(new string('A', 200), CancellationToken.None)).Product;
 
         Assert.NotNull(result);
         Assert.Equal("Lego Set", result.Name);
@@ -88,7 +89,7 @@ public sealed class GeminiProductVisionTests
     public async Task Gives_up_after_two_429s()
     {
         var handler = new SequenceHandler((HttpStatusCode.TooManyRequests, "{}"));
-        ProductIdentification? result = await ServiceWith(handler).IdentifyAsync(new string('A', 200), CancellationToken.None);
+        ProductIdentification? result = (await ServiceWith(handler).IdentifyAsync(new string('A', 200), CancellationToken.None)).Product;
 
         Assert.Null(result);
         Assert.Equal(2, handler.CallCount); // initial + one retry, then stop
@@ -236,6 +237,6 @@ public sealed class GeminiProductVisionTests
         var service = new GeminiProductVisionService(new HttpClient(new FakeHandler("{}", HttpStatusCode.OK)), config, NullLogger<GeminiProductVisionService>.Instance);
 
         Assert.False(service.IsConfigured);
-        Assert.Null(await service.IdentifyAsync("AAAA", CancellationToken.None));
+        Assert.Null((await service.IdentifyAsync("AAAA", CancellationToken.None)).Product);
     }
 }

@@ -13,7 +13,7 @@ import { useHaptics } from '../../hooks/useHaptics';
 import { formatMoney } from '../../utils/money';
 import type { MarketplaceListing } from '../../domain/types';
 import { CompSourcesPanel } from './CompSourcesPanel';
-import type { ScanDoneState, WebMatch } from './types';
+import type { ScanDoneState } from './types';
 import { resolveProductImage, resolveProductName } from './types';
 
 type ScanResultsProps = {
@@ -56,8 +56,7 @@ export function ScanResults({
   const heroImage = resolveProductImage(state);
   const hasIdentification = !!productName || !!state.productBrand || !!state.productCategory;
   const hasListings = state.listings.length > 0;
-  const hasWebMatches = state.webMatches.length > 0;
-  const hasAnyResults = hasIdentification || hasListings || hasWebMatches;
+  const hasAnyResults = hasIdentification || hasListings;
 
   const [refining, setRefining] = useState(false);
   const [refineQuery, setRefineQuery] = useState(productName ?? state.barcode ?? '');
@@ -98,10 +97,8 @@ export function ScanResults({
             <View style={styles.heroMeta}>
               {hasIdentification ? (
                 <StatusPill label="Identified" tone="success" size="sm" />
-              ) : hasWebMatches ? (
-                <StatusPill label="Partial match" tone="warning" size="sm" />
               ) : (
-                <StatusPill label="No match" tone="neutral" size="sm" />
+                <StatusPill label="Not identified" tone="neutral" size="sm" />
               )}
               {state.providersUsed.length > 0 ? (
                 <Text variant="label" color={c.textMuted}>{state.providersUsed.join(' · ')}</Text>
@@ -159,10 +156,19 @@ export function ScanResults({
             >
               <View style={styles.priceHeader}>
                 <Ionicons name="sparkles" size={16} color={c.accent} />
-                <Text variant="bodyBold" color={c.accent}>AI Resale Estimate</Text>
+                <Text variant="bodyBold" color={c.accent} style={{ flex: 1 }}>AI Resale Estimate</Text>
+                {state.valuationConfidence ? (
+                  <StatusPill
+                    label={`${state.valuationConfidence} confidence`}
+                    tone={state.valuationConfidence === 'high' ? 'success' : state.valuationConfidence === 'medium' ? 'warning' : 'neutral'}
+                    size="sm"
+                  />
+                ) : null}
               </View>
               <View style={styles.priceRange}>
-                <Text variant="caption" color={c.textSecondary}>Likely sells for</Text>
+                <Text variant="caption" color={c.textSecondary}>
+                  {state.priceRangeType === 'wide' ? 'Varies widely' : state.priceRangeType === 'tight' ? 'Likely sells for' : 'Likely sells for'}
+                </Text>
                 <Text variant="metricSmall" color={c.accent}>
                   {formatMoney(state.lowPrice)} – {formatMoney(state.highPrice)}
                 </Text>
@@ -221,6 +227,124 @@ export function ScanResults({
           </View>
         ) : null}
 
+        {/* ── Comps — real listings found via Google Search grounding (tap to open) ── */}
+        {state.comps.length > 0 ? (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+                <Ionicons name={state.sources.length > 0 ? 'globe-outline' : 'sparkles-outline'} size={15} color={state.sources.length > 0 ? c.info : c.accent} />
+                <Text variant="bodyBold" color={c.textSecondary}>Comparable Prices</Text>
+              </View>
+              <Text variant="label" color={c.textMuted}>{state.sources.length > 0 ? 'Live · web search' : 'AI estimate'}</Text>
+            </View>
+            {(['sold', 'active'] as const).map((status) => {
+              const rows = state.comps.filter((cm) => cm.status === status);
+              if (rows.length === 0) return null;
+              return (
+                <View key={status} style={styles.compGroup}>
+                  <Text variant="label" color={status === 'sold' ? c.success : c.textMuted}>
+                    {status === 'sold' ? 'Recently sold' : 'Active asking'}
+                  </Text>
+                  {rows.slice(0, 6).map((cm, i) => {
+                    const body = (
+                      <>
+                        <Text variant="bodyBold" color={status === 'sold' ? c.success : c.text}>
+                          {formatMoney(cm.price)}
+                        </Text>
+                        <Text variant="caption" color={c.textMuted} numberOfLines={1} style={{ flex: 1 }}>
+                          {[cm.condition, cm.note].filter(Boolean).join(' · ')}
+                        </Text>
+                        {cm.sourceUrl ? <Ionicons name="open-outline" size={13} color={c.textMuted} /> : null}
+                      </>
+                    );
+                    return cm.sourceUrl ? (
+                      <Pressable
+                        key={i}
+                        onPress={() => void Linking.openURL(cm.sourceUrl!)}
+                        style={({ pressed }) => [styles.compRow, { borderColor: c.borderLight }, pressed && { backgroundColor: c.surfaceAlt }]}
+                        accessibilityRole="link"
+                        accessibilityLabel={`${cm.status} ${formatMoney(cm.price)} ${cm.condition ?? ''} — open listing`}
+                      >
+                        {body}
+                      </Pressable>
+                    ) : (
+                      <View key={i} style={[styles.compRow, { borderColor: c.borderLight }]}>{body}</View>
+                    );
+                  })}
+                </View>
+              );
+            })}
+            <Text variant="label" color={c.textMuted} style={styles.noCaps}>
+              {state.sources.length > 0
+                ? 'Real listings found via Google Search. Tap any comp or source to open.'
+                : 'Estimated from market knowledge — tap a source below to verify.'}
+            </Text>
+          </View>
+        ) : null}
+
+        {/* ── Sources — the web pages the grounded search used ── */}
+        {state.sources.length > 0 ? (
+          <View style={styles.section}>
+            <Text variant="label" color={c.textMuted}>Sources</Text>
+            <View style={styles.sourceChips}>
+              {state.sources.slice(0, 6).map((s, i) => (
+                <Pressable
+                  key={i}
+                  onPress={() => void Linking.openURL(s.url)}
+                  style={({ pressed }) => [styles.sourceChip, { borderColor: c.borderLight }, pressed && { backgroundColor: c.surfaceAlt }]}
+                  accessibilityRole="link"
+                  accessibilityLabel={`Open source: ${s.title ?? s.url}`}
+                >
+                  <Ionicons name="link-outline" size={12} color={c.info} />
+                  <Text variant="label" color={c.info} numberOfLines={1} style={[styles.noCaps, { maxWidth: 160 }]}>
+                    {s.title ?? 'source'}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+        ) : null}
+
+        {/* ── Appraisal detail — what drives value + how to firm up the price ── */}
+        {(state.keyValueFactors.length > 0 || state.missingInformation.length > 0 || state.recommendedNextSteps.length > 0) ? (
+          <View style={[styles.appraisalBox, { borderColor: c.borderLight }]}>
+            {state.keyValueFactors.length > 0 ? (
+              <View style={styles.appraisalGroup}>
+                <Text variant="label" color={c.textMuted}>What drives value</Text>
+                <View style={styles.factorChips}>
+                  {state.keyValueFactors.slice(0, 6).map((f, i) => (
+                    <View key={i} style={[styles.factorChip, { backgroundColor: c.surfaceAlt }]}>
+                      <Text variant="label" color={c.textSecondary} style={styles.noCaps}>{f}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            ) : null}
+            {state.missingInformation.length > 0 ? (
+              <View style={styles.appraisalGroup}>
+                <Text variant="label" color={c.warning}>To narrow the price, confirm</Text>
+                {state.missingInformation.slice(0, 4).map((m, i) => (
+                  <View key={i} style={styles.appraisalRow}>
+                    <Ionicons name="help-circle-outline" size={14} color={c.warning} />
+                    <Text variant="caption" color={c.textSecondary} style={{ flex: 1 }}>{m}</Text>
+                  </View>
+                ))}
+              </View>
+            ) : null}
+            {state.recommendedNextSteps.length > 0 ? (
+              <View style={styles.appraisalGroup}>
+                <Text variant="label" color={c.textMuted}>Next steps</Text>
+                {state.recommendedNextSteps.slice(0, 4).map((s, i) => (
+                  <View key={i} style={styles.appraisalRow}>
+                    <Ionicons name="arrow-forward-circle-outline" size={14} color={c.primary} />
+                    <Text variant="caption" color={c.textSecondary} style={{ flex: 1 }}>{s}</Text>
+                  </View>
+                ))}
+              </View>
+            ) : null}
+          </View>
+        ) : null}
+
         {/* ── Find Comps — deep-links to real sold/active resale sources (the live workflow) ── */}
         {compQuery ? <CompSourcesPanel query={compQuery} /> : null}
 
@@ -235,27 +359,6 @@ export function ScanResults({
             </View>
             {state.listings.slice(0, 10).map((listing, i) => (
               <ListingRow key={i} listing={listing} productIdentityId={state.productIdentityId} />
-            ))}
-          </View>
-        ) : null}
-
-        {/* ── Web Matches from Cloud Vision (Google found these product pages) ── */}
-        {hasWebMatches ? (
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
-                <Ionicons name="globe-outline" size={16} color={c.info} />
-                <Text variant="bodyBold" color={c.textSecondary}>Found Online</Text>
-              </View>
-              <Text variant="label" color={c.textMuted}>{state.webMatches.length}</Text>
-            </View>
-            {!hasListings ? (
-              <Text variant="caption" color={c.textMuted}>
-                No marketplace pricing available. These web results may help with research.
-              </Text>
-            ) : null}
-            {state.webMatches.slice(0, 6).map((match, i) => (
-              <WebMatchRow key={i} match={match} />
             ))}
           </View>
         ) : null}
@@ -441,42 +544,6 @@ function ListingRow({ listing, productIdentityId }: { listing: MarketplaceListin
   );
 }
 
-// ── Web Match Row ──
-
-function WebMatchRow({ match }: { match: WebMatch }) {
-  const { colors: c } = useAppTheme();
-
-  const iconName: keyof typeof Ionicons.glyphMap =
-    match.source.includes('ebay') ? 'pricetag-outline'
-    : match.source.includes('amazon') ? 'cart-outline'
-    : match.source.includes('walmart') ? 'storefront-outline'
-    : match.source.includes('target') ? 'locate-outline'
-    : match.source.includes('mercari') ? 'bag-outline'
-    : 'link-outline';
-
-  return (
-    <Pressable
-      onPress={() => void Linking.openURL(match.url)}
-      accessibilityRole="link"
-      accessibilityLabel={`${match.title ?? 'Web result'} on ${match.source}`}
-      style={({ pressed }) => [
-        styles.webRow,
-        { borderColor: c.borderLight },
-        pressed && { backgroundColor: c.surfaceAlt },
-      ]}
-    >
-      <View style={[styles.webIcon, { backgroundColor: c.infoLight }]}>
-        <Ionicons name={iconName} size={14} color={c.info} />
-      </View>
-      <View style={{ flex: 1 }}>
-        <Text variant="caption" numberOfLines={1}>{match.title ?? match.url}</Text>
-        <Text variant="label" color={c.textMuted}>{match.source}</Text>
-      </View>
-      <Ionicons name="open-outline" size={14} color={c.textMuted} />
-    </Pressable>
-  );
-}
-
 // ── Styles ──
 
 const styles = StyleSheet.create({
@@ -585,23 +652,42 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
-  // Web matches
-  webRow: {
+  // Comps + sources
+  sourceChips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
+  sourceChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xxs,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xxs,
+    borderRadius: radius.full,
+    borderWidth: 1,
+  },
+  compGroup: { gap: spacing.xxs },
+  compRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    paddingVertical: spacing.sm,
+    paddingVertical: spacing.xs,
     paddingHorizontal: spacing.sm,
-    borderWidth: 1,
+    borderBottomWidth: 1,
+  },
+
+  // Appraisal detail
+  appraisalBox: {
+    gap: spacing.md,
+    padding: spacing.md,
     borderRadius: radius.md,
+    borderWidth: 1,
   },
-  webIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: radius.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
+  appraisalGroup: { gap: spacing.xs },
+  factorChips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
+  factorChip: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xxs,
+    borderRadius: radius.full,
   },
+  appraisalRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.xs },
 
   // Empty state
   emptyState: {

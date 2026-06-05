@@ -31,16 +31,14 @@ public static class DependencyInjection
         services.AddHttpClient<IBarcodeLookupProvider, OpenFoodFactsBarcodeLookupProvider>(ConfigureJsonClient);
         services.AddHttpClient<IBarcodeLookupProvider, UpcItemDbLookupService>(ConfigureJsonClient);
 
-        // Vision — Gemini multimodal is the primary product identifier (reasons about the
-        // item, returns specific name/brand/model/value). Cloud Vision adds reverse-image web
-        // matches. Composite orchestrates both. Gemini needs a longer timeout than JSON APIs.
-        services.AddHttpClient<IProductIdentifier, GeminiProductVisionService>(client =>
+        // Vision — Gemini multimodal is the SOLE product identifier + appraiser (reads the photo,
+        // returns specific name/brand/model + a conservative used-resale valuation). Needs a longer
+        // timeout than plain JSON APIs.
+        services.AddHttpClient<IVisionIdentificationService, GeminiProductVisionService>(client =>
         {
             client.Timeout = TimeSpan.FromSeconds(30);
             client.DefaultRequestHeaders.Add("Accept", "application/json");
         });
-        services.AddHttpClient<IWebImageMatcher, GoogleCloudVisionMatcher>(ConfigureJsonClient);
-        services.AddScoped<IVisionIdentificationService, CompositeVisionIdentificationService>();
 
         // Text-only resale estimator (Gemini) — gives barcode/keyword lookups a value estimate
         // when no live marketplace comps exist. Reuses the Gemini key.

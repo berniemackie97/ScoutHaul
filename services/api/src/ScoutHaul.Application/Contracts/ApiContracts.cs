@@ -337,13 +337,37 @@ public sealed record MarketplaceLookupResult(
     decimal? EstimatedResaleLow = null,
     decimal? EstimatedResaleHigh = null,
     string? EstimateSource = null,
-    string? EstimateRationale = null);
+    string? EstimateRationale = null,
+    string? EstimatePriceRangeType = null,
+    string? EstimateValuationConfidence = null,
+    IReadOnlyList<ResaleComp>? EstimateComps = null,
+    IReadOnlyList<ResaleSource>? EstimateSources = null);
 
 /// <summary>AI-generated used-resale price estimate for a product (text-only, no live comps).</summary>
 public sealed record ResaleEstimate(
     decimal Low,
     decimal High,
-    string? Rationale);
+    string? Rationale,
+    string? ValuationConfidence = null,
+    string? PriceRangeType = null,
+    IReadOnlyList<string>? KeyValueFactors = null,
+    IReadOnlyList<string>? MissingInformation = null,
+    IReadOnlyList<string>? RecommendedNextSteps = null,
+    IReadOnlyList<ResaleComp>? Comps = null,
+    IReadOnlyList<ResaleSource>? Sources = null);
+
+/// <summary>
+/// A comparable listing found via Google Search grounding — a REAL recent sold/active comp.
+/// </summary>
+public sealed record ResaleComp(
+    decimal Price,
+    string Status,      // "sold" | "active"
+    string? Condition,
+    string? Note,
+    string? SourceUrl = null);
+
+/// <summary>A web source the grounded search used (for "verify"/"open listing" links).</summary>
+public sealed record ResaleSource(string Url, string? Title);
 
 public sealed record CreateSourcingTripRequest(
     string Name,
@@ -516,30 +540,12 @@ public sealed record VisionIdentifyRequest(
     string? ImageUrl);
 
 public sealed record VisionIdentifyResult(
-    string? BestGuessLabel,
-    IReadOnlyList<VisionWebEntity> WebEntities,
-    IReadOnlyList<VisionMatchingPage> MatchingPages,
-    IReadOnlyList<VisionSimilarImage> SimilarImages,
-    IReadOnlyList<string> Labels,
-    IReadOnlyList<string> DetectedLogos,
-    string? DetectedText,
+    ProductIdentification? Product,
     string? SearchQuery,
-    ProductIdentification? Product = null);
-
-public sealed record VisionWebEntity(
-    string Description,
-    double Score);
-
-public sealed record VisionMatchingPage(
-    string Url,
-    string? Title);
-
-public sealed record VisionSimilarImage(
-    string Url);
+    string? DetectedText);
 
 /// <summary>
-/// Structured product identification from a multimodal model (Gemini).
-/// This is the primary signal — far richer than reverse-image labels.
+/// Structured product identification + valuation from Gemini multimodal — the sole identifier.
 /// </summary>
 public sealed record ProductIdentification(
     string? Name,
@@ -552,4 +558,11 @@ public sealed record ProductIdentification(
     decimal? EstimatedResaleHigh,
     string? IdentifyingText,
     IReadOnlyList<string> SearchKeywords,
-    string Confidence);
+    string Confidence, // identification (variant) confidence — kept name for compatibility
+    string? ValuationConfidence = null,
+    string? PriceRangeType = null, // tight | moderate | wide
+    IReadOnlyList<string>? KeyValueFactors = null,
+    IReadOnlyList<string>? MissingInformation = null,
+    IReadOnlyList<string>? RecommendedNextSteps = null,
+    string? Rationale = null,
+    IReadOnlyList<ResaleComp>? Comps = null);

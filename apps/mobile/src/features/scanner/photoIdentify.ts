@@ -1,7 +1,6 @@
-import { recognizeText } from '@infinitered/react-native-mlkit-text-recognition';
 import { readAsStringAsync } from 'expo-file-system';
 import { api } from '../../api';
-import type { ProductIdentification, VisionIdentifyResult } from '../../api/marketplace';
+import type { ProductIdentification, ResaleComp, VisionIdentifyResult } from '../../api/marketplace';
 
 export type IdentifyResult = {
   title: string | null;
@@ -14,132 +13,82 @@ export type IdentifyResult = {
   estimatedResaleLow: number | null;
   estimatedResaleHigh: number | null;
   rawText: string;
-  confidence: 'high' | 'medium' | 'low';
+  // Identification confidence — ALWAYS from Gemini, never fabricated. null = not identified.
+  confidence: 'high' | 'medium' | 'low' | null;
+  valuationConfidence: 'high' | 'medium' | 'low' | null;
+  priceRangeType: 'tight' | 'moderate' | 'wide' | null;
+  keyValueFactors: string[];
+  missingInformation: string[];
+  recommendedNextSteps: string[];
+  rationale: string | null;
+  comps: ResaleComp[];
   searchQuery: string;
   alternateQueries: string[];
-  visionLabels: string[];
-  webEntities: { description: string; score: number }[];
-  matchingPages: { url: string; title: string | null }[];
   bestGuessLabel: string | null;
 };
 
 // ── Main ──
-// Gemini multimodal is the primary identifier — it reasons about the product and returns
-// structured data (name, brand, model, value). Cloud Vision (if configured) adds web matches.
-// On-device OCR is a last-resort offline fallback only.
+// Gemini multimodal is the SOLE identifier — it reads text/logos and reasons about the product.
+// Google Cloud Vision contributes ONLY reverse-image web-match links (never identity or confidence).
+// There is no second identification system: if Gemini can't run, we do not fabricate a guess.
 
 export async function identifyFromPhoto(photoUri: string): Promise<IdentifyResult> {
   const vision = await callVisionApi(photoUri);
-
-  if (vision) {
-    return buildFromVision(vision);
-  }
-
-  // Offline / API unreachable — on-device OCR so the user still gets a starting query.
-  return buildFromOcrOnly(photoUri);
+  if (!vision) return emptyResult();
+  return buildFromVision(vision);
 }
 
-// ── Build result from Gemini + Cloud Vision response ──
+// ── Build result — Gemini is the single source of truth ──
 
 function buildFromVision(vision: VisionIdentifyResult): IdentifyResult {
   const product: ProductIdentification | null = vision.product;
-  const matchingPages = vision.matchingPages ?? [];
   const barcode = vision.detectedText ? extractBarcode(vision.detectedText) : null;
 
-  if (product) {
-    // Gemini identified the product — this is the strong path.
-    const searchQuery = vision.searchQuery
-      ?? (product.brand && product.model ? `${product.brand} ${product.model}` : null)
-      ?? product.name
-      ?? product.searchKeywords[0]
-      ?? '';
-
-    // Alternate queries: Gemini's keyword phrases, minus the primary, deduped.
-    const alternateQueries = dedupeQueries(searchQuery, [
-      ...(product.brand && product.model ? [`${product.brand} ${product.model}`] : []),
-      ...product.searchKeywords,
-      ...(product.name ? [product.name] : []),
-    ]);
-
+  // No Gemini identification (key unset or rate-limited after retry). Do NOT invent an identity
+  // or a confidence — return a clean unidentified result; the user refines manually.
+  if (!product) {
     return {
-      title: product.name,
-      brand: product.brand,
-      model: product.model,
-      category: product.category,
-      color: product.color,
-      condition: product.condition,
+      ...emptyResult(),
       barcode,
-      estimatedResaleLow: product.estimatedResaleLow,
-      estimatedResaleHigh: product.estimatedResaleHigh,
       rawText: vision.detectedText ?? '',
-      confidence: product.confidence,
-      searchQuery,
-      alternateQueries,
-      visionLabels: vision.labels ?? [],
-      webEntities: vision.webEntities ?? [],
-      matchingPages,
-      bestGuessLabel: product.name ?? vision.bestGuessLabel,
+      searchQuery: vision.searchQuery ?? '',
     };
   }
 
-  // No Gemini product (key not set, or rate-limited) — fall back to Cloud Vision web matches.
-  const searchQuery = vision.searchQuery ?? vision.bestGuessLabel ?? '';
-  const pageTitle = extractProductFromPageTitles(matchingPages);
+  const searchQuery = vision.searchQuery
+    ?? (product.brand && product.model ? `${product.brand} ${product.model}` : null)
+    ?? product.name
+    ?? product.searchKeywords[0]
+    ?? '';
+
   const alternateQueries = dedupeQueries(searchQuery, [
-    ...(pageTitle ? [pageTitle] : []),
-    ...(vision.bestGuessLabel ? [vision.bestGuessLabel] : []),
-    ...vision.webEntities.slice(0, 2).map((e) => e.description),
+    ...(product.brand && product.model ? [`${product.brand} ${product.model}`] : []),
+    ...product.searchKeywords,
+    ...(product.name ? [product.name] : []),
   ]);
 
-  const hasSignal = !!vision.bestGuessLabel || matchingPages.length > 0 || vision.webEntities.length > 0;
-
   return {
-    title: vision.bestGuessLabel ?? pageTitle,
-    brand: null,
-    model: null,
-    category: null,
-    color: null,
-    condition: null,
+    title: product.name,
+    brand: product.brand,
+    model: product.model,
+    category: product.category,
+    color: product.color,
+    condition: product.condition,
     barcode,
-    estimatedResaleLow: null,
-    estimatedResaleHigh: null,
+    estimatedResaleLow: product.estimatedResaleLow,
+    estimatedResaleHigh: product.estimatedResaleHigh,
     rawText: vision.detectedText ?? '',
-    confidence: vision.bestGuessLabel ? 'medium' : hasSignal ? 'low' : 'low',
+    confidence: normConfidence(product.confidence),
+    valuationConfidence: normConfidence(product.valuationConfidence),
+    priceRangeType: normRangeType(product.priceRangeType),
+    keyValueFactors: product.keyValueFactors ?? [],
+    missingInformation: product.missingInformation ?? [],
+    recommendedNextSteps: product.recommendedNextSteps ?? [],
+    rationale: product.rationale ?? null,
+    comps: product.comps ?? [],
     searchQuery,
     alternateQueries,
-    visionLabels: vision.labels ?? [],
-    webEntities: vision.webEntities ?? [],
-    matchingPages,
-    bestGuessLabel: vision.bestGuessLabel,
-  };
-}
-
-// ── Fallback: on-device OCR only (offline) ──
-
-async function buildFromOcrOnly(photoUri: string): Promise<IdentifyResult> {
-  let rawText = '';
-  try {
-    const result = await recognizeText(photoUri);
-    rawText = result.text.trim();
-  } catch {
-    return emptyResult();
-  }
-
-  if (!rawText || rawText.length < 3) return emptyResult();
-
-  // Use the most prominent text lines as a best-effort query.
-  const query = topTextLines(rawText, 3);
-  const barcode = extractBarcode(rawText);
-
-  return {
-    ...emptyResult(),
-    barcode,
-    rawText,
-    confidence: query ? 'low' : 'low',
-    searchQuery: query ?? '',
-    alternateQueries: [],
-    bestGuessLabel: query,
-    title: query,
+    bestGuessLabel: product.name,
   };
 }
 
@@ -156,10 +105,10 @@ async function callVisionApi(photoUri: string): Promise<VisionIdentifyResult | n
     const result = await api.visionIdentify(base64);
     console.log('[Vision] Result:', {
       product: result.product?.name ?? null,
-      confidence: result.product?.confidence ?? 'n/a',
-      brand: result.product?.brand ?? null,
+      idConfidence: result.product?.confidence ?? 'n/a',
+      valConfidence: result.product?.valuationConfidence ?? 'n/a',
+      rangeType: result.product?.priceRangeType ?? 'n/a',
       resale: result.product ? `$${result.product.estimatedResaleLow}-${result.product.estimatedResaleHigh}` : null,
-      webPages: result.matchingPages?.length ?? 0,
       query: result.searchQuery,
     });
     return result;
@@ -168,7 +117,7 @@ async function callVisionApi(photoUri: string): Promise<VisionIdentifyResult | n
     if (msg.includes('Sign in')) {
       console.error('[Vision] Auth required — user not signed in');
     } else {
-      console.error('[Vision] call failed, falling back to OCR:', msg);
+      console.error('[Vision] call failed:', msg);
     }
     return null;
   }
@@ -186,6 +135,14 @@ function extractBarcode(text: string): string | null {
   return (len === 8 || len === 12 || len === 13 || len === 14) ? match[1] : null;
 }
 
+function normConfidence(v: string | null | undefined): 'high' | 'medium' | 'low' | null {
+  return v === 'high' || v === 'medium' || v === 'low' ? v : null;
+}
+
+function normRangeType(v: string | null | undefined): 'tight' | 'moderate' | 'wide' | null {
+  return v === 'tight' || v === 'moderate' || v === 'wide' ? v : null;
+}
+
 function dedupeQueries(primary: string, candidates: string[]): string[] {
   const seen = new Set<string>([primary.toLowerCase().trim()]);
   const out: string[] = [];
@@ -200,36 +157,12 @@ function dedupeQueries(primary: string, candidates: string[]): string[] {
   return out.slice(0, 4);
 }
 
-// Pull a product name out of a marketplace page title (e.g. "Sony XM4 - eBay" → "Sony XM4").
-function extractProductFromPageTitles(pages: { url: string; title: string | null }[]): string | null {
-  const SITE_SUFFIX = /\s*[-–|·]\s*(eBay|Amazon|Walmart|Target|Best Buy|Mercari|Poshmark|Etsy|Wayfair|Google Shopping|Shopping|Search Results?).*$/i;
-  const TOO_GENERIC = /^(shop|buy|sell|search|find|compare|results|home|page|\d+)/i;
-  for (const page of pages) {
-    if (!page.title) continue;
-    const cleaned = page.title.replace(SITE_SUFFIX, '').replace(/\s{2,}/g, ' ').trim();
-    if (cleaned.length >= 8 && cleaned.length <= 120 && !TOO_GENERIC.test(cleaned)) return cleaned;
-  }
-  return null;
-}
-
-function topTextLines(text: string, count: number): string | null {
-  const lines = text
-    .split('\n')
-    .map((l) => l.trim())
-    .filter((l) =>
-      l.length > 3 && l.length < 60 &&
-      !/^https?:\/\//i.test(l) &&
-      !/^\$?\d+\.?\d*$/.test(l) &&
-      !/^(WARNING|CAUTION|DIRECTIONS|INGREDIENTS|NET WT|MADE IN|©)/i.test(l),
-    );
-  return lines.length > 0 ? lines.slice(0, count).join(' ').slice(0, 120) : null;
-}
-
 function emptyResult(): IdentifyResult {
   return {
     title: null, brand: null, model: null, category: null, color: null, condition: null,
     barcode: null, estimatedResaleLow: null, estimatedResaleHigh: null,
-    rawText: '', confidence: 'low', searchQuery: '', alternateQueries: [],
-    visionLabels: [], webEntities: [], matchingPages: [], bestGuessLabel: null,
+    rawText: '', confidence: null, valuationConfidence: null, priceRangeType: null,
+    keyValueFactors: [], missingInformation: [], recommendedNextSteps: [], rationale: null, comps: [],
+    searchQuery: '', alternateQueries: [], bestGuessLabel: null,
   };
 }

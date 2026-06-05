@@ -19,17 +19,14 @@ import { api } from '../src/api';
 import { Button } from '../src/components/Button';
 import { Card } from '../src/components/Card';
 import { Screen } from '../src/components/Screen';
-import { StatusPill } from '../src/components/StatusPill';
 import { Text } from '../src/components/Text';
-import { TextField } from '../src/components/TextField';
 import { ScanResults } from '../src/features/scanner/ScanResults';
 import type { IdentifyResult } from '../src/features/scanner/photoIdentify';
 import { identifyFromPhoto } from '../src/features/scanner/photoIdentify';
 import { radius, spacing } from '../src/components/theme';
 import { useAppTheme } from '../src/context/ThemeContext';
-import type { ScanMode, ScanState, VisionOverrides, WebMatch } from '../src/features/scanner/types';
+import type { ScanMode, ScanState, VisionOverrides } from '../src/features/scanner/types';
 import {
-  extractWebMatches,
   makeDoneError,
   makeDoneFromResult,
   resolveProductName,
@@ -76,12 +73,12 @@ export default function BarcodeScannerScreen() {
   const insets = useSafeAreaInsets();
   const isScanning = state.phase === 'scanning';
   const isPhotoMode = mode === 'photo-identify';
-  const showPhotoOverlay = (showCaptureOverlay || !!capturedPhotoUri) && state.phase !== 'scanning' && state.phase !== 'photo-review';
+  const showPhotoOverlay = (showCaptureOverlay || !!capturedPhotoUri) && state.phase !== 'scanning';
   const modeColor = isPhotoMode ? c.accent : c.primary;
 
   // Clear photo overlay when reaching results
   useEffect(() => {
-    if (state.phase === 'done' || state.phase === 'photo-review') {
+    if (state.phase === 'done') {
       setCapturedPhotoUri(null);
       setShowCaptureOverlay(false);
     }
@@ -168,12 +165,11 @@ export default function BarcodeScannerScreen() {
     primary: string,
     alternates: string[],
     photoUri: string,
-    webMatches: WebMatch[],
     overrides?: VisionOverrides,
   ) {
-    // No providers → skip API call entirely, go straight to results with Vision data
+    // No providers → skip API call entirely, go straight to results with Gemini data
     if (hasProvidersRef.current === false) {
-      setState(makeDoneFromResult(primary, makeEmptyResult(primary), photoUri, webMatches, overrides));
+      setState(makeDoneFromResult(primary, makeEmptyResult(primary), photoUri, overrides));
       return;
     }
 
@@ -184,12 +180,12 @@ export default function BarcodeScannerScreen() {
     try {
       primaryResult = await api.lookupSearch(primary);
       if (primaryResult.totalResults > 0 || primaryResult.productTitle || !primaryResult.providersUsed?.length) {
-        setState(makeDoneFromResult(primary, primaryResult, photoUri, webMatches, overrides));
+        setState(makeDoneFromResult(primary, primaryResult, photoUri, overrides));
         return;
       }
     } catch {
-      // API failed — show Vision-only results
-      setState(makeDoneFromResult(primary, makeEmptyResult(primary), photoUri, webMatches, overrides));
+      // API failed — show Gemini-only results
+      setState(makeDoneFromResult(primary, makeEmptyResult(primary), photoUri, overrides));
       return;
     }
 
@@ -199,13 +195,13 @@ export default function BarcodeScannerScreen() {
       try {
         const result = await api.lookupSearch(alt);
         if (result.totalResults > 0 || result.productTitle) {
-          setState(makeDoneFromResult(alt, result, photoUri, webMatches, overrides));
+          setState(makeDoneFromResult(alt, result, photoUri, overrides));
           return;
         }
       } catch { /* continue */ }
     }
 
-    setState(makeDoneFromResult(primary, primaryResult, photoUri, webMatches, overrides));
+    setState(makeDoneFromResult(primary, primaryResult, photoUri, overrides));
   }
 
   // ── Photo identify — Cloud Vision + OCR, then auto-search with retries ──
@@ -247,7 +243,6 @@ export default function BarcodeScannerScreen() {
         clearTimeout(stepTimer);
       }
       identifyResultRef.current = identified;
-      const webMatches = extractWebMatches(identified.matchingPages);
 
       setState({ phase: 'identifying', photoUri: photo.uri, ocrText: null, step: 'Identifying product…' });
 
@@ -257,7 +252,7 @@ export default function BarcodeScannerScreen() {
         await new Promise((r) => setTimeout(r, MIN_ANALYZE_MS - elapsed));
       }
 
-      // Vision metadata to carry through to results (even if marketplace doesn't resolve them)
+      // Gemini metadata carried through to results (id, value, confidences, factors).
       const overrides: VisionOverrides = {
         brand: identified.brand,
         model: identified.model,
@@ -267,37 +262,27 @@ export default function BarcodeScannerScreen() {
         title: identified.title,
         estimatedResaleLow: identified.estimatedResaleLow,
         estimatedResaleHigh: identified.estimatedResaleHigh,
+        idConfidence: identified.confidence,
+        valuationConfidence: identified.valuationConfidence,
+        priceRangeType: identified.priceRangeType,
+        keyValueFactors: identified.keyValueFactors,
+        missingInformation: identified.missingInformation,
+        recommendedNextSteps: identified.recommendedNextSteps,
+        rationale: identified.rationale,
+        comps: identified.comps,
       };
 
-      if (identified.confidence === 'high' && identified.searchQuery) {
-        haptics.success();
-        await searchWithRetry(
-          identified.searchQuery,
-          identified.alternateQueries,
-          photo.uri,
-          webMatches,
-          overrides,
-        );
-      } else if (identified.confidence === 'medium' && identified.searchQuery) {
-        haptics.medium();
-        await searchWithRetry(
-          identified.searchQuery,
-          identified.alternateQueries,
-          photo.uri,
-          webMatches,
-          overrides,
-        );
+      // ALWAYS go to the rich results screen (comps, estimate, refine) — regardless of
+      // confidence. Low confidence just shows a "Low" badge + the Refine control; users still
+      // get comp buttons and a value estimate instead of a dead-end review screen.
+      const query = identified.searchQuery || identified.title || '';
+      identified.confidence === 'high' ? haptics.success() : haptics.medium();
+
+      if (query) {
+        await searchWithRetry(query, identified.alternateQueries, photo.uri, overrides);
       } else {
-        // Low confidence — show review for user confirmation
-        setCapturedPhotoUri(null);
-        setShowCaptureOverlay(false);
-        setState({
-          phase: 'photo-review',
-          photoUri: photo.uri,
-          ocrText: identified.rawText,
-          query: identified.searchQuery,
-          identifyResult: identified,
-        });
+        // Nothing usable to search — still land on results with the photo + Refine to type a name.
+        setState(makeDoneFromResult('', makeEmptyResult(''), photo.uri, overrides));
       }
     } catch {
       setCapturedPhotoUri(null);
@@ -311,7 +296,6 @@ export default function BarcodeScannerScreen() {
     const q = query.trim();
     if (!q) return;
     const identified = identifyResultRef.current;
-    const webMatches = identified ? extractWebMatches(identified.matchingPages) : [];
     const overrides: VisionOverrides | undefined = identified
       ? {
           brand: identified.brand,
@@ -322,13 +306,21 @@ export default function BarcodeScannerScreen() {
           title: identified.title,
           estimatedResaleLow: identified.estimatedResaleLow,
           estimatedResaleHigh: identified.estimatedResaleHigh,
+          idConfidence: identified.confidence,
+          valuationConfidence: identified.valuationConfidence,
+          priceRangeType: identified.priceRangeType,
+          keyValueFactors: identified.keyValueFactors,
+          missingInformation: identified.missingInformation,
+          recommendedNextSteps: identified.recommendedNextSteps,
+          rationale: identified.rationale,
+          comps: identified.comps,
         }
       : undefined;
     setCapturedPhotoUri(photoUri ?? null);
 
     // No providers → skip API call
     if (hasProvidersRef.current === false) {
-      setState(makeDoneFromResult(q, makeEmptyResult(q), photoUri, webMatches, overrides));
+      setState(makeDoneFromResult(q, makeEmptyResult(q), photoUri, overrides));
       return;
     }
 
@@ -336,7 +328,7 @@ export default function BarcodeScannerScreen() {
     try {
       const result = await api.lookupSearch(q);
       if (result.totalResults > 0 || result.productTitle || !result.providersUsed?.length) {
-        setState(makeDoneFromResult(q, result, photoUri, webMatches, overrides));
+        setState(makeDoneFromResult(q, result, photoUri, overrides));
         return;
       }
       // Providers returned nothing — try alternates
@@ -347,15 +339,15 @@ export default function BarcodeScannerScreen() {
           try {
             const altResult = await api.lookupSearch(alt);
             if (altResult.totalResults > 0 || altResult.productTitle) {
-              setState(makeDoneFromResult(alt, altResult, photoUri, webMatches, overrides));
+              setState(makeDoneFromResult(alt, altResult, photoUri, overrides));
               return;
             }
           } catch { /* continue */ }
         }
       }
-      setState(makeDoneFromResult(q, result, photoUri, webMatches, overrides));
+      setState(makeDoneFromResult(q, result, photoUri, overrides));
     } catch {
-      setState(makeDoneFromResult(q, makeEmptyResult(q), photoUri, webMatches, overrides));
+      setState(makeDoneFromResult(q, makeEmptyResult(q), photoUri, overrides));
     }
   }
 
@@ -766,85 +758,6 @@ export default function BarcodeScannerScreen() {
               </Text>
             </View>
 
-          /* Photo review — show what was found, let user edit/confirm */
-          ) : state.phase === 'photo-review' ? (
-            <ScrollView style={styles.panelScroll} showsVerticalScrollIndicator={false} bounces={false}>
-              <View style={styles.panelInner}>
-                <View style={styles.identifyRow}>
-                  {state.photoUri ? (
-                    <Image source={{ uri: state.photoUri }} style={styles.reviewThumb} contentFit="cover" />
-                  ) : null}
-                  <View style={styles.identifyText}>
-                    <View style={styles.reviewHeader}>
-                      <View style={{ flex: 1 }}>
-                        <Text variant="bodyBold">
-                          {state.identifyResult?.bestGuessLabel
-                            ? 'Product identified'
-                            : state.identifyResult?.confidence === 'medium'
-                              ? 'Partial match'
-                              : state.query
-                                ? 'Text detected'
-                                : 'No product identified'}
-                        </Text>
-                        {state.identifyResult ? (
-                          <StatusPill
-                            label={state.identifyResult.confidence === 'high' ? 'High' : state.identifyResult.confidence === 'medium' ? 'Medium' : 'Low'}
-                            tone={state.identifyResult.confidence === 'high' ? 'success' : state.identifyResult.confidence === 'medium' ? 'warning' : 'neutral'}
-                            size="sm"
-                          />
-                        ) : null}
-                      </View>
-                      <Pressable onPress={resetToScanning} hitSlop={8}>
-                        <Ionicons name="close" size={22} color={c.textMuted} />
-                      </Pressable>
-                    </View>
-                  </View>
-                </View>
-
-                {/* Detected fields from identification */}
-                {state.identifyResult?.brand || state.identifyResult?.category ? (
-                  <View style={[styles.detectedFields, { backgroundColor: c.primaryLight }]}>
-                    {state.identifyResult.brand ? (
-                      <View style={styles.detectedField}>
-                        <Text variant="label" color={c.textMuted}>Brand</Text>
-                        <Text variant="bodyBold" color={c.primary}>{state.identifyResult.brand}</Text>
-                      </View>
-                    ) : null}
-                    {state.identifyResult.category ? (
-                      <View style={styles.detectedField}>
-                        <Text variant="label" color={c.textMuted}>Category</Text>
-                        <Text variant="bodyBold" color={c.primary}>{state.identifyResult.category}</Text>
-                      </View>
-                    ) : null}
-                    {state.identifyResult.model ? (
-                      <View style={styles.detectedField}>
-                        <Text variant="label" color={c.textMuted}>Model</Text>
-                        <Text variant="bodyBold" color={c.primary}>{state.identifyResult.model}</Text>
-                      </View>
-                    ) : null}
-                  </View>
-                ) : null}
-
-                <TextField
-                  label="Search marketplace"
-                  value={state.query}
-                  onChangeText={(v) => setState({ ...state, query: v })}
-                  placeholder="Product name, brand, model..."
-                  returnKeyType="search"
-                  onSubmitEditing={() => void searchManual(state.query, state.photoUri)}
-                />
-                <Button
-                  label="Search Marketplaces"
-                  icon="search-outline"
-                  size="lg"
-                  fullWidth
-                  disabled={!state.query.trim()}
-                  onPress={() => void searchManual(state.query, state.photoUri)}
-                />
-                <Button label="Retake" variant="ghost" size="sm" icon="camera-outline" onPress={resetToScanning} />
-              </View>
-            </ScrollView>
-
           /* Searching */
           ) : state.phase === 'searching' ? (
             <View style={styles.panelInner}>
@@ -1078,20 +991,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  identifyRow: { flexDirection: 'row', gap: spacing.md, alignItems: 'center' },
-  reviewThumb: { width: 72, height: 72, borderRadius: radius.md },
-  identifyText: { flex: 1, gap: spacing.xs },
-  reviewHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
-
-  detectedFields: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.md,
-    padding: spacing.md,
-    borderRadius: radius.md,
-  },
-  detectedField: { gap: spacing.xxs },
-
   mono: { fontVariant: ['tabular-nums'], letterSpacing: 0.5 },
 
   // Shutter flash

@@ -1,19 +1,12 @@
-import type { MarketplaceListing } from '../../domain/types';
+import type { MarketplaceListing, ResaleComp, ResaleSource } from '../../domain/types';
 
 export type ScanMode = 'barcode' | 'photo-identify';
-
-export type WebMatch = {
-  url: string;
-  title: string | null;
-  source: string;
-};
 
 export type ScanState =
   | { phase: 'scanning' }
   | { phase: 'searching'; barcode: string; photoUri?: string | null; step?: string }
   | { phase: 'capturing' }
   | { phase: 'identifying'; photoUri: string; ocrText: string | null; step?: string }
-  | { phase: 'photo-review'; photoUri: string; ocrText: string; query: string; identifyResult?: import('./photoIdentify').IdentifyResult }
   | ScanDoneState;
 
 export type ScanDoneState = {
@@ -39,7 +32,15 @@ export type ScanDoneState = {
   savedObservationCount: number;
   providersUsed: string[];
   providerWarnings: string[];
-  webMatches: WebMatch[];
+  // Gemini appraisal signals (identification vs valuation kept separate).
+  idConfidence: 'high' | 'medium' | 'low' | null;
+  valuationConfidence: 'high' | 'medium' | 'low' | null;
+  priceRangeType: 'tight' | 'moderate' | 'wide' | null;
+  keyValueFactors: string[];
+  missingInformation: string[];
+  recommendedNextSteps: string[];
+  comps: ResaleComp[];
+  sources: ResaleSource[];
 };
 
 export function resolveProductName(state: ScanDoneState): string | null {
@@ -56,7 +57,7 @@ export function resolveProductImage(state: ScanDoneState): string | null {
   return state.productImageUrl ?? state.photoUri ?? state.listings[0]?.imageUrl ?? null;
 }
 
-export function makeDoneError(query: string, error: unknown, webMatches: WebMatch[] = []): ScanDoneState {
+export function makeDoneError(query: string, error: unknown): ScanDoneState {
   return {
     phase: 'done',
     barcode: query,
@@ -79,7 +80,14 @@ export function makeDoneError(query: string, error: unknown, webMatches: WebMatc
     savedObservationCount: 0,
     providersUsed: [],
     providerWarnings: [],
-    webMatches,
+    idConfidence: null,
+    valuationConfidence: null,
+    priceRangeType: null,
+    keyValueFactors: [],
+    missingInformation: [],
+    recommendedNextSteps: [],
+    comps: [],
+    sources: [],
   };
 }
 
@@ -92,13 +100,20 @@ export type VisionOverrides = {
   title?: string | null;
   estimatedResaleLow?: number | null;
   estimatedResaleHigh?: number | null;
+  idConfidence?: 'high' | 'medium' | 'low' | null;
+  valuationConfidence?: 'high' | 'medium' | 'low' | null;
+  priceRangeType?: 'tight' | 'moderate' | 'wide' | null;
+  keyValueFactors?: string[];
+  missingInformation?: string[];
+  recommendedNextSteps?: string[];
+  rationale?: string | null;
+  comps?: ResaleComp[];
 };
 
 export function makeDoneFromResult(
   query: string,
   result: import('../../domain/types').MarketplaceLookupResult,
   photoUri?: string | null,
-  webMatches: WebMatch[] = [],
   v?: VisionOverrides,
 ): ScanDoneState {
   // Real marketplace data wins. Otherwise fall back to an AI resale estimate so the user always
@@ -113,7 +128,21 @@ export function makeDoneFromResult(
   const lowPrice = hasMarket ? (result.lowestPrice ?? null) : estLow;
   const highPrice = hasMarket ? (result.highestPrice ?? null) : estHigh;
   const priceSource: ScanDoneState['priceSource'] = hasMarket ? 'market' : hasEstimate ? 'estimate' : null;
-  const priceRationale = !hasMarket && hasEstimate ? (result.estimateRationale ?? null) : null;
+  // The server estimate is now GROUNDED (real Google-Search comps), so it wins over the photo
+  // vision override (training-knowledge) for everything valuation-related.
+  const priceRationale = !hasMarket && hasEstimate ? (result.estimateRationale ?? v?.rationale ?? null) : null;
+
+  const norm = <T extends string>(x: unknown, allowed: readonly T[]): T | null =>
+    typeof x === 'string' && (allowed as readonly string[]).includes(x) ? (x as T) : null;
+  const confSet = ['high', 'medium', 'low'] as const;
+  const rangeSet = ['tight', 'moderate', 'wide'] as const;
+
+  const valuationConfidence = !hasMarket
+    ? (norm(result.estimateValuationConfidence, confSet) ?? v?.valuationConfidence ?? null)
+    : null;
+  const priceRangeType = !hasMarket
+    ? (norm(result.estimatePriceRangeType, rangeSet) ?? v?.priceRangeType ?? null)
+    : null;
 
   return {
     phase: 'done',
@@ -138,24 +167,15 @@ export function makeDoneFromResult(
     savedObservationCount: result.savedObservationCount ?? 0,
     providersUsed: result.providersUsed ?? [],
     providerWarnings: result.providerWarnings ?? [],
-    webMatches,
+    idConfidence: v?.idConfidence ?? null,
+    valuationConfidence,
+    priceRangeType,
+    keyValueFactors: v?.keyValueFactors ?? [],
+    missingInformation: v?.missingInformation ?? [],
+    recommendedNextSteps: v?.recommendedNextSteps ?? [],
+    // Comps: prefer grounded server comps (real listings) over the vision override; none when
+    // live marketplace listings already populate the listings array.
+    comps: hasMarket ? [] : (result.estimateComps ?? v?.comps ?? []),
+    sources: result.estimateSources ?? [],
   };
-}
-
-export function extractWebMatches(
-  pages: { url: string; title: string | null }[],
-): WebMatch[] {
-  return pages
-    .filter((p) => p.url && !p.url.includes('google.com/imgres'))
-    .map((p) => {
-      let source: string;
-      try {
-        const host = new URL(p.url).hostname.replace(/^www\./, '');
-        source = host;
-      } catch {
-        source = 'Web';
-      }
-      return { url: p.url, title: p.title, source };
-    })
-    .slice(0, 8);
 }
