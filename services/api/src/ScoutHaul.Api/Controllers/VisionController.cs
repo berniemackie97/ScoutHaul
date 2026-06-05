@@ -17,7 +17,11 @@ public sealed class VisionController(
     /// brand, model, category, condition, a conservative used-resale valuation, and comp price points.
     /// </summary>
     [HttpPost("identify")]
-    [RequestSizeLimit(12_000_000)] // 12MB max for base64 image
+    // 28MB cap (under Kestrel's 30MB default). The client now downscales to ~300KB before upload,
+    // but full-res photos from older app builds base64-encode to 10-25MB on high-MP phones — at the
+    // old 12MB limit those silently 413'd and surfaced as "not identified" only for detailed/large
+    // images, which looked like random inconsistency. Generous headroom removes size as a failure mode.
+    [RequestSizeLimit(28_000_000)]
     public async Task<ActionResult<VisionIdentifyResult>> Identify(
         [FromBody] VisionIdentifyRequest request,
         CancellationToken cancellationToken)
