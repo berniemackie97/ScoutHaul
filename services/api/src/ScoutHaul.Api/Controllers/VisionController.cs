@@ -13,8 +13,8 @@ public sealed class VisionController(
     IHttpClientFactory httpClientFactory) : ControllerBase
 {
     /// <summary>
-    /// Identify a product from a photo using Google Cloud Vision Web Detection + Label Detection.
-    /// Returns best guess product name, web entities, matching product pages, and object labels.
+    /// Identify a product from a photo using Gemini multimodal. Returns a specific product name,
+    /// brand, model, category, condition, a conservative used-resale valuation, and comp price points.
     /// </summary>
     [HttpPost("identify")]
     [RequestSizeLimit(12_000_000)] // 12MB max for base64 image
@@ -24,7 +24,7 @@ public sealed class VisionController(
     {
         if (!visionService.IsConfigured)
         {
-            return StatusCode(503, new { title = "Vision service not configured", detail = "Google Cloud Vision API key is not set." });
+            return StatusCode(503, new { title = "Vision service not configured", detail = "Gemini API key (Gemini__ApiKey) is not set." });
         }
 
         if (string.IsNullOrWhiteSpace(request.ImageBase64) && string.IsNullOrWhiteSpace(request.ImageUrl))

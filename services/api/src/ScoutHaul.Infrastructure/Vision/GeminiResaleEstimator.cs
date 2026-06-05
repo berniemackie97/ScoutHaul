@@ -115,29 +115,45 @@ internal sealed class GeminiResaleEstimator(
 
         string url = $"https://generativelanguage.googleapis.com/v1beta/models/{Model}:generateContent?key={apiKey}";
         string json = JsonSerializer.Serialize(requestBody);
-        using var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-        HttpResponseMessage response;
-        try
+        // Grounded gemini-2.5-flash also returns transient 503 "high demand" / 429. Retry up to 4×
+        // with exponential backoff. StringContent can't be resent, so build a fresh one per attempt.
+        const int maxAttempts = 4;
+        for (int attempt = 1; attempt <= maxAttempts; attempt++)
         {
-            response = await httpClient.PostAsync(url, content, cancellationToken);
-        }
-        catch (Exception ex)
-        {
-            logger.LogWarning(ex, "Gemini resale estimate request failed for {Product}", productDescription);
-            return null;
-        }
-
-        using (response)
-        {
-            if (!response.IsSuccessStatusCode)
+            using var content = new StringContent(json, Encoding.UTF8, "application/json");
+            HttpResponseMessage response;
+            try
             {
+                response = await httpClient.PostAsync(url, content, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Gemini resale estimate request failed for {Product}", productDescription);
                 return null;
             }
 
-            string payload = await response.Content.ReadAsStringAsync(cancellationToken);
-            return Parse(payload);
+            using (response)
+            {
+                if (response.IsSuccessStatusCode)
+                {
+                    string payload = await response.Content.ReadAsStringAsync(cancellationToken);
+                    return Parse(payload);
+                }
+
+                bool transient = response.StatusCode is System.Net.HttpStatusCode.TooManyRequests
+                    or System.Net.HttpStatusCode.ServiceUnavailable
+                    or System.Net.HttpStatusCode.InternalServerError;
+                if (transient && attempt < maxAttempts)
+                {
+                    await Task.Delay(TimeSpan.FromMilliseconds(400 * (1 << (attempt - 1))), cancellationToken);
+                    continue;
+                }
+                return null;
+            }
         }
+
+        return null;
     }
 
     private ResaleEstimate? Parse(string payload)

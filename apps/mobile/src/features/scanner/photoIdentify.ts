@@ -1,4 +1,4 @@
-import { readAsStringAsync } from 'expo-file-system';
+import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import { api } from '../../api';
 import type { ProductIdentification, ResaleComp, VisionIdentifyResult } from '../../api/marketplace';
 
@@ -96,7 +96,7 @@ function buildFromVision(vision: VisionIdentifyResult): IdentifyResult {
 
 async function callVisionApi(photoUri: string): Promise<VisionIdentifyResult | null> {
   try {
-    const base64 = await readAsStringAsync(photoUri, { encoding: 'base64' });
+    const base64 = await downscaleToBase64(photoUri);
     if (!base64 || base64.length < 100) {
       console.warn('[Vision] Base64 too short, skipping:', base64?.length);
       return null;
@@ -124,6 +124,23 @@ async function callVisionApi(photoUri: string): Promise<VisionIdentifyResult | n
 }
 
 // ── Helpers ──
+
+// Phone cameras shoot 12–48MP. A raw full-res JPEG base64-encodes to several MB, which is slow to
+// upload (especially over adb-reverse) and can exceed the API's 12MB request cap → the identify
+// silently fails for EVERY photo while tiny barcode calls succeed. Downscale to 1280px wide + JPEG
+// q0.6 first: payload drops to ~150–350KB, uploads fast, and Gemini still resolves detail clearly.
+// On failure we return null (fail clean → user retakes) rather than sending the raw full-res file,
+// which is the very payload that breaks the upload.
+async function downscaleToBase64(uri: string): Promise<string | null> {
+  try {
+    const ref = await ImageManipulator.manipulate(uri).resize({ width: 1280 }).renderAsync();
+    const out = await ref.saveAsync({ compress: 0.6, format: SaveFormat.JPEG, base64: true });
+    return out.base64 ?? null;
+  } catch (error) {
+    console.warn('[Vision] Image resize failed:', error);
+    return null;
+  }
+}
 
 const BARCODE_PATTERN = /\b(\d{8}|\d{12,14})\b/;
 

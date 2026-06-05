@@ -86,13 +86,13 @@ public sealed class GeminiProductVisionTests
     }
 
     [Fact]
-    public async Task Gives_up_after_two_429s()
+    public async Task Gives_up_after_four_429s()
     {
         var handler = new SequenceHandler((HttpStatusCode.TooManyRequests, "{}"));
         ProductIdentification? result = (await ServiceWith(handler).IdentifyAsync(new string('A', 200), CancellationToken.None)).Product;
 
         Assert.Null(result);
-        Assert.Equal(2, handler.CallCount); // initial + one retry, then stop
+        Assert.Equal(4, handler.CallCount); // initial + three retries (exponential backoff), then stop
     }
 
     [Fact]
