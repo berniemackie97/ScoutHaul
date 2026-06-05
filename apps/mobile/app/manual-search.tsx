@@ -18,6 +18,7 @@ import { radius, spacing } from '../src/components/theme';
 import { useAppTheme } from '../src/context/ThemeContext';
 import type { MarketplaceListing, ProductIdentity } from '../src/domain/types';
 import { formatMoney } from '../src/utils/money';
+import { CompSourcesPanel } from '../src/features/scanner/CompSourcesPanel';
 
 export default function ManualSearchScreen() {
   const { colors: c, shadows: s } = useAppTheme();
@@ -157,19 +158,12 @@ export default function ManualSearchScreen() {
         />
       </View>
 
-      {/* Marketplace deep links — opens external search on eBay, Google, FB, Amazon, etc. */}
-      <Button
-        label="Search Marketplaces"
-        icon="open-outline"
-        variant="secondary"
-        fullWidth
-        onPress={() =>
-          router.push({
-            pathname: '/marketplace-links',
-            params: { query: params.productName ?? query, barcode },
-          })
-        }
-      />
+      {/* Real resale comps — tiered deep links (eBay Sold first), inline for speed */}
+      {(params.productName ?? query).trim() ? (
+        <Card>
+          <CompSourcesPanel query={params.productName ?? query} />
+        </Card>
+      ) : null}
 
       {/* If we have a barcode, offer direct barcode search too */}
       {barcode && barcode !== query ? (

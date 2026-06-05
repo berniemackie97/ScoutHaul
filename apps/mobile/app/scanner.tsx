@@ -116,10 +116,24 @@ export default function BarcodeScannerScreen() {
   // ── Barcode lookup ──
   async function lookupBarcode(barcode: string) {
     haptics.success();
-    setState({ phase: 'searching', barcode });
+    setState({ phase: 'searching', barcode, step: 'Looking up product…' });
+
+    // Staged label + minimum display so the lookup feels intentional, not a flash (parity
+    // with the photo analyze step). The single server call does product + value estimate.
+    const start = Date.now();
+    const MIN_MS = 1100;
+    const stepTimer = setTimeout(() => {
+      setState((s) => (s.phase === 'searching' ? { ...s, step: 'Checking resale value…' } : s));
+    }, 550);
+
     try {
-      setState(makeDoneFromResult(barcode, await api.lookupBarcode(barcode)));
+      const result = await api.lookupBarcode(barcode);
+      clearTimeout(stepTimer);
+      const elapsed = Date.now() - start;
+      if (elapsed < MIN_MS) await new Promise((r) => setTimeout(r, MIN_MS - elapsed));
+      setState(makeDoneFromResult(barcode, result));
     } catch (e) {
+      clearTimeout(stepTimer);
       setState(makeDoneError(barcode, e));
     }
   }
@@ -467,6 +481,55 @@ export default function BarcodeScannerScreen() {
     }
   }
 
+  // ── Persist the AI resale estimate into the product's price history ──
+  async function saveEstimateAsComp(): Promise<boolean> {
+    if (state.phase !== 'done' || state.priceSource !== 'estimate') return false;
+    const low = state.lowPrice;
+    const high = state.highPrice;
+    const mid = state.avgPrice ?? (low != null && high != null ? Math.round((low + high) / 2) : (low ?? high));
+    if (mid == null) return false;
+
+    const title = resolveProductName(state) ?? state.productTitle ?? state.barcode;
+    try {
+      // Ensure a ProductIdentity exists to attach the observation to.
+      let productIdentityId = state.productIdentityId;
+      if (!productIdentityId) {
+        const barcode = state.barcode.trim();
+        const isUpc = /^\d{8}$|^\d{12}$/.test(barcode);
+        const isEan = /^\d{13}$|^\d{14}$/.test(barcode);
+        productIdentityId = (await api.createProductIdentity({
+          title,
+          brand: state.productBrand ?? null,
+          category: state.productCategory ?? null,
+          upc: isUpc ? barcode : null,
+          ean: isEan ? barcode : null,
+          searchQuery: state.barcode,
+        })).id;
+        setState((s) => (s.phase === 'done' ? { ...s, productIdentityId } : s));
+      }
+
+      await api.addComp({
+        productIdentityId,
+        inventoryItemId: null,
+        observationType: 'Estimate',
+        source: 'AI Estimate',
+        sourceUrl: null,
+        title,
+        price: mid,
+        shippingPrice: null,
+        condition: state.productCondition ?? null,
+        observedAt: new Date().toISOString(),
+        soldAt: null,
+        notes: state.priceRationale ?? `AI estimate: $${low ?? '?'}–$${high ?? '?'}`,
+      });
+      haptics.success();
+      return true;
+    } catch {
+      haptics.error();
+      return false;
+    }
+  }
+
   // ── Permissions ──
   if (!permission) return <Screen><Text variant="body">Checking camera...</Text></Screen>;
   if (!permission.granted) {
@@ -800,15 +863,23 @@ export default function BarcodeScannerScreen() {
                     <Text variant="label" color={c.accent}>Search</Text>
                   </View>
                 </>
-              ) : null}
-              <View style={styles.processingRow}>
-                <Ionicons name="search-outline" size={20} color={c.primary} />
-                <Text variant="bodyBold" style={styles.mono} numberOfLines={1}>{state.barcode}</Text>
-              </View>
+              ) : (
+                /* Barcode lookup — branded header with the detected code */
+                <View style={styles.barcodeFoundRow}>
+                  <View style={[styles.barcodeFoundIcon, { backgroundColor: c.primaryLight }]}>
+                    <Ionicons name="barcode" size={22} color={c.primary} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text variant="label" color={c.textMuted}>Barcode detected</Text>
+                    <Text variant="bodyBold" style={styles.mono} numberOfLines={1}>{state.barcode}</Text>
+                  </View>
+                  <Ionicons name="checkmark-circle" size={20} color={c.success} />
+                </View>
+              )}
               <View style={styles.processingRow}>
                 <ActivityIndicator size="small" color={c.info} />
                 <Text variant="caption" color={c.info}>
-                  {state.step ?? 'Checking pricing sources...'}
+                  {state.step ?? 'Checking pricing sources…'}
                 </Text>
               </View>
             </View>
@@ -827,6 +898,7 @@ export default function BarcodeScannerScreen() {
               onAddInventory={addToInventory}
               onResearch={continueToSearch}
               onRefine={(q) => void searchManual(q, state.photoUri ?? undefined)}
+              onSaveEstimate={saveEstimateAsComp}
               onSaveProduct={() => void saveProduct()}
               onCancelEdit={() => setEditing(false)}
             />
@@ -998,6 +1070,14 @@ const styles = StyleSheet.create({
   },
 
   processingRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  barcodeFoundRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  barcodeFoundIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   identifyRow: { flexDirection: 'row', gap: spacing.md, alignItems: 'center' },
   reviewThumb: { width: 72, height: 72, borderRadius: radius.md },
   identifyText: { flex: 1, gap: spacing.xs },

@@ -28,6 +28,7 @@ type ScanResultsProps = {
   onAddInventory: () => void;
   onResearch: () => void;
   onRefine: (query: string) => void;
+  onSaveEstimate: () => Promise<boolean>;
   onSaveProduct: () => void;
   onCancelEdit: () => void;
 };
@@ -44,10 +45,13 @@ export function ScanResults({
   onAddInventory,
   onResearch,
   onRefine,
+  onSaveEstimate,
   onSaveProduct,
   onCancelEdit,
 }: ScanResultsProps) {
   const { colors: c } = useAppTheme();
+  const [estimateSaved, setEstimateSaved] = useState(false);
+  const [savingEstimate, setSavingEstimate] = useState(false);
   const productName = resolveProductName(state);
   const heroImage = resolveProductImage(state);
   const hasIdentification = !!productName || !!state.productBrand || !!state.productCategory;
@@ -166,6 +170,26 @@ export function ScanResults({
               <Text variant="label" color={c.textMuted}>
                 {state.priceRationale ?? 'AI estimate · confirm with comps'}
               </Text>
+              <Pressable
+                onPress={estimateSaved || savingEstimate ? undefined : async () => {
+                  setSavingEstimate(true);
+                  const ok = await onSaveEstimate();
+                  setSavingEstimate(false);
+                  setEstimateSaved(ok);
+                }}
+                style={[styles.saveEstimateBtn, { borderColor: c.accent + '40' }]}
+                accessibilityRole="button"
+                accessibilityLabel={estimateSaved ? 'Estimate saved to price history' : 'Save estimate to price history'}
+              >
+                <Ionicons
+                  name={estimateSaved ? 'checkmark-circle' : 'bookmark-outline'}
+                  size={15}
+                  color={estimateSaved ? c.success : c.accent}
+                />
+                <Text variant="label" color={estimateSaved ? c.success : c.accent} style={styles.noCaps}>
+                  {estimateSaved ? 'Saved to price history' : savingEstimate ? 'Saving…' : 'Save to price history'}
+                </Text>
+              </Pressable>
             </View>
           ) : (
             <View
@@ -476,6 +500,18 @@ const styles = StyleSheet.create({
   priceHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   priceRange: { flexDirection: 'row', alignItems: 'baseline', gap: spacing.sm },
   priceAvg: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  noCaps: { textTransform: 'none', letterSpacing: 0 },
+  saveEstimateBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: spacing.xs,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radius.full,
+    borderWidth: 1,
+    marginTop: spacing.xxs,
+  },
 
   // Alert / Info
   alertBox: {

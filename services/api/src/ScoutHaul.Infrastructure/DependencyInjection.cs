@@ -20,6 +20,9 @@ public static class DependencyInjection
 
         services.AddDbContext<ScoutHaulDbContext>(options => options.UseNpgsql(connectionString));
 
+        // In-memory cache (resale estimates, etc.) — protects the shared Gemini free-tier quota.
+        services.AddMemoryCache();
+
         // Barcode lookup — tried in order. Internal DB first (free, instant, learns over time),
         // then external APIs as fallback. Results get saved back to ProductIdentities for next time.
         services.AddScoped<IBarcodeLookupService, CompositeBarcodeLookupService>();
