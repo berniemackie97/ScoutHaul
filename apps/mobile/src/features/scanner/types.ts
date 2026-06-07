@@ -1,4 +1,5 @@
 import type { MarketplaceListing, ResaleComp, ResaleSource } from '../../domain/types';
+import type { VisionErrorKind } from './identifyHelpers';
 
 export type ScanMode = 'barcode' | 'photo-identify';
 
@@ -41,6 +42,10 @@ export type ScanDoneState = {
   recommendedNextSteps: string[];
   comps: ResaleComp[];
   sources: ResaleSource[];
+  // Why identify failed (quota/limit/outage/timeout) — lets results show the real cause instead of a
+  // misleading "no results". null = ran fine (identified or a genuine no-match).
+  identifyError: VisionErrorKind | null;
+  productConditionQuality: string | null;
 };
 
 export function resolveProductName(state: ScanDoneState): string | null {
@@ -88,6 +93,8 @@ export function makeDoneError(query: string, error: unknown): ScanDoneState {
     recommendedNextSteps: [],
     comps: [],
     sources: [],
+    identifyError: null,
+    productConditionQuality: null,
   };
 }
 
@@ -108,6 +115,8 @@ export type VisionOverrides = {
   recommendedNextSteps?: string[];
   rationale?: string | null;
   comps?: ResaleComp[];
+  errorKind?: VisionErrorKind | null;
+  conditionQuality?: string | null;
 };
 
 export function makeDoneFromResult(
@@ -177,5 +186,7 @@ export function makeDoneFromResult(
     // live marketplace listings already populate the listings array.
     comps: hasMarket ? [] : (result.estimateComps ?? v?.comps ?? []),
     sources: result.estimateSources ?? [],
+    identifyError: v?.errorKind ?? null,
+    productConditionQuality: v?.conditionQuality ?? null,
   };
 }

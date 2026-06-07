@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc.Filters;
 using ScoutHaul.Api.Services;
 
@@ -8,6 +9,13 @@ public sealed class RequireOrganizationPermissionAttribute(string permission) : 
 {
     public async Task OnAuthorizationAsync(AuthorizationFilterContext context)
     {
+        // Endpoints explicitly marked [AllowAnonymous] opt out of org-permission enforcement
+        // (e.g. GUID-addressed public image bytes that <Image> fetches without auth headers).
+        if (context.ActionDescriptor.EndpointMetadata.OfType<AllowAnonymousAttribute>().Any())
+        {
+            return;
+        }
+
         var currentUser = context.HttpContext.RequestServices.GetRequiredService<ICurrentUserContext>();
         await currentUser.ResolveAsync();
         var access = context.HttpContext.RequestServices.GetRequiredService<OrganizationAccessService>();

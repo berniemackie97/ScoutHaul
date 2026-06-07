@@ -2,6 +2,9 @@
 // (only erased type imports), so this module is trivially unit-testable and side-effect-free.
 import type { ResaleComp } from '../../api/marketplace';
 
+// Why identification failed, distinct from "ran fine, found nothing". Drives the specific UI message.
+export type VisionErrorKind = 'quota' | 'rate_limited' | 'unavailable' | 'timeout' | 'offline' | 'auth' | 'error';
+
 export type IdentifyResult = {
   title: string | null;
   brand: string | null;
@@ -9,6 +12,7 @@ export type IdentifyResult = {
   category: string | null;
   color: string | null;
   condition: string | null;
+  conditionQuality: string | null; // new | like-new | good | fair | poor | for-parts
   barcode: string | null;
   estimatedResaleLow: number | null;
   estimatedResaleHigh: number | null;
@@ -25,6 +29,9 @@ export type IdentifyResult = {
   searchQuery: string;
   alternateQueries: string[];
   bestGuessLabel: string | null;
+  // Set only when identification could not run (quota/limit/outage/timeout); null on success or a
+  // genuine "ran but found nothing".
+  errorKind: VisionErrorKind | null;
 };
 
 const VALID_BARCODE_LENGTHS = new Set([8, 12, 13, 14]); // EAN-8, UPC-A, EAN-13, ITF-14
@@ -68,9 +75,10 @@ export function dedupeQueries(primary: string, candidates: string[]): string[] {
 export function emptyResult(): IdentifyResult {
   return {
     title: null, brand: null, model: null, category: null, color: null, condition: null,
+    conditionQuality: null,
     barcode: null, estimatedResaleLow: null, estimatedResaleHigh: null,
     rawText: '', confidence: null, valuationConfidence: null, priceRangeType: null,
     keyValueFactors: [], missingInformation: [], recommendedNextSteps: [], rationale: null, comps: [],
-    searchQuery: '', alternateQueries: [], bestGuessLabel: null,
+    searchQuery: '', alternateQueries: [], bestGuessLabel: null, errorKind: null,
   };
 }

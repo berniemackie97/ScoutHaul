@@ -537,7 +537,11 @@ public sealed record DashboardSummaryDto(
 
 public sealed record VisionIdentifyRequest(
     string? ImageBase64,
-    string? ImageUrl);
+    string? ImageUrl,
+    // Optional known facts the user already entered (brand, condition, size, notes, …). Fed to the
+    // model to sharpen identification + valuation. Null/absent → behaves exactly as before (so older
+    // clients that don't send it are unaffected).
+    string? Context = null);
 
 public sealed record VisionIdentifyResult(
     ProductIdentification? Product,
@@ -565,4 +569,7 @@ public sealed record ProductIdentification(
     IReadOnlyList<string>? MissingInformation = null,
     IReadOnlyList<string>? RecommendedNextSteps = null,
     string? Rationale = null,
-    IReadOnlyList<ResaleComp>? Comps = null);
+    IReadOnlyList<ResaleComp>? Comps = null,
+    // Rough condition-quality rating inferred from the photo: new | like-new | good | fair | poor |
+    // for-parts. Distinct from the free-text Condition. Additive — null when not assessed.
+    string? ConditionQuality = null);

@@ -79,8 +79,8 @@ export const marketplaceApi = {
   comps: (params: string) => apiRequest<MarketObservation[]>(`/api/market-observations?${params}`),
   analyze: (body: AnalyzeRequest) => apiRequest<MarketAnalysisResponse>('/api/market-analysis/calculate', { method: 'POST', body }),
 
-  visionIdentify: (imageBase64: string, signal?: AbortSignal) =>
-    apiRequest<VisionIdentifyResult>('/api/vision/identify', { method: 'POST', body: { imageBase64 }, signal }),
+  visionIdentify: (imageBase64: string, signal?: AbortSignal, context?: string | null) =>
+    apiRequest<VisionIdentifyResult>('/api/vision/identify', { method: 'POST', body: { imageBase64, context: context || undefined }, signal }),
 
   providerStatus: () =>
     apiRequest<MarketplaceProviderStatus>('/api/marketplace-lookup/status'),
@@ -105,6 +105,7 @@ export type ProductIdentification = {
   category: string | null;
   color: string | null;
   condition: string | null;
+  conditionQuality?: string | null; // new | like-new | good | fair | poor | for-parts
   estimatedResaleLow: number | null;
   estimatedResaleHigh: number | null;
   identifyingText: string | null;

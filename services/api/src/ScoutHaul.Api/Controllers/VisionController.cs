@@ -61,7 +61,22 @@ public sealed class VisionController(
             imageBase64 = imageBase64[(commaIndex + 1)..];
         }
 
-        VisionIdentifyResult result = await visionService.IdentifyAsync(imageBase64, cancellationToken);
-        return Ok(result);
+        try
+        {
+            VisionIdentifyResult result = await visionService.IdentifyAsync(imageBase64, request.Context, cancellationToken);
+            return Ok(result);
+        }
+        catch (VisionUnavailableException ex)
+        {
+            // Surface the real cause so the client can show "daily limit reached", "busy", etc. —
+            // not a misleading "no results found". `code` is the stable machine key.
+            int status = ex.Code switch
+            {
+                "quota_exhausted" or "rate_limited" => StatusCodes.Status429TooManyRequests,
+                "upstream_unavailable" => StatusCodes.Status503ServiceUnavailable,
+                _ => StatusCodes.Status502BadGateway,
+            };
+            return StatusCode(status, new { code = ex.Code, title = "AI vision unavailable", detail = ex.Message });
+        }
     }
 }

@@ -1,8 +1,10 @@
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import { api } from '../../api';
+import { ApiError } from '../../api/client';
 import type { ProductIdentification, VisionIdentifyResult } from '../../api/marketplace';
 import {
   type IdentifyResult,
+  type VisionErrorKind,
   dedupeQueries,
   emptyResult,
   extractBarcode,
@@ -27,9 +29,11 @@ const log = (...args: unknown[]) => { if (__DEV__) console.log('[Vision]', ...ar
 
 // ── Main ──
 
-export async function identifyFromPhoto(photoUri: string): Promise<IdentifyResult> {
-  const vision = await callVisionApi(photoUri);
-  if (!vision) return emptyResult();
+// `context` = optional known facts (brand/condition/size/notes the user already entered) fed to the
+// model to sharpen identification + valuation.
+export async function identifyFromPhoto(photoUri: string, context?: string | null): Promise<IdentifyResult> {
+  const { vision, errorKind } = await callVisionApi(photoUri, context);
+  if (!vision) return { ...emptyResult(), errorKind };
   return buildFromVision(vision);
 }
 
@@ -69,6 +73,7 @@ function buildFromVision(vision: VisionIdentifyResult): IdentifyResult {
     category: product.category,
     color: product.color,
     condition: product.condition,
+    conditionQuality: product.conditionQuality ?? null,
     barcode,
     estimatedResaleLow: product.estimatedResaleLow,
     estimatedResaleHigh: product.estimatedResaleHigh,
@@ -84,16 +89,19 @@ function buildFromVision(vision: VisionIdentifyResult): IdentifyResult {
     searchQuery,
     alternateQueries,
     bestGuessLabel: product.name,
+    errorKind: null,
   };
 }
 
 // ── Vision API call ──
 
-async function callVisionApi(photoUri: string): Promise<VisionIdentifyResult | null> {
+type VisionCall = { vision: VisionIdentifyResult | null; errorKind: VisionErrorKind | null };
+
+async function callVisionApi(photoUri: string, context?: string | null): Promise<VisionCall> {
   const base64 = await downscaleToBase64(photoUri);
   if (!base64 || base64.length < MIN_BASE64_LENGTH) {
     log('encode produced too few bytes, skipping:', base64?.length ?? 0);
-    return null;
+    return { vision: null, errorKind: 'error' };
   }
 
   // Hard timeout: a stalled network/backend must surface as a clean failure, never a frozen overlay.
@@ -101,18 +109,31 @@ async function callVisionApi(photoUri: string): Promise<VisionIdentifyResult | n
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
     log('sending image…', Math.round(base64.length / 1024), 'KB');
-    const result = await api.visionIdentify(base64, controller.signal);
+    const result = await api.visionIdentify(base64, controller.signal, context);
     log('result:', result.product?.name ?? '(not identified)', result.product?.confidence ?? '');
-    return result;
+    return { vision: result, errorKind: null };
   } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
-    if (msg.includes('Sign in')) console.error('[Vision] auth required — user not signed in');
-    else if (controller.signal.aborted) console.error('[Vision] timed out after', REQUEST_TIMEOUT_MS, 'ms');
-    else console.error('[Vision] call failed:', msg);
-    return null;
+    const errorKind = classifyVisionError(error, controller.signal.aborted);
+    console.error('[Vision] call failed:', errorKind, error instanceof Error ? error.message : String(error));
+    return { vision: null, errorKind };
   } finally {
     clearTimeout(timeout);
   }
+}
+
+// Map a thrown error to a stable kind the UI turns into a specific message + CTA.
+function classifyVisionError(error: unknown, aborted: boolean): VisionErrorKind {
+  if (aborted) return 'timeout';
+  if (error instanceof ApiError) {
+    if (error.status === 429) return error.code === 'quota_exhausted' ? 'quota' : 'rate_limited';
+    if (error.status === 503 || error.status === 502) return 'unavailable';
+    return 'error';
+  }
+  const msg = error instanceof Error ? error.message : String(error);
+  if (msg.includes('Sign in')) return 'auth';
+  // RN fetch network failure surfaces as a TypeError ("Network request failed").
+  if (error instanceof TypeError || /network/i.test(msg)) return 'offline';
+  return 'error';
 }
 
 // ── Image prep ──

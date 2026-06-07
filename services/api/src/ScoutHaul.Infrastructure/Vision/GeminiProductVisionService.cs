@@ -24,9 +24,9 @@ internal sealed class GeminiProductVisionService(
 
     public bool IsConfigured => !string.IsNullOrWhiteSpace(configuration["Gemini:ApiKey"]);
 
-    public async Task<VisionIdentifyResult> IdentifyAsync(string imageBase64, CancellationToken cancellationToken)
+    public async Task<VisionIdentifyResult> IdentifyAsync(string imageBase64, string? context, CancellationToken cancellationToken)
     {
-        ProductIdentification? product = await IdentifyProductAsync(imageBase64, cancellationToken);
+        ProductIdentification? product = await IdentifyProductAsync(imageBase64, context, cancellationToken);
         return new VisionIdentifyResult(
             Product: product,
             SearchQuery: BuildSearchQuery(product),
@@ -85,7 +85,7 @@ internal sealed class GeminiProductVisionService(
         "listings — never invent URLs, exact dates, or claim you checked current listings. " +
         "Respond ONLY with valid JSON matching the schema.";
 
-    private async Task<ProductIdentification?> IdentifyProductAsync(string imageBase64, CancellationToken cancellationToken)
+    private async Task<ProductIdentification?> IdentifyProductAsync(string imageBase64, string? context, CancellationToken cancellationToken)
     {
         string? apiKey = configuration["Gemini:ApiKey"];
         if (string.IsNullOrWhiteSpace(apiKey))
@@ -94,19 +94,19 @@ internal sealed class GeminiProductVisionService(
             return null;
         }
 
+        // System prompt → (optional) user-provided known facts → image. Known facts are ground truth
+        // the model should trust to nail the exact variant and refine the valuation.
+        var parts = new List<object> { new { text = SystemPrompt } };
+        string? knownFacts = context?.Trim();
+        if (!string.IsNullOrWhiteSpace(knownFacts))
+        {
+            parts.Add(new { text = "Known facts provided by the user (treat as ground truth; use to disambiguate the variant and refine valuation):\n" + knownFacts });
+        }
+        parts.Add(new { inline_data = new { mime_type = "image/jpeg", data = imageBase64 } });
+
         var requestBody = new
         {
-            contents = new[]
-            {
-                new
-                {
-                    parts = new object[]
-                    {
-                        new { text = SystemPrompt },
-                        new { inline_data = new { mime_type = "image/jpeg", data = imageBase64 } },
-                    },
-                },
-            },
+            contents = new[] { new { parts = parts.ToArray() } },
             generationConfig = new
             {
                 temperature = 0.1, // deterministic — we want facts, not creativity
@@ -130,10 +130,12 @@ internal sealed class GeminiProductVisionService(
             {
                 response = await httpClient.PostAsync(url, content, cancellationToken);
             }
+            catch (OperationCanceledException) { throw; }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Gemini vision request failed (attempt {Attempt})", attempt);
-                return null;
+                logger.LogWarning(ex, "Gemini vision request threw (attempt {Attempt}/{Max})", attempt, maxAttempts);
+                if (attempt < maxAttempts) { await Backoff(attempt, cancellationToken); continue; }
+                throw new VisionUnavailableException("upstream_unavailable", "Could not reach the AI vision service.");
             }
 
             using (response)
@@ -144,25 +146,42 @@ internal sealed class GeminiProductVisionService(
                     return ParseResponse(payload);
                 }
 
+                string body = await response.Content.ReadAsStringAsync(cancellationToken);
+                (string code, string detail) = ClassifyError(response.StatusCode, body);
+                logger.LogWarning("Gemini returned {StatusCode} ({Code}, attempt {Attempt}/{Max}): {Body}",
+                    response.StatusCode, code, attempt, maxAttempts, body[..Math.Min(body.Length, 300)]);
+
                 bool transient = response.StatusCode is System.Net.HttpStatusCode.TooManyRequests
                     or System.Net.HttpStatusCode.ServiceUnavailable
                     or System.Net.HttpStatusCode.InternalServerError;
-
-                string body = await response.Content.ReadAsStringAsync(cancellationToken);
-                logger.LogWarning("Gemini returned {StatusCode} (attempt {Attempt}/{Max}): {Body}",
-                    response.StatusCode, attempt, maxAttempts, body[..Math.Min(body.Length, 300)]);
-
-                if (transient && attempt < maxAttempts)
+                // A daily-quota exhaustion won't clear in seconds — fail fast rather than burn retries.
+                if (transient && code != "quota_exhausted" && attempt < maxAttempts)
                 {
-                    // Exponential backoff: 400ms, 800ms, 1600ms.
-                    await Task.Delay(TimeSpan.FromMilliseconds(400 * (1 << (attempt - 1))), cancellationToken);
+                    await Backoff(attempt, cancellationToken);
                     continue;
                 }
-                return null;
+                throw new VisionUnavailableException(code, detail);
             }
         }
 
-        return null;
+        throw new VisionUnavailableException("upstream_error", "The AI vision service is unavailable.");
+    }
+
+    private static async Task Backoff(int attempt, CancellationToken ct) =>
+        await Task.Delay(TimeSpan.FromMilliseconds(400 * (1 << (attempt - 1))), ct);
+
+    // Map a failed Gemini HTTP response to a stable client code + user-facing detail.
+    private static (string code, string detail) ClassifyError(System.Net.HttpStatusCode status, string body)
+    {
+        if (status == System.Net.HttpStatusCode.TooManyRequests)
+        {
+            return body.Contains("PerDay", StringComparison.OrdinalIgnoreCase)
+                ? ("quota_exhausted", "The daily AI request limit has been reached.")
+                : ("rate_limited", "Too many AI requests right now. Try again in a moment.");
+        }
+        if (status == System.Net.HttpStatusCode.ServiceUnavailable)
+            return ("upstream_unavailable", "The AI service is busy. Try again shortly.");
+        return ("upstream_error", "The AI service returned an error.");
     }
 
     private ProductIdentification? ParseResponse(string payload)
@@ -232,7 +251,8 @@ internal sealed class GeminiProductVisionService(
                 MissingInformation: CleanList(dto.MissingInformation, 6),
                 RecommendedNextSteps: CleanList(dto.RecommendedNextSteps, 5),
                 Rationale: Clean(dto.Rationale),
-                Comps: GeminiResaleEstimator.CleanComps(dto.Comps));
+                Comps: GeminiResaleEstimator.CleanComps(dto.Comps),
+                ConditionQuality: Clean(dto.ConditionQuality)?.ToLowerInvariant());
         }
         catch (JsonException ex)
         {
@@ -283,6 +303,7 @@ internal sealed class GeminiProductVisionService(
             category = new { type = "string" },
             color = new { type = "string" },
             condition = new { type = "string", description = "Condition assumption from the photo" },
+            conditionQuality = new { type = "string", @enum = new[] { "new", "like-new", "good", "fair", "poor", "for-parts" }, description = "Rough overall condition grade visible in the photo" },
             estimatedResaleLow = new { type = "number", description = "Quick-sale / lower-condition USED resale USD" },
             estimatedResaleHigh = new { type = "number", description = "Good-used private-party resale USD (not an outlier)" },
             identifyingText = new { type = "string", description = "Text/model numbers actually visible on the item" },
@@ -323,6 +344,7 @@ internal sealed class GeminiProductVisionService(
         [JsonPropertyName("category")] public string? Category { get; set; }
         [JsonPropertyName("color")] public string? Color { get; set; }
         [JsonPropertyName("condition")] public string? Condition { get; set; }
+        [JsonPropertyName("conditionQuality")] public string? ConditionQuality { get; set; }
         [JsonPropertyName("estimatedResaleLow")] public decimal EstimatedResaleLow { get; set; }
         [JsonPropertyName("estimatedResaleHigh")] public decimal EstimatedResaleHigh { get; set; }
         [JsonPropertyName("identifyingText")] public string? IdentifyingText { get; set; }

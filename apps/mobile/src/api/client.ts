@@ -2,6 +2,20 @@ import { appConfig } from '../config';
 import { authStore } from '../services/auth';
 import { getActiveOrganizationId } from '../services/workspaceSession';
 
+// Thrown on non-2xx responses. Carries the HTTP status + the server's machine `code` (e.g.
+// "quota_exhausted") so callers can show a specific message/CTA. Extends Error → existing
+// `catch (e) { e.message }` callers keep working unchanged.
+export class ApiError extends Error {
+  constructor(
+    public readonly status: number,
+    public readonly code: string | null,
+    message: string,
+  ) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
+
 type RequestOptions = {
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   body?: unknown;
@@ -49,7 +63,9 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
 
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(parseErrorMessage(text) || `Request failed with ${response.status}`);
+    let code: string | null = null;
+    try { code = (JSON.parse(text) as { code?: string }).code ?? null; } catch { /* body not JSON */ }
+    throw new ApiError(response.status, code, parseErrorMessage(text) || `Request failed with ${response.status}`);
   }
 
   if (response.status === 204) {

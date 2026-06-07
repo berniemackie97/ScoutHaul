@@ -3,6 +3,7 @@ using System.Text;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using ScoutHaul.Application.Contracts;
+using ScoutHaul.Application.Services;
 using ScoutHaul.Infrastructure.Vision;
 
 namespace ScoutHaul.Tests.Vision;
@@ -26,7 +27,7 @@ public sealed class GeminiProductVisionTests
             NullLogger<GeminiProductVisionService>.Instance);
 
         // IdentifyAsync now returns a VisionIdentifyResult; tests assert on the Product it wraps.
-        return (await service.IdentifyAsync(new string('A', 200), CancellationToken.None)).Product;
+        return (await service.IdentifyAsync(new string('A', 200), null, CancellationToken.None)).Product;
     }
 
     private static string GeminiEnvelope(string innerJson)
@@ -78,7 +79,7 @@ public sealed class GeminiProductVisionTests
             (HttpStatusCode.TooManyRequests, """{"error":"rate limited"}"""),
             (HttpStatusCode.OK, ok));
 
-        ProductIdentification? result = (await ServiceWith(handler).IdentifyAsync(new string('A', 200), CancellationToken.None)).Product;
+        ProductIdentification? result = (await ServiceWith(handler).IdentifyAsync(new string('A', 200), null, CancellationToken.None)).Product;
 
         Assert.NotNull(result);
         Assert.Equal("Lego Set", result.Name);
@@ -86,13 +87,27 @@ public sealed class GeminiProductVisionTests
     }
 
     [Fact]
-    public async Task Gives_up_after_four_429s()
+    public async Task Throws_rate_limited_after_four_429s()
     {
         var handler = new SequenceHandler((HttpStatusCode.TooManyRequests, "{}"));
-        ProductIdentification? result = (await ServiceWith(handler).IdentifyAsync(new string('A', 200), CancellationToken.None)).Product;
+        var ex = await Assert.ThrowsAsync<VisionUnavailableException>(() =>
+            ServiceWith(handler).IdentifyAsync(new string('A', 200), null, CancellationToken.None));
 
-        Assert.Null(result);
-        Assert.Equal(4, handler.CallCount); // initial + three retries (exponential backoff), then stop
+        Assert.Equal("rate_limited", ex.Code);
+        Assert.Equal(4, handler.CallCount); // initial + three retries (exponential backoff), then throw
+    }
+
+    [Fact]
+    public async Task Throws_quota_exhausted_immediately_on_daily_cap()
+    {
+        // PerDay quota won't clear in seconds → fail fast, no retries wasted.
+        var handler = new SequenceHandler((HttpStatusCode.TooManyRequests,
+            """{"error":{"status":"RESOURCE_EXHAUSTED","details":[{"violations":[{"quotaId":"GenerateRequestsPerDayPerProjectPerModel-FreeTier"}]}]}}"""));
+        var ex = await Assert.ThrowsAsync<VisionUnavailableException>(() =>
+            ServiceWith(handler).IdentifyAsync(new string('A', 200), null, CancellationToken.None));
+
+        Assert.Equal("quota_exhausted", ex.Code);
+        Assert.Equal(1, handler.CallCount); // no retries on a daily-quota wall
     }
 
     [Fact]
@@ -210,10 +225,13 @@ public sealed class GeminiProductVisionTests
     }
 
     [Fact]
-    public async Task Returns_null_on_api_error()
+    public async Task Throws_on_persistent_api_error()
     {
-        ProductIdentification? result = await Identify("""{"error":{"code":429}}""", HttpStatusCode.TooManyRequests);
-        Assert.Null(result);
+        // A real provider error (not a 200-with-no-match) must surface as an exception so the client
+        // can show the cause, never a misleading "not identified".
+        var handler = new FakeHandler("""{"error":{"code":429}}""", HttpStatusCode.TooManyRequests);
+        await Assert.ThrowsAsync<VisionUnavailableException>(() =>
+            ServiceWith(handler).IdentifyAsync(new string('A', 200), null, CancellationToken.None));
     }
 
     [Fact]
@@ -237,6 +255,6 @@ public sealed class GeminiProductVisionTests
         var service = new GeminiProductVisionService(new HttpClient(new FakeHandler("{}", HttpStatusCode.OK)), config, NullLogger<GeminiProductVisionService>.Instance);
 
         Assert.False(service.IsConfigured);
-        Assert.Null((await service.IdentifyAsync("AAAA", CancellationToken.None)).Product);
+        Assert.Null((await service.IdentifyAsync("AAAA", null, CancellationToken.None)).Product);
     }
 }

@@ -15,6 +15,22 @@ import type { MarketplaceListing } from '../../domain/types';
 import { CompSourcesPanel } from './CompSourcesPanel';
 import type { ScanDoneState } from './types';
 import { resolveProductImage, resolveProductName } from './types';
+import type { VisionErrorKind } from './identifyHelpers';
+
+type IdentifyErrorInfo = { icon: keyof typeof Ionicons.glyphMap; title: string; detail: string; retry: boolean };
+
+// Specific, honest copy per failure — so the user knows WHAT happened, not a vague "no results".
+function identifyErrorCopy(kind: VisionErrorKind): IdentifyErrorInfo {
+  switch (kind) {
+    case 'quota': return { icon: 'hourglass-outline', title: 'Daily AI limit reached', detail: 'Today’s free AI quota is used up (resets ~midnight PT). Enable billing for higher limits — this was not a failed match.', retry: false };
+    case 'rate_limited': return { icon: 'time-outline', title: 'AI is busy', detail: 'Too many scans in a short time. Wait a few seconds and try again.', retry: true };
+    case 'unavailable': return { icon: 'cloud-offline-outline', title: 'AI service busy', detail: 'The AI service is temporarily unavailable. Try again shortly.', retry: true };
+    case 'timeout': return { icon: 'time-outline', title: 'Took too long', detail: 'The request timed out. Check your connection and try again.', retry: true };
+    case 'offline': return { icon: 'wifi-outline', title: 'No connection', detail: 'Couldn’t reach the server. Check your internet and try again.', retry: true };
+    case 'auth': return { icon: 'lock-closed-outline', title: 'Sign in required', detail: 'Please sign in to identify items.', retry: false };
+    default: return { icon: 'alert-circle-outline', title: 'Identification failed', detail: 'Something went wrong analyzing the photo. Try again.', retry: true };
+  }
+}
 
 type ScanResultsProps = {
   state: ScanDoneState;
@@ -69,6 +85,8 @@ export function ScanResults({
   const compQuery = productName
     ?? (/^\d{8,14}$/.test(state.barcode) ? '' : state.barcode);
 
+  const errInfo = state.identifyError ? identifyErrorCopy(state.identifyError) : null;
+
   return (
     <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false} bounces={false}>
       <View style={styles.content}>
@@ -110,6 +128,22 @@ export function ScanResults({
             </View>
           </View>
         </View>
+
+        {/* ── Identify error — surface the real cause (quota/limit/outage), not "no results" ── */}
+        {errInfo ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 14, borderWidth: 1, backgroundColor: c.surface, borderColor: c.danger }}>
+            <Ionicons name={errInfo.icon} size={22} color={c.danger} />
+            <View style={{ flex: 1, gap: 2 }}>
+              <Text variant="bodyBold" color={c.danger}>{errInfo.title}</Text>
+              <Text variant="caption" color={c.textSecondary}>{errInfo.detail}</Text>
+            </View>
+            {errInfo.retry ? (
+              <Pressable onPress={onRescan} hitSlop={8} style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: c.danger }}>
+                <Text variant="label" color={c.danger}>Retry</Text>
+              </Pressable>
+            ) : null}
+          </View>
+        ) : null}
 
         {/* ── Refine — correct a wrong/generic identification and search again ── */}
         {refining ? (
@@ -367,8 +401,8 @@ export function ScanResults({
           </View>
         ) : null}
 
-        {/* ── No Results State ── */}
-        {!hasAnyResults ? (
+        {/* ── No Results State (genuine no-match only; errors show the banner above instead) ── */}
+        {!hasAnyResults && !state.identifyError ? (
           <View style={[styles.emptyState, { backgroundColor: c.surfaceAlt }]}>
             <Ionicons name="search-outline" size={32} color={c.textMuted} />
             <Text variant="bodyBold" color={c.textSecondary}>No results found</Text>

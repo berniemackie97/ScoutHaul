@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ScoutHaul.Api.Authorization;
@@ -277,19 +278,23 @@ public sealed class InventoryController(
         return new InventoryPhotoUploadResultDto(item.Id, photoUrls, UploadedUrl: null, OrderedPhotos(item).Select(item => item.ToDto()).ToArray());
     }
 
+    // Public so a plain <Image> tag (which can't send auth headers) can load it. Safe: addressed by
+    // two unguessable GUIDs (item + photo), and only image bytes are exposed.
     [HttpGet("{id:guid}/photos/{photoId:guid}/thumbnail")]
+    [AllowAnonymous]
     [ResponseCache(Duration = 86400, Location = ResponseCacheLocation.Client)]
     public async Task<IActionResult> GetPhotoThumbnail(Guid id, Guid photoId, CancellationToken cancellationToken)
     {
-        var photo = await FindPhoto(id, photoId, cancellationToken);
+        var photo = await FindPhotoUnscoped(id, photoId, cancellationToken);
         return photo is null ? NotFound() : File(photo.ThumbnailBytes, "image/jpeg");
     }
 
     [HttpGet("{id:guid}/photos/{photoId:guid}/original")]
+    [AllowAnonymous]
     [ResponseCache(Duration = 86400, Location = ResponseCacheLocation.Client)]
     public async Task<IActionResult> GetPhotoOriginal(Guid id, Guid photoId, CancellationToken cancellationToken)
     {
-        var photo = await FindPhoto(id, photoId, cancellationToken);
+        var photo = await FindPhotoUnscoped(id, photoId, cancellationToken);
         return photo is null ? NotFound() : File(photo.OriginalBytes, photo.ContentType);
     }
 
@@ -512,6 +517,13 @@ public sealed class InventoryController(
             item => item.Id == photoId
                 && item.InventoryItemId == itemId
                 && item.OrganizationId == currentUser.OrganizationId,
+            cancellationToken);
+
+    // Org-unscoped (no authenticated user) — used only by the anonymous image-byte GET endpoints,
+    // which are already gated by the unguessable {itemId}+{photoId} GUID pair.
+    private Task<InventoryPhoto?> FindPhotoUnscoped(Guid itemId, Guid photoId, CancellationToken cancellationToken) =>
+        db.InventoryPhotos.SingleOrDefaultAsync(
+            item => item.Id == photoId && item.InventoryItemId == itemId,
             cancellationToken);
 
     private async Task SyncInventoryPurchaseExpense(

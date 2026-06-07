@@ -65,6 +65,8 @@ function toVisionOverrides(r: IdentifyResult): VisionOverrides {
     recommendedNextSteps: r.recommendedNextSteps,
     rationale: r.rationale,
     comps: r.comps,
+    errorKind: r.errorKind,
+    conditionQuality: r.conditionQuality,
   };
 }
 
@@ -285,6 +287,14 @@ export default function BarcodeScannerScreen() {
       // ALWAYS go to the rich results screen (comps, estimate, refine) — regardless of
       // confidence. Low confidence just shows a "Low" badge + the Refine control; users still
       // get comp buttons and a value estimate instead of a dead-end review screen.
+      // Identify itself failed (quota/limit/outage/timeout) — land on results showing the real
+      // cause + CTA, don't blind-search marketplaces with an empty query.
+      if (identified.errorKind) {
+        haptics.error();
+        setState(makeDoneFromResult('', makeEmptyResult(''), photo.uri, overrides));
+        return;
+      }
+
       const query = identified.searchQuery || identified.title || '';
       identified.confidence === 'high' ? haptics.success() : haptics.medium();
 

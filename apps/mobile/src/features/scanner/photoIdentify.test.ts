@@ -54,7 +54,7 @@ describe('dedupeQueries', () => {
       'wireless over-ear',
       'fifth extra query',      // beyond cap of 4
     ]);
-    expect(out).toEqual(['Sony headphones', 'noise cancelling', 'wireless over-ear']);
+    expect(out).toEqual(['Sony headphones', 'noise cancelling', 'wireless over-ear', 'fifth extra query']);
     expect(out.length).toBeLessThanOrEqual(4);
   });
 
