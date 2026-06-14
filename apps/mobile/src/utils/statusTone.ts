@@ -16,6 +16,7 @@ export function statusTone(status: string): ToneKey {
     case 'Researching':
     case 'NeedsCleaning':
     case 'NeedsTesting':
+    case 'NeedsRepair':
     case 'NeedsPhotos':
     case 'ReadyToList':
       return 'warning';

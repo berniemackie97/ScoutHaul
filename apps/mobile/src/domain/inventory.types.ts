@@ -5,6 +5,7 @@ export type InventoryStatus =
   | 'Purchased'
   | 'NeedsCleaning'
   | 'NeedsTesting'
+  | 'NeedsRepair'
   | 'NeedsPhotos'
   | 'ReadyToList'
   | 'Listed'

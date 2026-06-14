@@ -46,6 +46,7 @@ type ScanResultsProps = {
   addInventoryIcon?: keyof typeof Ionicons.glyphMap;
   onResearch: () => void;
   onRefine: (query: string) => void;
+  onReestimate?: () => void;
   onSaveEstimate: () => Promise<boolean>;
   onSaveProduct: () => void;
   onCancelEdit: () => void;
@@ -65,6 +66,7 @@ export function ScanResults({
   addInventoryIcon = 'add-circle-outline',
   onResearch,
   onRefine,
+  onReestimate,
   onSaveEstimate,
   onSaveProduct,
   onCancelEdit,
@@ -111,9 +113,13 @@ export function ScanResults({
                 {[state.productBrand, state.productModel, state.productCategory].filter(Boolean).join(' · ')}
               </Text>
             ) : null}
-            {(state.productColor || state.productCondition) ? (
+            {(state.productColor || state.productCondition || state.productConditionQuality) ? (
               <Text variant="label" color={c.textMuted} numberOfLines={1}>
-                {[state.productColor, state.productCondition].filter(Boolean).join(' · ')}
+                {[
+                  state.productColor,
+                  state.productCondition,
+                  state.productConditionQuality ? `grade: ${state.productConditionQuality}` : null,
+                ].filter(Boolean).join(' · ')}
               </Text>
             ) : null}
             <View style={styles.heroMeta}>
@@ -234,6 +240,17 @@ export function ScanResults({
                   {estimateSaved ? 'Saved to price history' : savingEstimate ? 'Saving…' : 'Save to price history'}
                 </Text>
               </Pressable>
+              {onReestimate ? (
+                <Pressable
+                  onPress={onReestimate}
+                  style={[styles.saveEstimateBtn, { borderColor: c.accent + '40' }]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Re-run the AI valuation"
+                >
+                  <Ionicons name="refresh-outline" size={15} color={c.accent} />
+                  <Text variant="label" color={c.accent} style={styles.noCaps}>Re-run valuation</Text>
+                </Pressable>
+              ) : null}
             </View>
           ) : (
             <View

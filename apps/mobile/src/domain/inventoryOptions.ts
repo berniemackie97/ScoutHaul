@@ -65,6 +65,7 @@ export const damageTypeOptions: SelectOption[] = [
 export const workflowActionOptions: { status: InventoryStatus; label: string }[] = [
   { status: 'NeedsCleaning', label: 'Needs cleaning' },
   { status: 'NeedsTesting', label: 'Needs testing' },
+  { status: 'NeedsRepair', label: 'Needs repair / alterations' },
   { status: 'NeedsPhotos', label: 'Needs photos' },
   { status: 'ReadyToList', label: 'Ready to list' },
   { status: 'Listed', label: 'Listed' },

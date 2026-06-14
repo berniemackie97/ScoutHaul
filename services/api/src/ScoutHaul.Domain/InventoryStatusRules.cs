@@ -10,6 +10,7 @@ public static class InventoryStatusRules
         InventoryStatus.Purchased,
         InventoryStatus.NeedsCleaning,
         InventoryStatus.NeedsTesting,
+        InventoryStatus.NeedsRepair,
         InventoryStatus.NeedsPhotos,
         InventoryStatus.ReadyToList,
         InventoryStatus.Listed,
@@ -21,6 +22,7 @@ public static class InventoryStatusRules
         InventoryStatus.Purchased,
         InventoryStatus.NeedsCleaning,
         InventoryStatus.NeedsTesting,
+        InventoryStatus.NeedsRepair,
         InventoryStatus.NeedsPhotos,
         InventoryStatus.ReadyToList
     ];

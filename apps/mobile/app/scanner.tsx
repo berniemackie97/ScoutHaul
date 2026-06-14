@@ -73,7 +73,7 @@ function toVisionOverrides(r: IdentifyResult): VisionOverrides {
 export default function BarcodeScannerScreen() {
   const { colors: c } = useAppTheme();
   const haptics = useHaptics();
-  const routeParams = useLocalSearchParams<{ sourcingTripId?: string; sourcingTripStopId?: string; mode?: ScanMode; fill?: string }>();
+  const routeParams = useLocalSearchParams<{ sourcingTripId?: string; sourcingTripStopId?: string; mode?: ScanMode; fill?: string; context?: string }>();
   // "fill" mode: launched from an existing form (e.g. inventory edit) that wants
   // the identified fields handed *back* rather than pushed into a new record.
   const isFillMode = routeParams.fill === '1';
@@ -267,7 +267,7 @@ export default function BarcodeScannerScreen() {
 
       let identified: IdentifyResult;
       try {
-        identified = await identifyFromPhoto(photo.uri);
+        identified = await identifyFromPhoto(photo.uri, routeParams.context);
       } finally {
         clearTimeout(stepTimer);
       }
@@ -363,6 +363,14 @@ export default function BarcodeScannerScreen() {
   function switchMode(newMode: ScanMode) {
     setMode(newMode);
     resetToScanning();
+  }
+
+  // Re-run the valuation for the current product on demand (reuses the manual-search path, which
+  // rebuilds the Gemini overrides from the identify ref + re-fetches grounded comps).
+  function reestimate() {
+    if (state.phase !== 'done') return;
+    const q = resolveProductName(state) ?? state.barcode;
+    if (q) void searchManual(q, state.photoUri ?? undefined);
   }
 
   function continueToSearch() {
@@ -523,6 +531,29 @@ export default function BarcodeScannerScreen() {
         soldAt: null,
         notes: state.priceRationale ?? `AI estimate: $${low ?? '?'}–$${high ?? '?'}`,
       });
+
+      // Also persist the AI's individual comp data points (sold/active) as observations so the item
+      // builds a real price-history trail — not just the single estimate midpoint. Tagged with an
+      // "AI Comp" source so they're distinguishable from API-verified comps. Best-effort per comp.
+      const observedAt = new Date().toISOString();
+      await Promise.all(
+        state.comps.map((comp) =>
+          api.addComp({
+            productIdentityId,
+            inventoryItemId: null,
+            observationType: comp.status === 'sold' ? 'Sold' : 'ActiveListing',
+            source: comp.sourceUrl ? 'AI Comp (web)' : 'AI Comp',
+            sourceUrl: comp.sourceUrl ?? null,
+            title,
+            price: comp.price,
+            shippingPrice: null,
+            condition: comp.condition ?? state.productCondition ?? null,
+            observedAt,
+            soldAt: comp.status === 'sold' ? observedAt : null,
+            notes: comp.note ?? null,
+          }).catch(() => null),
+        ),
+      );
       haptics.success();
       return true;
     } catch {
@@ -822,6 +853,7 @@ export default function BarcodeScannerScreen() {
               addInventoryIcon={isFillMode ? 'checkmark-circle-outline' : 'add-circle-outline'}
               onResearch={continueToSearch}
               onRefine={(q) => void searchManual(q, state.photoUri ?? undefined)}
+              onReestimate={reestimate}
               onSaveEstimate={saveEstimateAsComp}
               onSaveProduct={() => void saveProduct()}
               onCancelEdit={() => setEditing(false)}

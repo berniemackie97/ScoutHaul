@@ -14,6 +14,7 @@ public enum InventoryStatus
     Purchased,
     NeedsCleaning,
     NeedsTesting,
+    NeedsRepair,
     NeedsPhotos,
     ReadyToList,
     Listed,

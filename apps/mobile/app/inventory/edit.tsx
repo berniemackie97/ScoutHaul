@@ -293,9 +293,29 @@ export default function EditInventoryScreen() {
   // Photo-identify reuses the scanner's full flow (capture → analyze overlay →
   // grounded comps). The scanner hands the resolved fields back here via the
   // module handoff, which the focus effect above applies on return.
+  // Any fields already filled in are forwarded as `context` so the AI can use them as ground truth
+  // to sharpen identification + valuation (e.g. you typed the brand → it nails the variant).
+  function buildKnownFactsContext(): string {
+    const facts: string[] = [];
+    if (brand.trim()) facts.push(`Brand: ${brand.trim()}`);
+    if (title.trim()) facts.push(`Name/title: ${title.trim()}`);
+    if (model.trim()) facts.push(`Model: ${model.trim()}`);
+    if (category) facts.push(`Category: ${category}`);
+    if (color.trim()) facts.push(`Color: ${color.trim()}`);
+    if (condition) facts.push(`Condition: ${condition}`);
+    const size = [sizeSystem, sizeValue.trim()].filter(Boolean).join(' ');
+    if (size) facts.push(`Size: ${size}`);
+    if (notes.trim()) facts.push(`Notes: ${notes.trim()}`);
+    return facts.join('\n');
+  }
+
   function identifyItem() {
     haptics.medium();
-    router.push({ pathname: '/scanner', params: { mode: 'photo-identify', fill: '1' } });
+    const context = buildKnownFactsContext();
+    router.push({
+      pathname: '/scanner',
+      params: { mode: 'photo-identify', fill: '1', ...(context ? { context } : {}) },
+    });
   }
 
   async function save() {

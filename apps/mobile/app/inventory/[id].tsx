@@ -30,6 +30,7 @@ type WorkflowStage = {
 const workflowStages: WorkflowStage[] = [
   { status: 'NeedsCleaning', label: 'Clean', icon: 'water-outline' },
   { status: 'NeedsTesting', label: 'Test', icon: 'flask-outline' },
+  { status: 'NeedsRepair', label: 'Repair', icon: 'construct-outline' },
   { status: 'NeedsPhotos', label: 'Photo', icon: 'camera-outline' },
   { status: 'ReadyToList', label: 'Ready', icon: 'checkmark-circle-outline' },
   { status: 'Listed', label: 'Listed', icon: 'pricetag-outline' },
