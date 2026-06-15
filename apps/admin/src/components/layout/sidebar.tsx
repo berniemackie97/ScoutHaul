@@ -1,15 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { UserButton } from "@clerk/nextjs";
+import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard, Package, ShoppingCart, Users, Wrench,
   HandCoins, Truck, BarChart3, FileText, Settings,
-  ChevronLeft, ChevronRight, Menu, Package2,
+  ChevronLeft, ChevronRight, LogOut, Package2,
 } from "lucide-react";
 import { useState } from "react";
-import { cn, Button, Separator } from "@overhaul/ui";
+import { cn, Button } from "@overhaul/ui";
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 const navItems = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
@@ -26,7 +26,15 @@ const navItems = [
 
 export function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
+
+  async function handleSignOut() {
+    const supabase = createSupabaseBrowserClient();
+    await supabase.auth.signOut();
+    router.replace("/sign-in");
+    router.refresh();
+  }
 
   return (
     <aside
@@ -85,17 +93,24 @@ export function Sidebar() {
       {/* Footer */}
       <div className="border-t p-4">
         <div className={cn("flex items-center", collapsed ? "justify-center" : "gap-3")}>
-          {process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ? (
-            <UserButton afterSignOutUrl="/" />
-          ) : (
-            <div className="h-8 w-8 rounded-full bg-brand-200 flex items-center justify-center text-xs font-bold text-brand-700">A</div>
-          )}
+          <div className="h-8 w-8 rounded-full bg-brand-200 flex items-center justify-center text-xs font-bold text-brand-700 shrink-0">
+            A
+          </div>
           {!collapsed && (
-            <div className="min-w-0">
-              <p className="text-xs font-medium truncate">Admin User</p>
-              <p className="text-[10px] text-muted-foreground truncate">Owner</p>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-medium truncate">Operator</p>
+              <p className="text-[10px] text-muted-foreground truncate">Signed in</p>
             </div>
           )}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 shrink-0"
+            onClick={handleSignOut}
+            title="Sign out"
+          >
+            <LogOut className="h-4 w-4" />
+          </Button>
         </div>
       </div>
     </aside>

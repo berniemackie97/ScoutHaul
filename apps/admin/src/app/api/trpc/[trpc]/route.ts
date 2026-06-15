@@ -1,16 +1,15 @@
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import { appRouter } from "@overhaul/api";
 import { prisma } from "@overhaul/database";
-import { auth } from "@clerk/nextjs/server";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
+// Transitional: this tRPC/Prisma layer is being replaced by the typed .NET API
+// client (@overhaul/api-client). Auth is now Supabase; Clerk has been removed.
 const handler = async (req: Request) => {
-  const { userId } = await auth();
-
-  let userRole: string | null = null;
-  if (userId) {
-    const user = await prisma.user.findFirst({ where: { clerkId: userId } });
-    userRole = user?.role ?? null;
-  }
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   return fetchRequestHandler({
     endpoint: "/api/trpc",
@@ -18,8 +17,8 @@ const handler = async (req: Request) => {
     router: appRouter,
     createContext: () => ({
       prisma,
-      userId: userId ?? null,
-      userRole,
+      userId: user?.id ?? null,
+      userRole: null,
     }),
   });
 };
