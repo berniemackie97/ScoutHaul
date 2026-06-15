@@ -21,3 +21,15 @@ CLAUDE.md
 .aider*
 .copilot/
 apps/mobile/.env.example
+
+# web (next/turbo/test) — monorepo
+.next/
+out/
+.turbo/
+.vercel
+coverage/
+test-results/
+playwright-report/
+*.tsbuildinfo
+.pnp
+.pnp.js

@@ -1,0 +1,35 @@
+{
+  "name": "scouthaul-platform",
+  "private": true,
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "dev:storefront": "turbo run dev --filter=@overhaul/storefront",
+    "dev:admin": "turbo run dev --filter=@overhaul/admin",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "test:coverage": "turbo run test:coverage",
+    "test:e2e": "turbo run test:e2e",
+    "type-check": "turbo run type-check",
+    "db:generate": "turbo run db:generate --filter=@overhaul/database",
+    "format": "prettier --write \"apps/**/*.{ts,tsx,js,jsx,json,css,md} packages/**/*.{ts,tsx,js,jsx,json,css,md}\""
+  },
+  "devDependencies": {
+    "turbo": "^2.9.0",
+    "prettier": "^3.4.0",
+    "prettier-plugin-tailwindcss": "^0.6.0"
+  },
+  "packageManager": "pnpm@10.28.1",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "sharp",
+      "prisma",
+      "@prisma/client",
+      "@prisma/engines"
+    ]
+  }
+}

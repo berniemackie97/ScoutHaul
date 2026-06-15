@@ -1,0 +1,6 @@
+# Web/TS workspace. apps/mobile (Expo) is intentionally NOT a workspace member —
+# Expo/Metro has its own resolution; it stays standalone with its own node_modules.
+packages:
+  - "apps/storefront"
+  - "apps/admin"
+  - "packages/*"
