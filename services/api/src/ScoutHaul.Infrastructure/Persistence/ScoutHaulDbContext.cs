@@ -1,13 +1,20 @@
+using System.Reflection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using ScoutHaul.Application.Common;
 using ScoutHaul.Domain.Common;
 using ScoutHaul.Domain.Entities;
 
 namespace ScoutHaul.Infrastructure.Persistence;
 
-public sealed class ScoutHaulDbContext(DbContextOptions<ScoutHaulDbContext> options) : DbContext(options)
+public sealed class ScoutHaulDbContext(DbContextOptions<ScoutHaulDbContext> options, ITenantContext? tenant = null) : DbContext(options)
 {
+    // Per-request tenant. Null at design-time (migrations) and in unit tests that construct
+    // the context directly — in those cases org-scoping filters are left off (see ConfigureOrgFilter).
+    private readonly ITenantContext? _tenant = tenant;
+
     public DbSet<Organization> Organizations => Set<Organization>();
     public DbSet<AppUser> Users => Set<AppUser>();
     public DbSet<ExternalAuthAccount> ExternalAuthAccounts => Set<ExternalAuthAccount>();
@@ -39,12 +46,14 @@ public sealed class ScoutHaulDbContext(DbContextOptions<ScoutHaulDbContext> opti
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
+        ApplyTenantToNewEntities();
         StampEntities(ChangeTracker.Entries<EntityBase>());
         return base.SaveChangesAsync(cancellationToken);
     }
 
     public override int SaveChanges()
     {
+        ApplyTenantToNewEntities();
         StampEntities(ChangeTracker.Entries<EntityBase>());
         return base.SaveChanges();
     }
@@ -389,6 +398,65 @@ public sealed class ScoutHaulDbContext(DbContextOptions<ScoutHaulDbContext> opti
             entity.HasIndex(item => new { item.OrganizationId, item.Key }).IsUnique();
             entity.HasIndex(item => item.ExpiresAt);
         });
+
+        ApplyOrganizationQueryFilters(modelBuilder);
+    }
+
+    // Auto-assigns the active organization to newly added org-scoped entities that did not set one,
+    // so callers cannot accidentally persist a row without (or with a wrong) OrganizationId. No-op
+    // when there is no tenant (design-time / tests) or the org has not been resolved yet.
+    private void ApplyTenantToNewEntities()
+    {
+        if (_tenant?.OrganizationId is not Guid organizationId)
+        {
+            return;
+        }
+
+        foreach (EntityEntry<IOrganizationScoped> entry in ChangeTracker.Entries<IOrganizationScoped>())
+        {
+            if (entry.State == EntityState.Added && entry.Entity.OrganizationId == Guid.Empty)
+            {
+                entry.Entity.OrganizationId = organizationId;
+            }
+        }
+    }
+
+    private static readonly MethodInfo ConfigureOrgFilterMethod =
+        typeof(ScoutHaulDbContext).GetMethod(nameof(ConfigureOrgFilter), BindingFlags.Instance | BindingFlags.NonPublic)!;
+
+    // Applies org-scoping query filters to user-facing business data only. IdempotencyRecord and
+    // AuditLog are infrastructure records written/read by middleware with an explicit OrganizationId
+    // and are intentionally excluded so cross-cutting behavior is not affected by the request tenant.
+    private void ApplyOrganizationQueryFilters(ModelBuilder modelBuilder)
+    {
+        foreach (IMutableEntityType entityType in modelBuilder.Model.GetEntityTypes())
+        {
+            Type clrType = entityType.ClrType;
+            if (!typeof(IOrganizationScoped).IsAssignableFrom(clrType))
+            {
+                continue;
+            }
+
+            if (clrType == typeof(IdempotencyRecord) || clrType == typeof(AuditLog))
+            {
+                continue;
+            }
+
+            ConfigureOrgFilterMethod.MakeGenericMethod(clrType).Invoke(this, [modelBuilder]);
+        }
+    }
+
+    // Resolves the value compared against each row's OrganizationId. Routed through a null-safe
+    // property (not a raw _tenant deref) because EF eagerly evaluates member accesses during query
+    // parameter extraction, ignoring the boolean short-circuit below:
+    //   - no tenant service at all (design-time / unit tests) => null => filter left off (unfiltered)
+    //   - tenant present but org not yet resolved              => Guid.Empty => matches no real row (fail closed)
+    //   - tenant resolved                                      => the active organization id (scoped)
+    private Guid? TenantFilterId => _tenant is null ? null : _tenant.OrganizationId ?? Guid.Empty;
+
+    private void ConfigureOrgFilter<TEntity>(ModelBuilder modelBuilder) where TEntity : class, IOrganizationScoped
+    {
+        modelBuilder.Entity<TEntity>().HasQueryFilter(entity => TenantFilterId == null || entity.OrganizationId == TenantFilterId);
     }
 
     private static void StampEntities(IEnumerable<EntityEntry<EntityBase>> entries)

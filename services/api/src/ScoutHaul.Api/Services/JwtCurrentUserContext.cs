@@ -1,12 +1,13 @@
 using System.Security.Claims;
 using Microsoft.EntityFrameworkCore;
+using ScoutHaul.Application.Common;
 using ScoutHaul.Domain;
 using ScoutHaul.Domain.Entities;
 using ScoutHaul.Infrastructure.Persistence;
 
 namespace ScoutHaul.Api.Services;
 
-public sealed class JwtCurrentUserContext(IHttpContextAccessor httpContextAccessor, ScoutHaulDbContext db) : ICurrentUserContext
+public sealed class JwtCurrentUserContext(IHttpContextAccessor httpContextAccessor, ScoutHaulDbContext db, ITenantContext tenant) : ICurrentUserContext
 {
     private const string OrganizationHeader = "X-ScoutHaul-Organization-Id";
     private ResolvedUserContext? resolved;
@@ -46,6 +47,7 @@ public sealed class JwtCurrentUserContext(IHttpContextAccessor httpContextAccess
         OrganizationMember membership = await ResolveMembershipAsync(appUser, requestedOrganizationId);
 
         await db.SaveChangesAsync();
+        tenant.SetOrganization(membership.OrganizationId);
         resolved = new ResolvedUserContext(membership.OrganizationId, appUser.Id);
     }
 
