@@ -43,6 +43,16 @@ public sealed class ScoutHaulDbContext(DbContextOptions<ScoutHaulDbContext> opti
     public DbSet<ResaleTask> Tasks => Set<ResaleTask>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();
+    public DbSet<Customer> Customers => Set<Customer>();
+    public DbSet<CustomerAddress> CustomerAddresses => Set<CustomerAddress>();
+    public DbSet<StoreCategory> StoreCategories => Set<StoreCategory>();
+    public DbSet<StoreListing> StoreListings => Set<StoreListing>();
+    public DbSet<Cart> Carts => Set<Cart>();
+    public DbSet<CartLine> CartLines => Set<CartLine>();
+    public DbSet<Order> Orders => Set<Order>();
+    public DbSet<OrderLine> OrderLines => Set<OrderLine>();
+    public DbSet<WishlistItem> WishlistItems => Set<WishlistItem>();
+    public DbSet<Review> Reviews => Set<Review>();
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
@@ -397,6 +407,150 @@ public sealed class ScoutHaulDbContext(DbContextOptions<ScoutHaulDbContext> opti
             entity.Property(item => item.ResponseJson).HasColumnType("jsonb");
             entity.HasIndex(item => new { item.OrganizationId, item.Key }).IsUnique();
             entity.HasIndex(item => item.ExpiresAt);
+        });
+
+        // ── Storefront commerce ──────────────────────────────────────
+        modelBuilder.Entity<Customer>(entity =>
+        {
+            entity.ToTable("Customers");
+            entity.Property(item => item.ExternalSubject).HasMaxLength(256);
+            entity.Property(item => item.Email).HasMaxLength(320).IsRequired();
+            entity.Property(item => item.DisplayName).HasMaxLength(160);
+            entity.Property(item => item.Phone).HasMaxLength(40);
+            ConfigureMoney(entity.Property(item => item.StoreCreditBalance));
+            entity.HasIndex(item => new { item.OrganizationId, item.Email }).IsUnique();
+            entity.HasIndex(item => new { item.OrganizationId, item.ExternalSubject });
+            entity.HasOne(item => item.Organization).WithMany().HasForeignKey(item => item.OrganizationId);
+        });
+
+        modelBuilder.Entity<CustomerAddress>(entity =>
+        {
+            entity.ToTable("CustomerAddresses");
+            entity.Property(item => item.Label).HasMaxLength(80);
+            entity.Property(item => item.RecipientName).HasMaxLength(160).IsRequired();
+            entity.Property(item => item.Line1).HasMaxLength(240).IsRequired();
+            entity.Property(item => item.Line2).HasMaxLength(240);
+            entity.Property(item => item.City).HasMaxLength(120).IsRequired();
+            entity.Property(item => item.Region).HasMaxLength(120).IsRequired();
+            entity.Property(item => item.PostalCode).HasMaxLength(32).IsRequired();
+            entity.Property(item => item.Country).HasMaxLength(2).IsRequired();
+            entity.Property(item => item.Phone).HasMaxLength(40);
+            entity.HasIndex(item => new { item.OrganizationId, item.CustomerId });
+            entity.HasOne(item => item.Customer).WithMany(item => item.Addresses).HasForeignKey(item => item.CustomerId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<StoreCategory>(entity =>
+        {
+            entity.ToTable("StoreCategories");
+            entity.Property(item => item.Name).HasMaxLength(200).IsRequired();
+            entity.Property(item => item.Slug).HasMaxLength(200).IsRequired();
+            entity.Property(item => item.Description).HasMaxLength(2000);
+            entity.Property(item => item.ImageKey).HasMaxLength(500);
+            entity.HasIndex(item => new { item.OrganizationId, item.Slug }).IsUnique();
+            entity.HasOne(item => item.Organization).WithMany().HasForeignKey(item => item.OrganizationId);
+            entity.HasOne(item => item.Parent).WithMany(item => item.Children).HasForeignKey(item => item.ParentId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<StoreListing>(entity =>
+        {
+            entity.ToTable("StoreListings");
+            entity.Property(item => item.Slug).HasMaxLength(200).IsRequired();
+            entity.Property(item => item.Title).HasMaxLength(300).IsRequired();
+            entity.Property(item => item.Subtitle).HasMaxLength(300);
+            entity.Property(item => item.MetaTitle).HasMaxLength(200);
+            entity.Property(item => item.MetaDescription).HasMaxLength(500);
+            entity.Property(item => item.Status).HasConversion<string>().HasMaxLength(32);
+            ConfigureMoney(entity.Property(item => item.ListPrice));
+            ConfigureMoney(entity.Property(item => item.CompareAtPrice));
+            entity.HasIndex(item => new { item.OrganizationId, item.Slug }).IsUnique();
+            entity.HasIndex(item => new { item.OrganizationId, item.Status });
+            entity.HasIndex(item => item.InventoryItemId).IsUnique();
+            entity.HasOne(item => item.Organization).WithMany().HasForeignKey(item => item.OrganizationId);
+            entity.HasOne(item => item.InventoryItem).WithOne(item => item.StoreListing).HasForeignKey<StoreListing>(item => item.InventoryItemId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(item => item.StoreCategory).WithMany(item => item.Listings).HasForeignKey(item => item.StoreCategoryId).OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<Cart>(entity =>
+        {
+            entity.ToTable("Carts");
+            entity.Property(item => item.AnonymousId).HasMaxLength(80);
+            entity.Property(item => item.Status).HasConversion<string>().HasMaxLength(24);
+            entity.HasIndex(item => new { item.OrganizationId, item.AnonymousId });
+            entity.HasIndex(item => new { item.OrganizationId, item.CustomerId });
+            entity.HasOne(item => item.Customer).WithMany().HasForeignKey(item => item.CustomerId).OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<CartLine>(entity =>
+        {
+            entity.ToTable("CartLines");
+            ConfigureMoney(entity.Property(item => item.UnitPriceSnapshot));
+            entity.HasIndex(item => new { item.OrganizationId, item.CartId });
+            entity.HasOne(item => item.Cart).WithMany(item => item.Lines).HasForeignKey(item => item.CartId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(item => item.StoreListing).WithMany().HasForeignKey(item => item.StoreListingId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<Order>(entity =>
+        {
+            entity.ToTable("Orders");
+            entity.Property(item => item.OrderNumber).HasMaxLength(40).IsRequired();
+            entity.Property(item => item.Email).HasMaxLength(320).IsRequired();
+            entity.Property(item => item.Currency).HasMaxLength(8);
+            entity.Property(item => item.Status).HasConversion<string>().HasMaxLength(24);
+            entity.Property(item => item.PaymentStatus).HasConversion<string>().HasMaxLength(24);
+            entity.Property(item => item.FulfillmentStatus).HasConversion<string>().HasMaxLength(24);
+            entity.Property(item => item.StripeCheckoutSessionId).HasMaxLength(120);
+            entity.Property(item => item.StripePaymentIntentId).HasMaxLength(120);
+            entity.Property(item => item.ShipToName).HasMaxLength(160);
+            entity.Property(item => item.ShipToLine1).HasMaxLength(240);
+            entity.Property(item => item.ShipToLine2).HasMaxLength(240);
+            entity.Property(item => item.ShipToCity).HasMaxLength(120);
+            entity.Property(item => item.ShipToRegion).HasMaxLength(120);
+            entity.Property(item => item.ShipToPostalCode).HasMaxLength(32);
+            entity.Property(item => item.ShipToCountry).HasMaxLength(2);
+            entity.Property(item => item.CustomerNote).HasMaxLength(2000);
+            ConfigureMoney(entity.Property(item => item.Subtotal));
+            ConfigureMoney(entity.Property(item => item.DiscountTotal));
+            ConfigureMoney(entity.Property(item => item.TaxTotal));
+            ConfigureMoney(entity.Property(item => item.ShippingTotal));
+            ConfigureMoney(entity.Property(item => item.GrandTotal));
+            entity.HasIndex(item => new { item.OrganizationId, item.OrderNumber }).IsUnique();
+            entity.HasIndex(item => new { item.OrganizationId, item.Status });
+            entity.HasIndex(item => new { item.OrganizationId, item.CreatedAt });
+            entity.HasOne(item => item.Organization).WithMany().HasForeignKey(item => item.OrganizationId);
+            entity.HasOne(item => item.Customer).WithMany(item => item.Orders).HasForeignKey(item => item.CustomerId).OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<OrderLine>(entity =>
+        {
+            entity.ToTable("OrderLines");
+            entity.Property(item => item.TitleSnapshot).HasMaxLength(300).IsRequired();
+            entity.Property(item => item.SkuSnapshot).HasMaxLength(80);
+            ConfigureMoney(entity.Property(item => item.UnitPrice));
+            ConfigureMoney(entity.Property(item => item.LineTotal));
+            ConfigureMoney(entity.Property(item => item.UnitCostSnapshot));
+            entity.HasIndex(item => new { item.OrganizationId, item.OrderId });
+            entity.HasOne(item => item.Order).WithMany(item => item.Lines).HasForeignKey(item => item.OrderId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(item => item.InventoryItem).WithMany().HasForeignKey(item => item.InventoryItemId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<WishlistItem>(entity =>
+        {
+            entity.ToTable("WishlistItems");
+            entity.HasIndex(item => new { item.OrganizationId, item.CustomerId, item.StoreListingId }).IsUnique();
+            entity.HasOne(item => item.Customer).WithMany(item => item.WishlistItems).HasForeignKey(item => item.CustomerId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(item => item.StoreListing).WithMany().HasForeignKey(item => item.StoreListingId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<Review>(entity =>
+        {
+            entity.ToTable("Reviews");
+            entity.Property(item => item.Title).HasMaxLength(200);
+            entity.Property(item => item.Body).HasMaxLength(4000);
+            entity.Property(item => item.Status).HasConversion<string>().HasMaxLength(24);
+            entity.HasIndex(item => new { item.OrganizationId, item.StoreListingId });
+            entity.HasIndex(item => new { item.OrganizationId, item.Status });
+            entity.HasOne(item => item.Customer).WithMany(item => item.Reviews).HasForeignKey(item => item.CustomerId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(item => item.StoreListing).WithMany(item => item.Reviews).HasForeignKey(item => item.StoreListingId).OnDelete(DeleteBehavior.Cascade);
         });
 
         ApplyOrganizationQueryFilters(modelBuilder);

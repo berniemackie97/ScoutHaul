@@ -151,3 +151,54 @@ public enum ExpenseCategory
     Storage,
     Other
 }
+
+// ── Storefront commerce ──────────────────────────────────────────
+public enum StoreListingStatus
+{
+    Draft,
+    Active,
+    Reserved,
+    Sold,
+    Archived
+}
+
+public enum CartStatus
+{
+    Active,
+    Converted,
+    Abandoned
+}
+
+public enum OrderStatus
+{
+    Pending,
+    Paid,
+    Fulfilling,
+    Shipped,
+    Delivered,
+    Cancelled,
+    Refunded
+}
+
+public enum PaymentStatus
+{
+    Pending,
+    Paid,
+    PartiallyRefunded,
+    Refunded,
+    Failed
+}
+
+public enum FulfillmentStatus
+{
+    Unfulfilled,
+    Partial,
+    Fulfilled
+}
+
+public enum ReviewStatus
+{
+    Pending,
+    Approved,
+    Rejected
+}

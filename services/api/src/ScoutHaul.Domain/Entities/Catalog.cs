@@ -79,12 +79,14 @@ public sealed class InventoryItem : EntityBase, IOrganizationScoped
     public bool IsArchived { get; set; }
     public DateTimeOffset? PurchasedAt { get; set; }
     public DateTimeOffset? ListedAt { get; set; }
+    public int Quantity { get; set; } = 1;
     public DateTimeOffset? SoldAt { get; set; }
     public ICollection<MarketObservation> MarketObservations { get; set; } = [];
     public ICollection<InventoryPhoto> Photos { get; set; } = [];
     public ICollection<InventoryIssue> Issues { get; set; } = [];
     public ICollection<Listing> Listings { get; set; } = [];
     public ICollection<Sale> Sales { get; set; } = [];
+    public StoreListing? StoreListing { get; set; }
 }
 
 public sealed class InventoryPhoto : EntityBase, IOrganizationScoped
