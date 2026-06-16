@@ -3543,6 +3543,243 @@ export interface paths {
         };
         trace?: never;
     };
+    "/api/store/categories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["StoreCategoryDto"][];
+                        "application/json": components["schemas"]["StoreCategoryDto"][];
+                        "text/json": components["schemas"]["StoreCategoryDto"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["UpsertStoreCategoryRequest"];
+                    "text/json": components["schemas"]["UpsertStoreCategoryRequest"];
+                    "application/*+json": components["schemas"]["UpsertStoreCategoryRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["StoreCategoryDto"];
+                        "application/json": components["schemas"]["StoreCategoryDto"];
+                        "text/json": components["schemas"]["StoreCategoryDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/store/listings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    status?: components["schemas"]["StoreListingStatus"];
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["StoreListingDto"][];
+                        "application/json": components["schemas"]["StoreListingDto"][];
+                        "text/json": components["schemas"]["StoreListingDto"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["PublishListingRequest"];
+                    "text/json": components["schemas"]["PublishListingRequest"];
+                    "application/*+json": components["schemas"]["PublishListingRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["StoreListingDto"];
+                        "application/json": components["schemas"]["StoreListingDto"];
+                        "text/json": components["schemas"]["StoreListingDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/store/listings/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["StoreListingDto"];
+                        "application/json": components["schemas"]["StoreListingDto"];
+                        "text/json": components["schemas"]["StoreListingDto"];
+                    };
+                };
+            };
+        };
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["UpdateStoreListingRequest"];
+                    "text/json": components["schemas"]["UpdateStoreListingRequest"];
+                    "application/*+json": components["schemas"]["UpdateStoreListingRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["StoreListingDto"];
+                        "application/json": components["schemas"]["StoreListingDto"];
+                        "text/json": components["schemas"]["StoreListingDto"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/store/listings/{id}/unpublish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["StoreListingDto"];
+                        "application/json": components["schemas"]["StoreListingDto"];
+                        "text/json": components["schemas"]["StoreListingDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/tasks": {
         parameters: {
             query?: never;
@@ -4366,6 +4603,22 @@ export interface components {
             /** Format: date-time */
             updatedAt?: string;
         };
+        PublishListingRequest: {
+            /** Format: uuid */
+            inventoryItemId?: string;
+            /** Format: double */
+            listPrice?: number;
+            /** Format: uuid */
+            storeCategoryId?: string | null;
+            title?: string | null;
+            subtitle?: string | null;
+            description?: string | null;
+            /** Format: double */
+            compareAtPrice?: number | null;
+            isFeatured?: boolean;
+            metaTitle?: string | null;
+            metaDescription?: string | null;
+        };
         RealizedProfitDto: {
             /** Format: uuid */
             saleId?: string;
@@ -4626,6 +4879,48 @@ export interface components {
             scheduleVarianceMinutes?: number;
             status?: components["schemas"]["SourcingRouteStatus"];
         };
+        StoreCategoryDto: {
+            /** Format: uuid */
+            id?: string;
+            name?: string | null;
+            slug?: string | null;
+            description?: string | null;
+            /** Format: uuid */
+            parentId?: string | null;
+            /** Format: int32 */
+            sortOrder?: number;
+            isActive?: boolean;
+        };
+        StoreListingDto: {
+            /** Format: uuid */
+            id?: string;
+            /** Format: uuid */
+            inventoryItemId?: string;
+            /** Format: uuid */
+            storeCategoryId?: string | null;
+            slug?: string | null;
+            title?: string | null;
+            subtitle?: string | null;
+            description?: string | null;
+            /** Format: double */
+            listPrice?: number;
+            /** Format: double */
+            compareAtPrice?: number | null;
+            status?: components["schemas"]["StoreListingStatus"];
+            isFeatured?: boolean;
+            metaTitle?: string | null;
+            metaDescription?: string | null;
+            /** Format: int32 */
+            viewCount?: number;
+            /** Format: date-time */
+            publishedAt?: string | null;
+            /** Format: date-time */
+            createdAt?: string;
+            /** Format: date-time */
+            updatedAt?: string;
+        };
+        /** @enum {string} */
+        StoreListingStatus: "Draft" | "Active" | "Reserved" | "Sold" | "Archived";
         UpdateChecklistItemRequest: {
             isCompleted?: boolean;
         };
@@ -4664,6 +4959,21 @@ export interface components {
             /** Format: uuid */
             assignedToUserId?: string | null;
             notes?: string | null;
+        };
+        UpdateStoreListingRequest: {
+            /** Format: double */
+            listPrice?: number;
+            /** Format: uuid */
+            storeCategoryId?: string | null;
+            title?: string | null;
+            subtitle?: string | null;
+            description?: string | null;
+            /** Format: double */
+            compareAtPrice?: number | null;
+            isFeatured?: boolean;
+            metaTitle?: string | null;
+            metaDescription?: string | null;
+            status?: components["schemas"]["StoreListingStatus"];
         };
         UpdateTaskStatusRequest: {
             status?: components["schemas"]["WorkTaskStatus"];
@@ -4778,6 +5088,16 @@ export interface components {
             canBeSkipped?: boolean;
             /** Format: double */
             budgetCap?: number | null;
+        };
+        UpsertStoreCategoryRequest: {
+            name?: string | null;
+            slug?: string | null;
+            description?: string | null;
+            /** Format: uuid */
+            parentId?: string | null;
+            /** Format: int32 */
+            sortOrder?: number;
+            isActive?: boolean;
         };
         VisionIdentifyRequest: {
             imageBase64?: string | null;
