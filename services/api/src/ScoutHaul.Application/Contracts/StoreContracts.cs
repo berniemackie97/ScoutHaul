@@ -64,3 +64,35 @@ public sealed record UpsertStoreCategoryRequest(
     Guid? ParentId,
     int SortOrder,
     bool IsActive);
+
+// ── Public storefront (customer-facing, anonymous) ───────────────
+// Deliberately a safe subset — never exposes cost, supplier, or internal data.
+
+public sealed record StorefrontListingDto(
+    Guid Id,
+    string Slug,
+    string Title,
+    string? Subtitle,
+    decimal ListPrice,
+    decimal? CompareAtPrice,
+    bool IsFeatured,
+    Guid? StoreCategoryId);
+
+public sealed record StorefrontListingDetailDto(
+    Guid Id,
+    string Slug,
+    string Title,
+    string? Subtitle,
+    string? Description,
+    decimal ListPrice,
+    decimal? CompareAtPrice,
+    string? Brand,
+    string? Condition,
+    string? MetaTitle,
+    string? MetaDescription);
+
+public sealed record StorefrontPageDto<T>(
+    IReadOnlyList<T> Items,
+    int Page,
+    int PageSize,
+    int Total);

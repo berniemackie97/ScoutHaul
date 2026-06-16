@@ -3780,6 +3780,124 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/storefront/listings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    category?: string;
+                    search?: string;
+                    page?: number;
+                    pageSize?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["StorefrontListingDtoStorefrontPageDto"];
+                        "application/json": components["schemas"]["StorefrontListingDtoStorefrontPageDto"];
+                        "text/json": components["schemas"]["StorefrontListingDtoStorefrontPageDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/storefront/listings/{slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    slug: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["StorefrontListingDetailDto"];
+                        "application/json": components["schemas"]["StorefrontListingDetailDto"];
+                        "text/json": components["schemas"]["StorefrontListingDetailDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/storefront/categories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["StoreCategoryDto"][];
+                        "application/json": components["schemas"]["StoreCategoryDto"][];
+                        "text/json": components["schemas"]["StoreCategoryDto"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/tasks": {
         parameters: {
             query?: never;
@@ -4921,6 +5039,45 @@ export interface components {
         };
         /** @enum {string} */
         StoreListingStatus: "Draft" | "Active" | "Reserved" | "Sold" | "Archived";
+        StorefrontListingDetailDto: {
+            /** Format: uuid */
+            id?: string;
+            slug?: string | null;
+            title?: string | null;
+            subtitle?: string | null;
+            description?: string | null;
+            /** Format: double */
+            listPrice?: number;
+            /** Format: double */
+            compareAtPrice?: number | null;
+            brand?: string | null;
+            condition?: string | null;
+            metaTitle?: string | null;
+            metaDescription?: string | null;
+        };
+        StorefrontListingDto: {
+            /** Format: uuid */
+            id?: string;
+            slug?: string | null;
+            title?: string | null;
+            subtitle?: string | null;
+            /** Format: double */
+            listPrice?: number;
+            /** Format: double */
+            compareAtPrice?: number | null;
+            isFeatured?: boolean;
+            /** Format: uuid */
+            storeCategoryId?: string | null;
+        };
+        StorefrontListingDtoStorefrontPageDto: {
+            items?: components["schemas"]["StorefrontListingDto"][] | null;
+            /** Format: int32 */
+            page?: number;
+            /** Format: int32 */
+            pageSize?: number;
+            /** Format: int32 */
+            total?: number;
+        };
         UpdateChecklistItemRequest: {
             isCompleted?: boolean;
         };
