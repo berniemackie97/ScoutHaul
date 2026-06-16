@@ -111,6 +111,9 @@ importers:
       '@overhaul/api':
         specifier: workspace:*
         version: link:../../packages/api
+      '@overhaul/api-client':
+        specifier: workspace:*
+        version: link:../../packages/api-client
       '@overhaul/database':
         specifier: workspace:*
         version: link:../../packages/database

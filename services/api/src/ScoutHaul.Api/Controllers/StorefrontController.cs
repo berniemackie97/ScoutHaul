@@ -85,7 +85,9 @@ public sealed class StorefrontController(ScoutHaulDbContext db, ITenantContext t
                 listing.ListPrice,
                 listing.CompareAtPrice,
                 listing.IsFeatured,
-                listing.StoreCategoryId))
+                listing.StoreCategoryId,
+                listing.InventoryItem!.Condition,
+                listing.InventoryItem!.Brand))
             .ToListAsync(cancellationToken);
 
         return new StorefrontPageDto<StorefrontListingDto>(items, page, pageSize, total);

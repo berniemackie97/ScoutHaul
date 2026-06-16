@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ArrowRight, ShieldCheck, Tag, Truck, Recycle, Wrench, HandCoins } from "lucide-react";
 import { ProductCard } from "@/components/store/product-card";
-import { sampleSpecimens, sampleCategories } from "@/lib/sample-data";
+import { getListings, getCategories } from "@/lib/catalog";
 
 const valueProps = [
   { icon: ShieldCheck, title: "Inspected & honest", body: "Every item tested and described as-is. Condition is in every listing — never buried." },
@@ -16,9 +16,11 @@ const services = [
   { icon: HandCoins, title: "Consignment", body: "Have something good you're done with? We'll sell it for you. Clear terms, fair split.", href: "/consignment" },
 ];
 
-const featured = sampleSpecimens[0];
+export default async function HomePage() {
+  const [items, categories] = await Promise.all([getListings(), getCategories()]);
+  const featured = items[0]!;
+  const floor = items.slice(0, 8);
 
-export default function HomePage() {
   return (
     <div>
       {/* ── Hero ─────────────────────────────────────────── */}
@@ -125,7 +127,7 @@ export default function HomePage() {
           </Link>
         </div>
         <div className="mt-8 grid grid-cols-2 gap-px bg-rule sm:grid-cols-3 lg:grid-cols-4">
-          {sampleSpecimens.map((item) => (
+          {floor.map((item) => (
             <ProductCard key={item.id} item={item} />
           ))}
         </div>
@@ -136,7 +138,7 @@ export default function HomePage() {
         <div className="mx-auto max-w-7xl px-6 py-16">
           <h2 className="font-heading text-2xl font-semibold tracking-tight text-ink">Shop by category</h2>
           <div className="mt-8 grid grid-cols-2 gap-px bg-rule md:grid-cols-3 lg:grid-cols-6">
-            {sampleCategories.map((cat) => (
+            {categories.map((cat) => (
               <Link
                 key={cat.slug}
                 href={`/categories/${cat.slug}`}

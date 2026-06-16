@@ -43,9 +43,11 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
         <div>
           <div className="relative flex aspect-square items-center justify-center border border-rule bg-surface">
             <span className="font-heading text-9xl text-ink/[0.07]">OT</span>
-            <span className="absolute left-3 top-3 font-mono text-[11px] uppercase tracking-wider text-slate/70">
-              {item.sku}
-            </span>
+            {item.sku ? (
+              <span className="absolute left-3 top-3 font-mono text-[11px] uppercase tracking-wider text-slate/70">
+                {item.sku}
+              </span>
+            ) : null}
             <span aria-hidden className="absolute bottom-3 right-3 h-5 w-5 border-b border-r border-copper/50" />
           </div>
           <div className="mt-3 grid grid-cols-4 gap-3">
@@ -60,10 +62,14 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
         {/* Dossier */}
         <div>
           <div className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-wider text-slate/80">
-            <Link href={`/products?category=${item.category.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`} className="hover:text-ink">
-              {item.category}
-            </Link>
-            <span aria-hidden className="h-1 w-1 rounded-full bg-copper" />
+            {item.category ? (
+              <>
+                <Link href={`/products?category=${item.category.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`} className="hover:text-ink">
+                  {item.category}
+                </Link>
+                <span aria-hidden className="h-1 w-1 rounded-full bg-copper" />
+              </>
+            ) : null}
             <span className="text-copper">{item.condition}</span>
           </div>
 

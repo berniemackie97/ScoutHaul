@@ -13,8 +13,10 @@ export interface CreateApiClientOptions {
    * anonymous calls (e.g. public storefront reads).
    */
   getAccessToken?: () => string | null | undefined | Promise<string | null | undefined>;
-  /** Optional organization id, sent as the X-ScoutHaul-Organization-Id header. */
+  /** Optional organization id, sent as the X-ScoutHaul-Organization-Id header (operator calls). */
   organizationId?: string;
+  /** Optional store organization id, sent as the X-ScoutHaul-Store header (public storefront reads). */
+  storeId?: string;
   /** Extra fetch implementation (e.g. Next.js server fetch with caching options). */
   fetch?: typeof fetch;
 }
@@ -37,6 +39,9 @@ export function createApiClient(options: CreateApiClientOptions): ScoutHaulClien
       }
       if (options.organizationId) {
         request.headers.set("X-ScoutHaul-Organization-Id", options.organizationId);
+      }
+      if (options.storeId) {
+        request.headers.set("X-ScoutHaul-Store", options.storeId);
       }
       return request;
     },

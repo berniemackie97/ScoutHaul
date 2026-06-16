@@ -5068,6 +5068,8 @@ export interface components {
             isFeatured?: boolean;
             /** Format: uuid */
             storeCategoryId?: string | null;
+            condition?: string | null;
+            brand?: string | null;
         };
         StorefrontListingDtoStorefrontPageDto: {
             items?: components["schemas"]["StorefrontListingDto"][] | null;

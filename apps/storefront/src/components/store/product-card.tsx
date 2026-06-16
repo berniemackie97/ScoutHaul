@@ -13,16 +13,22 @@ export function ProductCard({ item }: { item: Specimen }) {
             OT
           </span>
         </div>
-        <span className="absolute left-2.5 top-2.5 font-mono text-[10px] uppercase tracking-wider text-slate/70">
-          {item.sku}
-        </span>
+        {item.sku ? (
+          <span className="absolute left-2.5 top-2.5 font-mono text-[10px] uppercase tracking-wider text-slate/70">
+            {item.sku}
+          </span>
+        ) : null}
         <span aria-hidden className="absolute bottom-2.5 right-2.5 h-3 w-3 border-b border-r border-copper/60" />
       </div>
 
       <div className="space-y-2 p-3.5">
         <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-wider text-slate/70">
-          <span>{item.category}</span>
-          <span aria-hidden className="h-1 w-1 rounded-full bg-copper" />
+          {item.category ? (
+            <>
+              <span>{item.category}</span>
+              <span aria-hidden className="h-1 w-1 rounded-full bg-copper" />
+            </>
+          ) : null}
           <span className="text-copper">{item.condition}</span>
         </div>
         <h3 className="font-heading text-[15px] font-medium leading-snug text-ink line-clamp-2">

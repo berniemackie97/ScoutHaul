@@ -7912,6 +7912,14 @@
             "type": "string",
             "format": "uuid",
             "nullable": true
+          },
+          "condition": {
+            "type": "string",
+            "nullable": true
+          },
+          "brand": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false

@@ -4,7 +4,7 @@
 export type Specimen = {
   id: string;
   slug: string;
-  sku: string;
+  sku?: string;
   title: string;
   brand?: string;
   category: string;

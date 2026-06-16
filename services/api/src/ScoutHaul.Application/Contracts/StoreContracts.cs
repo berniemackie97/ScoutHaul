@@ -76,7 +76,9 @@ public sealed record StorefrontListingDto(
     decimal ListPrice,
     decimal? CompareAtPrice,
     bool IsFeatured,
-    Guid? StoreCategoryId);
+    Guid? StoreCategoryId,
+    string? Condition,
+    string? Brand);
 
 public sealed record StorefrontListingDetailDto(
     Guid Id,
