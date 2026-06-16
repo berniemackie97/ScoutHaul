@@ -1,241 +1,137 @@
-"use client";
-
-import { useState } from "react";
-import { useParams } from "next/navigation";
-import Image from "next/image";
 import Link from "next/link";
-import {
-  Heart, ShoppingCart, Truck, Shield, RotateCcw,
-  ChevronLeft, Star, MapPin, Share2,
-} from "lucide-react";
-import {
-  Button, Badge, Card, CardContent, Separator, Tabs, TabsContent, TabsList, TabsTrigger,
-  formatCurrency,
-} from "@overhaul/ui";
-import { trpc } from "@/lib/trpc";
+import { notFound } from "next/navigation";
+import { ArrowLeft, ShieldCheck, Truck, RotateCcw, MapPin } from "lucide-react";
+import { ProductCard } from "@/components/store/product-card";
+import { getListing, getRelated } from "@/lib/catalog";
 
-const conditionLabels: Record<string, string> = {
-  NEW: "New", LIKE_NEW: "Like New", EXCELLENT: "Excellent",
-  GOOD: "Good", FAIR: "Fair", POOR: "Poor", FOR_PARTS: "For Parts",
-};
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  const item = await getListing(slug);
+  return {
+    title: item ? item.title : "Not found",
+    description: item?.blurb,
+  };
+}
 
-export default function ProductDetailPage() {
-  const params = useParams();
-  const slug = params.slug as string;
-  const [selectedImage, setSelectedImage] = useState(0);
+export default async function ProductPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  const item = await getListing(slug);
+  if (!item) notFound();
 
-  const { data: product, isLoading } = trpc.products.bySlug.useQuery({ slug });
+  const related = await getRelated(slug);
 
-  if (isLoading) {
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="grid md:grid-cols-2 gap-8 animate-pulse">
-          <div className="aspect-square bg-muted rounded-xl" />
-          <div className="space-y-4">
-            <div className="h-4 bg-muted rounded w-1/4" />
-            <div className="h-8 bg-muted rounded w-3/4" />
-            <div className="h-6 bg-muted rounded w-1/4" />
-            <div className="h-20 bg-muted rounded" />
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!product) {
-    return (
-      <div className="container mx-auto px-4 py-16 text-center">
-        <h1 className="text-2xl font-bold">Product not found</h1>
-        <Link href="/products">
-          <Button variant="outline" className="mt-4">
-            <ChevronLeft className="h-4 w-4" /> Back to Products
-          </Button>
-        </Link>
-      </div>
-    );
-  }
-
-  const images = product.images.length > 0
-    ? product.images
-    : [{ url: "https://placehold.co/600x600/f5f5f5/999?text=No+Image", altText: "No image" }];
+  const spec: [string, string | undefined][] = [
+    ["Condition", item.condition],
+    ["Brand", item.brand],
+    ["Era", item.era],
+    ["Category", item.category],
+    ["Item no.", item.sku],
+    ["Location", "Bradenton, FL"],
+  ];
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      {/* Breadcrumb */}
-      <nav className="flex items-center gap-2 text-sm text-muted-foreground mb-6">
-        <Link href="/products" className="hover:text-foreground">Products</Link>
-        <span>/</span>
-        <Link href={`/categories/${product.category.slug}`} className="hover:text-foreground">
-          {product.category.name}
-        </Link>
-        <span>/</span>
-        <span className="text-foreground">{product.name}</span>
-      </nav>
+    <div className="mx-auto max-w-7xl px-6 py-10">
+      <Link
+        href="/products"
+        className="inline-flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-wider text-slate transition-colors hover:text-ink"
+      >
+        <ArrowLeft className="h-3.5 w-3.5" aria-hidden /> Back to the floor
+      </Link>
 
-      <div className="grid md:grid-cols-2 gap-8 lg:gap-12">
-        {/* Images */}
-        <div className="space-y-4">
-          <div className="relative aspect-square overflow-hidden rounded-xl bg-muted">
-            <Image
-              src={images[selectedImage]?.url ?? ""}
-              alt={images[selectedImage]?.altText ?? product.name}
-              fill
-              className="object-cover"
-              priority
-            />
+      <div className="mt-6 grid gap-10 lg:grid-cols-[1.1fr_0.9fr]">
+        {/* Gallery */}
+        <div>
+          <div className="relative flex aspect-square items-center justify-center border border-rule bg-surface">
+            <span className="font-heading text-9xl text-ink/[0.07]">OT</span>
+            <span className="absolute left-3 top-3 font-mono text-[11px] uppercase tracking-wider text-slate/70">
+              {item.sku}
+            </span>
+            <span aria-hidden className="absolute bottom-3 right-3 h-5 w-5 border-b border-r border-copper/50" />
           </div>
-          {images.length > 1 && (
-            <div className="flex gap-2 overflow-x-auto pb-2">
-              {images.map((img, i) => (
-                <button
-                  key={img.url}
-                  onClick={() => setSelectedImage(i)}
-                  className={`relative h-20 w-20 rounded-lg overflow-hidden shrink-0 border-2 transition-colors ${
-                    i === selectedImage ? "border-brand-600" : "border-transparent"
-                  }`}
-                >
-                  <Image src={img.url} alt={img.altText ?? ""} fill className="object-cover" />
-                </button>
-              ))}
-            </div>
-          )}
+          <div className="mt-3 grid grid-cols-4 gap-3">
+            {[0, 1, 2, 3].map((i) => (
+              <div key={i} className="flex aspect-square items-center justify-center border border-rule bg-surface">
+                <span className="font-heading text-2xl text-ink/[0.06]">OT</span>
+              </div>
+            ))}
+          </div>
         </div>
 
-        {/* Details */}
+        {/* Dossier */}
         <div>
-          <div className="flex items-center gap-2 mb-2">
-            <Badge variant="secondary">{product.category.name}</Badge>
-            <Badge variant={product.condition === "NEW" || product.condition === "LIKE_NEW" ? "success" : "info"}>
-              {conditionLabels[product.condition]}
-            </Badge>
+          <div className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-wider text-slate/80">
+            <Link href={`/products?category=${item.category.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`} className="hover:text-ink">
+              {item.category}
+            </Link>
+            <span aria-hidden className="h-1 w-1 rounded-full bg-copper" />
+            <span className="text-copper">{item.condition}</span>
           </div>
 
-          <h1 className="text-2xl md:text-3xl font-bold mb-2">{product.name}</h1>
+          <h1 className="mt-3 font-heading text-4xl font-semibold leading-tight tracking-tight text-ink">
+            {item.title}
+          </h1>
+          {item.brand ? <p className="mt-1.5 text-sm text-slate">{item.brand}</p> : null}
 
-          {product.brand && (
-            <p className="text-muted-foreground text-sm mb-4">
-              {product.brand} {product.model && `- ${product.model}`} {product.year && `(${product.year})`}
-            </p>
-          )}
-
-          <div className="flex items-baseline gap-3 mb-6">
-            <span className="text-3xl font-bold">{formatCurrency(Number(product.listPrice))}</span>
-            {product.compareAtPrice && Number(product.compareAtPrice) > Number(product.listPrice) && (
-              <>
-                <span className="text-lg text-muted-foreground line-through">
-                  {formatCurrency(Number(product.compareAtPrice))}
-                </span>
-                <Badge variant="destructive">
-                  {Math.round((1 - Number(product.listPrice) / Number(product.compareAtPrice)) * 100)}% off
-                </Badge>
-              </>
-            )}
+          <div className="mt-5 flex items-baseline gap-3">
+            <span className="text-3xl font-semibold text-ink">${item.price.toLocaleString()}</span>
+            {item.compareAt ? (
+              <span className="text-lg text-slate/60 line-through">${item.compareAt.toLocaleString()}</span>
+            ) : null}
           </div>
 
-          <p className="text-muted-foreground mb-6">{product.shortDescription ?? product.description.slice(0, 200)}</p>
+          <p className="mt-5 leading-relaxed text-slate">{item.blurb}</p>
 
-          {/* Actions */}
-          <div className="flex gap-3 mb-6">
-            <Button size="lg" className="flex-1">
-              <ShoppingCart className="h-4 w-4" />
-              Add to Cart
-            </Button>
-            <Button variant="outline" size="lg">
-              <Heart className="h-4 w-4" />
-            </Button>
-            <Button variant="outline" size="lg">
-              <Share2 className="h-4 w-4" />
-            </Button>
+          <div className="mt-7 flex flex-col gap-3 sm:flex-row">
+            <button className="flex-1 bg-copper px-6 py-3.5 text-sm font-semibold uppercase tracking-wider text-white transition-colors hover:bg-brand-700">
+              Add to cart
+            </button>
+            <button className="flex-1 border border-ink/30 px-6 py-3.5 text-sm font-semibold uppercase tracking-wider text-ink transition-colors hover:bg-surface">
+              Make an offer
+            </button>
           </div>
 
-          {/* Shipping info */}
-          <Card className="mb-6">
-            <CardContent className="p-4 space-y-3">
-              {product.isShippable && (
-                <div className="flex items-center gap-3 text-sm">
-                  <Truck className="h-4 w-4 text-brand-600" />
-                  <span>Free shipping on orders over $100</span>
-                </div>
-              )}
-              {product.localPickupOnly && (
-                <div className="flex items-center gap-3 text-sm">
-                  <MapPin className="h-4 w-4 text-brand-600" />
-                  <span>Local pickup only - Jacksonville, FL</span>
-                </div>
-              )}
-              <div className="flex items-center gap-3 text-sm">
-                <Shield className="h-4 w-4 text-brand-600" />
-                <span>Buyer protection on all purchases</span>
-              </div>
-              <div className="flex items-center gap-3 text-sm">
-                <RotateCcw className="h-4 w-4 text-brand-600" />
-                <span>7-day return policy</span>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* SKU + Tags */}
-          <div className="text-xs text-muted-foreground space-y-1">
-            <p>SKU: {product.sku}</p>
-            {product.tags.length > 0 && (
-              <div className="flex gap-1 flex-wrap">
-                {product.tags.map((tag) => (
-                  <Badge key={tag} variant="outline" className="text-xs">{tag}</Badge>
+          {/* The dossier — honest spec sheet */}
+          <div className="mt-8 border border-rule">
+            <div className="border-b border-rule bg-ink px-4 py-2.5">
+              <span className="font-mono text-[11px] font-semibold uppercase tracking-widest text-white">
+                The dossier
+              </span>
+            </div>
+            <dl className="divide-y divide-rule">
+              {spec
+                .filter(([, value]) => value)
+                .map(([label, value]) => (
+                  <div key={label} className="flex items-center justify-between px-4 py-2.5">
+                    <dt className="font-mono text-[11px] uppercase tracking-wider text-slate/80">{label}</dt>
+                    <dd className="font-mono text-[12px] text-ink">{value}</dd>
+                  </div>
                 ))}
-              </div>
-            )}
+            </dl>
           </div>
+
+          {/* Trust */}
+          <ul className="mt-6 space-y-2.5 text-sm text-slate">
+            <li className="flex items-center gap-2.5"><ShieldCheck className="h-4 w-4 text-copper" aria-hidden /> Inspected and graded straight — condition is exactly as listed.</li>
+            <li className="flex items-center gap-2.5"><RotateCcw className="h-4 w-4 text-copper" aria-hidden /> Easy returns if it arrives not as described.</li>
+            <li className="flex items-center gap-2.5"><Truck className="h-4 w-4 text-copper" aria-hidden /> Ships nationwide. Free over $100.</li>
+            <li className="flex items-center gap-2.5"><MapPin className="h-4 w-4 text-copper" aria-hidden /> Local pickup available in Bradenton, FL.</li>
+          </ul>
         </div>
       </div>
 
-      {/* Tabs */}
-      <Tabs defaultValue="description" className="mt-12">
-        <TabsList>
-          <TabsTrigger value="description">Description</TabsTrigger>
-          <TabsTrigger value="condition">Condition Details</TabsTrigger>
-          <TabsTrigger value="reviews">Reviews ({product._count.reviews})</TabsTrigger>
-        </TabsList>
-        <TabsContent value="description" className="mt-4">
-          <div className="prose max-w-none">
-            <p className="text-muted-foreground whitespace-pre-wrap">{product.description}</p>
+      {/* Related */}
+      {related.length > 0 ? (
+        <section className="mt-20">
+          <h2 className="border-b border-rule pb-4 font-heading text-2xl font-semibold tracking-tight text-ink">
+            More from the floor
+          </h2>
+          <div className="mt-6 grid grid-cols-2 gap-px bg-rule sm:grid-cols-3 lg:grid-cols-4">
+            {related.map((rel) => (
+              <ProductCard key={rel.id} item={rel} />
+            ))}
           </div>
-        </TabsContent>
-        <TabsContent value="condition" className="mt-4">
-          <div className="space-y-4">
-            <div>
-              <h3 className="font-semibold mb-1">Condition: {conditionLabels[product.condition]}</h3>
-              <p className="text-muted-foreground">{product.conditionNotes ?? "No additional condition notes."}</p>
-            </div>
-            {product.weight && (
-              <p className="text-sm text-muted-foreground">Weight: {Number(product.weight)} lbs</p>
-            )}
-          </div>
-        </TabsContent>
-        <TabsContent value="reviews" className="mt-4">
-          {product.reviews.length === 0 ? (
-            <p className="text-muted-foreground">No reviews yet. Be the first to review this product!</p>
-          ) : (
-            <div className="space-y-4">
-              {product.reviews.map((review) => (
-                <Card key={review.id} className="p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="flex gap-0.5">
-                      {Array.from({ length: review.rating }).map((_, i) => (
-                        <Star key={i} className="h-3 w-3 fill-brand-500 text-brand-500" />
-                      ))}
-                    </div>
-                    <span className="text-sm font-medium">
-                      {review.user.firstName} {review.user.lastName?.charAt(0)}.
-                    </span>
-                  </div>
-                  {review.title && <p className="font-medium text-sm">{review.title}</p>}
-                  {review.content && <p className="text-sm text-muted-foreground mt-1">{review.content}</p>}
-                </Card>
-              ))}
-            </div>
-          )}
-        </TabsContent>
-      </Tabs>
+        </section>
+      ) : null}
     </div>
   );
 }

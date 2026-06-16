@@ -1,226 +1,172 @@
 import Link from "next/link";
-import {
-  Package,
-  Truck,
-  Shield,
-  Recycle,
-  ArrowRight,
-  Wrench,
-  HandCoins,
-  Star,
-} from "lucide-react";
-import { Button, Card, CardContent, Badge } from "@overhaul/ui";
-
-const categories = [
-  { name: "Furniture", slug: "furniture", icon: "🪑", count: 45 },
-  { name: "Electronics", slug: "electronics", icon: "📱", count: 32 },
-  { name: "Collectibles", slug: "collectibles", icon: "🏆", count: 28 },
-  { name: "Household", slug: "household", icon: "🏠", count: 56 },
-  { name: "Sporting Goods", slug: "sporting-goods", icon: "⚾", count: 19 },
-  { name: "Tools & Equipment", slug: "tools-equipment", icon: "🔧", count: 23 },
-];
+import { ArrowRight, ShieldCheck, Tag, Truck, Recycle, Wrench, HandCoins } from "lucide-react";
+import { ProductCard } from "@/components/store/product-card";
+import { sampleSpecimens, sampleCategories } from "@/lib/sample-data";
 
 const valueProps = [
-  {
-    icon: Shield,
-    title: "Quality Guaranteed",
-    description: "Every item inspected and honestly described. What you see is what you get.",
-  },
-  {
-    icon: Truck,
-    title: "Free Shipping 100+",
-    description: "Free shipping on orders over $100. Local pickup always available in Jacksonville.",
-  },
-  {
-    icon: Recycle,
-    title: "Sustainable Shopping",
-    description: "Extend the life of quality goods. Better for your wallet, better for the planet.",
-  },
-  {
-    icon: HandCoins,
-    title: "Fair Prices Always",
-    description: "Sourced smart, priced fair. 50-60% below retail on quality secondhand items.",
-  },
+  { icon: ShieldCheck, title: "Inspected & honest", body: "Every item tested and described as-is. Condition is in every listing — never buried." },
+  { icon: Tag, title: "Sourced & priced fair", body: "Estate sales, liquidation, smart buys. Typically 50–60% below retail." },
+  { icon: Truck, title: "Ships fast · local pickup", body: "Quick dispatch nationwide. Pickup available here in Bradenton." },
+  { icon: Recycle, title: "A second life", body: "Quality goods kept in use. Better for your wallet, better for the planet." },
 ];
+
+const services = [
+  { icon: ShieldCheck, title: "Buy with confidence", body: "Every item is inspected and graded straight. If it isn't as described, send it back.", href: "/grading" },
+  { icon: Wrench, title: "Repairs", body: "Electronics, furniture, and appliances brought back to working order at a fair rate.", href: "/repairs" },
+  { icon: HandCoins, title: "Consignment", body: "Have something good you're done with? We'll sell it for you. Clear terms, fair split.", href: "/consignment" },
+];
+
+const featured = sampleSpecimens[0];
 
 export default function HomePage() {
   return (
     <div>
-      {/* Hero */}
-      <section className="relative bg-gradient-to-br from-brand-50 via-white to-brand-50 dark:from-brand-950 dark:via-background dark:to-brand-950">
-        <div className="container mx-auto px-4 py-16 md:py-24">
-          <div className="max-w-3xl">
-            <Badge variant="secondary" className="mb-4">
-              Florida&apos;s Trusted Secondhand Marketplace
-            </Badge>
-            <h1 className="text-4xl md:text-6xl font-bold tracking-tight mb-6">
-              Quality finds.
-              <br />
-              <span className="text-brand-600">Fair prices.</span>
-              <br />
-              Second life.
-            </h1>
-            <p className="text-lg text-muted-foreground mb-8 max-w-xl">
-              Curated secondhand furniture, electronics, and collectibles sourced
-              from estate sales and liquidation events across Florida. Every item
-              inspected, honestly described, and priced to sell.
+      {/* ── Hero ─────────────────────────────────────────── */}
+      <section className="border-b border-rule">
+        <div className="mx-auto grid max-w-7xl gap-12 px-6 py-16 md:py-24 lg:grid-cols-[1.15fr_0.85fr] lg:items-center">
+          <div>
+            <p className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.25em] text-slate/80">
+              <span aria-hidden className="inline-block h-2 w-2 bg-copper" />
+              Est. 2026 · Bradenton, Florida
             </p>
-            <div className="flex flex-wrap gap-3">
-              <Link href="/products">
-                <Button size="xl">
-                  Shop All Products
-                  <ArrowRight className="h-4 w-4" />
-                </Button>
+            <h1 className="mt-6 font-heading text-5xl font-semibold leading-[1.04] tracking-tight text-ink md:text-7xl">
+              Good finds.
+              <br />
+              <span className="text-copper">No surprises.</span>
+            </h1>
+            <p className="mt-6 max-w-xl text-lg leading-relaxed text-slate">
+              Quality secondhand furniture, electronics, tools and the occasional great find — each
+              one inspected, graded straight, and ready to use. What you see is what shows up.
+            </p>
+            <div className="mt-8 flex flex-wrap items-center gap-3">
+              <Link
+                href="/products"
+                className="inline-flex items-center gap-2 bg-copper px-6 py-3 text-sm font-semibold uppercase tracking-wider text-white transition-colors hover:bg-brand-700"
+              >
+                Shop the floor
+                <ArrowRight className="h-4 w-4" aria-hidden />
               </Link>
-              <Link href="/repairs">
-                <Button variant="outline" size="xl">
-                  <Wrench className="h-4 w-4" />
-                  Repair Services
-                </Button>
+              <Link
+                href="/grading"
+                className="inline-flex items-center gap-2 border border-ink/30 px-6 py-3 text-sm font-semibold uppercase tracking-wider text-ink transition-colors hover:bg-surface"
+              >
+                How we grade
+              </Link>
+            </div>
+            <dl className="mt-12 flex flex-wrap gap-x-10 gap-y-4 border-t border-rule pt-6 font-mono text-[11px] uppercase tracking-wider text-slate/80">
+              <div><dt className="text-ink font-semibold text-base">247</dt><dd>items live</dd></div>
+              <div><dt className="text-ink font-semibold text-base">Every</dt><dd>item inspected</dd></div>
+              <div><dt className="text-ink font-semibold text-base">FL</dt><dd>ships from</dd></div>
+              <div><dt className="text-ink font-semibold text-base">Pickup</dt><dd>in Bradenton</dd></div>
+            </dl>
+          </div>
+
+          {/* Featured specimen */}
+          <div className="relative border border-rule bg-surface">
+            <span className="absolute left-0 top-0 z-10 bg-ink px-2.5 py-1 font-mono text-[10px] font-semibold uppercase tracking-widest text-white">
+              Featured
+            </span>
+            <span aria-hidden className="absolute right-3 top-3 z-10 h-4 w-4 border-r border-t border-copper" />
+            <div className="flex aspect-[4/3] items-center justify-center border-b border-rule">
+              <span className="font-heading text-8xl text-ink/[0.08]">OT</span>
+            </div>
+            <div className="space-y-3 p-6">
+              <div className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-wider text-slate/80">
+                <span>{featured.sku}</span>
+                <span aria-hidden className="h-1 w-1 rounded-full bg-copper" />
+                <span className="text-copper">{featured.condition}</span>
+              </div>
+              <h2 className="font-heading text-2xl font-medium leading-snug text-ink">{featured.title}</h2>
+              <p className="text-sm leading-relaxed text-slate">{featured.blurb}</p>
+              <div className="flex items-baseline gap-3 pt-1">
+                <span className="text-2xl font-semibold text-ink">${featured.price.toLocaleString()}</span>
+                {featured.compareAt ? (
+                  <span className="text-slate/60 line-through">${featured.compareAt.toLocaleString()}</span>
+                ) : null}
+              </div>
+              <Link
+                href={`/products/${featured.slug}`}
+                className="inline-flex items-center gap-1.5 pt-1 font-mono text-[12px] font-semibold uppercase tracking-wider text-copper hover:text-brand-700"
+              >
+                View dossier <ArrowRight className="h-3.5 w-3.5" aria-hidden />
               </Link>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Value Props */}
-      <section className="border-y bg-muted/30">
-        <div className="container mx-auto px-4 py-8">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {valueProps.map((prop) => (
-              <div key={prop.title} className="flex items-start gap-3">
-                <div className="h-10 w-10 rounded-lg bg-brand-100 dark:bg-brand-900 flex items-center justify-center shrink-0">
-                  <prop.icon className="h-5 w-5 text-brand-600" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-sm">{prop.title}</h3>
-                  <p className="text-xs text-muted-foreground mt-0.5">{prop.description}</p>
-                </div>
+      {/* ── Value strip ──────────────────────────────────── */}
+      <section className="bg-ink">
+        <div className="mx-auto grid max-w-7xl gap-8 px-6 py-12 sm:grid-cols-2 lg:grid-cols-4">
+          {valueProps.map((prop) => (
+            <div key={prop.title} className="flex gap-4">
+              <prop.icon className="h-6 w-6 shrink-0 text-copper" aria-hidden />
+              <div>
+                <h3 className="font-heading text-base font-medium text-white">{prop.title}</h3>
+                <p className="mt-1 text-sm leading-relaxed text-white/65">{prop.body}</p>
               </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Categories */}
-      <section className="container mx-auto px-4 py-16">
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h2 className="text-2xl font-bold">Shop by Category</h2>
-            <p className="text-muted-foreground mt-1">
-              Browse our curated collection of secondhand goods
-            </p>
-          </div>
-          <Link href="/categories">
-            <Button variant="ghost">
-              View All <ArrowRight className="h-4 w-4" />
-            </Button>
-          </Link>
-        </div>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-          {categories.map((cat) => (
-            <Link key={cat.slug} href={`/categories/${cat.slug}`}>
-              <Card className="text-center p-6 hover:shadow-md transition-all hover:border-brand-300 cursor-pointer group">
-                <div className="text-4xl mb-3">{cat.icon}</div>
-                <h3 className="font-semibold text-sm group-hover:text-brand-600 transition-colors">
-                  {cat.name}
-                </h3>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {cat.count} items
-                </p>
-              </Card>
-            </Link>
+            </div>
           ))}
         </div>
       </section>
 
-      {/* Featured Products placeholder */}
-      <section className="bg-muted/30 py-16">
-        <div className="container mx-auto px-4">
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <h2 className="text-2xl font-bold">Featured Finds</h2>
-              <p className="text-muted-foreground mt-1">
-                Hand-picked items with the best value
-              </p>
-            </div>
-            <Link href="/products?featured=true">
-              <Button variant="ghost">
-                View All <ArrowRight className="h-4 w-4" />
-              </Button>
-            </Link>
+      {/* ── On the floor ─────────────────────────────────── */}
+      <section className="mx-auto max-w-7xl px-6 py-20">
+        <div className="flex items-end justify-between border-b border-rule pb-5">
+          <div>
+            <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-copper">Latest finds</p>
+            <h2 className="mt-2 font-heading text-3xl font-semibold tracking-tight text-ink">On the floor</h2>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {[1, 2, 3, 4].map((i) => (
-              <Card key={i} className="overflow-hidden">
-                <div className="aspect-square bg-muted flex items-center justify-center">
-                  <Package className="h-12 w-12 text-muted-foreground/30" />
-                </div>
-                <CardContent className="p-4">
-                  <p className="text-xs text-muted-foreground">Featured Item</p>
-                  <p className="font-medium text-sm mt-1">Products will appear here</p>
-                  <p className="font-bold mt-2">$--.-</p>
-                </CardContent>
-              </Card>
+          <Link
+            href="/products"
+            className="hidden items-center gap-1.5 font-mono text-[12px] font-semibold uppercase tracking-wider text-slate hover:text-ink sm:inline-flex"
+          >
+            View all <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+          </Link>
+        </div>
+        <div className="mt-8 grid grid-cols-2 gap-px bg-rule sm:grid-cols-3 lg:grid-cols-4">
+          {sampleSpecimens.map((item) => (
+            <ProductCard key={item.id} item={item} />
+          ))}
+        </div>
+      </section>
+
+      {/* ── Categories ───────────────────────────────────── */}
+      <section className="border-y border-rule bg-surface">
+        <div className="mx-auto max-w-7xl px-6 py-16">
+          <h2 className="font-heading text-2xl font-semibold tracking-tight text-ink">Shop by category</h2>
+          <div className="mt-8 grid grid-cols-2 gap-px bg-rule md:grid-cols-3 lg:grid-cols-6">
+            {sampleCategories.map((cat) => (
+              <Link
+                key={cat.slug}
+                href={`/categories/${cat.slug}`}
+                className="group flex flex-col gap-2 bg-background p-5 transition-colors hover:bg-surface"
+              >
+                <span className="font-mono text-[11px] uppercase tracking-wider text-slate/70">
+                  {String(cat.count).padStart(2, "0")} items
+                </span>
+                <span className="font-heading text-lg font-medium leading-tight text-ink group-hover:text-copper">
+                  {cat.name}
+                </span>
+              </Link>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Services CTA */}
-      <section className="container mx-auto px-4 py-16">
-        <div className="grid md:grid-cols-2 gap-6">
-          <Card className="p-8 bg-gradient-to-br from-brand-50 to-white dark:from-brand-950 dark:to-background border-brand-200 dark:border-brand-800">
-            <Wrench className="h-10 w-10 text-brand-600 mb-4" />
-            <h3 className="text-xl font-bold mb-2">Repair Services</h3>
-            <p className="text-muted-foreground mb-4">
-              Got something broken? We fix electronics, furniture, and appliances
-              at fair rates. Get a free quote today.
-            </p>
-            <Link href="/repairs">
-              <Button>
-                Get a Repair Quote <ArrowRight className="h-4 w-4" />
-              </Button>
+      {/* ── Services ─────────────────────────────────────── */}
+      <section className="mx-auto max-w-7xl px-6 py-20">
+        <div className="grid gap-px bg-rule md:grid-cols-3">
+          {services.map((svc) => (
+            <Link key={svc.title} href={svc.href} className="group bg-background p-8 transition-colors hover:bg-surface">
+              <svc.icon className="h-7 w-7 text-copper" aria-hidden />
+              <h3 className="mt-4 font-heading text-xl font-medium text-ink">{svc.title}</h3>
+              <p className="mt-2 text-sm leading-relaxed text-slate">{svc.body}</p>
+              <span className="mt-4 inline-flex items-center gap-1.5 font-mono text-[12px] font-semibold uppercase tracking-wider text-copper">
+                Learn more <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden />
+              </span>
             </Link>
-          </Card>
-
-          <Card className="p-8 bg-gradient-to-br from-green-50 to-white dark:from-green-950 dark:to-background border-green-200 dark:border-green-800">
-            <HandCoins className="h-10 w-10 text-green-600 mb-4" />
-            <h3 className="text-xl font-bold mb-2">Sell on Consignment</h3>
-            <p className="text-muted-foreground mb-4">
-              Have quality items to sell? We handle the listing, selling, and
-              shipping. You get paid when it sells.
-            </p>
-            <Link href="/consignment">
-              <Button variant="outline" className="border-green-600 text-green-700 hover:bg-green-50">
-                Start Consigning <ArrowRight className="h-4 w-4" />
-              </Button>
-            </Link>
-          </Card>
-        </div>
-      </section>
-
-      {/* Testimonials */}
-      <section className="bg-muted/30 py-16">
-        <div className="container mx-auto px-4 text-center">
-          <h2 className="text-2xl font-bold mb-8">What Our Customers Say</h2>
-          <div className="grid md:grid-cols-3 gap-6 max-w-4xl mx-auto">
-            {[
-              { name: "Sarah M.", text: "Found an amazing mid-century desk for half the price of retail. Excellent condition, exactly as described.", rating: 5 },
-              { name: "James T.", text: "Had my laptop repaired here. Quick turnaround, fair price, and it works perfectly now. Highly recommend.", rating: 5 },
-              { name: "Maria L.", text: "Consigned some furniture and it sold within a week. Easy process and I got a great payout.", rating: 5 },
-            ].map((review) => (
-              <Card key={review.name} className="p-6 text-left">
-                <div className="flex gap-0.5 mb-3">
-                  {Array.from({ length: review.rating }).map((_, i) => (
-                    <Star key={i} className="h-4 w-4 fill-brand-500 text-brand-500" />
-                  ))}
-                </div>
-                <p className="text-sm text-muted-foreground mb-4">&ldquo;{review.text}&rdquo;</p>
-                <p className="text-sm font-semibold">{review.name}</p>
-              </Card>
-            ))}
-          </div>
+          ))}
         </div>
       </section>
     </div>
