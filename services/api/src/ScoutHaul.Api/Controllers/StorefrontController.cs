@@ -23,14 +23,33 @@ public sealed class StorefrontController(ScoutHaulDbContext db, ITenantContext t
 
     private async Task<bool> TryResolveStoreAsync(CancellationToken cancellationToken)
     {
-        var raw = Request.Headers[StoreHeader].FirstOrDefault();
-        if (!Guid.TryParse(raw, out var organizationId))
+        var raw = Request.Headers[StoreHeader].FirstOrDefault()?.Trim();
+        if (string.IsNullOrEmpty(raw))
         {
             return false;
         }
 
-        // Organizations is not org-scoped, so this lookup is allowed anonymously.
-        if (!await db.Organizations.AnyAsync(org => org.Id == organizationId, cancellationToken))
+        // The store is identified by its domain (e.g. "overhaultrading.com") so no org id
+        // is hardcoded in the storefront. A raw org id is still accepted for tooling/back-compat.
+        // Organizations is not org-scoped, so these lookups are allowed anonymously.
+        Guid organizationId;
+        if (Guid.TryParse(raw, out var id))
+        {
+            organizationId = await db.Organizations
+                .Where(org => org.Id == id)
+                .Select(org => org.Id)
+                .FirstOrDefaultAsync(cancellationToken);
+        }
+        else
+        {
+            var domain = NormalizeDomain(raw);
+            organizationId = await db.Organizations
+                .Where(org => org.StoreDomain != null && org.StoreDomain.ToLower() == domain)
+                .Select(org => org.Id)
+                .FirstOrDefaultAsync(cancellationToken);
+        }
+
+        if (organizationId == Guid.Empty)
         {
             return false;
         }
@@ -38,6 +57,18 @@ public sealed class StorefrontController(ScoutHaulDbContext db, ITenantContext t
         // Scopes every subsequent org-scoped query in this request to the resolved store.
         tenant.SetOrganization(organizationId);
         return true;
+    }
+
+    private static string NormalizeDomain(string value)
+    {
+        var domain = value.ToLowerInvariant();
+        if (domain.StartsWith("www.", StringComparison.Ordinal))
+        {
+            domain = domain[4..];
+        }
+
+        var colon = domain.IndexOf(':');
+        return colon >= 0 ? domain[..colon] : domain;
     }
 
     [HttpGet("listings")]

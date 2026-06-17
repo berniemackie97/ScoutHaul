@@ -2,14 +2,17 @@ import { createApiClient } from "@overhaul/api-client";
 
 export const STORE = {
   name: "Overhaul Trading Company",
-  /** This store's organization id, sent as X-ScoutHaul-Store on public reads. */
-  orgId: process.env.NEXT_PUBLIC_STORE_ORG_ID ?? "",
+  /**
+   * This store's public domain. Sent as X-ScoutHaul-Store; the API resolves the
+   * organization that owns this domain — no hardcoded org id anywhere.
+   */
+  domain: process.env.NEXT_PUBLIC_STORE_DOMAIN ?? "overhaultrading.com",
   apiBaseUrl: process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:5080",
 };
 
-export const liveCatalogEnabled = Boolean(STORE.orgId);
+export const liveCatalogEnabled = Boolean(STORE.domain);
 
-/** Typed public storefront client (anonymous, store resolved by header). */
+/** Typed public storefront client (anonymous; store resolved by domain header). */
 export function storefrontApi() {
-  return createApiClient({ baseUrl: STORE.apiBaseUrl, storeId: STORE.orgId });
+  return createApiClient({ baseUrl: STORE.apiBaseUrl, storeId: STORE.domain });
 }

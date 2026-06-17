@@ -74,7 +74,9 @@ public sealed class ScoutHaulDbContext(DbContextOptions<ScoutHaulDbContext> opti
         {
             entity.ToTable("Organizations");
             entity.Property(item => item.Name).HasMaxLength(200).IsRequired();
+            entity.Property(item => item.StoreDomain).HasMaxLength(253);
             entity.HasIndex(item => item.Name);
+            entity.HasIndex(item => item.StoreDomain).IsUnique();
         });
 
         modelBuilder.Entity<AppUser>(entity =>

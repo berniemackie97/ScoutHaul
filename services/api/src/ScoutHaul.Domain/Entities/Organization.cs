@@ -5,6 +5,14 @@ namespace ScoutHaul.Domain.Entities;
 public sealed class Organization : EntityBase
 {
     public required string Name { get; set; }
+
+    /// <summary>
+    /// Public storefront domain this organization owns (e.g. "overhaultrading.com").
+    /// When set, the public storefront API resolves this org by domain — no hardcoded
+    /// org id anywhere. Null = this org has no public storefront.
+    /// </summary>
+    public string? StoreDomain { get; set; }
+
     public ICollection<OrganizationMember> Members { get; set; } = [];
     public ICollection<OrganizationRoleDefinition> Roles { get; set; } = [];
     public ICollection<OrganizationTeam> Teams { get; set; } = [];
