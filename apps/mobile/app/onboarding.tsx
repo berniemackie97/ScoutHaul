@@ -144,7 +144,7 @@ export default function OnboardingScreen() {
           <Ionicons name="compass-outline" size={26} color={c.textInverse} />
         </View>
         <View style={styles.headerText}>
-          <Text variant="title">Set up ScoutHaul</Text>
+          <Text variant="title">Set up HaulScout</Text>
           <Text variant="caption" color={c.textMuted}>Workspace-first, account-optional.</Text>
         </View>
         <Pressable accessibilityRole="button" accessibilityLabel="Continue local" onPress={() => void finish(true)} hitSlop={8}>
@@ -460,7 +460,7 @@ function LaunchStep({
     <Card>
       <Text variant="subtitle">Launch Plan</Text>
       <Text variant="body">
-        ScoutHaul is ready to open the right workspace setup path for this account.
+        HaulScout is ready to open the right workspace setup path for this account.
       </Text>
       <View style={styles.launchList}>
         <LaunchRow

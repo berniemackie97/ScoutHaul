@@ -18,7 +18,7 @@ services:
   api:
     build:
       context: ./services/api
-      dockerfile: src/ScoutHaul.Api/Dockerfile
+      dockerfile: src/HaulScout.Api/Dockerfile
     depends_on:
       postgres:
         condition: service_healthy

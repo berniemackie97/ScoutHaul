@@ -1,4 +1,4 @@
-# ScoutHaul Mobile - Frontend UX Audit & Redesign
+# HaulScout Mobile - Frontend UX Audit & Redesign
 
 ## Round 1: Design System & Screen Redesign
 

@@ -3,7 +3,7 @@ import { createApiClient } from "@overhaul/api-client";
 export const STORE = {
   name: "Overhaul Trading Company",
   /**
-   * This store's public domain. Sent as X-ScoutHaul-Store; the API resolves the
+   * This store's public domain. Sent as X-HaulScout-Store; the API resolves the
    * organization that owns this domain — no hardcoded org id anywhere.
    */
   domain: process.env.NEXT_PUBLIC_STORE_DOMAIN ?? "overhaultrading.com",

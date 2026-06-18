@@ -1,4 +1,4 @@
-# ScoutHaul Frontend UX Audit
+# HaulScout Frontend UX Audit
 
 ## Major UX Problems Found
 

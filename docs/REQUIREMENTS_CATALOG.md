@@ -1,4 +1,4 @@
-# ScoutHaul + Overhaul Trading — Capability & Requirements Catalog
+# HaulScout + Overhaul Trading — Capability & Requirements Catalog
 
 > The complete "what this must become" — the acceptance criteria, captured so nothing is discovered too late. Companion to [PLATFORM_BLUEPRINT.md](PLATFORM_BLUEPRINT.md).
 >

@@ -1,13 +1,13 @@
-# ScoutHaul
+# HaulScout
 
-ScoutHaul is a cross-platform resale workflow MVP for scouting, manual comps, deal analysis, inventory, sourcing trips, budgets, listings, sales, tasks, offline drafts, and sync queue foundations.
+HaulScout is a cross-platform resale workflow MVP for scouting, manual comps, deal analysis, inventory, sourcing trips, budgets, listings, sales, tasks, offline drafts, and sync queue foundations.
 
 The app is intentionally not an AI app. It does not use paid AI services, marketplace scraping, Azure-only hosting, or fabricated pricing.
 
 ## Structure
 
 ```text
-ScoutHaul/
+HaulScout/
   apps/mobile                 Expo React Native app
   services/api                ASP.NET Core Web API solution
   services/api/db/seed        External SQL seed scripts
@@ -30,7 +30,7 @@ Local configuration examples:
 Run locally with Docker:
 
 ```bash
-cd /Volumes/EnderChest/Development/Repos/DotNet/Apps/ScoutHaul
+cd /Volumes/EnderChest/Development/Repos/DotNet/Apps/HaulScout
 docker compose up --build
 ```
 
@@ -44,7 +44,7 @@ Then open:
 Run the API directly against the Docker database:
 
 ```bash
-cd services/api/src/ScoutHaul.Api
+cd services/api/src/HaulScout.Api
 dotnet run
 ```
 
@@ -54,14 +54,14 @@ Run backend tests:
 
 ```bash
 cd services/api
-dotnet test ScoutHaul.slnx
+dotnet test HaulScout.slnx
 ```
 
 Build all backend projects:
 
 ```bash
 cd services/api
-dotnet build ScoutHaul.slnx
+dotnet build HaulScout.slnx
 ```
 
 Create a migration:
@@ -69,8 +69,8 @@ Create a migration:
 ```bash
 cd services/api
 dotnet ef migrations add MigrationName \
-  --project src/ScoutHaul.Infrastructure/ScoutHaul.Infrastructure.csproj \
-  --startup-project src/ScoutHaul.Api/ScoutHaul.Api.csproj \
+  --project src/HaulScout.Infrastructure/HaulScout.Infrastructure.csproj \
+  --startup-project src/HaulScout.Api/HaulScout.Api.csproj \
   --output-dir Persistence/Migrations
 ```
 
@@ -84,7 +84,7 @@ Requirements:
 Run:
 
 ```bash
-cd /Volumes/EnderChest/Development/Repos/DotNet/Apps/ScoutHaul/apps/mobile
+cd /Volumes/EnderChest/Development/Repos/DotNet/Apps/HaulScout/apps/mobile
 npm install
 EXPO_PUBLIC_API_BASE_URL=http://localhost:5080 npx expo start
 ```
@@ -104,7 +104,7 @@ npm run typecheck
 Build a local Android APK for closed beta device testing:
 
 ```bash
-cd /Volumes/EnderChest/Development/Repos/DotNet/Apps/ScoutHaul/apps/mobile
+cd /Volumes/EnderChest/Development/Repos/DotNet/Apps/HaulScout/apps/mobile
 npm install
 npx eas login
 npx eas build:configure
@@ -135,8 +135,8 @@ The Docker image includes the `org.opencontainers.image.source` label so GHCR ca
 
 Development still supports stub auth for local smoke tests:
 
-- `X-ScoutHaul-Organization-Id`
-- `X-ScoutHaul-User-Id`
+- `X-HaulScout-Organization-Id`
+- `X-HaulScout-User-Id`
 
 Real sign-in uses Supabase Auth for cross-platform mobile/web sessions. Configure the mobile app with your Supabase project values:
 
@@ -154,7 +154,7 @@ Authentication__Supabase__Audience=authenticated
 # Authentication__Supabase__JwtSecret=your-supabase-jwt-secret
 ```
 
-Supabase owns authentication sessions. ScoutHaul owns organizations, teams, roles, permissions, inventory, routes, budgets, and billing state. When `StubAuth__DefaultOrganizationId` is present, development requests can still fall back to stub headers, but a valid Supabase bearer token takes precedence.
+Supabase owns authentication sessions. HaulScout owns organizations, teams, roles, permissions, inventory, routes, budgets, and billing state. When `StubAuth__DefaultOrganizationId` is present, development requests can still fall back to stub headers, but a valid Supabase bearer token takes precedence.
 
 ## Offline Rules
 
@@ -169,7 +169,7 @@ Offline mode does not create live market recommendations. A deal analysis requir
 
 ## Marketplace Rules
 
-ScoutHaul does not embed marketplace scraping or navigation flows in the app. Barcode scans run through configured product identity providers, then optional pricing providers such as PriceCharting, Keepa, SerpApi Google Shopping, and eBay Browse. When provider data is unavailable, ScoutHaul still generates external search links for eBay, Facebook Marketplace, Google, Google Shopping, Amazon, Whatnot, Mercari, and Craigslist so the user can capture manual comps.
+HaulScout does not embed marketplace scraping or navigation flows in the app. Barcode scans run through configured product identity providers, then optional pricing providers such as PriceCharting, Keepa, SerpApi Google Shopping, and eBay Browse. When provider data is unavailable, HaulScout still generates external search links for eBay, Facebook Marketplace, Google, Google Shopping, Amazon, Whatnot, Mercari, and Craigslist so the user can capture manual comps.
 
 Active listing prices are never treated as sold prices. Provider estimates are saved as `Estimate` observations and can be used as a cached fallback only when sold comps are unavailable. Every comp has a type such as `Sold`, `ActiveListing`, `ManualSold`, `ManualActive`, `InternalSale`, `Estimate`, or `Unknown`. Recommendations expose a pricing basis such as `LiveValidated`, `CachedRecent`, `CachedStale`, `ManualEstimate`, `InternalHistory`, or `Unavailable`.
 
@@ -190,14 +190,14 @@ Active listing prices are never treated as sold prices. Provider estimates are s
 Validated locally:
 
 ```bash
-cd services/api && dotnet build ScoutHaul.slnx
-cd services/api && dotnet test ScoutHaul.slnx
-cd services/api && dotnet format ScoutHaul.slnx --verify-no-changes --verbosity minimal
-cd services/api && dotnet list ScoutHaul.slnx package --vulnerable --include-transitive
+cd services/api && dotnet build HaulScout.slnx
+cd services/api && dotnet test HaulScout.slnx
+cd services/api && dotnet format HaulScout.slnx --verify-no-changes --verbosity minimal
+cd services/api && dotnet list HaulScout.slnx package --vulnerable --include-transitive
 cd apps/mobile && npm run typecheck
 cd apps/mobile && npx expo-doctor@latest
 cd apps/mobile && npm audit --audit-level=high
-docker build -f services/api/src/ScoutHaul.Api/Dockerfile services/api
+docker build -f services/api/src/HaulScout.Api/Dockerfile services/api
 docker compose config
 docker compose up -d --build
 curl -fsS http://localhost:5080/health

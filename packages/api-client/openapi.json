@@ -1,7 +1,7 @@
 {
   "openapi": "3.0.4",
   "info": {
-    "title": "ScoutHaul.Api, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null",
+    "title": "HaulScout.Api, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null",
     "version": "1.0"
   },
   "paths": {
@@ -266,6 +266,18 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/": {
+      "get": {
+        "tags": [
+          "HaulScout.Api, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
           }
         }
       }
@@ -3305,18 +3317,6 @@
                 }
               }
             }
-          }
-        }
-      }
-    },
-    "/": {
-      "get": {
-        "tags": [
-          "ScoutHaul.Api, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
           }
         }
       }
@@ -8564,6 +8564,9 @@
       "name": "Dashboard"
     },
     {
+      "name": "HaulScout.Api, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+    },
+    {
       "name": "Inventory"
     },
     {
@@ -8589,9 +8592,6 @@
     },
     {
       "name": "Sales"
-    },
-    {
-      "name": "ScoutHaul.Api, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
     },
     {
       "name": "Session"

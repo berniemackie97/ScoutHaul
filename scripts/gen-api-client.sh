@@ -9,10 +9,10 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 API_DIR="$ROOT/services/api"
-DLL="src/ScoutHaul.Api/bin/Debug/net10.0/ScoutHaul.Api.dll"
+DLL="src/HaulScout.Api/bin/Debug/net10.0/HaulScout.Api.dll"
 
 echo "==> Building API"
-dotnet build "$API_DIR/src/ScoutHaul.Api/ScoutHaul.Api.csproj" -v q --nologo
+dotnet build "$API_DIR/src/HaulScout.Api/HaulScout.Api.csproj" -v q --nologo
 
 echo "==> Emitting OpenAPI document"
 cd "$API_DIR"

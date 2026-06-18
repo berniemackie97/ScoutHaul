@@ -1,22 +1,22 @@
-# ScoutHaul Platform Blueprint
+# HaulScout Platform Blueprint
 
-> Authoritative architecture + execution plan for unifying **ScoutHaul** (the company's internal resale/inventory engine + API) and **Overhaul Trading** (the company's public storefront brand) into one enterprise-grade platform, sharing one inventory.
+> Authoritative architecture + execution plan for unifying **HaulScout** (the company's internal resale/inventory engine + API) and **Overhaul Trading** (the company's public storefront brand) into one enterprise-grade platform, sharing one inventory.
 >
 > Status: **APPROVED — internal-tool scope** · Owner: berniedev · Last updated: 2026-06-14
 >
 > This document is the single source of truth for **architecture**. The exhaustive feature/acceptance spec lives in [REQUIREMENTS_CATALOG.md](REQUIREMENTS_CATALOG.md). Every phase below maps to a tracked task. Do not start a phase before its predecessor's exit criteria are met.
 >
-> **⚠️ SCOPE (2026-06-14):** ScoutHaul is an **internal tool/component for the company**, not a public SaaS — no public tenant onboarding, no self-serve billing, no Stripe Connect, no SaaS marketing site for now. The company runs **one** Overhaul Trading storefront. The multi-tenant infrastructure already in the codebase (`Organization`, `IOrganizationScoped`, RBAC) is **kept as-is** — it costs nothing, prevents data-scoping bugs, and leaves the public-SaaS door open later (parked Phase 11). We build the company's own stack first.
+> **⚠️ SCOPE (2026-06-14):** HaulScout is an **internal tool/component for the company**, not a public SaaS — no public tenant onboarding, no self-serve billing, no Stripe Connect, no SaaS marketing site for now. The company runs **one** Overhaul Trading storefront. The multi-tenant infrastructure already in the codebase (`Organization`, `IOrganizationScoped`, RBAC) is **kept as-is** — it costs nothing, prevents data-scoping bugs, and leaves the public-SaaS door open later (parked Phase 11). We build the company's own stack first.
 
 ---
 
 ## 0. TL;DR — what we're building
 
-One backend (the existing **.NET 10 ScoutHaul API**) is the system of record for everything. The web apps from OverhaulTrading are **salvaged for UI, repointed at that API, and their Prisma DB / Clerk / tRPC data layers are retired.** Auth consolidates on **Supabase** (already wired into the backend). Everything lives in **one polyglot monorepo**. The multi-tenant data model stays in place (dormant) so the public-SaaS door is open later, but current scope is **the company's own single store** — we build Overhaul Trading's storefront + admin + command center on the shared inventory. Public SaaS onboarding is parked (Phase 11).
+One backend (the existing **.NET 10 HaulScout API**) is the system of record for everything. The web apps from OverhaulTrading are **salvaged for UI, repointed at that API, and their Prisma DB / Clerk / tRPC data layers are retired.** Auth consolidates on **Supabase** (already wired into the backend). Everything lives in **one polyglot monorepo**. The multi-tenant data model stays in place (dormant) so the public-SaaS door is open later, but current scope is **the company's own single store** — we build Overhaul Trading's storefront + admin + command center on the shared inventory. Public SaaS onboarding is parked (Phase 11).
 
 ```
                          ┌────────────────────────────────────────────────┐
-                         │     Company Platform — ScoutHaul + Overhaul     │
+                         │     Company Platform — HaulScout + Overhaul     │
                          └────────────────────────────────────────────────┘
 
   SURFACES (presentation only)                       CORE (system of record)
@@ -24,7 +24,7 @@ One backend (the existing **.NET 10 ScoutHaul API**) is the system of record for
   📱 Mobile (Expo)          ─┐
      sourcing / scanning     │
                              │      OpenAPI typed client      ┌───────────────────────────┐
-  🛍  Storefront (Next)      ─┼──────────  HTTPS/JSON  ───────▶│   ScoutHaul.Api (.NET 10) │
+  🛍  Storefront (Next)      ─┼──────────  HTTPS/JSON  ───────▶│   HaulScout.Api (.NET 10) │
      overhaultrading.com      │                                │   modular monolith        │
      public store            │                                │   ┌─────────────────────┐ │
                              │                                │   │ Sourcing  Inventory │ │
@@ -48,17 +48,17 @@ One backend (the existing **.NET 10 ScoutHaul API**) is the system of record for
 
 | # | Decision | Choice | Rationale |
 |---|----------|--------|-----------|
-| D1 | Business model | **ScoutHaul = internal back-office/engine for the company; Overhaul Trading = the company's public storefront brand.** Not a public SaaS for now. | Confirmed by you (2026-06-14). `Organization`/`IOrganizationScoped` infra stays dormant for future-proofing; one active org. |
+| D1 | Business model | **HaulScout = internal back-office/engine for the company; Overhaul Trading = the company's public storefront brand.** Not a public SaaS for now. | Confirmed by you (2026-06-14). `Organization`/`IOrganizationScoped` infra stays dormant for future-proofing; one active org. |
 | D2 | System of record | Single **.NET API + one Postgres** | Confirmed. Clean architecture + mature RBAC already exist. Avoids two ORMs fighting one schema. |
 | D3 | OverhaulTrading fate | **Salvage UI, retire data layer.** Prisma → reference spec; Clerk/tRPC removed | Next.js storefront/admin UI is real work worth keeping; its Postgres/Prisma duplicates the source of truth. |
 | D4 | Auth | **Supabase** everywhere | Backend already validates Supabase JWTs. Free to 50k MAU. Adding Clerk = a second auth system to pay for and maintain. |
-| D5 | Repo | **One polyglot monorepo** (fold web into ScoutHaul) | Detailed in §11. Atomic API+client+UI changes; shared design system; solo/small-team coordination cost of multi-repo not justified yet. |
+| D5 | Repo | **One polyglot monorepo** (fold web into HaulScout) | Detailed in §11. Atomic API+client+UI changes; shared design system; solo/small-team coordination cost of multi-repo not justified yet. |
 | D6 | Storefront vs Admin | **Separate deployables**, unified at data/auth layer | Opposite security/caching/SEO/audience profiles. Roles govern *within* admin, not storefront-vs-admin. |
 | D7 | Product model | Storefront product = **projection of `InventoryItem` + a `StoreListing`**, not a new table | `InventoryItem` already carries the full resale lifecycle and `OrganizationId`. |
 | D8 | API style | **REST + OpenAPI**, typed TS client generated | Cross-language (C#↔TS) means contract-over-codegen, not shared types. Drop tRPC. |
-| D9 | Sequencing | **Company-stack-first; SaaS parked** | Ship the company's own storefront + admin + command center. Keep multi-tenant seams dormant; don't build public onboarding/billing until/unless ScoutHaul goes public (Phase 11, parked). |
-| D10 | Domains | `overhaultrading.com` = storefront; admin on `admin.overhaultrading.com` | No scouthaul.com needed — ScoutHaul is internal, not a marketed product. |
-| D11 | Repo merge | **Copy** OverhaulTrading web apps/packages into ScoutHaul | OverhaulTrading has **no git commits** (loose files) — there's no history to subtree-merge. Copy in, keep the original as a backup until the monorepo builds, then delete. |
+| D9 | Sequencing | **Company-stack-first; SaaS parked** | Ship the company's own storefront + admin + command center. Keep multi-tenant seams dormant; don't build public onboarding/billing until/unless HaulScout goes public (Phase 11, parked). |
+| D10 | Domains | `overhaultrading.com` = storefront; admin on `admin.overhaultrading.com` | No scouthaul.com needed — HaulScout is internal, not a marketed product. |
+| D11 | Repo merge | **Copy** OverhaulTrading web apps/packages into HaulScout | OverhaulTrading has **no git commits** (loose files) — there's no history to subtree-merge. Copy in, keep the original as a backup until the monorepo builds, then delete. |
 | D12 | Pawn/lending | **Out of scope**, gated to compliance review (Phase 12) | Regulated; not v1. |
 | D13 | Images | **Object storage + CDN from the start** (not a late migration) | Storefront LCP<2s needs CDN images; serving `bytea` from the API to a public store is slow/expensive. Moved into Phase 3. |
 | D14 | Customer auth | **Two Supabase projects** — operators (invite-only) vs customers (open signup) | Keeps a public-signup pool from ever touching privileged operator identities. Free tier allows 2 projects. |
@@ -77,7 +77,7 @@ One backend (the existing **.NET 10 ScoutHaul API**) is the system of record for
   - `overhaultrading.com` → resolves to the Overhaul Trading org.
   - The host→tenant seam is built now (cheap, keeps the model honest); multi-store wildcard/custom-domain automation is parked (Phase 11).
   - Host→tenant resolution happens in Next.js middleware; the resolved tenant id is sent to the API, which still authorizes independently (never trust the host alone).
-- **Company/brand pages** (`/about`, etc.) for Overhaul Trading live **inside the storefront app** — they are the store's brand. (A separate ScoutHaul SaaS marketing site is parked, Phase 11.)
+- **Company/brand pages** (`/about`, etc.) for Overhaul Trading live **inside the storefront app** — they are the store's brand. (A separate HaulScout SaaS marketing site is parked, Phase 11.)
 
 ---
 
@@ -89,8 +89,8 @@ One backend (the existing **.NET 10 ScoutHaul API**) is the system of record for
 | Storefront | Next.js 15 (App Router, RSC, ISR) | Public + customers | Supabase (customer pop.) | Per-tenant, SEO-critical, CDN-cached. `overhaultrading.com`. |
 | Admin | Next.js 15 (App Router, mostly client/data-dense) | Operators/staff | Supabase (operator pop.) | RBAC-gated back-office. `admin.overhaultrading.com`. |
 | Command Center | A tier **inside Admin** (role-gated), split out only if needed | Owner/Manager | Supabase | Real-time ops cockpit: live orders, KPIs, sourcing pipeline, channel health, alerts. |
-| ~~Platform Admin~~ | — | — | — | **Parked** — only if ScoutHaul ever goes public (Phase 11). |
-| ~~Marketing (SaaS)~~ | — | — | — | **Parked** — no scouthaul.com needed; ScoutHaul is internal. |
+| ~~Platform Admin~~ | — | — | — | **Parked** — only if HaulScout ever goes public (Phase 11). |
+| ~~Marketing (SaaS)~~ | — | — | — | **Parked** — no scouthaul.com needed; HaulScout is internal. |
 
 **Command Center clarification:** it is *not* a separate product — it's the high-signal overview layer of Admin (think "mission control" home screen + real-time widgets). Building it as a separate app now would duplicate auth/data/deploy for no gain.
 
@@ -205,7 +205,7 @@ A unique item (qty 1) can be published to the **own storefront** *and* **eBay** 
 
 ## 11. Repo strategy — final: one polyglot monorepo
 
-**Decision: fold the web apps into the ScoutHaul repo as a single monorepo.** Reasoning (you asked me to choose the long-term best):
+**Decision: fold the web apps into the HaulScout repo as a single monorepo.** Reasoning (you asked me to choose the long-term best):
 
 - **The contract seam wins.** A backend endpoint change, the regenerated TS client, and the UI that consumes it land in **one type-checked PR**. Split repos make this a multi-PR, version-bump dance — the single biggest source of integration bugs, for zero benefit at your team size.
 - **Shared TS across web + mobile.** Design system, API client, domain enums (mirrored from C#) are shared once. OverhaulTrading already proves pnpm + Turbo works here.
@@ -215,7 +215,7 @@ A unique item (qty 1) can be published to the **own storefront** *and* **eBay** 
 
 ### Target layout
 ```
-ScoutHaul/
+HaulScout/
   apps/
     mobile/                 # Expo (existing, moved under apps/ — already there)
     storefront/             # Next.js public store (from OverhaulTrading/apps/storefront)
@@ -240,7 +240,7 @@ ScoutHaul/
 
 ### Tooling
 - pnpm workspaces + Turbo for TS (build/lint/test/type-check + affected-graph).
-- .NET CLI for `services/api` (`dotnet build/test ScoutHaul.slnx`).
+- .NET CLI for `services/api` (`dotnet build/test HaulScout.slnx`).
 - CI = two lanes (TS via Turbo, .NET via dotnet) + a contract-check job (regenerate client, fail if drift).
 
 ---
@@ -278,7 +278,7 @@ Recommendation: develop on **Scrappy**, flip to **Supabase Pro** the day Overhau
 Each phase has **exit criteria**. Don't advance until met. These map 1:1 to the task list.
 
 **Phase 0 — Foundation & decisions (this doc).**
-Exit: blueprint approved; open decisions in §15 answered; monorepo skeleton bootstrapped (pnpm/turbo at ScoutHaul root, web apps moved in, builds green side-by-side with .NET).
+Exit: blueprint approved; open decisions in §15 answered; monorepo skeleton bootstrapped (pnpm/turbo at HaulScout root, web apps moved in, builds green side-by-side with .NET).
 
 **Phase 1 — Security & tenancy hardening.**
 EF global query filters on all `IOrganizationScoped` entities; auto-set `OrganizationId` on insert; rotate the committed Supabase secret; customer-vs-operator claim split; tenant-isolation tests.
@@ -321,7 +321,7 @@ Backfill any remaining legacy `bytea` photos to object storage; per-tenant/endpo
 Exit: no image bytes left in Postgres; observability dashboards live; load test passes target throughput.
 
 **Phase 11 — Public SaaS (PARKED — out of current scope).**
-Only if ScoutHaul is later opened to outside resellers. Tenant self-onboarding; Stripe Connect; platform super-admin; billing/subscriptions; wildcard + custom-domain automation; marketing site. Multi-tenant seams already in place make this additive later.
+Only if HaulScout is later opened to outside resellers. Tenant self-onboarding; Stripe Connect; platform super-admin; billing/subscriptions; wildcard + custom-domain automation; marketing site. Multi-tenant seams already in place make this additive later.
 
 **Phase 12 — Lending/Pawn (GATED).**
 Only after legal/compliance review. Out of default scope.
@@ -330,12 +330,12 @@ Only after legal/compliance review. Out of default scope.
 
 ## 15. Business decisions — RESOLVED (2026-06-14)
 
-1. **Scope** — ScoutHaul is an **internal company tool**, not public SaaS. SaaS surfaces parked (Phase 11).
+1. **Scope** — HaulScout is an **internal company tool**, not public SaaS. SaaS surfaces parked (Phase 11).
 2. **SaaS domain** — none needed. Admin → `admin.overhaultrading.com`.
 3. **Payments** — Stripe single-account (the company's) + Stripe Tax. Connect parked with Phase 11.
 4. **Hosting** — start Scrappy (Cloudflare/Fly + Supabase Free), flip to Supabase Pro at first real order.
 5. **Pawn/lending** — **out**, gated to Phase 12 (compliance-first).
-6. **Repo merge** — copy into ScoutHaul (OverhaulTrading has **no git history** — nothing to subtree-merge); leave OverhaulTrading in place as a backup until the monorepo builds, then delete.
+6. **Repo merge** — copy into HaulScout (OverhaulTrading has **no git history** — nothing to subtree-merge); leave OverhaulTrading in place as a backup until the monorepo builds, then delete.
 
 Remaining low-stakes defaults (proceeding unless you object): object storage = Supabase Storage; API client codegen = `openapi-typescript` + `openapi-fetch`; transactional email = Resend/Postmark; search = Postgres FTS → Typesense; CI = Turbo lane + .NET lane + contract-drift check + a **staging environment** before prod.
 

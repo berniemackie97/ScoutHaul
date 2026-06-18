@@ -168,7 +168,7 @@ export function WorkspaceAdminScreen() {
           </View>
         )}
         <Divider />
-        <TextField label="New organization" value={organizationName} onChangeText={setOrganizationName} placeholder="ScoutHaul Resale Co." />
+        <TextField label="New organization" value={organizationName} onChangeText={setOrganizationName} placeholder="HaulScout Resale Co." />
         <Button
           label={isCreatingOrg ? 'Creating...' : 'Create Organization'}
           icon="business-outline"

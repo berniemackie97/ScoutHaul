@@ -46,21 +46,21 @@ jobs:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
       - name: Restore
-        run: dotnet restore services/api/ScoutHaul.slnx
+        run: dotnet restore services/api/HaulScout.slnx
 
       - name: Format check
         working-directory: services/api
-        run: dotnet format ScoutHaul.slnx --verify-no-changes --verbosity minimal
+        run: dotnet format HaulScout.slnx --verify-no-changes --verbosity minimal
 
       - name: Build
-        run: dotnet build services/api/ScoutHaul.slnx --configuration Release --no-restore -warnaserror
+        run: dotnet build services/api/HaulScout.slnx --configuration Release --no-restore -warnaserror
 
       - name: Test
-        run: dotnet test services/api/ScoutHaul.slnx --configuration Release --no-build
+        run: dotnet test services/api/HaulScout.slnx --configuration Release --no-build
 
       - name: NuGet vulnerability audit
         working-directory: services/api
-        run: dotnet list ScoutHaul.slnx package --vulnerable --include-transitive
+        run: dotnet list HaulScout.slnx package --vulnerable --include-transitive
 
   mobile:
     name: Mobile
@@ -112,7 +112,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: services/api
-          file: services/api/src/ScoutHaul.Api/Dockerfile
+          file: services/api/src/HaulScout.Api/Dockerfile
           load: true
           push: false
           tags: scouthaul-api:ci
@@ -151,7 +151,7 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
-            org.opencontainers.image.description=ScoutHaul ASP.NET Core API
+            org.opencontainers.image.description=HaulScout ASP.NET Core API
           tags: |
             type=ref,event=branch
             type=ref,event=tag
@@ -171,7 +171,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: services/api
-          file: services/api/src/ScoutHaul.Api/Dockerfile
+          file: services/api/src/HaulScout.Api/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

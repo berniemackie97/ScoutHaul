@@ -28,7 +28,7 @@ export function AccountHeader({ title, topInset }: AccountHeaderProps) {
             <Ionicons name="compass" size={20} color={c.primary} />
           </View>
           <Text variant="bodyBold" color={c.textInverse} style={styles.logoText}>
-            ScoutHaul
+            HaulScout
           </Text>
         </View>
         <Text variant="title" color={c.textInverse} style={styles.heroTitle}>

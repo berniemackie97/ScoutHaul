@@ -40,7 +40,7 @@ async function buildHeaders(includeContentType = true): Promise<Record<string, s
   }
 
   if (activeOrganizationId) {
-    headers['X-ScoutHaul-Organization-Id'] = activeOrganizationId;
+    headers['X-HaulScout-Organization-Id'] = activeOrganizationId;
   }
 
   return headers;

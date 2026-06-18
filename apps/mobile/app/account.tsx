@@ -281,7 +281,7 @@ export default function AccountScreen() {
               <View style={styles.logoMark}>
                 <Ionicons name="compass" size={20} color={c.primary} />
               </View>
-              <Text variant="bodyBold" color="#FFFFFF" style={styles.logoText}>ScoutHaul</Text>
+              <Text variant="bodyBold" color="#FFFFFF" style={styles.logoText}>HaulScout</Text>
             </View>
             <Text variant="title" color="#FFFFFF" style={styles.heroTitle}>Your Account</Text>
           </View>
@@ -381,7 +381,7 @@ export default function AccountScreen() {
               <Ionicons name="compass" size={20} color={c.primary} />
             </View>
             <Text variant="bodyBold" color="#FFFFFF" style={styles.logoText}>
-              ScoutHaul
+              HaulScout
             </Text>
           </View>
           <Text variant="title" color="#FFFFFF" style={styles.heroTitle}>
