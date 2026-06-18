@@ -17,7 +17,8 @@ public sealed class SessionController(ScoutHaulDbContext db, ICurrentUserContext
         await currentUser.ResolveAsync();
 
         Guid userId = currentUser.UserId;
-        Guid organizationId = currentUser.OrganizationId;
+        // Null when the user is org-less (onboarding). Org-scoped counts then naturally come back 0.
+        Guid? organizationId = currentUser.ActiveOrganizationId;
 
         // EF Core DbContext not thread-safe — sequential queries
         var user = await db.Users.SingleAsync(item => item.Id == userId, cancellationToken);

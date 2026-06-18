@@ -4844,7 +4844,7 @@ export interface components {
             user?: components["schemas"]["SessionUserDto"];
             organizations?: components["schemas"]["OrganizationDto"][] | null;
             /** Format: uuid */
-            selectedOrganizationId?: string;
+            selectedOrganizationId?: string | null;
             remoteCounts?: components["schemas"]["SessionRemoteCountsDto"];
             /** Format: date-time */
             serverTime?: string;

@@ -13,7 +13,9 @@ public sealed class JwtCurrentUserContext(IHttpContextAccessor httpContextAccess
     private ResolvedUserContext? resolved;
 
     public Guid OrganizationId => resolved?.OrganizationId
-        ?? throw new InvalidOperationException("ResolveAsync must be called before accessing OrganizationId.");
+        ?? throw new InvalidOperationException("The current user has no active organization. Create or join one first.");
+
+    public Guid? ActiveOrganizationId => resolved?.OrganizationId;
 
     public Guid UserId => resolved?.UserId
         ?? throw new InvalidOperationException("ResolveAsync must be called before accessing UserId.");
@@ -44,11 +46,14 @@ public sealed class JwtCurrentUserContext(IHttpContextAccessor httpContextAccess
 
         AppUser appUser = await ResolveUserAsync(externalSubject, email, displayName);
         Guid? requestedOrganizationId = ReadGuidHeader(OrganizationHeader);
-        OrganizationMember membership = await ResolveMembershipAsync(appUser, requestedOrganizationId);
+        OrganizationMember? membership = await ResolveMembershipAsync(appUser, requestedOrganizationId);
 
         await db.SaveChangesAsync();
-        tenant.SetOrganization(membership.OrganizationId);
-        resolved = new ResolvedUserContext(membership.OrganizationId, appUser.Id);
+        if (membership is not null)
+        {
+            tenant.SetOrganization(membership.OrganizationId);
+        }
+        resolved = new ResolvedUserContext(membership?.OrganizationId, appUser.Id);
     }
 
     private async Task<AppUser> ResolveUserAsync(string externalSubject, string email, string displayName)
@@ -101,7 +106,7 @@ public sealed class JwtCurrentUserContext(IHttpContextAccessor httpContextAccess
         return appUser;
     }
 
-    private async Task<OrganizationMember> ResolveMembershipAsync(AppUser appUser, Guid? requestedOrganizationId)
+    private async Task<OrganizationMember?> ResolveMembershipAsync(AppUser appUser, Guid? requestedOrganizationId)
     {
         if (requestedOrganizationId is not null)
         {
@@ -121,27 +126,10 @@ public sealed class JwtCurrentUserContext(IHttpContextAccessor httpContextAccess
             .OrderBy(item => item.JoinedAt)
             .FirstOrDefaultAsync();
 
-        if (existingMembership is not null)
-        {
-            return existingMembership;
-        }
-
-        var organization = new Organization { Name = $"{appUser.DisplayName}'s workspace" };
-        OrganizationRoleDefinition ownerRole = OrganizationRoleDefaults.CreateOwnerRole(organization.Id);
-        OrganizationRoleDefinition operatorRole = OrganizationRoleDefaults.CreateOperatorRole(organization.Id);
-
-        var membership = new OrganizationMember
-        {
-            OrganizationId = organization.Id,
-            UserId = appUser.Id,
-            RoleId = ownerRole.Id,
-            Role = OrganizationRole.Owner
-        };
-
-        db.Organizations.Add(organization);
-        db.OrganizationRoles.AddRange(ownerRole, operatorRole);
-        db.OrganizationMembers.Add(membership);
-        return membership;
+        // No membership: the user is org-less and must onboard — create an organization
+        // (becoming Owner) or redeem an invite. We deliberately do NOT auto-create a personal
+        // workspace here; that was the source of the fragmented "name's workspace" orgs.
+        return existingMembership;
     }
 
     private static string? ReadClaim(ClaimsPrincipal? user, params string[] claimTypes)
@@ -182,5 +170,5 @@ public sealed class JwtCurrentUserContext(IHttpContextAccessor httpContextAccess
         return value.Length <= maxLength ? value : value[..maxLength];
     }
 
-    private sealed record ResolvedUserContext(Guid OrganizationId, Guid UserId);
+    private sealed record ResolvedUserContext(Guid? OrganizationId, Guid UserId);
 }

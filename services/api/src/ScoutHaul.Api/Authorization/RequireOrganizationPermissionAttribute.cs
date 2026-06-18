@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 using ScoutHaul.Api.Services;
 
@@ -18,7 +19,16 @@ public sealed class RequireOrganizationPermissionAttribute(string permission) : 
 
         var currentUser = context.HttpContext.RequestServices.GetRequiredService<ICurrentUserContext>();
         await currentUser.ResolveAsync();
+
+        // Org-less users (no membership yet) cannot touch org-scoped endpoints — they must
+        // onboard first (create an org or redeem an invite).
+        if (currentUser.ActiveOrganizationId is not Guid organizationId)
+        {
+            context.Result = new ForbidResult();
+            return;
+        }
+
         var access = context.HttpContext.RequestServices.GetRequiredService<OrganizationAccessService>();
-        await access.RequirePermission(currentUser.OrganizationId, permission, context.HttpContext.RequestAborted);
+        await access.RequirePermission(organizationId, permission, context.HttpContext.RequestAborted);
     }
 }

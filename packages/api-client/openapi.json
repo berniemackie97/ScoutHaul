@@ -7284,7 +7284,8 @@
           },
           "selectedOrganizationId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "nullable": true
           },
           "remoteCounts": {
             "$ref": "#/components/schemas/SessionRemoteCountsDto"

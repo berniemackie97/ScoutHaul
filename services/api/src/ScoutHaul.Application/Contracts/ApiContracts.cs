@@ -44,7 +44,7 @@ public sealed record SessionRemoteCountsDto(
 public sealed record SessionBootstrapDto(
     SessionUserDto User,
     IReadOnlyList<OrganizationDto> Organizations,
-    Guid SelectedOrganizationId,
+    Guid? SelectedOrganizationId,
     SessionRemoteCountsDto RemoteCounts,
     DateTimeOffset ServerTime);
 

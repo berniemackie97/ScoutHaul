@@ -15,6 +15,7 @@ public class StorePublishingTests
     private sealed class StubCurrentUser(Guid organizationId) : ICurrentUserContext
     {
         public Guid OrganizationId => organizationId;
+        public Guid? ActiveOrganizationId => organizationId;
         public Guid UserId { get; } = Guid.NewGuid();
         public Task ResolveAsync() => Task.CompletedTask;
     }
