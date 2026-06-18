@@ -2,5 +2,8 @@
 # Expo/Metro has its own resolution; it stays standalone with its own node_modules.
 packages:
   - "apps/storefront"
-  - "apps/admin"
+  # apps/admin is parked: it still runs on the retired tRPC/Prisma stack and is
+  # scheduled for a clean Phase 5 rebuild on the .NET API. Keeping it out of the
+  # workspace stops its dead deps (prisma generate) from breaking installs/deploys.
+  # - "apps/admin"
   - "packages/*"
