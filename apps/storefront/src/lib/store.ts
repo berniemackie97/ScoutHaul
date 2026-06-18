@@ -7,7 +7,7 @@ export const STORE = {
    * organization that owns this domain — no hardcoded org id anywhere.
    */
   domain: process.env.NEXT_PUBLIC_STORE_DOMAIN ?? "overhaultrading.com",
-  apiBaseUrl: process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:5080",
+  apiBaseUrl: process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://scouthaul-production.up.railway.app",
 };
 
 export const liveCatalogEnabled = Boolean(STORE.domain);
