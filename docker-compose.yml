@@ -23,10 +23,12 @@ services:
       postgres:
         condition: service_healthy
     # Secrets & provider keys (Gemini, Cloud Vision, etc.) come from services/api/.env
-    # which is gitignored. The explicit `environment:` block below overrides any
+    # which is gitignored. Optional: absent in CI, where the `environment:` block below
+    # supplies everything the smoke test needs. The explicit block also overrides any
     # overlapping keys with container-network-correct values (e.g. Postgres host).
     env_file:
-      - ./services/api/.env
+      - path: ./services/api/.env
+        required: false
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_HTTP_PORTS: 8080
