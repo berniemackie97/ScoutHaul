@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  transpilePackages: ["@overhaul/ui", "@overhaul/api", "@overhaul/database"],
+  transpilePackages: ["@overhaul/ui", "@overhaul/api-client"],
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "**.r2.cloudflarestorage.com" },
