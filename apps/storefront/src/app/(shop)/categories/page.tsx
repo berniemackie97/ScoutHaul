@@ -1,71 +1,30 @@
-"use client";
-
 import Link from "next/link";
-import { Package, ArrowRight } from "lucide-react";
-import { Card, CardContent, Badge } from "@overhaul/ui";
-import { trpc } from "@/lib/trpc";
+import { getCategories } from "@/lib/catalog";
 
-const categoryIcons: Record<string, string> = {
-  furniture: "🪑",
-  electronics: "📱",
-  collectibles: "🏆",
-  household: "🏠",
-  "sporting-goods": "⚽",
-  "tools-equipment": "🔧",
-};
+export const metadata = { title: "Categories" };
 
-export default function CategoriesPage() {
-  const { data: categories, isLoading } = trpc.products.categories.useQuery();
-
+export default async function CategoriesPage() {
+  const categories = await getCategories();
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold">Shop by Category</h1>
-        <p className="text-muted-foreground mt-1">
-          Browse our curated collection organized by category
-        </p>
+    <div className="mx-auto max-w-7xl px-6 py-12">
+      <div className="border-b border-rule pb-6">
+        <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-copper">Browse</p>
+        <h1 className="mt-2 font-heading text-4xl font-semibold tracking-tight text-ink">Categories</h1>
       </div>
-
-      {isLoading ? (
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="h-48 bg-muted rounded-xl animate-pulse" />
-          ))}
-        </div>
-      ) : (
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {categories?.map((cat) => (
-            <Link key={cat.id} href={`/categories/${cat.slug}`}>
-              <Card className="group hover:shadow-lg transition-all hover:border-brand-300 h-full">
-                <CardContent className="p-6 flex flex-col h-full">
-                  <div className="text-4xl mb-4">{categoryIcons[cat.slug] ?? "📦"}</div>
-                  <h2 className="text-xl font-bold mb-2 group-hover:text-brand-600 transition-colors">
-                    {cat.name}
-                  </h2>
-                  {cat.description && (
-                    <p className="text-sm text-muted-foreground mb-4 flex-1">{cat.description}</p>
-                  )}
-                  <div className="flex items-center justify-between mt-auto pt-4">
-                    <Badge variant="secondary">
-                      {cat._count.products} {cat._count.products === 1 ? "item" : "items"}
-                    </Badge>
-                    <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-brand-600 transition-colors" />
-                  </div>
-                  {cat.children.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 mt-3 pt-3 border-t">
-                      {cat.children.map((child) => (
-                        <Badge key={child.id} variant="outline" className="text-xs">
-                          {child.name}
-                        </Badge>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </Link>
-          ))}
-        </div>
-      )}
+      <div className="mt-8 grid grid-cols-2 gap-px bg-rule md:grid-cols-3 lg:grid-cols-4">
+        {categories.map((category) => (
+          <Link
+            key={category.slug}
+            href={`/products?category=${category.slug}`}
+            className="group flex flex-col gap-2 bg-background p-6 transition-colors hover:bg-surface"
+          >
+            <span className="font-mono text-[11px] uppercase tracking-wider text-slate/70">
+              {String(category.count).padStart(2, "0")} items
+            </span>
+            <span className="font-heading text-xl font-medium text-ink group-hover:text-copper">{category.name}</span>
+          </Link>
+        ))}
+      </div>
     </div>
   );
 }
