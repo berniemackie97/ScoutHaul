@@ -1,20 +1,30 @@
 import Link from "next/link";
-import { ArrowRight, ShieldCheck, Tag, Truck, Recycle, Wrench, HandCoins } from "lucide-react";
+import { ArrowRight, ArrowUpRight, BadgeCheck } from "lucide-react";
 import { ProductCard } from "@/components/store/product-card";
+import { Reveal } from "@/components/ui/reveal";
 import { getListings, getCategories } from "@/lib/catalog";
 
-const valueProps = [
-  { icon: ShieldCheck, title: "Inspected & honest", body: "Every item tested and described as-is. Condition is in every listing — never buried." },
-  { icon: Tag, title: "Sourced & priced fair", body: "Estate sales, liquidation, smart buys. Typically 50–60% below retail." },
-  { icon: Truck, title: "Ships fast · local pickup", body: "Quick dispatch nationwide. Pickup available here in Bradenton." },
-  { icon: Recycle, title: "A second life", body: "Quality goods kept in use. Better for your wallet, better for the planet." },
+const principles = [
+  { title: "Inspected & honest", body: "Every item tested and described as-is. The condition is in the listing — never buried." },
+  { title: "Sourced & priced fair", body: "Estate sales, liquidation, smart buys. Typically 50–60% below retail." },
+  { title: "Ships fast · local pickup", body: "Quick dispatch nationwide. Pickup available here in Bradenton." },
+  { title: "A second life", body: "Quality goods kept in use — better for your wallet, and for the planet." },
 ];
 
 const services = [
-  { icon: ShieldCheck, title: "Buy with confidence", body: "Every item is inspected and graded straight. If it isn't as described, send it back.", href: "/grading" },
-  { icon: Wrench, title: "Repairs", body: "Electronics, furniture, and appliances brought back to working order at a fair rate.", href: "/repairs" },
-  { icon: HandCoins, title: "Consignment", body: "Have something good you're done with? We'll sell it for you. Clear terms, fair split.", href: "/consignment" },
+  { no: "01", title: "Buy with confidence", body: "Every item is inspected and graded straight. If it isn't as described, send it back.", href: "/grading" },
+  { no: "02", title: "Repairs", body: "Electronics, furniture, and appliances brought back to working order at a fair rate.", href: "/repairs" },
+  { no: "03", title: "Consignment", body: "Have something good you're done with? We'll sell it for you. Clear terms, fair split.", href: "/consignment" },
 ];
+
+const heroStats: [string, string][] = [
+  ["247", "items live"],
+  ["100%", "inspected"],
+  ["50–60%", "below retail"],
+  ["FL", "ships from"],
+];
+
+const ticker = ["Inspected", "Graded straight", "Certified honest", "No surprises", "Sourced fair", "A second life"];
 
 export default async function HomePage() {
   const [items, categories] = await Promise.all([getListings(), getCategories()]);
@@ -23,151 +33,221 @@ export default async function HomePage() {
 
   return (
     <div>
-      {/* ── Hero ─────────────────────────────────────────── */}
-      <section className="border-b border-rule">
-        <div className="mx-auto grid max-w-7xl gap-12 px-6 py-16 md:py-24 lg:grid-cols-[1.15fr_0.85fr] lg:items-center">
-          <div>
-            <p className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.25em] text-slate/80">
-              <span aria-hidden className="inline-block h-2 w-2 bg-copper" />
-              Est. 2026 · Bradenton, Florida
+      {/* ── Hero — bold, art-directed, dark ───────────────── */}
+      <section className="relative overflow-hidden bg-ink text-background">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0"
+          style={{ backgroundImage: "radial-gradient(50% 55% at 88% -8%, hsl(30 64% 52% / 0.24), transparent 60%)" }}
+        />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 opacity-[0.05]"
+          style={{
+            backgroundImage:
+              "linear-gradient(hsl(40 36% 96%) 1px, transparent 1px), linear-gradient(90deg, hsl(40 36% 96%) 1px, transparent 1px)",
+            backgroundSize: "76px 76px",
+          }}
+        />
+
+        <div className="relative mx-auto max-w-7xl px-6 pb-16 pt-20 md:pt-24">
+          <Reveal>
+            <p className="flex items-center gap-3 font-mono text-[11px] uppercase tracking-[0.3em] text-copper">
+              <span aria-hidden className="inline-block h-px w-10 bg-copper" />
+              Est. 2026 · Bradenton, Florida · Secondhand goods, certified honest
             </p>
-            <h1 className="mt-6 font-heading text-5xl font-semibold leading-[1.04] tracking-tight text-ink md:text-7xl">
+          </Reveal>
+
+          <Reveal delay={90}>
+            <h1 className="mt-8 font-heading text-[clamp(3rem,12vw,10rem)] font-semibold leading-[0.84] tracking-[-0.03em]">
               Good finds.
               <br />
               <span className="text-copper">No surprises.</span>
             </h1>
-            <p className="mt-6 max-w-xl text-lg leading-relaxed text-slate">
-              Quality secondhand furniture, electronics, tools and the occasional great find — each
-              one inspected, graded straight, and ready to use. What you see is what shows up.
-            </p>
-            <div className="mt-8 flex flex-wrap items-center gap-3">
-              <Link
-                href="/products"
-                className="inline-flex items-center gap-2 bg-copper px-6 py-3 text-sm font-semibold uppercase tracking-wider text-white transition-colors hover:bg-brand-700"
-              >
-                Shop the floor
-                <ArrowRight className="h-4 w-4" aria-hidden />
-              </Link>
-              <Link
-                href="/grading"
-                className="inline-flex items-center gap-2 border border-ink/30 px-6 py-3 text-sm font-semibold uppercase tracking-wider text-ink transition-colors hover:bg-surface"
-              >
-                How we grade
-              </Link>
-            </div>
-            <dl className="mt-12 flex flex-wrap gap-x-10 gap-y-4 border-t border-rule pt-6 font-mono text-[11px] uppercase tracking-wider text-slate/80">
-              <div><dt className="text-ink font-semibold text-base">247</dt><dd>items live</dd></div>
-              <div><dt className="text-ink font-semibold text-base">Every</dt><dd>item inspected</dd></div>
-              <div><dt className="text-ink font-semibold text-base">FL</dt><dd>ships from</dd></div>
-              <div><dt className="text-ink font-semibold text-base">Pickup</dt><dd>in Bradenton</dd></div>
-            </dl>
-          </div>
+          </Reveal>
 
-          {/* Featured specimen */}
-          <div className="relative border border-rule bg-surface">
-            <span className="absolute left-0 top-0 z-10 bg-ink px-2.5 py-1 font-mono text-[10px] font-semibold uppercase tracking-widest text-white">
-              Featured
-            </span>
-            <span aria-hidden className="absolute right-3 top-3 z-10 h-4 w-4 border-r border-t border-copper" />
-            <div className="flex aspect-[4/3] items-center justify-center border-b border-rule">
-              <span className="font-heading text-8xl text-ink/[0.08]">OT</span>
-            </div>
-            <div className="space-y-3 p-6">
-              <div className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-wider text-slate/80">
-                <span>{featured.sku}</span>
-                <span aria-hidden className="h-1 w-1 rounded-full bg-copper" />
-                <span className="text-copper">{featured.condition}</span>
+          <div className="mt-14 grid gap-12 lg:grid-cols-[1fr_minmax(0,26rem)] lg:items-end">
+            <Reveal delay={170}>
+              <p className="max-w-md text-lg leading-relaxed text-background/70">
+                Secondhand furniture, electronics and tools — each piece inspected, graded straight, and
+                certified honest before it ever hits the floor.
+              </p>
+              <div className="mt-8 flex flex-wrap items-center gap-5">
+                <Link
+                  href="/products"
+                  className="group inline-flex items-center gap-2.5 bg-copper px-7 py-3.5 text-sm font-semibold uppercase tracking-[0.12em] text-ink transition-transform duration-300 hover:-translate-y-0.5"
+                >
+                  Shop the floor
+                  <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" aria-hidden />
+                </Link>
+                <Link
+                  href="/grading"
+                  className="inline-flex items-center border-b border-background/30 pb-1 text-sm font-semibold uppercase tracking-[0.12em] text-background transition-colors hover:border-copper hover:text-copper"
+                >
+                  How we grade
+                </Link>
               </div>
-              <h2 className="font-heading text-2xl font-medium leading-snug text-ink">{featured.title}</h2>
-              <p className="text-sm leading-relaxed text-slate">{featured.blurb}</p>
-              <div className="flex items-baseline gap-3 pt-1">
-                <span className="text-2xl font-semibold text-ink">${featured.price.toLocaleString()}</span>
-                {featured.compareAt ? (
-                  <span className="text-slate/60 line-through">${featured.compareAt.toLocaleString()}</span>
-                ) : null}
-              </div>
-              <Link
-                href={`/products/${featured.slug}`}
-                className="inline-flex items-center gap-1.5 pt-1 font-mono text-[12px] font-semibold uppercase tracking-wider text-copper hover:text-brand-700"
+              <dl className="mt-12 grid grid-cols-2 gap-x-8 gap-y-6 border-t border-background/15 pt-7 sm:grid-cols-4">
+                {heroStats.map(([k, v]) => (
+                  <div key={v}>
+                    <dt className="font-heading text-2xl font-semibold text-background">{k}</dt>
+                    <dd className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.18em] text-background/55">{v}</dd>
+                  </div>
+                ))}
+              </dl>
+            </Reveal>
+
+            {/* Featured certified lot */}
+            <Reveal delay={240} className="relative">
+              <div
+                aria-hidden
+                className="absolute -left-5 -top-7 z-20 flex h-28 w-28 -rotate-[14deg] flex-col items-center justify-center rounded-full border-2 border-copper bg-ink text-center shadow-elev-lg"
               >
-                View dossier <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+                <span className="absolute inset-2 rounded-full border border-dashed border-copper/40" />
+                <span className="font-mono text-[8px] uppercase tracking-[0.18em] text-copper">Inspected</span>
+                <BadgeCheck className="my-1 h-6 w-6 text-copper" aria-hidden />
+                <span className="font-mono text-[8px] uppercase tracking-[0.18em] text-copper">& Graded</span>
+              </div>
+
+              <Link href={`/products/${featured.slug}`} className="group block">
+                <div className="relative aspect-[4/5] overflow-hidden bg-background/[0.04] ring-1 ring-background/15 transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:-translate-y-1.5">
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="font-heading text-[9rem] text-background/[0.05] transition-transform duration-[800ms] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-105">
+                      OT
+                    </span>
+                  </div>
+                  <span aria-hidden className="absolute right-4 top-4 h-7 w-7 border-r-2 border-t-2 border-copper" />
+                  <div className="absolute inset-x-0 bottom-0 space-y-2 bg-gradient-to-t from-ink via-ink/80 to-transparent px-6 pb-6 pt-20">
+                    <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.18em] text-copper">
+                      <span>Lot of the week</span>
+                      <span aria-hidden className="h-1 w-1 rounded-full bg-copper" />
+                      <span>{featured.sku}</span>
+                    </div>
+                    <h2 className="font-heading text-2xl font-medium leading-snug text-background">{featured.title}</h2>
+                    <div className="flex items-center gap-3 pt-1">
+                      <span className="font-heading text-xl font-semibold text-background">${featured.price.toLocaleString()}</span>
+                      {featured.compareAt ? (
+                        <span className="font-mono text-xs text-background/50 line-through">${featured.compareAt.toLocaleString()}</span>
+                      ) : null}
+                      <span className="ml-auto inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.18em] text-copper">
+                        View dossier
+                        <ArrowUpRight className="h-3.5 w-3.5 transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" aria-hidden />
+                      </span>
+                    </div>
+                  </div>
+                </div>
               </Link>
-            </div>
+            </Reveal>
+          </div>
+        </div>
+
+        {/* Brand-promise marquee */}
+        <div className="relative flex overflow-hidden border-t border-background/12 bg-ink py-4">
+          <div className="marquee-track flex shrink-0 items-center gap-12 whitespace-nowrap pr-12 font-mono text-[11px] uppercase tracking-[0.32em] text-copper">
+            {[...ticker, ...ticker, ...ticker, ...ticker].map((t, i) => (
+              <span key={i} className="flex items-center gap-12">
+                {t}
+                <span aria-hidden className="h-1 w-1 rounded-full bg-copper/50" />
+              </span>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* ── Value strip ──────────────────────────────────── */}
-      <section className="bg-ink">
-        <div className="mx-auto grid max-w-7xl gap-8 px-6 py-12 sm:grid-cols-2 lg:grid-cols-4">
-          {valueProps.map((prop) => (
-            <div key={prop.title} className="flex gap-4">
-              <prop.icon className="h-6 w-6 shrink-0 text-copper" aria-hidden />
-              <div>
-                <h3 className="font-heading text-base font-medium text-white">{prop.title}</h3>
-                <p className="mt-1 text-sm leading-relaxed text-white/65">{prop.body}</p>
-              </div>
-            </div>
-          ))}
+      {/* ── Principles (manifest) ────────────────────────── */}
+      <section className="border-b border-rule bg-background">
+        <div className="mx-auto max-w-7xl px-6 py-16">
+          <div className="grid gap-x-10 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">
+            {principles.map((p, i) => (
+              <Reveal key={p.title} delay={i * 80}>
+                <div className="border-t border-copper/50 pt-5">
+                  <div className="flex items-baseline gap-3">
+                    <span className="font-mono text-xs text-copper">{String(i + 1).padStart(2, "0")}</span>
+                    <h3 className="font-heading text-lg font-medium text-ink">{p.title}</h3>
+                  </div>
+                  <p className="mt-2.5 text-sm leading-relaxed text-slate">{p.body}</p>
+                </div>
+              </Reveal>
+            ))}
+          </div>
         </div>
       </section>
 
       {/* ── On the floor ─────────────────────────────────── */}
-      <section className="mx-auto max-w-7xl px-6 py-20">
-        <div className="flex items-end justify-between border-b border-rule pb-5">
+      <section className="mx-auto max-w-7xl px-6 py-24">
+        <Reveal className="flex items-end justify-between">
           <div>
-            <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-copper">Latest finds</p>
-            <h2 className="mt-2 font-heading text-3xl font-semibold tracking-tight text-ink">On the floor</h2>
+            <p className="font-mono text-[11px] uppercase tracking-[0.28em] text-copper">Latest finds</p>
+            <h2 className="mt-3 font-heading text-4xl font-semibold tracking-[-0.02em] text-ink">On the floor</h2>
           </div>
           <Link
             href="/products"
-            className="hidden items-center gap-1.5 font-mono text-[12px] font-semibold uppercase tracking-wider text-slate hover:text-ink sm:inline-flex"
+            className="group hidden items-center gap-2 border-b border-ink/20 pb-1 font-mono text-[11px] uppercase tracking-[0.18em] text-slate transition-colors hover:border-copper hover:text-ink sm:inline-flex"
           >
-            View all <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+            View all
+            <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-1" aria-hidden />
           </Link>
-        </div>
-        <div className="mt-8 grid grid-cols-2 gap-px bg-rule sm:grid-cols-3 lg:grid-cols-4">
-          {floor.map((item) => (
-            <ProductCard key={item.id} item={item} />
+        </Reveal>
+        <div className="mt-12 grid grid-cols-2 gap-x-6 gap-y-12 sm:grid-cols-3 lg:grid-cols-4">
+          {floor.map((item, i) => (
+            <Reveal key={item.id} delay={(i % 4) * 90}>
+              <ProductCard item={item} />
+            </Reveal>
           ))}
         </div>
       </section>
 
-      {/* ── Categories ───────────────────────────────────── */}
-      <section className="border-y border-rule bg-surface">
-        <div className="mx-auto max-w-7xl px-6 py-16">
-          <h2 className="font-heading text-2xl font-semibold tracking-tight text-ink">Shop by category</h2>
-          <div className="mt-8 grid grid-cols-2 gap-px bg-rule md:grid-cols-3 lg:grid-cols-6">
-            {categories.map((cat) => (
-              <Link
-                key={cat.slug}
-                href={`/categories/${cat.slug}`}
-                className="group flex flex-col gap-2 bg-background p-5 transition-colors hover:bg-surface"
-              >
-                <span className="font-mono text-[11px] uppercase tracking-wider text-slate/70">
-                  {String(cat.count).padStart(2, "0")} items
-                </span>
-                <span className="font-heading text-lg font-medium leading-tight text-ink group-hover:text-copper">
-                  {cat.name}
-                </span>
-              </Link>
+      {/* ── Categories (index) ───────────────────────────── */}
+      <section className="border-y border-rule bg-surface/50">
+        <div className="mx-auto max-w-7xl px-6 py-20">
+          <Reveal className="flex items-end justify-between">
+            <h2 className="font-heading text-3xl font-semibold tracking-[-0.02em] text-ink">Shop by category</h2>
+            <span className="font-mono text-[11px] uppercase tracking-[0.18em] text-slate/55">
+              {categories.length} departments
+            </span>
+          </Reveal>
+          <div className="mt-10 grid gap-x-14 sm:grid-cols-2">
+            {categories.map((cat, i) => (
+              <Reveal key={cat.slug} delay={(i % 2) * 70}>
+                <Link
+                  href={`/categories/${cat.slug}`}
+                  className="group flex items-baseline justify-between border-b border-rule py-6 transition-colors hover:border-ink"
+                >
+                  <span className="flex items-baseline gap-4">
+                    <span className="font-mono text-xs text-slate/45">{String(i + 1).padStart(2, "0")}</span>
+                    <span className="font-heading text-2xl font-medium text-ink transition-colors group-hover:text-copper">
+                      {cat.name}
+                    </span>
+                  </span>
+                  <span className="flex items-center gap-3 font-mono text-[11px] uppercase tracking-[0.18em] text-slate/55">
+                    {String(cat.count).padStart(2, "0")} items
+                    <ArrowUpRight
+                      className="h-4 w-4 text-copper opacity-0 transition-all duration-300 group-hover:translate-x-0.5 group-hover:opacity-100"
+                      aria-hidden
+                    />
+                  </span>
+                </Link>
+              </Reveal>
             ))}
           </div>
         </div>
       </section>
 
       {/* ── Services ─────────────────────────────────────── */}
-      <section className="mx-auto max-w-7xl px-6 py-20">
-        <div className="grid gap-px bg-rule md:grid-cols-3">
-          {services.map((svc) => (
-            <Link key={svc.title} href={svc.href} className="group bg-background p-8 transition-colors hover:bg-surface">
-              <svc.icon className="h-7 w-7 text-copper" aria-hidden />
-              <h3 className="mt-4 font-heading text-xl font-medium text-ink">{svc.title}</h3>
-              <p className="mt-2 text-sm leading-relaxed text-slate">{svc.body}</p>
-              <span className="mt-4 inline-flex items-center gap-1.5 font-mono text-[12px] font-semibold uppercase tracking-wider text-copper">
-                Learn more <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden />
-              </span>
-            </Link>
+      <section className="mx-auto max-w-7xl px-6 py-24">
+        <div className="grid gap-x-10 gap-y-10 md:grid-cols-3">
+          {services.map((svc, i) => (
+            <Reveal key={svc.title} delay={i * 90}>
+              <Link href={svc.href} className="group block border-t-2 border-ink/10 pt-6 transition-colors hover:border-copper">
+                <span className="font-mono text-xs text-copper">{svc.no}</span>
+                <h3 className="mt-3 font-heading text-2xl font-medium text-ink">{svc.title}</h3>
+                <p className="mt-2.5 text-sm leading-relaxed text-slate">{svc.body}</p>
+                <span className="mt-5 inline-flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.18em] text-ink">
+                  Learn more
+                  <ArrowRight className="h-3.5 w-3.5 text-copper transition-transform group-hover:translate-x-1" aria-hidden />
+                </span>
+              </Link>
+            </Reveal>
           ))}
         </div>
       </section>

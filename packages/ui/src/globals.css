@@ -3,54 +3,84 @@
 @tailwind utilities;
 
 /*
- * Overhaul Trading Company brand tokens.
- * Ink Navy #0F2A43 · Copper #B5742E · Slate #33475B · Rule #C9D0D8 · Surface #F3F5F7
- * "Trustworthy, capable, clean — a serious operator, not a flea-market stall."
+ * Overhaul Trading Company — design foundation.
+ * Aesthetic: "archival goods house" — warm paper, ink navy, bold copper.
+ * Ledger-precise rules, editorial serif, restrained motion. Premium, honest,
+ * never a flea-market stall.
  */
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 209 63% 16%;
-    --card: 0 0% 100%;
-    --card-foreground: 209 63% 16%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 209 63% 16%;
-    --primary: 209 63% 16%;
-    --primary-foreground: 210 20% 98%;
-    --secondary: 210 20% 96%;
+    /* Surfaces — warm paper, not stark white */
+    --background: 40 36% 96%;       /* bone paper */
+    --foreground: 209 64% 13%;      /* ink navy */
+    --card: 40 44% 98%;             /* lifted warm white */
+    --card-foreground: 209 64% 13%;
+    --popover: 40 44% 98%;
+    --popover-foreground: 209 64% 13%;
+
+    --primary: 209 63% 16%;         /* ink navy */
+    --primary-foreground: 40 40% 97%;
+    --secondary: 40 26% 91%;        /* warm sand */
     --secondary-foreground: 209 63% 16%;
-    --muted: 210 20% 96%;
-    --muted-foreground: 210 24% 35%;
-    --accent: 210 20% 96%;
+    --muted: 40 22% 92%;
+    --muted-foreground: 210 14% 38%;
+    --accent: 40 26% 91%;           /* subtle warm hover (kept neutral) */
     --accent-foreground: 209 63% 16%;
-    --destructive: 0 72% 42%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 210 16% 82%;
-    --input: 210 16% 82%;
-    --ring: 30 59% 45%;
-    --radius: 0.375rem;
+    --destructive: 0 66% 41%;
+    --destructive-foreground: 40 40% 97%;
+
+    --border: 38 20% 84%;           /* warm rule */
+    --input: 38 20% 84%;
+    --ring: 30 59% 45%;             /* copper focus */
+    --radius: 0.25rem;              /* tight, editorial */
+
+    /* Brand + system tokens */
+    --copper: 30 59% 45%;
+    --copper-bright: 30 62% 52%;
+    --ink: 209 64% 13%;
+    --paper: 40 36% 96%;
+
+    /* Elevation — soft, warm-tinted */
+    --shadow-sm: 0 1px 2px hsl(209 40% 12% / 0.06), 0 1px 1px hsl(209 40% 12% / 0.04);
+    --shadow-md: 0 6px 20px -8px hsl(209 42% 14% / 0.16);
+    --shadow-lg: 0 30px 60px -22px hsl(209 46% 12% / 0.28);
+
+    /* Motion */
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+    --dur-1: 160ms;
+    --dur-2: 320ms;
+    --dur-3: 600ms;
   }
 
   .dark {
-    --background: 209 56% 9%;
-    --foreground: 210 20% 96%;
-    --card: 209 52% 11%;
-    --card-foreground: 210 20% 96%;
-    --popover: 209 52% 11%;
-    --popover-foreground: 210 20% 96%;
-    --primary: 210 20% 96%;
+    --background: 209 52% 8%;
+    --foreground: 40 30% 92%;
+    --card: 209 46% 10%;
+    --card-foreground: 40 30% 92%;
+    --popover: 209 46% 10%;
+    --popover-foreground: 40 30% 92%;
+    --primary: 40 34% 92%;
     --primary-foreground: 209 63% 12%;
-    --secondary: 209 38% 16%;
-    --secondary-foreground: 210 20% 96%;
-    --muted: 209 38% 16%;
-    --muted-foreground: 210 16% 72%;
-    --accent: 209 38% 16%;
-    --accent-foreground: 210 20% 96%;
-    --destructive: 0 60% 42%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 209 34% 20%;
-    --input: 209 34% 20%;
-    --ring: 30 59% 50%;
+    --secondary: 209 34% 15%;
+    --secondary-foreground: 40 30% 92%;
+    --muted: 209 34% 15%;
+    --muted-foreground: 40 12% 66%;
+    --accent: 209 34% 15%;
+    --accent-foreground: 40 30% 92%;
+    --destructive: 0 60% 45%;
+    --destructive-foreground: 40 30% 95%;
+    --border: 209 30% 18%;
+    --input: 209 30% 18%;
+    --ring: 30 60% 52%;
+
+    --copper: 30 62% 54%;
+    --copper-bright: 30 66% 60%;
+    --ink: 209 64% 13%;
+    --paper: 209 52% 8%;
+    --shadow-sm: 0 1px 2px hsl(0 0% 0% / 0.4);
+    --shadow-md: 0 8px 24px -8px hsl(0 0% 0% / 0.5);
+    --shadow-lg: 0 30px 60px -20px hsl(0 0% 0% / 0.6);
   }
 }
 
@@ -58,11 +88,49 @@
   * {
     @apply border-border;
   }
+
   body {
     @apply bg-background text-foreground;
     font-feature-settings: "cv05", "ss01";
+    /* Atmosphere: warm paper with a faint copper dawn at the top-right and a soft
+       ink settle at the top-left — depth without noise. */
+    background-image:
+      radial-gradient(120% 60% at 88% -8%, hsl(30 55% 50% / 0.07), transparent 60%),
+      radial-gradient(90% 50% at 0% -4%, hsl(209 60% 30% / 0.05), transparent 55%);
   }
+
   h1, h2, h3, h4, .font-heading {
     font-family: var(--font-serif), Georgia, "Times New Roman", serif;
+    letter-spacing: -0.012em;
+  }
+
+  ::selection {
+    background: hsl(var(--copper) / 0.22);
+    color: hsl(var(--ink));
+  }
+}
+
+/* Motion + elevation primitives. Honors reduced-motion. */
+@layer utilities {
+  @keyframes reveal-up {
+    from { opacity: 0; transform: translateY(14px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .reveal {
+    animation: reveal-up var(--dur-3) var(--ease-out) both;
+  }
+  .shadow-elev-sm { box-shadow: var(--shadow-sm); }
+  .shadow-elev-md { box-shadow: var(--shadow-md); }
+  .shadow-elev-lg { box-shadow: var(--shadow-lg); }
+
+  @keyframes marquee {
+    from { transform: translateX(0); }
+    to { transform: translateX(-50%); }
+  }
+  .marquee-track { animation: marquee 32s linear infinite; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .reveal { animation: none; }
+    *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
   }
 }

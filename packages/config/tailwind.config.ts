@@ -58,8 +58,8 @@ const config: Config = {
         copper: "#b5742e",
         ink: "#0f2a43",
         slate: "#33475b",
-        rule: "#c9d0d8",
-        surface: "#f3f5f7",
+        rule: "#dcd5c7",
+        surface: "#f1ece1",
       },
       borderRadius: {
         lg: "var(--radius)",
