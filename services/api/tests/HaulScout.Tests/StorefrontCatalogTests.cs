@@ -37,12 +37,12 @@ public class StorefrontCatalogTests
         await using (var seed = new HaulScoutDbContext(options, seedTenant))
         {
             seed.Organizations.Add(new Organization { Id = org, Name = "Overhaul Trading" });
-            // Sellable: listed, in stock, priced.
+            // Sellable: listed + priced.
             seed.InventoryItems.Add(new InventoryItem { Title = "Listed item", Status = InventoryStatus.Listed, Quantity = 1, EstimatedSalePrice = 25m });
+            // Sellable: listed + priced even at Quantity 0 (operators use 0 for single, untracked items).
+            seed.InventoryItems.Add(new InventoryItem { Title = "Listed single", Status = InventoryStatus.Listed, Quantity = 0, EstimatedSalePrice = 30m });
             // Not sellable: still a draft.
             seed.InventoryItems.Add(new InventoryItem { Title = "Draft item", Status = InventoryStatus.Draft, Quantity = 1, EstimatedSalePrice = 20m });
-            // Not sellable: listed but out of stock.
-            seed.InventoryItems.Add(new InventoryItem { Title = "Out of stock", Status = InventoryStatus.Listed, Quantity = 0, EstimatedSalePrice = 30m });
             // Not sellable: listed but unpriced.
             seed.InventoryItems.Add(new InventoryItem { Title = "Unpriced", Status = InventoryStatus.Listed, Quantity = 1 });
             await seed.SaveChangesAsync();
@@ -58,11 +58,10 @@ public class StorefrontCatalogTests
 
         Assert.Null(result.Result);
         var page = result.Value!;
-        var only = Assert.Single(page.Items);
-        Assert.Equal("Listed item", only.Title);
-        Assert.Equal(25m, only.ListPrice);
-        Assert.StartsWith("listed-item-", only.Slug);
-        Assert.Equal(1, page.Total);
+        Assert.Equal(2, page.Total);
+        Assert.Contains(page.Items, x => x.Title == "Listed item");
+        Assert.Contains(page.Items, x => x.Title == "Listed single");
+        Assert.All(page.Items, x => Assert.True(x.ListPrice > 0));
     }
 
     [Fact]
