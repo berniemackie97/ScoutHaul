@@ -111,11 +111,11 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
-      - name: Type-check (shared packages + storefront)
-        run: pnpm --filter @overhaul/api-client --filter @overhaul/ui --filter @overhaul/storefront type-check
+      - name: Type-check (shared packages + apps)
+        run: pnpm --filter @overhaul/api-client --filter @overhaul/ui --filter @overhaul/storefront --filter @overhaul/admin type-check
 
-      - name: Build storefront
-        run: pnpm --filter @overhaul/storefront build
+      - name: Build storefront + admin
+        run: pnpm --filter @overhaul/storefront --filter @overhaul/admin build
 
   docker:
     name: Docker
