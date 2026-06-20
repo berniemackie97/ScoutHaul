@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowRight, ArrowUpRight, BadgeCheck } from "lucide-react";
 import { ProductCard } from "@/components/store/product-card";
+import { NewsletterForm } from "@/components/store/newsletter-form";
 import { Reveal } from "@/components/ui/reveal";
 import { getListings, getCategories } from "@/lib/catalog";
 
@@ -25,6 +26,18 @@ const heroStats: [string, string][] = [
 ];
 
 const ticker = ["Inspected", "Graded straight", "Certified honest", "No surprises", "Sourced fair", "A second life"];
+
+const collections = [
+  { no: "01", title: "Just in", body: "Freshly inspected and added to the floor this week.", href: "/products" },
+  { no: "02", title: "Under $100", body: "Honest finds that go easy on the wallet.", href: "/products" },
+  { no: "03", title: "Staff picks", body: "The pieces we'd happily take home ourselves.", href: "/products" },
+];
+
+const testimonials = [
+  { quote: "Described the wear down to the scuff. No surprises when it showed up — rare these days.", name: "Marcus T.", place: "Sarasota, FL" },
+  { quote: "The receiver was recapped exactly like the listing said. Sounds incredible, packed with care.", name: "Dana R.", place: "Tampa, FL" },
+  { quote: "Picked up locally in Bradenton. Honest folks, fair price, zero games. I'll be back.", name: "Priya S.", place: "Bradenton, FL" },
+];
 
 export default async function HomePage() {
   const [items, categories] = await Promise.all([getListings(), getCategories()]);
@@ -197,6 +210,41 @@ export default async function HomePage() {
         </div>
       </section>
 
+      {/* ── Curated collections (dark band) ──────────────── */}
+      <section className="bg-ink text-background">
+        <div className="mx-auto max-w-7xl px-6 py-20">
+          <Reveal>
+            <p className="font-mono text-[11px] uppercase tracking-[0.28em] text-copper">Curated</p>
+            <h2 className="mt-3 font-heading text-4xl font-semibold tracking-[-0.02em] text-background">Ways to shop</h2>
+          </Reveal>
+          <div className="mt-10 grid gap-6 md:grid-cols-3">
+            {collections.map((c, i) => (
+              <Reveal key={c.title} delay={i * 90}>
+                <Link
+                  href={c.href}
+                  className="group flex aspect-[5/4] flex-col justify-between bg-background/[0.04] p-7 ring-1 ring-background/15 transition-all duration-300 hover:bg-background/[0.07] hover:ring-copper"
+                >
+                  <span className="font-mono text-xs text-copper">{c.no}</span>
+                  <div>
+                    <h3 className="font-heading text-3xl font-medium text-background transition-colors group-hover:text-copper">
+                      {c.title}
+                    </h3>
+                    <p className="mt-1.5 max-w-[24ch] text-sm leading-relaxed text-background/60">{c.body}</p>
+                    <span className="mt-4 inline-flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.18em] text-copper">
+                      Browse
+                      <ArrowUpRight
+                        className="h-3.5 w-3.5 transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
+                        aria-hidden
+                      />
+                    </span>
+                  </div>
+                </Link>
+              </Reveal>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* ── Categories (index) ───────────────────────────── */}
       <section className="border-y border-rule bg-surface/50">
         <div className="mx-auto max-w-7xl px-6 py-20">
@@ -233,6 +281,31 @@ export default async function HomePage() {
         </div>
       </section>
 
+      {/* ── Social proof ─────────────────────────────────── */}
+      <section className="mx-auto max-w-7xl px-6 py-24">
+        <Reveal>
+          <p className="font-mono text-[11px] uppercase tracking-[0.28em] text-copper">Word on the floor</p>
+          <h2 className="mt-3 font-heading text-4xl font-semibold tracking-[-0.02em] text-ink">Bought with confidence</h2>
+        </Reveal>
+        <div className="mt-12 grid gap-10 md:grid-cols-3">
+          {testimonials.map((t, i) => (
+            <Reveal key={t.name} delay={i * 90}>
+              <figure className="border-t-2 border-copper/40 pt-6">
+                <blockquote className="font-heading text-xl font-medium leading-snug text-ink">
+                  &ldquo;{t.quote}&rdquo;
+                </blockquote>
+                <figcaption className="mt-5 font-mono text-[11px] uppercase tracking-[0.16em] text-slate/70">
+                  {t.name} · {t.place}
+                </figcaption>
+                <p className="mt-2 inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.16em] text-copper">
+                  <BadgeCheck className="h-3.5 w-3.5" aria-hidden /> Verified buyer
+                </p>
+              </figure>
+            </Reveal>
+          ))}
+        </div>
+      </section>
+
       {/* ── Services ─────────────────────────────────────── */}
       <section className="mx-auto max-w-7xl px-6 py-24">
         <div className="grid gap-x-10 gap-y-10 md:grid-cols-3">
@@ -249,6 +322,22 @@ export default async function HomePage() {
               </Link>
             </Reveal>
           ))}
+        </div>
+      </section>
+
+      {/* ── Newsletter (first dibs) ──────────────────────── */}
+      <section className="border-t border-rule bg-surface/50">
+        <div className="mx-auto max-w-3xl px-6 py-20 text-center">
+          <Reveal>
+            <p className="font-mono text-[11px] uppercase tracking-[0.28em] text-copper">First dibs</p>
+            <h2 className="mt-3 font-heading text-[clamp(2rem,4vw,3rem)] font-semibold tracking-[-0.02em] text-ink">
+              The good stuff goes fast.
+            </h2>
+            <p className="mx-auto mt-4 max-w-md leading-relaxed text-slate">
+              New finds drop every week. Get them in your inbox before they hit the floor.
+            </p>
+            <NewsletterForm />
+          </Reveal>
         </div>
       </section>
     </div>
