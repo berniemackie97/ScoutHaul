@@ -39,8 +39,8 @@ export default function SignInPage() {
             <Package2 className="h-6 w-6 text-white" />
           </div>
           <div>
-            <h1 className="text-xl font-bold">Overhaul Admin</h1>
-            <p className="text-sm text-muted-foreground">Sign in to the operator portal</p>
+            <h1 className="text-xl font-bold">HaulScout</h1>
+            <p className="text-sm text-muted-foreground">Sign in to the operator console</p>
           </div>
         </div>
 
