@@ -24,11 +24,12 @@ public sealed class StorefrontController(HaulScoutDbContext db, ITenantContext t
 {
     private const string StoreHeader = "X-HaulScout-Store";
 
-    // Inventory a customer may actually buy: in stock, priced, and marked ready/listed.
+    // Inventory a customer may actually buy: priced, not archived, and marked ready/listed.
+    // (Quantity is intentionally NOT a gate — operators use 0 for single, untracked items;
+    // availability is governed by Status. Sold/Shipped items fall out via their status.)
     private IQueryable<InventoryItem> SellableItems() =>
         db.InventoryItems.Where(i =>
             !i.IsArchived
-            && i.Quantity > 0
             && (i.Status == InventoryStatus.Listed || i.Status == InventoryStatus.ReadyToList)
             && (i.EstimatedSalePrice ?? i.SellerAskingPrice) > 0m);
 
