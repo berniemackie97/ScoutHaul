@@ -21,13 +21,19 @@ export function Reveal({
   const [shown, setShown] = useState(false);
 
   useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
     const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
     if (reduce || typeof IntersectionObserver === "undefined") {
       setShown(true);
       return;
     }
-    const el = ref.current;
-    if (!el) return;
+    // Already in the initial viewport → reveal now. IntersectionObserver's first
+    // callback can lag, which would otherwise leave above-the-fold content hidden.
+    if (el.getBoundingClientRect().top < window.innerHeight * 0.95) {
+      setShown(true);
+      return;
+    }
     const io = new IntersectionObserver(
       ([entry]) => {
         if (entry?.isIntersecting) {

@@ -32,7 +32,7 @@ export function Header() {
   function onSearch(e: FormEvent) {
     e.preventDefault();
     const term = query.trim();
-    router.push(term ? `/products?search=${encodeURIComponent(term)}` : "/products");
+    router.push(term ? `/products?q=${encodeURIComponent(term)}` : "/products");
   }
 
   return (

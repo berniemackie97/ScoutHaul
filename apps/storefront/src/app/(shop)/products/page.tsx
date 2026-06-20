@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Search } from "lucide-react";
 import { ProductCard } from "@/components/store/product-card";
+import { Reveal } from "@/components/ui/reveal";
 import { getListings, getCategories } from "@/lib/catalog";
 
 export const metadata = {
@@ -8,12 +9,10 @@ export const metadata = {
   description: "Quality secondhand furniture, electronics, tools and finds — each one inspected and graded straight.",
 };
 
-function pill(active: boolean) {
+function pillClass(active: boolean) {
   return [
-    "border px-3.5 py-1.5 font-mono text-[11px] uppercase tracking-wider transition-colors",
-    active
-      ? "border-ink bg-ink text-white"
-      : "border-rule text-slate hover:border-ink/40 hover:text-ink",
+    "border px-4 py-2 font-mono text-[11px] uppercase tracking-[0.16em] transition-colors",
+    active ? "border-ink bg-ink text-background" : "border-rule text-slate hover:border-ink/40 hover:text-ink",
   ].join(" ");
 }
 
@@ -27,29 +26,37 @@ export default async function ProductsPage({
     getListings({ category: sp.category, search: sp.q }),
     getCategories(),
   ]);
+  const activeCat = categories.find((c) => c.slug === sp.category);
+  const eyebrow = sp.q ? `Results for “${sp.q}”` : activeCat ? activeCat.name : "The catalogue";
 
   return (
-    <div className="mx-auto max-w-7xl px-6 py-12">
-      <div className="border-b border-rule pb-6">
-        <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-copper">
-          {items.length} {items.length === 1 ? "item" : "items"} live
-        </p>
-        <h1 className="mt-2 font-heading text-4xl font-semibold tracking-tight text-ink">
-          The floor
-        </h1>
-      </div>
+    <div className="mx-auto max-w-7xl px-6 py-12 md:py-16">
+      <Reveal className="flex flex-wrap items-end justify-between gap-4 border-b border-rule pb-6">
+        <div>
+          <p className="font-mono text-[11px] uppercase tracking-[0.28em] text-copper">{eyebrow}</p>
+          <h1 className="mt-2 font-heading text-[clamp(2.5rem,5vw,4rem)] font-semibold tracking-[-0.02em] text-ink">
+            The floor
+          </h1>
+        </div>
+        <span className="font-mono text-[11px] uppercase tracking-[0.18em] text-slate/60">
+          {items.length} {items.length === 1 ? "lot" : "lots"} live
+        </span>
+      </Reveal>
 
-      <div className="flex flex-wrap items-center gap-2 py-6">
-        <Link href="/products" className={pill(!sp.category)}>
+      <div className="flex flex-wrap items-center gap-2 py-7">
+        <Link href="/products" className={pillClass(!sp.category && !sp.q)}>
           All
         </Link>
         {categories.map((cat) => (
-          <Link key={cat.slug} href={`/products?category=${cat.slug}`} className={pill(sp.category === cat.slug)}>
+          <Link key={cat.slug} href={`/products?category=${cat.slug}`} className={pillClass(sp.category === cat.slug)}>
             {cat.name}
           </Link>
         ))}
 
-        <form action="/products" className="ml-auto flex items-center gap-2 border border-rule bg-background px-3 py-2 focus-within:border-copper">
+        <form
+          action="/products"
+          className="ml-auto flex items-center gap-2 border border-rule bg-background px-3 py-2 transition-colors focus-within:border-copper"
+        >
           <Search className="h-4 w-4 text-slate" aria-hidden />
           <input
             name="q"
@@ -62,14 +69,16 @@ export default async function ProductsPage({
       </div>
 
       {items.length > 0 ? (
-        <div className="grid grid-cols-2 gap-px bg-rule sm:grid-cols-3 lg:grid-cols-4">
-          {items.map((item) => (
-            <ProductCard key={item.id} item={item} />
+        <div className="grid grid-cols-2 gap-x-6 gap-y-12 sm:grid-cols-3 lg:grid-cols-4">
+          {items.map((item, i) => (
+            <Reveal key={item.id} delay={(i % 4) * 70}>
+              <ProductCard item={item} />
+            </Reveal>
           ))}
         </div>
       ) : (
-        <div className="border border-rule bg-surface px-6 py-20 text-center">
-          <p className="font-heading text-xl text-ink">Nothing matches that yet.</p>
+        <div className="bg-surface px-6 py-24 text-center ring-1 ring-rule">
+          <p className="font-heading text-2xl text-ink">Nothing matches that yet.</p>
           <p className="mt-2 text-sm text-slate">
             New finds land regularly. Try another category, or{" "}
             <Link href="/products" className="text-copper underline-offset-4 hover:underline">
