@@ -1,82 +1,71 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@overhaul/ui";
 import { Package2 } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
+const inputClass =
+  "flex h-11 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+
 export default function SignInPage() {
   const router = useRouter();
+  const [stage, setStage] = useState<"email" | "code">("email");
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [linkLoading, setLinkLoading] = useState(false);
 
-  useEffect(() => {
-    const errorCode = new URLSearchParams(window.location.search).get("error");
-    if (errorCode === "oauth_callback") {
-      setError("Secure sign-in could not be completed. Request a new email link and try again.");
-    }
-  }, []);
-
-  async function handleEmailLink() {
-    const normalizedEmail = email.trim().toLowerCase();
-    if (!normalizedEmail || !normalizedEmail.includes("@")) {
-      setError("Enter the email address attached to your operator account.");
-      return;
-    }
-
-    setLinkLoading(true);
-    setError(null);
-    setMessage(null);
-    const supabase = createSupabaseBrowserClient();
-    // Keep this byte-for-byte identical to the production Supabase redirect allowlist.
-    // Adding even a harmless query string can make Supabase fall back to the mobile Site URL.
-    const emailRedirectTo = `${window.location.origin}/auth/callback`;
-    const { error: signInError } = await supabase.auth.signInWithOtp({
-      email: normalizedEmail,
-      options: {
-        emailRedirectTo,
-        shouldCreateUser: false,
-      },
-    });
-
-    setLinkLoading(false);
-    if (signInError) {
-      setError(signInError.message);
-      return;
-    }
-    setMessage("Check your email for a secure HaulScout sign-in link. It can take a minute to arrive.");
-  }
-
-  async function handleSubmit(event: React.FormEvent) {
+  async function sendCode(event: FormEvent) {
     event.preventDefault();
+    const addr = email.trim().toLowerCase();
+    if (!addr.includes("@")) {
+      setError("Enter the email on your operator account.");
+      return;
+    }
     setLoading(true);
     setError(null);
-    setMessage(null);
-
     const supabase = createSupabaseBrowserClient();
-    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
-
+    const { error: otpError } = await supabase.auth.signInWithOtp({
+      email: addr,
+      options: { shouldCreateUser: false },
+    });
     setLoading(false);
-    if (signInError) {
-      setError(signInError.message);
+    if (otpError) {
+      setError(otpError.message);
       return;
     }
+    setEmail(addr);
+    setStage("code");
+  }
 
+  async function verifyCode(event: FormEvent) {
+    event.preventDefault();
+    const token = code.trim();
+    if (token.length < 6) {
+      setError("Enter the 6-digit code from your email.");
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    const supabase = createSupabaseBrowserClient();
+    const { error: verifyError } = await supabase.auth.verifyOtp({ email, token, type: "email" });
+    setLoading(false);
+    if (verifyError) {
+      setError("That code didn't work. Check it or request a new one.");
+      return;
+    }
     router.replace("/");
     router.refresh();
   }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <div className="w-full max-w-sm space-y-6">
+      <div className="w-full max-w-sm space-y-7">
         <div className="flex flex-col items-center gap-3 text-center">
           <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-brand-600">
-            <Package2 className="h-6 w-6 text-white" />
+            <Package2 className="h-6 w-6 text-white" aria-hidden />
           </div>
           <div>
             <h1 className="text-xl font-bold">HaulScout</h1>
@@ -84,54 +73,65 @@ export default function SignInPage() {
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <label htmlFor="email" className="text-sm font-medium">
-              Email
-            </label>
-            <input
-              id="email"
-              type="email"
-              autoComplete="email"
-              required
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            />
-          </div>
-
-          <Button type="button" className="w-full" disabled={linkLoading || loading} onClick={handleEmailLink}>
-            {linkLoading ? "Sending secure link…" : "Email me a sign-in link"}
-          </Button>
-
-          <div className="flex items-center gap-3">
-            <div className="h-px flex-1 bg-border" />
-            <span className="text-xs uppercase tracking-wide text-muted-foreground">or use a password</span>
-            <div className="h-px flex-1 bg-border" />
-          </div>
-
-          <div className="space-y-2">
-            <label htmlFor="password" className="text-sm font-medium">
-              Password
-            </label>
-            <input
-              id="password"
-              type="password"
-              autoComplete="current-password"
-              required
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            />
-          </div>
-
-          {error && <p className="text-sm text-destructive">{error}</p>}
-          {message && <p className="rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-900">{message}</p>}
-
-          <Button type="submit" variant="outline" className="w-full" disabled={loading || linkLoading}>
-            {loading ? "Signing in…" : "Sign in"}
-          </Button>
-        </form>
+        {stage === "email" ? (
+          <form onSubmit={sendCode} className="space-y-4">
+            <div className="space-y-2">
+              <label htmlFor="email" className="text-sm font-medium">
+                Operator email
+              </label>
+              <input
+                id="email"
+                type="email"
+                autoComplete="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@email.com"
+                className={inputClass}
+              />
+            </div>
+            {error && <p className="text-sm text-destructive">{error}</p>}
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? "Sending code…" : "Email me a code"}
+            </Button>
+          </form>
+        ) : (
+          <form onSubmit={verifyCode} className="space-y-4">
+            <p className="text-center text-sm text-muted-foreground">
+              Enter the 6-digit code sent to <span className="font-medium text-foreground">{email}</span>.
+            </p>
+            <div className="space-y-2">
+              <label htmlFor="code" className="text-sm font-medium">
+                Sign-in code
+              </label>
+              <input
+                id="code"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                required
+                value={code}
+                onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                placeholder="123456"
+                className={`${inputClass} text-center text-lg tracking-[0.4em]`}
+              />
+            </div>
+            {error && <p className="text-sm text-destructive">{error}</p>}
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? "Verifying…" : "Verify & sign in"}
+            </Button>
+            <button
+              type="button"
+              onClick={() => {
+                setStage("email");
+                setCode("");
+                setError(null);
+              }}
+              className="w-full text-center text-xs text-muted-foreground hover:text-foreground"
+            >
+              Use a different email
+            </button>
+          </form>
+        )}
       </div>
     </div>
   );
