@@ -11,8 +11,10 @@ export default function SignInPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [linkLoading, setLinkLoading] = useState(false);
 
   useEffect(() => {
     const errorCode = new URLSearchParams(window.location.search).get("error");
@@ -24,6 +26,7 @@ export default function SignInPage() {
   async function handleGoogleSignIn() {
     setGoogleLoading(true);
     setError(null);
+    setMessage(null);
     const supabase = createSupabaseBrowserClient();
     const redirectTo = `${window.location.origin}/auth/callback?next=/`;
     const { error: signInError } = await supabase.auth.signInWithOAuth({
@@ -37,10 +40,39 @@ export default function SignInPage() {
     }
   }
 
+  async function handleEmailLink() {
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail || !normalizedEmail.includes("@")) {
+      setError("Enter the email address attached to your operator account.");
+      return;
+    }
+
+    setLinkLoading(true);
+    setError(null);
+    setMessage(null);
+    const supabase = createSupabaseBrowserClient();
+    const emailRedirectTo = `${window.location.origin}/auth/callback?next=/`;
+    const { error: signInError } = await supabase.auth.signInWithOtp({
+      email: normalizedEmail,
+      options: {
+        emailRedirectTo,
+        shouldCreateUser: false,
+      },
+    });
+
+    setLinkLoading(false);
+    if (signInError) {
+      setError(signInError.message);
+      return;
+    }
+    setMessage("Check your email for a secure HaulScout sign-in link. It can take a minute to arrive.");
+  }
+
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     setLoading(true);
     setError(null);
+    setMessage(null);
 
     const supabase = createSupabaseBrowserClient();
     const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
@@ -68,7 +100,7 @@ export default function SignInPage() {
           </div>
         </div>
 
-        <Button type="button" variant="outline" className="w-full" disabled={googleLoading || loading} onClick={handleGoogleSignIn}>
+        <Button type="button" variant="outline" className="w-full" disabled={googleLoading || loading || linkLoading} onClick={handleGoogleSignIn}>
           <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4">
             <path fill="#4285F4" d="M21.6 12.23c0-.71-.06-1.4-.18-2.07H12v3.92h5.38a4.6 4.6 0 0 1-2 3.02v2.54h3.24c1.9-1.75 2.98-4.33 2.98-7.41Z" />
             <path fill="#34A853" d="M12 22c2.7 0 4.98-.9 6.63-2.36l-3.24-2.54c-.9.6-2.05.96-3.39.96-2.61 0-4.82-1.76-5.61-4.13H3.05v2.62A10 10 0 0 0 12 22Z" />
@@ -80,7 +112,7 @@ export default function SignInPage() {
 
         <div className="flex items-center gap-3">
           <div className="h-px flex-1 bg-border" />
-          <span className="text-xs uppercase tracking-wide text-muted-foreground">or use a password</span>
+          <span className="text-xs uppercase tracking-wide text-muted-foreground">or use email</span>
           <div className="h-px flex-1 bg-border" />
         </div>
 
@@ -100,6 +132,16 @@ export default function SignInPage() {
             />
           </div>
 
+          <Button type="button" variant="outline" className="w-full" disabled={linkLoading || loading || googleLoading} onClick={handleEmailLink}>
+            {linkLoading ? "Sending secure link…" : "Email me a sign-in link"}
+          </Button>
+
+          <div className="flex items-center gap-3">
+            <div className="h-px flex-1 bg-border" />
+            <span className="text-xs uppercase tracking-wide text-muted-foreground">or use a password</span>
+            <div className="h-px flex-1 bg-border" />
+          </div>
+
           <div className="space-y-2">
             <label htmlFor="password" className="text-sm font-medium">
               Password
@@ -116,8 +158,9 @@ export default function SignInPage() {
           </div>
 
           {error && <p className="text-sm text-destructive">{error}</p>}
+          {message && <p className="rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-900">{message}</p>}
 
-          <Button type="submit" className="w-full" disabled={loading || googleLoading}>
+          <Button type="submit" className="w-full" disabled={loading || googleLoading || linkLoading}>
             {loading ? "Signing in…" : "Sign in"}
           </Button>
         </form>
