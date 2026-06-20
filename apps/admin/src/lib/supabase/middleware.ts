@@ -32,7 +32,9 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const isAuthRoute = request.nextUrl.pathname.startsWith("/sign-in");
+  const isSignInRoute = request.nextUrl.pathname.startsWith("/sign-in");
+  const isOAuthCallback = request.nextUrl.pathname.startsWith("/auth/callback");
+  const isAuthRoute = isSignInRoute || isOAuthCallback;
 
   if (!user && !isAuthRoute) {
     const url = request.nextUrl.clone();
@@ -40,7 +42,7 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  if (user && isAuthRoute) {
+  if (user && isSignInRoute) {
     const url = request.nextUrl.clone();
     url.pathname = "/";
     return NextResponse.redirect(url);
