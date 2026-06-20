@@ -1,7 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { ArrowUpRight } from "lucide-react";
-import type { Specimen } from "@/lib/sample-data";
+import type { Specimen } from "@/lib/catalog";
 
 export function ProductCard({ item }: { item: Specimen }) {
   return (

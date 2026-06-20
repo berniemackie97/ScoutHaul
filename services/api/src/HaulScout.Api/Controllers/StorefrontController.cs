@@ -170,16 +170,16 @@ public sealed class StorefrontController(HaulScoutDbContext db, ITenantContext t
     [HttpGet("photos/{photoId:guid}")]
     public async Task<IActionResult> Photo(Guid photoId, [FromQuery] string? size, CancellationToken cancellationToken)
     {
-        if (!await TryResolveStoreAsync(cancellationToken))
-        {
-            return BadRequest("Unknown store.");
-        }
-
-        // Store-scoped automatically: InventoryPhoto is IOrganizationScoped, so the global
-        // query filter restricts this lookup to the resolved store's photos.
+        // Public image: addressed by an unguessable photo id and served WITHOUT the store
+        // header — Next/Image and browsers fetch it directly. Safe-gated to photos of a
+        // sellable item belonging to a store with a public domain; tenant filter bypassed.
         var full = string.Equals(size, "full", StringComparison.OrdinalIgnoreCase);
         var photo = await db.InventoryPhotos
-            .Where(p => p.Id == photoId)
+            .IgnoreQueryFilters()
+            .Where(p => p.Id == photoId
+                && p.InventoryItem!.Organization!.StoreDomain != null
+                && !p.InventoryItem.IsArchived
+                && (p.InventoryItem.Status == InventoryStatus.Listed || p.InventoryItem.Status == InventoryStatus.ReadyToList))
             .Select(p => new { Bytes = full ? p.OriginalBytes : p.ThumbnailBytes, p.ContentType })
             .FirstOrDefaultAsync(cancellationToken);
 

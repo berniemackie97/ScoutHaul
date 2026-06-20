@@ -6,6 +6,8 @@ import { ProductCard } from "@/components/store/product-card";
 import { Reveal } from "@/components/ui/reveal";
 import { getListing, getRelated } from "@/lib/catalog";
 
+export const dynamic = "force-dynamic";
+
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const item = await getListing(slug);

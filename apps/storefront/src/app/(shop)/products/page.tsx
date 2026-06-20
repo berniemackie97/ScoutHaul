@@ -4,6 +4,8 @@ import { ProductCard } from "@/components/store/product-card";
 import { Reveal } from "@/components/ui/reveal";
 import { getListings, getCategories } from "@/lib/catalog";
 
+export const dynamic = "force-dynamic";
+
 export const metadata = {
   title: "Shop the floor",
   description: "Quality secondhand furniture, electronics, tools and finds — each one inspected and graded straight.",

@@ -6,6 +6,9 @@ import { NewsletterForm } from "@/components/store/newsletter-form";
 import { Reveal } from "@/components/ui/reveal";
 import { getListings, getCategories } from "@/lib/catalog";
 
+// Always render from live data — never a stale, build-time snapshot.
+export const dynamic = "force-dynamic";
+
 const principles = [
   { title: "Inspected & honest", body: "Every item tested and described as-is. The condition is in the listing — never buried." },
   { title: "Sourced & priced fair", body: "Estate sales, liquidation, smart buys. Typically 50–60% below retail." },
@@ -42,7 +45,7 @@ const testimonials = [
 
 export default async function HomePage() {
   const [items, categories] = await Promise.all([getListings(), getCategories()]);
-  const featured = items[0]!;
+  const featured = items[0];
   const floor = items.slice(0, 8);
 
   return (
@@ -112,6 +115,7 @@ export default async function HomePage() {
             </Reveal>
 
             {/* Featured certified lot */}
+            {featured ? (
             <Reveal delay={240} className="relative">
               <div
                 aria-hidden
@@ -163,6 +167,7 @@ export default async function HomePage() {
                 </div>
               </Link>
             </Reveal>
+            ) : null}
           </div>
         </div>
 

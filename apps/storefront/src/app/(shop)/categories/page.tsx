@@ -3,6 +3,8 @@ import { ArrowUpRight } from "lucide-react";
 import { Reveal } from "@/components/ui/reveal";
 import { getCategories } from "@/lib/catalog";
 
+export const dynamic = "force-dynamic";
+
 export const metadata = {
   title: "Categories",
   description: "Browse the floor by department — furniture, electronics, collectibles, tools and more.",
