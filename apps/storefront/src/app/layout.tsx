@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Source_Serif_4, Source_Sans_3, Source_Code_Pro } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
 import "@overhaul/ui/globals.css";
 
 const serif = Source_Serif_4({
@@ -45,6 +46,7 @@ export default function RootLayout({
     <html lang="en" className={`${serif.variable} ${sans.variable} ${mono.variable}`}>
       <body className="min-h-screen bg-background font-sans text-foreground antialiased">
         {children}
+        <Analytics />
       </body>
     </html>
   );
