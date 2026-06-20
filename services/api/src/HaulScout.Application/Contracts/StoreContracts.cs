@@ -78,7 +78,11 @@ public sealed record StorefrontListingDto(
     bool IsFeatured,
     Guid? StoreCategoryId,
     string? Condition,
-    string? Brand);
+    string? Brand,
+    // Relative URL of the hero photo (e.g. /api/storefront/photos/{id}); null when no photo.
+    string? ImageUrl,
+    // Category name (free-text from the inventory item).
+    string? Category);
 
 public sealed record StorefrontListingDetailDto(
     Guid Id,
@@ -91,7 +95,11 @@ public sealed record StorefrontListingDetailDto(
     string? Brand,
     string? Condition,
     string? MetaTitle,
-    string? MetaDescription);
+    string? MetaDescription,
+    // Relative URL of the hero photo (e.g. /api/storefront/photos/{id}); null when no photo.
+    string? ImageUrl,
+    // Category name (free-text from the inventory item).
+    string? Category);
 
 public sealed record StorefrontPageDto<T>(
     IReadOnlyList<T> Items,

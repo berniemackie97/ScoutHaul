@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { ArrowUpRight } from "lucide-react";
 import type { Specimen } from "@/lib/sample-data";
 
@@ -13,11 +14,21 @@ export function ProductCard({ item }: { item: Specimen }) {
 
       {/* Plate */}
       <div className="relative aspect-[4/5] overflow-hidden bg-surface ring-1 ring-rule transition-[box-shadow,transform] duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:-translate-y-1 group-hover:shadow-elev-lg group-hover:ring-ink/25">
-        <div className="absolute inset-0 flex items-center justify-center">
-          <span className="font-heading text-5xl text-ink/[0.06] transition-transform duration-[800ms] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-[1.08]">
-            OT
-          </span>
-        </div>
+        {item.image ? (
+          <Image
+            src={item.image}
+            alt={item.title}
+            fill
+            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+            className="object-cover transition-transform duration-[800ms] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-[1.05]"
+          />
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span className="font-heading text-5xl text-ink/[0.06] transition-transform duration-[800ms] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-[1.08]">
+              OT
+            </span>
+          </div>
+        )}
 
         {/* Copper corner survey-mark draws on hover */}
         <span

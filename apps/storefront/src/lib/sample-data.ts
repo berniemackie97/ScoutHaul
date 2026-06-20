@@ -1,5 +1,6 @@
-// Representative catalog used until the storefront is wired to the live API
-// (and as a graceful fallback). Honest, specific copy — the brand voice.
+// Last-resort fallback ONLY — shown if the live API is unreachable, so the store
+// never hard-errors during an outage. Real catalog data (titles, prices, photos)
+// comes from your inventory via /api/storefront/*. No stock images here.
 
 export type Specimen = {
   id: string;
@@ -13,6 +14,8 @@ export type Specimen = {
   compareAt?: number;
   era?: string;
   blurb: string;
+  /** Absolute image URL of the item's hero photo (served by the API). */
+  image?: string;
 };
 
 export const sampleSpecimens: Specimen[] = [

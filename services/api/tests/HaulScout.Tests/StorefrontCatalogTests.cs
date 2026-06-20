@@ -25,11 +25,11 @@ public class StorefrontCatalogTests
     }
 
     [Fact]
-    public async Task Browse_returns_only_active_listings_for_the_resolved_store()
+    public async Task Browse_returns_only_sellable_inventory_for_the_resolved_store()
     {
         var org = Guid.NewGuid();
         var options = new DbContextOptionsBuilder<HaulScoutDbContext>()
-            .UseInMemoryDatabase(nameof(Browse_returns_only_active_listings_for_the_resolved_store))
+            .UseInMemoryDatabase(nameof(Browse_returns_only_sellable_inventory_for_the_resolved_store))
             .Options;
 
         var seedTenant = new TenantContext();
@@ -37,11 +37,14 @@ public class StorefrontCatalogTests
         await using (var seed = new HaulScoutDbContext(options, seedTenant))
         {
             seed.Organizations.Add(new Organization { Id = org, Name = "Overhaul Trading" });
-            var active = new InventoryItem { Title = "Active item" };
-            var draft = new InventoryItem { Title = "Draft item" };
-            seed.InventoryItems.AddRange(active, draft);
-            seed.StoreListings.Add(new StoreListing { InventoryItemId = active.Id, Slug = "active-item", Title = "Active item", ListPrice = 10m, Status = StoreListingStatus.Active });
-            seed.StoreListings.Add(new StoreListing { InventoryItemId = draft.Id, Slug = "draft-item", Title = "Draft item", ListPrice = 20m, Status = StoreListingStatus.Draft });
+            // Sellable: listed, in stock, priced.
+            seed.InventoryItems.Add(new InventoryItem { Title = "Listed item", Status = InventoryStatus.Listed, Quantity = 1, EstimatedSalePrice = 25m });
+            // Not sellable: still a draft.
+            seed.InventoryItems.Add(new InventoryItem { Title = "Draft item", Status = InventoryStatus.Draft, Quantity = 1, EstimatedSalePrice = 20m });
+            // Not sellable: listed but out of stock.
+            seed.InventoryItems.Add(new InventoryItem { Title = "Out of stock", Status = InventoryStatus.Listed, Quantity = 0, EstimatedSalePrice = 30m });
+            // Not sellable: listed but unpriced.
+            seed.InventoryItems.Add(new InventoryItem { Title = "Unpriced", Status = InventoryStatus.Listed, Quantity = 1 });
             await seed.SaveChangesAsync();
         }
 
@@ -56,7 +59,9 @@ public class StorefrontCatalogTests
         Assert.Null(result.Result);
         var page = result.Value!;
         var only = Assert.Single(page.Items);
-        Assert.Equal("active-item", only.Slug);
+        Assert.Equal("Listed item", only.Title);
+        Assert.Equal(25m, only.ListPrice);
+        Assert.StartsWith("listed-item-", only.Slug);
         Assert.Equal(1, page.Total);
     }
 

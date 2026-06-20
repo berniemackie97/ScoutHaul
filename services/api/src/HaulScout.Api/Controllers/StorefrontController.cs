@@ -1,18 +1,21 @@
+using System.Text;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using HaulScout.Application.Common;
 using HaulScout.Application.Contracts;
 using HaulScout.Domain;
+using HaulScout.Domain.Entities;
 using HaulScout.Infrastructure.Persistence;
 
 namespace HaulScout.Api.Controllers;
 
 /// <summary>
 /// Public, anonymous storefront catalog read API consumed by the Next.js storefront.
-/// The store (organization) is resolved from the X-HaulScout-Store header, which the
-/// storefront sets from its host→org mapping. Only published (Active) listings and a
-/// safe subset of fields are exposed — never cost, supplier, or internal data.
+/// Serves the organisation's REAL sellable inventory directly — one shared inventory,
+/// no separate "publish" step. The store (organization) is resolved from the
+/// X-HaulScout-Store header. Only a safe subset of fields is exposed — never cost,
+/// supplier, or internal data.
 /// </summary>
 [ApiController]
 [Route("api/storefront")]
@@ -20,6 +23,175 @@ namespace HaulScout.Api.Controllers;
 public sealed class StorefrontController(HaulScoutDbContext db, ITenantContext tenant) : ControllerBase
 {
     private const string StoreHeader = "X-HaulScout-Store";
+
+    // Inventory a customer may actually buy: in stock, priced, and marked ready/listed.
+    private IQueryable<InventoryItem> SellableItems() =>
+        db.InventoryItems.Where(i =>
+            !i.IsArchived
+            && i.Quantity > 0
+            && (i.Status == InventoryStatus.Listed || i.Status == InventoryStatus.ReadyToList)
+            && (i.EstimatedSalePrice ?? i.SellerAskingPrice) > 0m);
+
+    [HttpGet("listings")]
+    public async Task<ActionResult<StorefrontPageDto<StorefrontListingDto>>> Browse(
+        [FromQuery] string? category,
+        [FromQuery] string? search,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 24,
+        CancellationToken cancellationToken = default)
+    {
+        if (!await TryResolveStoreAsync(cancellationToken))
+        {
+            return BadRequest("Unknown store.");
+        }
+
+        page = Math.Max(page, 1);
+        pageSize = Math.Clamp(pageSize, 1, 60);
+
+        var query = SellableItems();
+
+        if (!string.IsNullOrWhiteSpace(category))
+        {
+            var slug = category.Trim();
+            var name = (await query
+                    .Where(i => i.Category != null && i.Category != "")
+                    .Select(i => i.Category!)
+                    .Distinct()
+                    .ToListAsync(cancellationToken))
+                .FirstOrDefault(n => Slugify(n) == slug);
+            query = name is null ? query.Where(_ => false) : query.Where(i => i.Category == name);
+        }
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = $"%{search.Trim()}%";
+            query = query.Where(i =>
+                EF.Functions.ILike(i.Title, term)
+                || (i.Brand != null && EF.Functions.ILike(i.Brand, term)));
+        }
+
+        var total = await query.CountAsync(cancellationToken);
+
+        var rows = await query
+            .OrderByDescending(i => i.ListedAt ?? i.CreatedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(i => new
+            {
+                i.Id,
+                i.Title,
+                i.Brand,
+                i.Category,
+                i.Condition,
+                ListPrice = i.EstimatedSalePrice ?? i.SellerAskingPrice ?? 0m,
+                HeroPhotoId = i.Photos
+                    .OrderByDescending(p => p.IsHero)
+                    .ThenBy(p => p.SortOrder)
+                    .Select(p => (Guid?)p.Id)
+                    .FirstOrDefault(),
+            })
+            .ToListAsync(cancellationToken);
+
+        var items = rows
+            .Select(r => new StorefrontListingDto(
+                r.Id, BuildSlug(r.Title, r.Id), r.Title, null, r.ListPrice, null,
+                false, null, r.Condition, r.Brand, PhotoUrl(r.HeroPhotoId), r.Category))
+            .ToList();
+
+        return new StorefrontPageDto<StorefrontListingDto>(items, page, pageSize, total);
+    }
+
+    [HttpGet("listings/{slug}")]
+    public async Task<ActionResult<StorefrontListingDetailDto>> Detail(string slug, CancellationToken cancellationToken)
+    {
+        if (!await TryResolveStoreAsync(cancellationToken))
+        {
+            return BadRequest("Unknown store.");
+        }
+
+        if (!TryGetSlugId(slug, out var itemId))
+        {
+            return NotFound();
+        }
+
+        var row = await SellableItems()
+            .Where(i => i.Id == itemId)
+            .Select(i => new
+            {
+                i.Id,
+                i.Title,
+                i.Description,
+                i.Brand,
+                i.Category,
+                i.Condition,
+                ListPrice = i.EstimatedSalePrice ?? i.SellerAskingPrice ?? 0m,
+                HeroPhotoId = i.Photos
+                    .OrderByDescending(p => p.IsHero)
+                    .ThenBy(p => p.SortOrder)
+                    .Select(p => (Guid?)p.Id)
+                    .FirstOrDefault(),
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (row is null)
+        {
+            return NotFound();
+        }
+
+        return new StorefrontListingDetailDto(
+            row.Id, BuildSlug(row.Title, row.Id), row.Title, null, row.Description,
+            row.ListPrice, null, row.Brand, row.Condition, row.Title, row.Description,
+            PhotoUrl(row.HeroPhotoId), row.Category);
+    }
+
+    [HttpGet("categories")]
+    public async Task<ActionResult<IReadOnlyList<StoreCategoryDto>>> Categories(CancellationToken cancellationToken)
+    {
+        if (!await TryResolveStoreAsync(cancellationToken))
+        {
+            return BadRequest("Unknown store.");
+        }
+
+        var groups = await SellableItems()
+            .Where(i => i.Category != null && i.Category != "")
+            .GroupBy(i => i.Category!)
+            .Select(g => new { Name = g.Key, Count = g.Count() })
+            .OrderByDescending(g => g.Count)
+            .ToListAsync(cancellationToken);
+
+        var categories = groups
+            .Select((c, idx) => new StoreCategoryDto(Guid.Empty, c.Name, Slugify(c.Name), null, null, idx, true))
+            .ToList();
+
+        return categories;
+    }
+
+    [HttpGet("photos/{photoId:guid}")]
+    public async Task<IActionResult> Photo(Guid photoId, [FromQuery] string? size, CancellationToken cancellationToken)
+    {
+        if (!await TryResolveStoreAsync(cancellationToken))
+        {
+            return BadRequest("Unknown store.");
+        }
+
+        // Store-scoped automatically: InventoryPhoto is IOrganizationScoped, so the global
+        // query filter restricts this lookup to the resolved store's photos.
+        var full = string.Equals(size, "full", StringComparison.OrdinalIgnoreCase);
+        var photo = await db.InventoryPhotos
+            .Where(p => p.Id == photoId)
+            .Select(p => new { Bytes = full ? p.OriginalBytes : p.ThumbnailBytes, p.ContentType })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (photo is null)
+        {
+            return NotFound();
+        }
+
+        Response.Headers.CacheControl = "public, max-age=31536000, immutable";
+        return File(photo.Bytes, full ? photo.ContentType : "image/jpeg");
+    }
+
+    // ── store resolution + helpers ──────────────────────────────────────────
 
     private async Task<bool> TryResolveStoreAsync(CancellationToken cancellationToken)
     {
@@ -71,108 +243,34 @@ public sealed class StorefrontController(HaulScoutDbContext db, ITenantContext t
         return colon >= 0 ? domain[..colon] : domain;
     }
 
-    [HttpGet("listings")]
-    public async Task<ActionResult<StorefrontPageDto<StorefrontListingDto>>> Browse(
-        [FromQuery] string? category,
-        [FromQuery] string? search,
-        [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 24,
-        CancellationToken cancellationToken = default)
+    private static string? PhotoUrl(Guid? photoId) =>
+        photoId is null ? null : $"/api/storefront/photos/{photoId}";
+
+    private static string Slugify(string value)
     {
-        if (!await TryResolveStoreAsync(cancellationToken))
+        var sb = new StringBuilder(value.Length);
+        foreach (var ch in value.ToLowerInvariant())
         {
-            return BadRequest("Unknown store.");
+            sb.Append(char.IsLetterOrDigit(ch) ? ch : '-');
         }
 
-        page = Math.Max(page, 1);
-        pageSize = Math.Clamp(pageSize, 1, 60);
-
-        var query = db.StoreListings.Where(listing => listing.Status == StoreListingStatus.Active);
-
-        if (!string.IsNullOrWhiteSpace(category))
+        var slug = sb.ToString();
+        while (slug.Contains("--", StringComparison.Ordinal))
         {
-            var categorySlug = category.Trim();
-            query = query.Where(listing => listing.StoreCategory != null && listing.StoreCategory.Slug == categorySlug);
+            slug = slug.Replace("--", "-");
         }
 
-        if (!string.IsNullOrWhiteSpace(search))
-        {
-            var term = $"%{search.Trim()}%";
-            query = query.Where(listing => EF.Functions.ILike(listing.Title, term));
-        }
-
-        var total = await query.CountAsync(cancellationToken);
-
-        var items = await query
-            .OrderByDescending(listing => listing.IsFeatured)
-            .ThenByDescending(listing => listing.PublishedAt)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .Select(listing => new StorefrontListingDto(
-                listing.Id,
-                listing.Slug,
-                listing.Title,
-                listing.Subtitle,
-                listing.ListPrice,
-                listing.CompareAtPrice,
-                listing.IsFeatured,
-                listing.StoreCategoryId,
-                listing.InventoryItem!.Condition,
-                listing.InventoryItem!.Brand))
-            .ToListAsync(cancellationToken);
-
-        return new StorefrontPageDto<StorefrontListingDto>(items, page, pageSize, total);
+        return slug.Trim('-');
     }
 
-    [HttpGet("listings/{slug}")]
-    public async Task<ActionResult<StorefrontListingDetailDto>> Detail(string slug, CancellationToken cancellationToken)
+    // Stable, unique slug derived from the item: "{title-slug}-{id:N}".
+    private static string BuildSlug(string title, Guid id) => $"{Slugify(title)}-{id:N}";
+
+    private static bool TryGetSlugId(string slug, out Guid id)
     {
-        if (!await TryResolveStoreAsync(cancellationToken))
-        {
-            return BadRequest("Unknown store.");
-        }
-
-        var detail = await db.StoreListings
-            .Where(listing => listing.Slug == slug && listing.Status == StoreListingStatus.Active)
-            .Select(listing => new StorefrontListingDetailDto(
-                listing.Id,
-                listing.Slug,
-                listing.Title,
-                listing.Subtitle,
-                listing.Description,
-                listing.ListPrice,
-                listing.CompareAtPrice,
-                listing.InventoryItem!.Brand,
-                listing.InventoryItem!.Condition,
-                listing.MetaTitle,
-                listing.MetaDescription))
-            .FirstOrDefaultAsync(cancellationToken);
-
-        return detail is null ? NotFound() : detail;
-    }
-
-    [HttpGet("categories")]
-    public async Task<ActionResult<IReadOnlyList<StoreCategoryDto>>> Categories(CancellationToken cancellationToken)
-    {
-        if (!await TryResolveStoreAsync(cancellationToken))
-        {
-            return BadRequest("Unknown store.");
-        }
-
-        var categories = await db.StoreCategories
-            .Where(category => category.IsActive)
-            .OrderBy(category => category.SortOrder)
-            .ThenBy(category => category.Name)
-            .Select(category => new StoreCategoryDto(
-                category.Id,
-                category.Name,
-                category.Slug,
-                category.Description,
-                category.ParentId,
-                category.SortOrder,
-                category.IsActive))
-            .ToListAsync(cancellationToken);
-
-        return categories.ToList();
+        id = Guid.Empty;
+        return !string.IsNullOrEmpty(slug)
+            && slug.Length >= 32
+            && Guid.TryParseExact(slug[^32..], "N", out id);
     }
 }
