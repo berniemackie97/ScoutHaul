@@ -4,24 +4,44 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard, Package, ShoppingCart, Users, Wrench,
-  HandCoins, Truck, BarChart3, FileText, Settings,
+  HandCoins, Truck, BarChart3, Settings,
   ChevronLeft, ChevronRight, LogOut, Package2,
 } from "lucide-react";
 import { useState } from "react";
 import { cn, Button } from "@overhaul/ui";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
-const navItems = [
-  { name: "Dashboard", href: "/", icon: LayoutDashboard },
-  { name: "Inventory", href: "/inventory", icon: Package },
-  { name: "Orders", href: "/orders", icon: ShoppingCart },
-  { name: "Customers", href: "/customers", icon: Users },
-  { name: "Repairs", href: "/repairs", icon: Wrench },
-  { name: "Consignments", href: "/consignments", icon: HandCoins },
-  { name: "Suppliers", href: "/suppliers", icon: Truck },
-  { name: "Analytics", href: "/analytics", icon: BarChart3 },
-  { name: "Blog", href: "/blog", icon: FileText },
-  { name: "Settings", href: "/settings", icon: Settings },
+const navGroups = [
+  {
+    label: "Control",
+    items: [
+      { name: "Command Center", href: "/", icon: LayoutDashboard },
+      { name: "Inventory", href: "/inventory", icon: Package },
+    ],
+  },
+  {
+    label: "Commerce",
+    items: [
+      { name: "Orders", href: "/orders", icon: ShoppingCart },
+      { name: "Customers", href: "/customers", icon: Users },
+    ],
+  },
+  {
+    label: "Operations",
+    items: [
+      { name: "Repairs", href: "/repairs", icon: Wrench },
+      { name: "Consignments", href: "/consignments", icon: HandCoins },
+      { name: "Suppliers", href: "/suppliers", icon: Truck },
+    ],
+  },
+  {
+    label: "Intelligence",
+    items: [{ name: "Reports", href: "/analytics", icon: BarChart3 }],
+  },
+  {
+    label: "System",
+    items: [{ name: "Settings", href: "/settings", icon: Settings }],
+  },
 ];
 
 export function Sidebar() {
@@ -51,8 +71,8 @@ export function Sidebar() {
               <Package2 className="h-4 w-4 text-white" />
             </div>
             <div>
-              <p className="font-bold text-sm leading-none">Overhaul</p>
-              <p className="text-[10px] text-muted-foreground leading-none mt-0.5">Admin Portal</p>
+              <p className="font-bold text-sm leading-none">HaulScout</p>
+              <p className="text-[10px] text-muted-foreground leading-none mt-0.5">Operator Console</p>
             </div>
           </Link>
         )}
@@ -68,26 +88,31 @@ export function Sidebar() {
 
       {/* Nav */}
       <nav className="flex-1 px-2 py-4 space-y-1 overflow-y-auto">
-        {navItems.map((item) => {
-          const isActive = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-                isActive
-                  ? "bg-brand-100 text-brand-700 dark:bg-brand-900 dark:text-brand-100"
-                  : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
-                collapsed && "justify-center px-2"
-              )}
-              title={collapsed ? item.name : undefined}
-            >
-              <item.icon className="h-4 w-4 shrink-0" />
-              {!collapsed && <span>{item.name}</span>}
-            </Link>
-          );
-        })}
+        {navGroups.map((group) => (
+          <div key={group.label} className="mb-4">
+            {!collapsed && <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/70">{group.label}</p>}
+            {group.items.map((item) => {
+              const isActive = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                    isActive
+                      ? "bg-brand-100 text-brand-700 dark:bg-brand-900 dark:text-brand-100"
+                      : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+                    collapsed && "justify-center px-2"
+                  )}
+                  title={collapsed ? item.name : undefined}
+                >
+                  <item.icon className="h-4 w-4 shrink-0" />
+                  {!collapsed && <span>{item.name}</span>}
+                </Link>
+              );
+            })}
+          </div>
+        ))}
       </nav>
 
       {/* Footer */}

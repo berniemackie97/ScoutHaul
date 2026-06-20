@@ -13,6 +13,11 @@ const apiHost = (() => {
 
 const nextConfig: NextConfig = {
   transpilePackages: ["@overhaul/ui", "@overhaul/api-client"],
+  experimental: {
+    serverActions: {
+      bodySizeLimit: "10mb",
+    },
+  },
   images: {
     remotePatterns: [{ protocol: "https", hostname: apiHost }],
   },
