@@ -3898,6 +3898,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/storefront/photos/{photoId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    size?: string;
+                };
+                header?: never;
+                path: {
+                    photoId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/tasks": {
         parameters: {
             query?: never;
@@ -5054,6 +5091,8 @@ export interface components {
             condition?: string | null;
             metaTitle?: string | null;
             metaDescription?: string | null;
+            imageUrl?: string | null;
+            category?: string | null;
         };
         StorefrontListingDto: {
             /** Format: uuid */
@@ -5070,6 +5109,8 @@ export interface components {
             storeCategoryId?: string | null;
             condition?: string | null;
             brand?: string | null;
+            imageUrl?: string | null;
+            category?: string | null;
         };
         StorefrontListingDtoStorefrontPageDto: {
             items?: components["schemas"]["StorefrontListingDto"][] | null;

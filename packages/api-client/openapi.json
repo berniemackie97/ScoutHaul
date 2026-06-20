@@ -4913,6 +4913,36 @@
         }
       }
     },
+    "/api/storefront/photos/{photoId}": {
+      "get": {
+        "tags": [
+          "Storefront"
+        ],
+        "parameters": [
+          {
+            "name": "photoId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
     "/api/tasks": {
       "post": {
         "tags": [
@@ -7874,6 +7904,14 @@
           "metaDescription": {
             "type": "string",
             "nullable": true
+          },
+          "imageUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "category": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -7919,6 +7957,14 @@
             "nullable": true
           },
           "brand": {
+            "type": "string",
+            "nullable": true
+          },
+          "imageUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "category": {
             "type": "string",
             "nullable": true
           }

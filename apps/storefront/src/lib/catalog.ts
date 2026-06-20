@@ -1,4 +1,4 @@
-import { storefrontApi, liveCatalogEnabled } from "./store";
+import { storefrontApi, liveCatalogEnabled, STORE } from "./store";
 import { sampleSpecimens, sampleCategories, type Specimen } from "./sample-data";
 
 // Storefront data access. Calls the live public API (/api/storefront/*) when a store
@@ -43,11 +43,12 @@ export async function getListings(opts?: { category?: string; search?: string })
             slug: dto.slug ?? "",
             title: dto.title ?? "",
             brand: dto.brand ?? undefined,
-            category: "",
+            category: dto.category ?? "",
             condition: dto.condition ?? "Good",
             price: dto.listPrice ?? 0,
             compareAt: dto.compareAtPrice ?? undefined,
             blurb: dto.subtitle ?? "",
+            image: dto.imageUrl ? STORE.apiBaseUrl + dto.imageUrl : undefined,
           }),
         );
       }
@@ -70,11 +71,12 @@ export async function getListing(slug: string): Promise<Specimen | null> {
           slug: data.slug ?? "",
           title: data.title ?? "",
           brand: data.brand ?? undefined,
-          category: "",
+          category: data.category ?? "",
           condition: data.condition ?? "Good",
           price: data.listPrice ?? 0,
           compareAt: data.compareAtPrice ?? undefined,
           blurb: data.description ?? data.subtitle ?? "",
+          image: data.imageUrl ? STORE.apiBaseUrl + data.imageUrl : undefined,
         };
       }
     } catch {

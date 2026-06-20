@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { notFound } from "next/navigation";
 import { ArrowLeft, BadgeCheck, ShieldCheck, Truck, RotateCcw, MapPin } from "lucide-react";
 import { ProductCard } from "@/components/store/product-card";
@@ -64,9 +65,20 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
             </div>
 
             <div className="relative aspect-[4/5] overflow-hidden bg-surface ring-1 ring-rule">
-              <div className="absolute inset-0 flex items-center justify-center">
-                <span className="font-heading text-[9rem] text-ink/[0.06]">OT</span>
-              </div>
+              {item.image ? (
+                <Image
+                  src={item.image}
+                  alt={item.title}
+                  fill
+                  sizes="(max-width: 1024px) 100vw, 50vw"
+                  className="object-cover"
+                  priority
+                />
+              ) : (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="font-heading text-[9rem] text-ink/[0.06]">OT</span>
+                </div>
+              )}
               {item.sku ? (
                 <span className="absolute right-4 top-4 font-mono text-[11px] uppercase tracking-[0.18em] text-slate/60">
                   {item.sku}

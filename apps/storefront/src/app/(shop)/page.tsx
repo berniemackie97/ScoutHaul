@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { ArrowRight, ArrowUpRight, BadgeCheck } from "lucide-react";
 import { ProductCard } from "@/components/store/product-card";
 import { NewsletterForm } from "@/components/store/newsletter-form";
@@ -124,11 +125,22 @@ export default async function HomePage() {
 
               <Link href={`/products/${featured.slug}`} className="group block">
                 <div className="relative aspect-[4/5] overflow-hidden bg-background/[0.04] ring-1 ring-background/15 transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:-translate-y-1.5">
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="font-heading text-[9rem] text-background/[0.05] transition-transform duration-[800ms] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-105">
-                      OT
-                    </span>
-                  </div>
+                  {featured.image ? (
+                    <Image
+                      src={featured.image}
+                      alt={featured.title}
+                      fill
+                      sizes="(max-width: 1024px) 100vw, 45vw"
+                      className="object-cover transition-transform duration-[800ms] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-105"
+                      priority
+                    />
+                  ) : (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <span className="font-heading text-[9rem] text-background/[0.05] transition-transform duration-[800ms] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-105">
+                        OT
+                      </span>
+                    </div>
+                  )}
                   <span aria-hidden className="absolute right-4 top-4 h-7 w-7 border-r-2 border-t-2 border-copper" />
                   <div className="absolute inset-x-0 bottom-0 space-y-2 bg-gradient-to-t from-ink via-ink/80 to-transparent px-6 pb-6 pt-20">
                     <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.18em] text-copper">
