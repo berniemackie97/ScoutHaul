@@ -33,7 +33,9 @@ export default function SignInPage() {
     setError(null);
     setMessage(null);
     const supabase = createSupabaseBrowserClient();
-    const emailRedirectTo = `${window.location.origin}/auth/callback?next=/`;
+    // Keep this byte-for-byte identical to the production Supabase redirect allowlist.
+    // Adding even a harmless query string can make Supabase fall back to the mobile Site URL.
+    const emailRedirectTo = `${window.location.origin}/auth/callback`;
     const { error: signInError } = await supabase.auth.signInWithOtp({
       email: normalizedEmail,
       options: {
