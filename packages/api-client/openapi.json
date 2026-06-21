@@ -342,6 +342,13 @@
             }
           },
           {
+            "name": "lifecycle",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/InventoryLifecycleGroup"
+            }
+          },
+          {
             "name": "includeArchived",
             "in": "query",
             "schema": {
@@ -6308,6 +6315,12 @@
           "isArchived": {
             "type": "boolean"
           },
+          "lifecycleGroup": {
+            "$ref": "#/components/schemas/InventoryLifecycleGroup"
+          },
+          "isSold": {
+            "type": "boolean"
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time"
@@ -6318,6 +6331,15 @@
           }
         },
         "additionalProperties": false
+      },
+      "InventoryLifecycleGroup": {
+        "enum": [
+          "Active",
+          "Sold",
+          "Returned",
+          "Removed"
+        ],
+        "type": "string"
       },
       "InventoryPhotoDto": {
         "type": "object",

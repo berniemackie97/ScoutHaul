@@ -138,6 +138,8 @@ public sealed record InventoryItemDto(
     IReadOnlyList<InventoryPhotoDto> Photos,
     string? HeroPhotoThumbnailUrl,
     bool IsArchived,
+    InventoryLifecycleGroup LifecycleGroup,
+    bool IsSold,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);
 

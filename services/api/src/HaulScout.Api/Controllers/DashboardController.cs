@@ -18,19 +18,10 @@ public sealed class DashboardController(HaulScoutDbContext db, ICurrentUserConte
     {
         Guid organizationId = currentUser.OrganizationId;
 
-        var currentInventoryStatuses = new[]
-        {
-            InventoryStatus.Draft,
-            InventoryStatus.Researching,
-            InventoryStatus.Watchlist,
-            InventoryStatus.Purchased,
-            InventoryStatus.NeedsCleaning,
-            InventoryStatus.NeedsTesting,
-            InventoryStatus.NeedsPhotos,
-            InventoryStatus.ReadyToList,
-            InventoryStatus.Listed,
-            InventoryStatus.Packed
-        };
+        // Current inventory = the Active lifecycle group (unsold, workable). Sold/fulfilling items
+        // (Sold, Packed, Shipped, Delivered) are intentionally excluded so they never inflate
+        // inventory value or show up as "stale" / "unlisted".
+        var currentInventoryStatuses = InventoryLifecycle.InGroup(InventoryLifecycleGroup.Active).ToArray();
 
         var unlistedStatuses = new[]
         {

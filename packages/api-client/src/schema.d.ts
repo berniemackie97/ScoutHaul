@@ -336,6 +336,7 @@ export interface paths {
             parameters: {
                 query?: {
                     status?: components["schemas"]["InventoryStatus"];
+                    lifecycle?: components["schemas"]["InventoryLifecycleGroup"];
                     includeArchived?: boolean;
                 };
                 header?: never;
@@ -4688,11 +4689,15 @@ export interface components {
             photos?: components["schemas"]["InventoryPhotoDto"][] | null;
             heroPhotoThumbnailUrl?: string | null;
             isArchived?: boolean;
+            lifecycleGroup?: components["schemas"]["InventoryLifecycleGroup"];
+            isSold?: boolean;
             /** Format: date-time */
             createdAt?: string;
             /** Format: date-time */
             updatedAt?: string;
         };
+        /** @enum {string} */
+        InventoryLifecycleGroup: "Active" | "Sold" | "Returned" | "Removed";
         InventoryPhotoDto: {
             /** Format: uuid */
             id?: string;
