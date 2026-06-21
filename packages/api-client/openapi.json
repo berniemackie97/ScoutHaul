@@ -3068,6 +3068,83 @@
         }
       }
     },
+    "/api/reports/overview": {
+      "get": {
+        "tags": [
+          "Reports"
+        ],
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/BusinessReportDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BusinessReportDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BusinessReportDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/reports/overview.csv": {
+      "get": {
+        "tags": [
+          "Reports"
+        ],
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
     "/api/sales": {
       "get": {
         "tags": [
@@ -5384,6 +5461,86 @@
         },
         "additionalProperties": false
       },
+      "BusinessReportDto": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "to": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "granularity": {
+            "type": "string",
+            "nullable": true
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "kpis": {
+            "$ref": "#/components/schemas/ReportKpiDto"
+          },
+          "comparison": {
+            "$ref": "#/components/schemas/ReportComparisonDto"
+          },
+          "inventory": {
+            "$ref": "#/components/schemas/ReportInventorySnapshotDto"
+          },
+          "series": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReportSeriesPointDto"
+            },
+            "nullable": true
+          },
+          "platforms": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReportDimensionDto"
+            },
+            "nullable": true
+          },
+          "expenseCategories": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReportDimensionDto"
+            },
+            "nullable": true
+          },
+          "inventoryCategories": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReportDimensionDto"
+            },
+            "nullable": true
+          },
+          "inventoryStatuses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReportDimensionDto"
+            },
+            "nullable": true
+          },
+          "aging": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReportAgingBucketDto"
+            },
+            "nullable": true
+          },
+          "topSales": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReportSaleRowDto"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "ChangeInventoryStatusRequest": {
         "type": "object",
         "properties": {
@@ -7143,6 +7300,258 @@
         },
         "additionalProperties": false
       },
+      "ReportAgingBucketDto": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string",
+            "nullable": true
+          },
+          "count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "cost": {
+            "type": "number",
+            "format": "double"
+          },
+          "estimatedValue": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ReportChangeDto": {
+        "type": "object",
+        "properties": {
+          "current": {
+            "type": "number",
+            "format": "double"
+          },
+          "previous": {
+            "type": "number",
+            "format": "double"
+          },
+          "percentChange": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ReportComparisonDto": {
+        "type": "object",
+        "properties": {
+          "grossSales": {
+            "$ref": "#/components/schemas/ReportChangeDto"
+          },
+          "netProfit": {
+            "$ref": "#/components/schemas/ReportChangeDto"
+          },
+          "salesCount": {
+            "$ref": "#/components/schemas/ReportChangeDto"
+          },
+          "averageSaleValue": {
+            "$ref": "#/components/schemas/ReportChangeDto"
+          },
+          "operatingExpenses": {
+            "$ref": "#/components/schemas/ReportChangeDto"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ReportDimensionDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "amount": {
+            "type": "number",
+            "format": "double"
+          },
+          "secondaryAmount": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ReportInventorySnapshotDto": {
+        "type": "object",
+        "properties": {
+          "itemCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "cost": {
+            "type": "number",
+            "format": "double"
+          },
+          "estimatedValue": {
+            "type": "number",
+            "format": "double"
+          },
+          "unlistedCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "staleCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "missingCostCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "missingValueCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "missingLocationCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "missingPhotoCount": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ReportKpiDto": {
+        "type": "object",
+        "properties": {
+          "salesCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "returnedSalesCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "grossSales": {
+            "type": "number",
+            "format": "double"
+          },
+          "costOfGoods": {
+            "type": "number",
+            "format": "double"
+          },
+          "grossProfit": {
+            "type": "number",
+            "format": "double"
+          },
+          "saleCosts": {
+            "type": "number",
+            "format": "double"
+          },
+          "realizedNetProfit": {
+            "type": "number",
+            "format": "double"
+          },
+          "operatingExpenses": {
+            "type": "number",
+            "format": "double"
+          },
+          "inventorySpend": {
+            "type": "number",
+            "format": "double"
+          },
+          "averageSaleValue": {
+            "type": "number",
+            "format": "double"
+          },
+          "netMarginPercent": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ReportSaleRowDto": {
+        "type": "object",
+        "properties": {
+          "saleId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "inventoryItemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "platform": {
+            "type": "string",
+            "nullable": true
+          },
+          "soldPrice": {
+            "type": "number",
+            "format": "double"
+          },
+          "purchaseCost": {
+            "type": "number",
+            "format": "double"
+          },
+          "netProfit": {
+            "type": "number",
+            "format": "double"
+          },
+          "marginPercent": {
+            "type": "number",
+            "format": "double"
+          },
+          "soldAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ReportSeriesPointDto": {
+        "type": "object",
+        "properties": {
+          "periodStart": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "label": {
+            "type": "string",
+            "nullable": true
+          },
+          "grossSales": {
+            "type": "number",
+            "format": "double"
+          },
+          "netProfit": {
+            "type": "number",
+            "format": "double"
+          },
+          "operatingExpenses": {
+            "type": "number",
+            "format": "double"
+          },
+          "inventorySpend": {
+            "type": "number",
+            "format": "double"
+          },
+          "salesCount": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
       "ResaleComp": {
         "type": "object",
         "properties": {
@@ -7248,6 +7657,10 @@
             "nullable": true
           },
           "soldPrice": {
+            "type": "number",
+            "format": "double"
+          },
+          "costOfGoods": {
             "type": "number",
             "format": "double"
           },
@@ -8635,6 +9048,9 @@
     },
     {
       "name": "ProductIdentities"
+    },
+    {
+      "name": "Reports"
     },
     {
       "name": "Sales"

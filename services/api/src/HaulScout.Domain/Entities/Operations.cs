@@ -84,6 +84,7 @@ public sealed class Sale : EntityBase, IOrganizationScoped
     public Listing? Listing { get; set; }
     public required string Platform { get; set; }
     public decimal SoldPrice { get; set; }
+    public decimal CostOfGoods { get; set; }
     public decimal PlatformFees { get; set; }
     public decimal PaymentFees { get; set; }
     public decimal ShippingCost { get; set; }

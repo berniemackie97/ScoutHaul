@@ -255,6 +255,7 @@ public static class DtoMapping
         item.ListingId,
         item.Platform,
         item.SoldPrice,
+        item.CostOfGoods,
         item.PlatformFees,
         item.PaymentFees,
         item.ShippingCost,

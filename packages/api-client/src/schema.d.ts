@@ -2414,6 +2414,82 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/reports/overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    from?: string;
+                    to?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["BusinessReportDto"];
+                        "application/json": components["schemas"]["BusinessReportDto"];
+                        "text/json": components["schemas"]["BusinessReportDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/reports/overview.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    from?: string;
+                    to?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/sales": {
         parameters: {
             query?: never;
@@ -4236,6 +4312,25 @@ export interface components {
             /** Format: double */
             remainingAmount?: number;
         };
+        BusinessReportDto: {
+            /** Format: date-time */
+            from?: string;
+            /** Format: date-time */
+            to?: string;
+            granularity?: string | null;
+            /** Format: date-time */
+            generatedAt?: string;
+            kpis?: components["schemas"]["ReportKpiDto"];
+            comparison?: components["schemas"]["ReportComparisonDto"];
+            inventory?: components["schemas"]["ReportInventorySnapshotDto"];
+            series?: components["schemas"]["ReportSeriesPointDto"][] | null;
+            platforms?: components["schemas"]["ReportDimensionDto"][] | null;
+            expenseCategories?: components["schemas"]["ReportDimensionDto"][] | null;
+            inventoryCategories?: components["schemas"]["ReportDimensionDto"][] | null;
+            inventoryStatuses?: components["schemas"]["ReportDimensionDto"][] | null;
+            aging?: components["schemas"]["ReportAgingBucketDto"][] | null;
+            topSales?: components["schemas"]["ReportSaleRowDto"][] | null;
+        };
         ChangeInventoryStatusRequest: {
             status?: components["schemas"]["InventoryStatus"];
         };
@@ -4820,6 +4915,116 @@ export interface components {
         ReorderSourcingTripStopsRequest: {
             stopIds?: string[] | null;
         };
+        ReportAgingBucketDto: {
+            label?: string | null;
+            /** Format: int32 */
+            count?: number;
+            /** Format: double */
+            cost?: number;
+            /** Format: double */
+            estimatedValue?: number;
+        };
+        ReportChangeDto: {
+            /** Format: double */
+            current?: number;
+            /** Format: double */
+            previous?: number;
+            /** Format: double */
+            percentChange?: number | null;
+        };
+        ReportComparisonDto: {
+            grossSales?: components["schemas"]["ReportChangeDto"];
+            netProfit?: components["schemas"]["ReportChangeDto"];
+            salesCount?: components["schemas"]["ReportChangeDto"];
+            averageSaleValue?: components["schemas"]["ReportChangeDto"];
+            operatingExpenses?: components["schemas"]["ReportChangeDto"];
+        };
+        ReportDimensionDto: {
+            name?: string | null;
+            /** Format: int32 */
+            count?: number;
+            /** Format: double */
+            amount?: number;
+            /** Format: double */
+            secondaryAmount?: number;
+        };
+        ReportInventorySnapshotDto: {
+            /** Format: int32 */
+            itemCount?: number;
+            /** Format: double */
+            cost?: number;
+            /** Format: double */
+            estimatedValue?: number;
+            /** Format: int32 */
+            unlistedCount?: number;
+            /** Format: int32 */
+            staleCount?: number;
+            /** Format: int32 */
+            missingCostCount?: number;
+            /** Format: int32 */
+            missingValueCount?: number;
+            /** Format: int32 */
+            missingLocationCount?: number;
+            /** Format: int32 */
+            missingPhotoCount?: number;
+        };
+        ReportKpiDto: {
+            /** Format: int32 */
+            salesCount?: number;
+            /** Format: int32 */
+            returnedSalesCount?: number;
+            /** Format: double */
+            grossSales?: number;
+            /** Format: double */
+            costOfGoods?: number;
+            /** Format: double */
+            grossProfit?: number;
+            /** Format: double */
+            saleCosts?: number;
+            /** Format: double */
+            realizedNetProfit?: number;
+            /** Format: double */
+            operatingExpenses?: number;
+            /** Format: double */
+            inventorySpend?: number;
+            /** Format: double */
+            averageSaleValue?: number;
+            /** Format: double */
+            netMarginPercent?: number;
+        };
+        ReportSaleRowDto: {
+            /** Format: uuid */
+            saleId?: string;
+            /** Format: uuid */
+            inventoryItemId?: string;
+            title?: string | null;
+            platform?: string | null;
+            /** Format: double */
+            soldPrice?: number;
+            /** Format: double */
+            purchaseCost?: number;
+            /** Format: double */
+            netProfit?: number;
+            /** Format: double */
+            marginPercent?: number;
+            /** Format: date-time */
+            soldAt?: string;
+        };
+        ReportSeriesPointDto: {
+            /** Format: date-time */
+            periodStart?: string;
+            label?: string | null;
+            /** Format: double */
+            grossSales?: number;
+            /** Format: double */
+            netProfit?: number;
+            /** Format: double */
+            operatingExpenses?: number;
+            /** Format: double */
+            inventorySpend?: number;
+            /** Format: int32 */
+            salesCount?: number;
+        };
         ResaleComp: {
             /** Format: double */
             price?: number;
@@ -4858,6 +5063,8 @@ export interface components {
             platform?: string | null;
             /** Format: double */
             soldPrice?: number;
+            /** Format: double */
+            costOfGoods?: number;
             /** Format: double */
             platformFees?: number;
             /** Format: double */

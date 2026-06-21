@@ -107,6 +107,7 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
             ListingId = request.ListingId,
             Platform = request.Platform.Trim(),
             SoldPrice = request.SoldPrice,
+            CostOfGoods = item.PurchasePrice ?? 0,
             PlatformFees = request.PlatformFees,
             PaymentFees = request.PaymentFees,
             ShippingCost = request.ShippingCost,
@@ -162,7 +163,7 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
 
         RealizedSaleFinancials financials = ResaleFinancialCalculator.CalculateRealizedSale(
             sale.SoldPrice,
-            sale.InventoryItem?.PurchasePrice ?? 0,
+            sale.CostOfGoods,
             sale.PlatformFees,
             sale.PaymentFees,
             sale.ShippingCost,
