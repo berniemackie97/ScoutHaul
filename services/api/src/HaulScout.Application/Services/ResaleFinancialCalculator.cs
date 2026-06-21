@@ -40,6 +40,13 @@ public static class ResaleFinancialCalculator
             RoundPercent(marginPercent));
     }
 
+    /// <summary>
+    /// Sales tax we owe the state for a sale. Zero when the marketplace remits it (facilitator pass-through);
+    /// otherwise the collected tax becomes our liability. Never affects net profit either way.
+    /// </summary>
+    public static decimal SalesTaxOwed(decimal salesTaxCollected, bool remittedByPlatform) =>
+        remittedByPlatform ? 0m : RoundMoney(Math.Max(0, salesTaxCollected));
+
     private static decimal RoundMoney(decimal value) => decimal.Round(value, 2, MidpointRounding.AwayFromZero);
     private static decimal RoundPercent(decimal value) => decimal.Round(value, 2, MidpointRounding.AwayFromZero);
 }

@@ -1,4 +1,5 @@
 using HaulScout.Application.Contracts;
+using HaulScout.Application.Services;
 using HaulScout.Domain.Entities;
 using System.Text.Json;
 
@@ -261,10 +262,23 @@ public static class DtoMapping
         item.ShippingCost,
         item.SuppliesCost,
         item.OtherCosts,
+        item.SalesTaxCollected,
+        item.TaxRemittedByPlatform,
+        ResaleFinancialCalculator.SalesTaxOwed(item.SalesTaxCollected, item.TaxRemittedByPlatform),
         item.NetProfit,
         item.Status,
         item.SoldAt,
         item.Notes);
+
+    public static SaleCorrectionDto ToDto(this SaleCorrection item) => new(
+        item.Id,
+        item.SaleId,
+        item.Version,
+        item.Reason,
+        item.CorrectedByUser?.DisplayName ?? item.CorrectedByUser?.Email ?? "Operator",
+        item.CreatedAt,
+        item.BeforeJson,
+        item.AfterJson);
 
     public static ResaleTaskDto ToDto(this ResaleTask item) => new(
         item.Id,

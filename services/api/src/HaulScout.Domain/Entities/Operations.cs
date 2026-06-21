@@ -90,10 +90,39 @@ public sealed class Sale : EntityBase, IOrganizationScoped
     public decimal ShippingCost { get; set; }
     public decimal SuppliesCost { get; set; }
     public decimal OtherCosts { get; set; }
+
+    /// <summary>Sales tax charged on the order. Never part of net profit (see <see cref="TaxRemittedByPlatform"/>).</summary>
+    public decimal SalesTaxCollected { get; set; }
+
+    /// <summary>
+    /// True when the marketplace collected and remits the sales tax (facilitator) — pass-through, neither
+    /// revenue nor liability. False when we collected it and owe it to the state — a sales-tax liability.
+    /// </summary>
+    public bool TaxRemittedByPlatform { get; set; } = true;
+
     public decimal NetProfit { get; set; }
     public SaleStatus Status { get; set; } = SaleStatus.Recorded;
     public DateTimeOffset SoldAt { get; set; } = DateTimeOffset.UtcNow;
     public string? Notes { get; set; }
+    public ICollection<SaleCorrection> Corrections { get; set; } = [];
+}
+
+/// <summary>
+/// An immutable audit record of one edit to a <see cref="Sale"/>. Corrections never erase prior state —
+/// each captures who, when, why, and the full before/after financial snapshot. Posted history is preserved.
+/// </summary>
+public sealed class SaleCorrection : EntityBase, IOrganizationScoped
+{
+    public Guid OrganizationId { get; set; }
+    public Guid SaleId { get; set; }
+    public Sale? Sale { get; set; }
+    public Guid CorrectedByUserId { get; set; }
+    public AppUser? CorrectedByUser { get; set; }
+    public required string Reason { get; set; }
+    public required string BeforeJson { get; set; }
+    public required string AfterJson { get; set; }
+    /// <summary>1-based sequence: the Nth correction recorded for a sale has Version = N.</summary>
+    public int Version { get; set; }
 }
 
 public sealed class Shipment : EntityBase, IOrganizationScoped

@@ -2556,6 +2556,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/sales/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SaleDto"];
+                        "application/json": components["schemas"]["SaleDto"];
+                        "text/json": components["schemas"]["SaleDto"];
+                    };
+                };
+            };
+        };
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["UpdateSaleRequest"];
+                    "text/json": components["schemas"]["UpdateSaleRequest"];
+                    "application/*+json": components["schemas"]["UpdateSaleRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SaleDto"];
+                        "application/json": components["schemas"]["SaleDto"];
+                        "text/json": components["schemas"]["SaleDto"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/sales/{id}/profit": {
         parameters: {
             query?: never;
@@ -2710,6 +2778,45 @@ export interface paths {
                 };
             };
         };
+        trace?: never;
+    };
+    "/api/sales/{id}/corrections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SaleCorrectionDto"][];
+                        "application/json": components["schemas"]["SaleCorrectionDto"][];
+                        "text/json": components["schemas"]["SaleCorrectionDto"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/session/bootstrap": {
@@ -4943,6 +5050,8 @@ export interface components {
             /** Format: double */
             totalFeesAndCosts?: number;
             /** Format: double */
+            salesTaxOwed?: number;
+            /** Format: double */
             netProfit?: number;
             /** Format: double */
             roiPercent?: number;
@@ -4972,6 +5081,9 @@ export interface components {
             /** Format: date-time */
             soldAt?: string | null;
             notes?: string | null;
+            /** Format: double */
+            salesTaxCollected?: number;
+            taxRemittedByPlatform?: boolean;
         };
         RedeemOrganizationInviteCodeRequest: {
             code?: string | null;
@@ -5116,6 +5228,20 @@ export interface components {
             /** Format: date-time */
             createdAt?: string;
         };
+        SaleCorrectionDto: {
+            /** Format: uuid */
+            id?: string;
+            /** Format: uuid */
+            saleId?: string;
+            /** Format: int32 */
+            version?: number;
+            reason?: string | null;
+            correctedBy?: string | null;
+            /** Format: date-time */
+            correctedAt?: string;
+            beforeJson?: string | null;
+            afterJson?: string | null;
+        };
         SaleDto: {
             /** Format: uuid */
             id?: string;
@@ -5139,6 +5265,11 @@ export interface components {
             suppliesCost?: number;
             /** Format: double */
             otherCosts?: number;
+            /** Format: double */
+            salesTaxCollected?: number;
+            taxRemittedByPlatform?: boolean;
+            /** Format: double */
+            salesTaxOwed?: number;
             /** Format: double */
             netProfit?: number;
             status?: components["schemas"]["SaleStatus"];
@@ -5412,6 +5543,28 @@ export interface components {
             /** Format: uuid */
             roleId?: string | null;
             legacyRole?: components["schemas"]["OrganizationRole"];
+        };
+        UpdateSaleRequest: {
+            platform?: string | null;
+            /** Format: double */
+            soldPrice?: number;
+            /** Format: double */
+            platformFees?: number;
+            /** Format: double */
+            paymentFees?: number;
+            /** Format: double */
+            shippingCost?: number;
+            /** Format: double */
+            suppliesCost?: number;
+            /** Format: double */
+            otherCosts?: number;
+            /** Format: double */
+            salesTaxCollected?: number;
+            taxRemittedByPlatform?: boolean;
+            /** Format: date-time */
+            soldAt?: string;
+            notes?: string | null;
+            reason?: string | null;
         };
         UpdateSourcingRouteStatusRequest: {
             status?: components["schemas"]["SourcingRouteStatus"];

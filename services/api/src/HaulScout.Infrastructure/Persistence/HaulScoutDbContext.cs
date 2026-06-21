@@ -37,6 +37,7 @@ public sealed class HaulScoutDbContext(DbContextOptions<HaulScoutDbContext> opti
     public DbSet<SourceLocation> SourceLocations => Set<SourceLocation>();
     public DbSet<Listing> Listings => Set<Listing>();
     public DbSet<Sale> Sales => Set<Sale>();
+    public DbSet<SaleCorrection> SaleCorrections => Set<SaleCorrection>();
     public DbSet<Shipment> Shipments => Set<Shipment>();
     public DbSet<Expense> Expenses => Set<Expense>();
     public DbSet<Budget> Budgets => Set<Budget>();
@@ -347,10 +348,22 @@ public sealed class HaulScoutDbContext(DbContextOptions<HaulScoutDbContext> opti
             ConfigureMoney(entity.Property(item => item.ShippingCost));
             ConfigureMoney(entity.Property(item => item.SuppliesCost));
             ConfigureMoney(entity.Property(item => item.OtherCosts));
+            ConfigureMoney(entity.Property(item => item.SalesTaxCollected));
             ConfigureMoney(entity.Property(item => item.NetProfit));
             entity.HasIndex(item => new { item.OrganizationId, item.SoldAt });
             entity.HasOne(item => item.InventoryItem).WithMany(item => item.Sales).HasForeignKey(item => item.InventoryItemId);
             entity.HasOne(item => item.Listing).WithMany().HasForeignKey(item => item.ListingId).OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<SaleCorrection>(entity =>
+        {
+            entity.ToTable("SaleCorrections");
+            entity.Property(item => item.Reason).HasMaxLength(1000).IsRequired();
+            entity.Property(item => item.BeforeJson).HasColumnType("jsonb").IsRequired();
+            entity.Property(item => item.AfterJson).HasColumnType("jsonb").IsRequired();
+            entity.HasIndex(item => new { item.OrganizationId, item.SaleId, item.Version });
+            entity.HasOne(item => item.Sale).WithMany(item => item.Corrections).HasForeignKey(item => item.SaleId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(item => item.CorrectedByUser).WithMany().HasForeignKey(item => item.CorrectedByUserId).OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<Shipment>(entity =>

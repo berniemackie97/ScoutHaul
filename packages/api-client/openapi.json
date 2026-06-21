@@ -3238,6 +3238,103 @@
         }
       }
     },
+    "/api/sales/{id}": {
+      "get": {
+        "tags": [
+          "Sales"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaleDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaleDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaleDto"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Sales"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSaleRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSaleRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSaleRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaleDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaleDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaleDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/sales/{id}/profit": {
       "get": {
         "tags": [
@@ -3391,6 +3488,55 @@
               "text/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SaleDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sales/{id}/corrections": {
+      "get": {
+        "tags": [
+          "Sales"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SaleCorrectionDto"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SaleCorrectionDto"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SaleCorrectionDto"
+                  }
                 }
               }
             }
@@ -7274,6 +7420,10 @@
             "type": "number",
             "format": "double"
           },
+          "salesTaxOwed": {
+            "type": "number",
+            "format": "double"
+          },
           "netProfit": {
             "type": "number",
             "format": "double"
@@ -7347,6 +7497,13 @@
           "notes": {
             "type": "string",
             "nullable": true
+          },
+          "salesTaxCollected": {
+            "type": "number",
+            "format": "double"
+          },
+          "taxRemittedByPlatform": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false
@@ -7707,6 +7864,44 @@
         },
         "additionalProperties": false
       },
+      "SaleCorrectionDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "saleId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "correctedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "correctedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "beforeJson": {
+            "type": "string",
+            "nullable": true
+          },
+          "afterJson": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "SaleDto": {
         "type": "object",
         "properties": {
@@ -7756,6 +7951,17 @@
             "format": "double"
           },
           "otherCosts": {
+            "type": "number",
+            "format": "double"
+          },
+          "salesTaxCollected": {
+            "type": "number",
+            "format": "double"
+          },
+          "taxRemittedByPlatform": {
+            "type": "boolean"
+          },
+          "salesTaxOwed": {
             "type": "number",
             "format": "double"
           },
@@ -8545,6 +8751,59 @@
           },
           "legacyRole": {
             "$ref": "#/components/schemas/OrganizationRole"
+          }
+        },
+        "additionalProperties": false
+      },
+      "UpdateSaleRequest": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string",
+            "nullable": true
+          },
+          "soldPrice": {
+            "type": "number",
+            "format": "double"
+          },
+          "platformFees": {
+            "type": "number",
+            "format": "double"
+          },
+          "paymentFees": {
+            "type": "number",
+            "format": "double"
+          },
+          "shippingCost": {
+            "type": "number",
+            "format": "double"
+          },
+          "suppliesCost": {
+            "type": "number",
+            "format": "double"
+          },
+          "otherCosts": {
+            "type": "number",
+            "format": "double"
+          },
+          "salesTaxCollected": {
+            "type": "number",
+            "format": "double"
+          },
+          "taxRemittedByPlatform": {
+            "type": "boolean"
+          },
+          "soldAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false

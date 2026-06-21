@@ -1682,6 +1682,10 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                         .HasPrecision(12, 2)
                         .HasColumnType("numeric(12,2)");
 
+                    b.Property<decimal>("SalesTaxCollected")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
+
                     b.Property<decimal>("ShippingCost")
                         .HasPrecision(12, 2)
                         .HasColumnType("numeric(12,2)");
@@ -1702,6 +1706,9 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                         .HasPrecision(12, 2)
                         .HasColumnType("numeric(12,2)");
 
+                    b.Property<bool>("TaxRemittedByPlatform")
+                        .HasColumnType("boolean");
+
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -1714,6 +1721,54 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                     b.HasIndex("OrganizationId", "SoldAt");
 
                     b.ToTable("Sales", (string)null);
+                });
+
+            modelBuilder.Entity("HaulScout.Domain.Entities.SaleCorrection", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("AfterJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<string>("BeforeJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<Guid>("CorrectedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<Guid>("SaleId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CorrectedByUserId");
+
+                    b.HasIndex("SaleId");
+
+                    b.HasIndex("OrganizationId", "SaleId", "Version");
+
+                    b.ToTable("SaleCorrections", (string)null);
                 });
 
             modelBuilder.Entity("HaulScout.Domain.Entities.Shipment", b =>
@@ -2618,6 +2673,25 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                     b.Navigation("Listing");
                 });
 
+            modelBuilder.Entity("HaulScout.Domain.Entities.SaleCorrection", b =>
+                {
+                    b.HasOne("HaulScout.Domain.Entities.AppUser", "CorrectedByUser")
+                        .WithMany()
+                        .HasForeignKey("CorrectedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("HaulScout.Domain.Entities.Sale", "Sale")
+                        .WithMany("Corrections")
+                        .HasForeignKey("SaleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("CorrectedByUser");
+
+                    b.Navigation("Sale");
+                });
+
             modelBuilder.Entity("HaulScout.Domain.Entities.Shipment", b =>
                 {
                     b.HasOne("HaulScout.Domain.Entities.Sale", "Sale")
@@ -2812,6 +2886,11 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                     b.Navigation("InventoryItems");
 
                     b.Navigation("MarketObservations");
+                });
+
+            modelBuilder.Entity("HaulScout.Domain.Entities.Sale", b =>
+                {
+                    b.Navigation("Corrections");
                 });
 
             modelBuilder.Entity("HaulScout.Domain.Entities.SourcingTrip", b =>

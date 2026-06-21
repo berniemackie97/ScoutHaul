@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard, Package, ShoppingCart, Users, Wrench,
-  HandCoins, Truck, BarChart3, Settings,
+  HandCoins, Truck, BarChart3, Settings, Wallet,
   ChevronLeft, ChevronRight, LogOut, Package2,
 } from "lucide-react";
 import { useState } from "react";
@@ -22,6 +22,7 @@ const navGroups = [
   {
     label: "Commerce",
     items: [
+      { name: "Sales & finance", href: "/finance", icon: Wallet },
       { name: "Orders", href: "/orders", icon: ShoppingCart },
       { name: "Customers", href: "/customers", icon: Users },
     ],
