@@ -530,10 +530,15 @@ public sealed class InventoryController(
 
     // Org-unscoped (no authenticated user) — used only by the anonymous image-byte GET endpoints,
     // which are already gated by the unguessable {itemId}+{photoId} GUID pair.
+    // Serves photo bytes to anonymous <img>/Image requests by unguessable GUID. Must IgnoreQueryFilters:
+    // the endpoint is [AllowAnonymous], so no tenant is resolved and the org query filter would otherwise
+    // fail closed (OrganizationId == Guid.Empty) and 404 every photo.
     private Task<InventoryPhoto?> FindPhotoUnscoped(Guid itemId, Guid photoId, CancellationToken cancellationToken) =>
-        db.InventoryPhotos.SingleOrDefaultAsync(
-            item => item.Id == photoId && item.InventoryItemId == itemId,
-            cancellationToken);
+        db.InventoryPhotos
+            .IgnoreQueryFilters()
+            .SingleOrDefaultAsync(
+                item => item.Id == photoId && item.InventoryItemId == itemId,
+                cancellationToken);
 
     private async Task SyncInventoryPurchaseExpense(
         InventoryItem item,
