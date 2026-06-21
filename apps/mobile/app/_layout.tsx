@@ -21,7 +21,12 @@ function BrandedSplash() {
   useEffect(() => {
     Animated.sequence([
       Animated.parallel([
-        Animated.timing(logoScale, { toValue: 1, duration: 500, easing: Easing.out(Easing.back(1.5)), useNativeDriver: true }),
+        Animated.timing(logoScale, {
+          toValue: 1,
+          duration: 500,
+          easing: Easing.out(Easing.back(1.5)),
+          useNativeDriver: true,
+        }),
         Animated.timing(logoOpacity, { toValue: 1, duration: 400, useNativeDriver: true }),
       ]),
       Animated.timing(textOpacity, { toValue: 1, duration: 300, useNativeDriver: true }),
@@ -43,8 +48,12 @@ function BrandedSplash() {
         </View>
       </Animated.View>
       <Animated.View style={[splashStyles.textWrap, { opacity: textOpacity }]}>
-        <Text variant="title" color="#FFFFFF">HaulScout</Text>
-        <Text variant="caption" color="rgba(255,255,255,0.6)">Resale command center</Text>
+        <Text variant="title" color="#FFFFFF">
+          HaulScout
+        </Text>
+        <Text variant="caption" color="rgba(255,255,255,0.6)">
+          Resale command center
+        </Text>
       </Animated.View>
       <Animated.View style={[splashStyles.loader, { opacity: textOpacity }]}>
         <ActivityIndicator size="small" color="rgba(255,255,255,0.5)" />
@@ -132,6 +141,7 @@ function RootStack() {
       <Stack.Screen name="listing-queue" options={{ title: 'Listing Queue' }} />
       <Stack.Screen name="sales" options={{ title: 'Sales & Shipping' }} />
       <Stack.Screen name="record-sale" options={{ title: 'Record Sale' }} />
+      <Stack.Screen name="sale-transition" options={{ title: 'Sale Workflow' }} />
       <Stack.Screen name="tasks" options={{ title: 'Tasks' }} />
       <Stack.Screen name="settings" options={{ title: 'Settings' }} />
       <Stack.Screen name="workspace-admin" options={{ title: 'Workspace Admin' }} />
@@ -156,7 +166,7 @@ function StartupGate() {
       if (authStore.isAuthenticated) {
         try {
           await bootstrapSignedInWorkspace();
-          if (await getPendingSyncCount() > 0) {
+          if ((await getPendingSyncCount()) > 0) {
             await processSyncQueue();
           }
           profile = await getWorkspaceProfile();

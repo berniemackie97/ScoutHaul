@@ -286,7 +286,18 @@ public static class DtoMapping
         item.NetProfit,
         item.Status,
         item.SoldAt,
-        item.Notes);
+        item.Notes,
+        SaleWorkflow.Next(item.Status));
+
+    public static SaleShipmentDto ToDto(this Shipment item) => new(
+        item.Id,
+        item.SaleId,
+        item.Carrier,
+        item.TrackingNumber,
+        item.Cost,
+        item.PackedAt,
+        item.ShippedAt,
+        item.DeliveredAt);
 
     public static SaleCorrectionDto ToDto(this SaleCorrection item) => new(
         item.Id,

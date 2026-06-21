@@ -182,7 +182,7 @@ Active listing prices are never treated as sold prices. Provider estimates are s
 - Verify deal analysis shows explicit pricing basis/confidence warnings and does not value an item from active listings only.
 - Toggle offline mode or disconnect network, save a draft, queue sync, reconnect, and run Sync Now from Settings.
 - Upload inventory photos, reload the item, and confirm remote photos render on another device signed into the same workspace.
-- Record a listing, record a sale from inventory/listing queue, then pack, ship, and deliver it from Sales & Shipping.
+- Record a current or historical sale from mobile or admin with governed channel, tax, fee, and cost inputs; then pack, ship, deliver, cancel, return, and refund it through the shared audited workflow.
 - Delete routes/stops/listings/tasks/budget expenses from the mobile UI and confirm the list updates without stale rows.
 
 ## Current Verification

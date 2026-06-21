@@ -18,6 +18,55 @@ namespace HaulScout.Api.Controllers;
 [RequireOrganizationPermission(HaulScoutPermissions.ManageListings)]
 public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext currentUser) : ControllerBase
 {
+    private static readonly SaleStatus[] ReleasedInventoryStatuses = [SaleStatus.Returned, SaleStatus.Refunded, SaleStatus.Cancelled];
+
+    [HttpGet("reference-data")]
+    public async Task<ActionResult<SalesReferenceDataDto>> ReferenceData(CancellationToken cancellationToken)
+    {
+        List<string> existing = await ExistingChannels(cancellationToken);
+        var channels = SalesChannelCatalog.Channels.ToList();
+        channels.AddRange(existing
+            .Where(value => channels.All(option => !string.Equals(option.Value, value, StringComparison.OrdinalIgnoreCase)))
+            .Select(value => new SaleChannelOptionDto(value, $"{value} (legacy — standardize)", "Legacy data", true)));
+        return new SalesReferenceDataDto(channels);
+    }
+
+    [HttpGet("candidates")]
+    public async Task<ActionResult<IReadOnlyList<SaleCandidateDto>>> Candidates(CancellationToken cancellationToken)
+    {
+        var items = await db.InventoryItems
+            .AsNoTracking()
+            .Where(item => item.OrganizationId == currentUser.OrganizationId
+                && !item.IsArchived
+                && !item.Sales.Any(sale => !ReleasedInventoryStatuses.Contains(sale.Status)))
+            .OrderByDescending(item => item.UpdatedAt)
+            .Take(500)
+            .Select(item => new SaleCandidateDto(
+                item.Id,
+                item.Title,
+                item.Status,
+                item.PurchasePrice ?? 0,
+                item.EstimatedSalePrice ?? item.SellerAskingPrice,
+                item.Listings
+                    .Where(listing => listing.Status == ListingStatus.Active || listing.Status == ListingStatus.Draft)
+                    .OrderByDescending(listing => listing.UpdatedAt)
+                    .Select(listing => (Guid?)listing.Id)
+                    .FirstOrDefault(),
+                item.Listings
+                    .Where(listing => listing.Status == ListingStatus.Active || listing.Status == ListingStatus.Draft)
+                    .OrderByDescending(listing => listing.UpdatedAt)
+                    .Select(listing => listing.Platform)
+                    .FirstOrDefault(),
+                item.Listings
+                    .Where(listing => listing.Status == ListingStatus.Active || listing.Status == ListingStatus.Draft)
+                    .OrderByDescending(listing => listing.UpdatedAt)
+                    .Select(listing => (decimal?)listing.ListPrice)
+                    .FirstOrDefault()))
+            .ToListAsync(cancellationToken);
+
+        return items;
+    }
+
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<SaleDto>>> List(
         [FromQuery] SaleStatus? status,
@@ -51,6 +100,7 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
     }
 
     [HttpPost]
+    [RequireOrganizationPermission(HaulScoutPermissions.ManageFinance)]
     public async Task<ActionResult<SaleDto>> Record(RecordSaleRequest request, CancellationToken cancellationToken)
     {
         var item = await db.InventoryItems.SingleOrDefaultAsync(
@@ -62,9 +112,10 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
             return NotFound("Inventory item was not found.");
         }
 
-        if (string.IsNullOrWhiteSpace(request.Platform) || request.SoldPrice <= 0)
+        string? channel = SalesChannelCatalog.CanonicalValue(request.Platform, await ExistingChannels(cancellationToken));
+        if (channel is null || request.SoldPrice <= 0)
         {
-            return BadRequest("Platform and positive sold price are required.");
+            return BadRequest("Select a controlled sales channel and enter a positive sold price.");
         }
 
         if (request.PlatformFees < 0 || request.PaymentFees < 0 || request.ShippingCost < 0 || request.SuppliesCost < 0 || request.OtherCosts < 0 || request.SalesTaxCollected < 0)
@@ -72,10 +123,15 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
             return BadRequest("Costs, fees, and tax cannot be negative.");
         }
 
+        if (request.SoldAt?.UtcDateTime.Date > DateTime.UtcNow.Date)
+        {
+            return BadRequest("Sale date cannot be in the future.");
+        }
+
         bool alreadySold = await db.Sales.AnyAsync(
             saleItem => saleItem.InventoryItemId == request.InventoryItemId
                         && saleItem.OrganizationId == currentUser.OrganizationId
-                        && saleItem.Status != SaleStatus.Returned,
+                        && !ReleasedInventoryStatuses.Contains(saleItem.Status),
             cancellationToken);
 
         if (alreadySold)
@@ -115,7 +171,7 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
             OrganizationId = currentUser.OrganizationId,
             InventoryItemId = request.InventoryItemId,
             ListingId = request.ListingId,
-            Platform = request.Platform.Trim(),
+            Platform = channel,
             SoldPrice = request.SoldPrice,
             CostOfGoods = item.PurchasePrice ?? 0,
             PlatformFees = request.PlatformFees,
@@ -195,20 +251,39 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
 
     [HttpPatch("{id:guid}/packed")]
     public Task<ActionResult<SaleDto>> MarkPacked(Guid id, CancellationToken cancellationToken) =>
-        MarkStatus(id, SaleStatus.Packed, InventoryStatus.Packed, cancellationToken);
+        Transition(id, new SaleStatusTransitionRequest(SaleStatus.Packed, null, null, null, null), cancellationToken);
 
     [HttpPatch("{id:guid}/shipped")]
     public Task<ActionResult<SaleDto>> MarkShipped(Guid id, CancellationToken cancellationToken) =>
-        MarkStatus(id, SaleStatus.Shipped, InventoryStatus.Shipped, cancellationToken);
+        Transition(id, new SaleStatusTransitionRequest(SaleStatus.Shipped, null, null, null, null), cancellationToken);
 
     [HttpPatch("{id:guid}/delivered")]
     public Task<ActionResult<SaleDto>> MarkDelivered(Guid id, CancellationToken cancellationToken) =>
-        MarkStatus(id, SaleStatus.Delivered, InventoryStatus.Delivered, cancellationToken);
+        Transition(id, new SaleStatusTransitionRequest(SaleStatus.Delivered, null, null, null, null), cancellationToken);
 
-    private async Task<ActionResult<SaleDto>> MarkStatus(Guid id, SaleStatus saleStatus, InventoryStatus inventoryStatus, CancellationToken cancellationToken)
+    [HttpGet("{id:guid}/shipment")]
+    public async Task<ActionResult<SaleShipmentDto>> GetShipment(Guid id, CancellationToken cancellationToken)
+    {
+        bool saleExists = await db.Sales.AnyAsync(
+            item => item.Id == id && item.OrganizationId == currentUser.OrganizationId,
+            cancellationToken);
+        if (!saleExists) return NotFound();
+
+        Shipment? shipment = await db.Shipments
+            .AsNoTracking()
+            .SingleOrDefaultAsync(item => item.SaleId == id && item.OrganizationId == currentUser.OrganizationId, cancellationToken);
+        return shipment is null ? NotFound() : shipment.ToDto();
+    }
+
+    [HttpPatch("{id:guid}/status")]
+    public async Task<ActionResult<SaleDto>> Transition(
+        Guid id,
+        SaleStatusTransitionRequest request,
+        CancellationToken cancellationToken)
     {
         var sale = await db.Sales
             .Include(item => item.InventoryItem)
+            .Include(item => item.Listing)
             .SingleOrDefaultAsync(item => item.Id == id && item.OrganizationId == currentUser.OrganizationId, cancellationToken);
 
         if (sale is null)
@@ -216,12 +291,111 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
             return NotFound();
         }
 
-        sale.Status = saleStatus;
-        if (sale.InventoryItem is not null)
+        if (!SaleWorkflow.CanTransition(sale.Status, request.Status))
         {
-            sale.InventoryItem.Status = inventoryStatus;
+            return Conflict($"A sale cannot move from {sale.Status} to {request.Status}.");
         }
 
+        string? reason = TrimToNull(request.Reason);
+        if (SaleWorkflow.RequiresReason(sale.Status, request.Status) && reason is null)
+        {
+            return BadRequest("A reason is required for this sale transition.");
+        }
+
+        string? carrier = TrimToNull(request.Carrier);
+        string? trackingNumber = TrimToNull(request.TrackingNumber);
+        if ((carrier is null) != (trackingNumber is null))
+        {
+            return BadRequest("Carrier and tracking number must be supplied together.");
+        }
+
+        DateTimeOffset occurredAt = request.OccurredAt ?? DateTimeOffset.UtcNow;
+        if (occurredAt > DateTimeOffset.UtcNow.AddMinutes(5))
+        {
+            return BadRequest("Transition time cannot be in the future.");
+        }
+
+        if (occurredAt < sale.SoldAt)
+        {
+            return BadRequest("Transition time cannot be earlier than the sale date.");
+        }
+
+        Shipment? shipment = await db.Shipments.SingleOrDefaultAsync(
+            item => item.SaleId == sale.Id && item.OrganizationId == currentUser.OrganizationId,
+            cancellationToken);
+        if (request.Status == SaleStatus.Shipped && shipment?.PackedAt > occurredAt)
+        {
+            return BadRequest("Shipped time cannot be earlier than packed time.");
+        }
+
+        if (request.Status == SaleStatus.Delivered && shipment?.ShippedAt > occurredAt)
+        {
+            return BadRequest("Delivered time cannot be earlier than shipped time.");
+        }
+
+        SaleStatus previousStatus = sale.Status;
+        string before = SnapshotSale(sale);
+        sale.Status = request.Status;
+        if (sale.InventoryItem is not null)
+        {
+            if (request.Status != SaleStatus.ReturnRequested)
+            {
+                sale.InventoryItem.Status = SaleWorkflow.InventoryStatusFor(request.Status, sale.ListingId.HasValue);
+            }
+
+            if (request.Status == SaleStatus.Cancelled)
+            {
+                sale.InventoryItem.SoldAt = null;
+            }
+        }
+
+        if (sale.Listing is not null && request.Status == SaleStatus.Cancelled)
+        {
+            sale.Listing.Status = ListingStatus.Active;
+            sale.Listing.EndedAt = null;
+        }
+
+        if (request.Status is SaleStatus.Packed or SaleStatus.Shipped or SaleStatus.Delivered)
+        {
+            shipment ??= new Shipment
+            {
+                OrganizationId = currentUser.OrganizationId,
+                SaleId = sale.Id,
+                Cost = sale.ShippingCost,
+            };
+            if (db.Entry(shipment).State == EntityState.Detached) db.Shipments.Add(shipment);
+            if (request.Status == SaleStatus.Packed) shipment.PackedAt ??= occurredAt;
+            if (request.Status == SaleStatus.Shipped)
+            {
+                shipment.PackedAt ??= occurredAt;
+                shipment.ShippedAt ??= occurredAt;
+                shipment.Carrier = carrier ?? shipment.Carrier;
+                shipment.TrackingNumber = trackingNumber ?? shipment.TrackingNumber;
+            }
+            if (request.Status == SaleStatus.Delivered) shipment.DeliveredAt ??= occurredAt;
+        }
+        else if (previousStatus == SaleStatus.Packed && request.Status == SaleStatus.Recorded && shipment is not null)
+        {
+            shipment.PackedAt = null;
+        }
+
+        if (request.Status == SaleStatus.Cancelled)
+        {
+            MarketObservation? observation = await db.MarketObservations
+                .Where(item => item.InventoryItemId == sale.InventoryItemId
+                    && item.ObservationType == MarketObservationType.InternalSale
+                    && item.OrganizationId == currentUser.OrganizationId
+                    && item.SoldAt == sale.SoldAt)
+                .OrderByDescending(item => item.ObservedAt)
+                .FirstOrDefaultAsync(cancellationToken);
+            if (observation is not null) db.MarketObservations.Remove(observation);
+        }
+
+        await AddCorrection(
+            sale,
+            before,
+            reason ?? $"Workflow transition: {previousStatus} → {request.Status}",
+            cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         return sale.ToDto();
     }
@@ -235,9 +409,10 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
             return BadRequest("A reason is required to correct a sale.");
         }
 
-        if (string.IsNullOrWhiteSpace(request.Platform) || request.SoldPrice <= 0)
+        string? channel = SalesChannelCatalog.CanonicalValue(request.Platform, await ExistingChannels(cancellationToken));
+        if (channel is null || request.SoldPrice <= 0)
         {
-            return BadRequest("Platform and a positive sold price are required.");
+            return BadRequest("Select a controlled sales channel and enter a positive sold price.");
         }
 
         if (request.PlatformFees < 0 || request.PaymentFees < 0 || request.ShippingCost < 0
@@ -246,8 +421,14 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
             return BadRequest("Costs, fees, and tax cannot be negative.");
         }
 
+        if (request.SoldAt.UtcDateTime.Date > DateTime.UtcNow.Date)
+        {
+            return BadRequest("Sale date cannot be in the future.");
+        }
+
         var sale = await db.Sales
             .Include(item => item.InventoryItem)
+            .Include(item => item.Listing)
             .SingleOrDefaultAsync(item => item.Id == id && item.OrganizationId == currentUser.OrganizationId, cancellationToken);
 
         if (sale is null)
@@ -256,8 +437,9 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
         }
 
         string before = SnapshotSale(sale);
+        DateTimeOffset previousSoldAt = sale.SoldAt;
 
-        sale.Platform = request.Platform.Trim();
+        sale.Platform = channel;
         sale.SoldPrice = request.SoldPrice;
         sale.PlatformFees = request.PlatformFees;
         sale.PaymentFees = request.PaymentFees;
@@ -268,6 +450,23 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
         sale.TaxRemittedByPlatform = request.TaxRemittedByPlatform;
         sale.SoldAt = request.SoldAt;
         sale.Notes = TrimToNull(request.Notes);
+        if (sale.InventoryItem is not null) sale.InventoryItem.SoldAt = request.SoldAt;
+        if (sale.Listing is not null && sale.Listing.Status == ListingStatus.Sold) sale.Listing.EndedAt = request.SoldAt;
+
+        MarketObservation? observation = await db.MarketObservations
+            .Where(item => item.InventoryItemId == sale.InventoryItemId
+                && item.ObservationType == MarketObservationType.InternalSale
+                && item.OrganizationId == currentUser.OrganizationId
+                && item.SoldAt == previousSoldAt)
+            .OrderByDescending(item => item.ObservedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (observation is not null)
+        {
+            observation.Price = request.SoldPrice;
+            observation.TotalPrice = request.SoldPrice;
+            observation.ObservedAt = request.SoldAt;
+            observation.SoldAt = request.SoldAt;
+        }
 
         // Net profit is always recomputed from the corrected inputs (tax excluded); never trust a stored figure.
         RealizedSaleFinancials financials = ResaleFinancialCalculator.CalculateRealizedSale(
@@ -275,19 +474,7 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
             sale.ShippingCost, sale.SuppliesCost, sale.OtherCosts);
         sale.NetProfit = financials.NetProfit;
 
-        int nextVersion = await db.SaleCorrections
-            .CountAsync(item => item.SaleId == sale.Id && item.OrganizationId == currentUser.OrganizationId, cancellationToken) + 1;
-
-        db.SaleCorrections.Add(new SaleCorrection
-        {
-            OrganizationId = currentUser.OrganizationId,
-            SaleId = sale.Id,
-            CorrectedByUserId = currentUser.UserId,
-            Reason = request.Reason.Trim(),
-            BeforeJson = before,
-            AfterJson = SnapshotSale(sale),
-            Version = nextVersion,
-        });
+        await AddCorrection(sale, before, request.Reason.Trim(), cancellationToken);
 
         await db.SaveChangesAsync(cancellationToken);
         return sale.ToDto();
@@ -330,5 +517,42 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
         Status = sale.Status.ToString(),
         sale.Notes,
     });
+
+    private async Task AddCorrection(
+        Sale sale,
+        string before,
+        string reason,
+        CancellationToken cancellationToken)
+    {
+        int nextVersion = await db.SaleCorrections
+            .CountAsync(item => item.SaleId == sale.Id && item.OrganizationId == currentUser.OrganizationId, cancellationToken) + 1;
+        db.SaleCorrections.Add(new SaleCorrection
+        {
+            OrganizationId = currentUser.OrganizationId,
+            SaleId = sale.Id,
+            CorrectedByUserId = currentUser.UserId,
+            Reason = reason,
+            BeforeJson = before,
+            AfterJson = SnapshotSale(sale),
+            Version = nextVersion,
+        });
+    }
+
+    private async Task<List<string>> ExistingChannels(CancellationToken cancellationToken)
+    {
+        List<string> saleChannels = await db.Sales
+            .AsNoTracking()
+            .Where(item => item.OrganizationId == currentUser.OrganizationId)
+            .Select(item => item.Platform)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+        List<string> listingChannels = await db.Listings
+            .AsNoTracking()
+            .Where(item => item.OrganizationId == currentUser.OrganizationId)
+            .Select(item => item.Platform)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+        return saleChannels.Concat(listingChannels).Distinct(StringComparer.OrdinalIgnoreCase).Order().ToList();
+    }
 
 }

@@ -136,7 +136,10 @@ public enum SaleStatus
     Packed,
     Shipped,
     Delivered,
-    Returned
+    ReturnRequested,
+    Returned,
+    Refunded,
+    Cancelled
 }
 
 public enum WorkTaskStatus

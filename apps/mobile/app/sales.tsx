@@ -14,40 +14,31 @@ import { StatusPill } from '../src/components/StatusPill';
 import { Text } from '../src/components/Text';
 import { radius, spacing, type ToneKey } from '../src/components/theme';
 import { useAppTheme } from '../src/context/ThemeContext';
-import { useHaptics } from '../src/hooks/useHaptics';
 import type { Sale, SaleStatus } from '../src/domain/types';
 import { formatMoney } from '../src/utils/money';
 
-type SaleFilter = 'All' | 'NeedsShipping' | SaleStatus;
+type SaleFilter = 'All' | 'NeedsShipping' | 'InTransit' | 'Complete' | 'Returns' | 'Cancelled';
 
 const filterOptions: { value: SaleFilter; label: string }[] = [
   { value: 'All', label: 'All' },
   { value: 'NeedsShipping', label: 'Ship' },
-  { value: 'Recorded', label: 'Sold' },
-  { value: 'Packed', label: 'Packed' },
-  { value: 'Shipped', label: 'Shipped' },
-  { value: 'Delivered', label: 'Done' },
+  { value: 'InTransit', label: 'Transit' },
+  { value: 'Complete', label: 'Done' },
+  { value: 'Returns', label: 'Returns' },
+  { value: 'Cancelled', label: 'Cancelled' },
 ];
 
 function saleTone(status: SaleStatus): ToneKey {
   if (status === 'Delivered') return 'success';
   if (status === 'Shipped') return 'info';
   if (status === 'Packed') return 'warning';
-  if (status === 'Returned') return 'danger';
+  if (status === 'ReturnRequested') return 'warning';
+  if (status === 'Returned' || status === 'Refunded' || status === 'Cancelled') return 'danger';
   return 'neutral';
 }
 
-type WorkflowStep = { label: string; status: SaleStatus; icon: keyof typeof Ionicons.glyphMap; tone: ToneKey };
-
-const workflowMap: Partial<Record<SaleStatus, WorkflowStep>> = {
-  Recorded: { label: 'Mark Packed', status: 'Packed', icon: 'file-tray-full-outline', tone: 'warning' },
-  Packed: { label: 'Mark Shipped', status: 'Shipped', icon: 'paper-plane-outline', tone: 'info' },
-  Shipped: { label: 'Mark Delivered', status: 'Delivered', icon: 'checkmark-circle-outline', tone: 'success' },
-};
-
 export default function SalesScreen() {
-  const { colors: c, tones, shadows: s } = useAppTheme();
-  const haptics = useHaptics();
+  const { colors: c, shadows: s } = useAppTheme();
   const [sales, setSales] = useState<Sale[]>([]);
   const [filter, setFilter] = useState<SaleFilter>('NeedsShipping');
   const [error, setError] = useState<string | null>(null);
@@ -67,26 +58,20 @@ export default function SalesScreen() {
     }
   }
 
-  useFocusEffect(useCallback(() => { void load(); }, []));
+  useFocusEffect(
+    useCallback(() => {
+      void load();
+    }, [])
+  );
 
   const filtered = useMemo(() => {
     if (filter === 'All') return sales;
     if (filter === 'NeedsShipping') return sales.filter((sale) => sale.status === 'Recorded' || sale.status === 'Packed');
-    return sales.filter((sale) => sale.status === filter);
+    if (filter === 'InTransit') return sales.filter((sale) => sale.status === 'Shipped');
+    if (filter === 'Complete') return sales.filter((sale) => sale.status === 'Delivered');
+    if (filter === 'Returns') return sales.filter((sale) => ['ReturnRequested', 'Returned', 'Refunded'].includes(sale.status));
+    return sales.filter((sale) => sale.status === 'Cancelled');
   }, [sales, filter]);
-
-  async function advanceSale(sale: Sale, status: SaleStatus) {
-    try {
-      haptics.success();
-      if (status === 'Packed') await api.markSalePacked(sale.id);
-      if (status === 'Shipped') await api.markSaleShipped(sale.id);
-      if (status === 'Delivered') await api.markSaleDelivered(sale.id);
-      await load();
-    } catch (e) {
-      haptics.error();
-      setError(e instanceof Error ? e.message : 'Unable to update sale.');
-    }
-  }
 
   return (
     <Screen refreshing={refreshing} onRefresh={() => void load(true)}>
@@ -110,18 +95,17 @@ export default function SalesScreen() {
         />
       ) : (
         filtered.map((sale) => {
-          const step = workflowMap[sale.status];
-          const tone = tones[saleTone(sale.status)];
           return (
             <View key={sale.id} style={[styles.saleCard, { backgroundColor: c.surface, borderColor: c.borderLight, ...s.sm }]}>
-              <Pressable
-                onPress={() => router.push(`/inventory/${sale.inventoryItemId}`)}
-                style={styles.saleBody}
-              >
+              <Pressable onPress={() => router.push(`/inventory/${sale.inventoryItemId}`)} style={styles.saleBody}>
                 <View style={styles.saleTop}>
                   <View style={styles.saleInfo}>
-                    <Text variant="bodyBold" numberOfLines={1}>{sale.inventoryItemTitle || sale.platform}</Text>
-                    <Text variant="caption">{sale.platform} · {new Date(sale.soldAt).toLocaleDateString()}</Text>
+                    <Text variant="bodyBold" numberOfLines={1}>
+                      {sale.inventoryItemTitle || sale.platform}
+                    </Text>
+                    <Text variant="caption">
+                      {sale.platform} · {new Date(sale.soldAt).toLocaleDateString()}
+                    </Text>
                   </View>
                   <View style={styles.saleMoney}>
                     <Text variant="metricSmall">{formatMoney(sale.soldPrice)}</Text>
@@ -140,14 +124,16 @@ export default function SalesScreen() {
                 </View>
               </Pressable>
 
-              {step ? (
+              {(sale.allowedTransitions ?? []).length > 0 ? (
                 <Pressable
-                  onPress={() => void advanceSale(sale, step.status)}
-                  style={[styles.workflowBtn, { backgroundColor: tone.bg, borderColor: tone.border }]}
+                  onPress={() => router.push({ pathname: '/sale-transition', params: { saleId: sale.id } })}
+                  style={[styles.workflowBtn, { backgroundColor: c.primaryLight, borderColor: c.primary }]}
                 >
-                  <Ionicons name={step.icon} size={18} color={tone.text} />
-                  <Text variant="bodyBold" color={tone.text}>{step.label}</Text>
-                  <Ionicons name="arrow-forward" size={16} color={tone.text} />
+                  <Ionicons name="git-branch-outline" size={18} color={c.primary} />
+                  <Text variant="bodyBold" color={c.primary}>
+                    Update fulfillment / return
+                  </Text>
+                  <Ionicons name="arrow-forward" size={16} color={c.primary} />
                 </Pressable>
               ) : null}
             </View>

@@ -1,12 +1,12 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useTransition } from "react";
 import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle } from "@overhaul/ui";
 import {
-  INVENTORY_STATUS_GROUPS,
+  COMMERCE_MANAGED_STATUSES,
+  MANUAL_INVENTORY_STATUSES,
   TERMINAL_STATUSES,
-  isSoldStatus,
-  statusRank,
   type InventoryStatus,
 } from "@/features/inventory/inventory-operations";
 import { changeInventoryStatus } from "./actions";
@@ -15,14 +15,13 @@ export function StatusControl({ id, status }: { id: string; status: InventorySta
   const [nextStatus, setNextStatus] = useState<InventoryStatus>(status);
   const [message, setMessage] = useState("");
   const [isPending, startTransition] = useTransition();
+  const isCommerceManaged = COMMERCE_MANAGED_STATUSES.includes(status) && status !== "Returned";
 
   function submit() {
     if (nextStatus === status) return;
 
     if (TERMINAL_STATUSES.includes(nextStatus)) {
       if (!window.confirm(`Move this item to ${nextStatus}? This removes it from active inventory.`)) return;
-    } else if (isSoldStatus(status) && statusRank(nextStatus) < statusRank(status)) {
-      if (!window.confirm(`Move this item back from ${status} to ${nextStatus}? Do this only to correct a mistake — it can desync the sale record.`)) return;
     }
 
     startTransition(async () => {
@@ -36,29 +35,44 @@ export function StatusControl({ id, status }: { id: string; status: InventorySta
       <CardHeader>
         <CardTitle className="text-lg">Lifecycle stage</CardTitle>
         <CardDescription>
-          Move the item through its lifecycle. Sale &amp; fulfillment stages normally advance from the sale,
-          but you can set any stage here to correct a record.
+          Manage inventory preparation and disposition. Sale, fulfillment, and return stages are controlled by the sale record.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
-        <select
-          className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-          value={nextStatus}
-          disabled={isPending}
-          onChange={(event) => setNextStatus(event.target.value as InventoryStatus)}
-        >
-          {INVENTORY_STATUS_GROUPS.map((group) => (
-            <optgroup key={group.group} label={group.group}>
-              {group.options.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
+        {isCommerceManaged ? (
+          <>
+            <p className="text-muted-foreground text-sm">
+              This stage is controlled by its sale record so inventory, fulfillment, reports, and audit history stay synchronized.
+            </p>
+            <Button asChild className="w-full" variant="outline">
+              <Link href="/finance">Open sales workflow</Link>
+            </Button>
+          </>
+        ) : (
+          <>
+            <select
+              className="border-input bg-background focus:ring-ring h-10 w-full rounded-lg border px-3 text-sm focus:outline-none focus:ring-2"
+              value={nextStatus}
+              disabled={isPending}
+              onChange={(event) => setNextStatus(event.target.value as InventoryStatus)}
+            >
+              {status === "Returned" && <option value="Returned">Returned</option>}
+              {MANUAL_INVENTORY_STATUSES.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
               ))}
-            </optgroup>
-          ))}
-        </select>
-        <Button className="w-full" onClick={submit} disabled={isPending || nextStatus === status}>
-          {isPending ? "Updating…" : "Update stage"}
-        </Button>
-        {message && <p className="text-sm text-muted-foreground" aria-live="polite">{message}</p>}
+            </select>
+            <Button className="w-full" onClick={submit} disabled={isPending || nextStatus === status}>
+              {isPending ? "Updating…" : "Update stage"}
+            </Button>
+            {message && (
+              <p className="text-muted-foreground text-sm" aria-live="polite">
+                {message}
+              </p>
+            )}
+          </>
+        )}
       </CardContent>
     </Card>
   );
