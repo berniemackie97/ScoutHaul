@@ -341,6 +341,7 @@ public sealed class HaulScoutDbContext(DbContextOptions<HaulScoutDbContext> opti
             entity.Property(item => item.Platform).HasMaxLength(80).IsRequired();
             entity.Property(item => item.Status).HasConversion<string>().HasMaxLength(32);
             ConfigureMoney(entity.Property(item => item.SoldPrice));
+            ConfigureMoney(entity.Property(item => item.CostOfGoods));
             ConfigureMoney(entity.Property(item => item.PlatformFees));
             ConfigureMoney(entity.Property(item => item.PaymentFees));
             ConfigureMoney(entity.Property(item => item.ShippingCost));
