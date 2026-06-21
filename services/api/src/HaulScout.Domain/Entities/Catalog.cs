@@ -59,8 +59,23 @@ public sealed class InventoryItem : EntityBase, IOrganizationScoped
     public string? Model { get; set; }
     public string? Color { get; set; }
     public string? Condition { get; set; }
+    public InventoryOwnershipType OwnershipType { get; set; } = InventoryOwnershipType.Owned;
+    public InventoryFunctionalStatus FunctionalStatus { get; set; } = InventoryFunctionalStatus.Unknown;
+    public InventoryCompletenessStatus CompletenessStatus { get; set; } = InventoryCompletenessStatus.Unknown;
+    public InventoryAuthenticityStatus AuthenticityStatus { get; set; } = InventoryAuthenticityStatus.NotAssessed;
+    public InventoryPackagingStatus PackagingStatus { get; set; } = InventoryPackagingStatus.NotApplicable;
     public string? SizeSystem { get; set; }
     public string? SizeValue { get; set; }
+    public string? ManufacturerPartNumber { get; set; }
+    public string? SerialNumber { get; set; }
+    public string? CountryOfOrigin { get; set; }
+    public int? ManufactureYear { get; set; }
+    public decimal? Length { get; set; }
+    public decimal? Width { get; set; }
+    public decimal? Height { get; set; }
+    public DimensionUnit DimensionUnit { get; set; } = DimensionUnit.Inches;
+    public decimal? Weight { get; set; }
+    public WeightUnit WeightUnit { get; set; } = WeightUnit.Ounces;
     public string? AttributesJson { get; set; }
     public string? MeasurementsJson { get; set; }
     public string? StorageLocation { get; set; }

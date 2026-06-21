@@ -61,6 +61,7 @@ builder.Services
 builder.Services.AddScoped<OrganizationAccessService>();
 builder.Services.AddScoped<MarketplaceLookupPersistenceService>();
 builder.Services.AddScoped<InventoryPhotoStorageService>();
+builder.Services.AddScoped<InventoryReferenceDataService>();
 builder.Services.AddHttpClient<SupabaseAdminInviteService>();
 builder.Services.AddAuthorization(options =>
 {

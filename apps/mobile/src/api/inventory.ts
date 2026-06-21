@@ -13,6 +13,26 @@ export type PhotoResponse = {
   photos: InventoryPhoto[];
 };
 
+export type InventoryReferenceOption = {
+  value: string;
+  label: string;
+  group?: string | null;
+  parentValue?: string | null;
+  isLegacy?: boolean;
+};
+
+export type InventoryReferenceData = {
+  categories: InventoryReferenceOption[];
+  brands: InventoryReferenceOption[];
+  models: InventoryReferenceOption[];
+  conditions: InventoryReferenceOption[];
+  colors: InventoryReferenceOption[];
+  sizeSystems: InventoryReferenceOption[];
+  sizes: InventoryReferenceOption[];
+  storageLocations: InventoryReferenceOption[];
+  countries: InventoryReferenceOption[];
+};
+
 export type CreateInventoryRequest = {
   title: string;
   category?: string | null;
@@ -54,6 +74,7 @@ export type CreateIssueRequest = {
 export const inventoryApi = {
   list: () => apiRequest<InventoryItem[]>('/api/inventory'),
   get: (id: string) => apiRequest<InventoryItem>(`/api/inventory/${id}`),
+  referenceData: () => apiRequest<InventoryReferenceData>('/api/inventory/reference-data'),
   create: (body: CreateInventoryRequest) => apiRequest<InventoryItem>('/api/inventory', { method: 'POST', body }),
   update: (id: string, body: CreateInventoryRequest) => apiRequest<InventoryItem>(`/api/inventory/${id}`, { method: 'PUT', body }),
   archive: (id: string) => apiRequest<void>(`/api/inventory/${id}`, { method: 'DELETE' }),

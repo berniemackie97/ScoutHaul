@@ -114,7 +114,22 @@ public sealed record StorefrontListingDetailDto(
     // Relative URL of the hero photo (e.g. /api/storefront/photos/{id}); null when no photo.
     string? ImageUrl,
     // Category name (free-text from the inventory item).
-    string? Category);
+    string? Category,
+    string? Model,
+    string? Color,
+    string? SizeSystem,
+    string? SizeValue,
+    InventoryFunctionalStatus FunctionalStatus,
+    InventoryCompletenessStatus CompletenessStatus,
+    InventoryPackagingStatus PackagingStatus,
+    string? CountryOfOrigin,
+    int? ManufactureYear,
+    decimal? Length,
+    decimal? Width,
+    decimal? Height,
+    DimensionUnit DimensionUnit,
+    decimal? Weight,
+    WeightUnit WeightUnit);
 
 public sealed record StorefrontPageDto<T>(
     IReadOnlyList<T> Items,

@@ -1,7 +1,7 @@
 {
   "openapi": "3.0.4",
   "info": {
-    "title": "HaulScout.Api",
+    "title": "HaulScout.Api, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null",
     "version": "1.0"
   },
   "paths": {
@@ -273,7 +273,7 @@
     "/": {
       "get": {
         "tags": [
-          "HaulScout.Api"
+          "HaulScout.Api, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
         ],
         "responses": {
           "200": {
@@ -503,6 +503,35 @@
         "responses": {
           "200": {
             "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/inventory/reference-data": {
+      "get": {
+        "tags": [
+          "Inventory"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/InventoryReferenceDataDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InventoryReferenceDataDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InventoryReferenceDataDto"
+                }
+              }
+            }
           }
         }
       }
@@ -6073,6 +6102,13 @@
         },
         "additionalProperties": false
       },
+      "DimensionUnit": {
+        "enum": [
+          "Inches",
+          "Centimeters"
+        ],
+        "type": "string"
+      },
       "ExpenseCategory": {
         "enum": [
           "InventoryPurchase",
@@ -6126,6 +6162,39 @@
           }
         },
         "additionalProperties": false
+      },
+      "InventoryAuthenticityStatus": {
+        "enum": [
+          "NotAssessed",
+          "Authentic",
+          "LikelyAuthentic",
+          "NeedsVerification",
+          "Replica",
+          "Counterfeit"
+        ],
+        "type": "string"
+      },
+      "InventoryCompletenessStatus": {
+        "enum": [
+          "Unknown",
+          "Complete",
+          "MissingAccessories",
+          "MissingParts",
+          "Incomplete"
+        ],
+        "type": "string"
+      },
+      "InventoryFunctionalStatus": {
+        "enum": [
+          "Unknown",
+          "Untested",
+          "FullyFunctional",
+          "FunctionalWithIssues",
+          "Intermittent",
+          "NonFunctional",
+          "PartsOnly"
+        ],
+        "type": "string"
       },
       "InventoryIssueDto": {
         "type": "object",
@@ -6328,6 +6397,64 @@
           "updatedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "ownershipType": {
+            "$ref": "#/components/schemas/InventoryOwnershipType"
+          },
+          "functionalStatus": {
+            "$ref": "#/components/schemas/InventoryFunctionalStatus"
+          },
+          "completenessStatus": {
+            "$ref": "#/components/schemas/InventoryCompletenessStatus"
+          },
+          "authenticityStatus": {
+            "$ref": "#/components/schemas/InventoryAuthenticityStatus"
+          },
+          "packagingStatus": {
+            "$ref": "#/components/schemas/InventoryPackagingStatus"
+          },
+          "manufacturerPartNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "serialNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "countryOfOrigin": {
+            "type": "string",
+            "nullable": true
+          },
+          "manufactureYear": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "length": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "width": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "height": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "dimensionUnit": {
+            "$ref": "#/components/schemas/DimensionUnit"
+          },
+          "weight": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "weightUnit": {
+            "$ref": "#/components/schemas/WeightUnit"
           }
         },
         "additionalProperties": false
@@ -6338,6 +6465,27 @@
           "Sold",
           "Returned",
           "Removed"
+        ],
+        "type": "string"
+      },
+      "InventoryOwnershipType": {
+        "enum": [
+          "Owned",
+          "Consigned",
+          "CustomerRepair",
+          "VendorManaged"
+        ],
+        "type": "string"
+      },
+      "InventoryPackagingStatus": {
+        "enum": [
+          "NotApplicable",
+          "FactorySealed",
+          "OriginalExcellent",
+          "OriginalWorn",
+          "OriginalDamaged",
+          "ReplacementPackaging",
+          "LooseNoPackaging"
         ],
         "type": "string"
       },
@@ -6420,6 +6568,100 @@
               "$ref": "#/components/schemas/InventoryPhotoDto"
             },
             "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "InventoryReferenceDataDto": {
+        "type": "object",
+        "properties": {
+          "categories": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InventoryReferenceOptionDto"
+            },
+            "nullable": true
+          },
+          "brands": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InventoryReferenceOptionDto"
+            },
+            "nullable": true
+          },
+          "models": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InventoryReferenceOptionDto"
+            },
+            "nullable": true
+          },
+          "conditions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InventoryReferenceOptionDto"
+            },
+            "nullable": true
+          },
+          "colors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InventoryReferenceOptionDto"
+            },
+            "nullable": true
+          },
+          "sizeSystems": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InventoryReferenceOptionDto"
+            },
+            "nullable": true
+          },
+          "sizes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InventoryReferenceOptionDto"
+            },
+            "nullable": true
+          },
+          "storageLocations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InventoryReferenceOptionDto"
+            },
+            "nullable": true
+          },
+          "countries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InventoryReferenceOptionDto"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "InventoryReferenceOptionDto": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string",
+            "nullable": true
+          },
+          "label": {
+            "type": "string",
+            "nullable": true
+          },
+          "group": {
+            "type": "string",
+            "nullable": true
+          },
+          "parentValue": {
+            "type": "string",
+            "nullable": true
+          },
+          "isLegacy": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false
@@ -8645,6 +8887,66 @@
           "category": {
             "type": "string",
             "nullable": true
+          },
+          "model": {
+            "type": "string",
+            "nullable": true
+          },
+          "color": {
+            "type": "string",
+            "nullable": true
+          },
+          "sizeSystem": {
+            "type": "string",
+            "nullable": true
+          },
+          "sizeValue": {
+            "type": "string",
+            "nullable": true
+          },
+          "functionalStatus": {
+            "$ref": "#/components/schemas/InventoryFunctionalStatus"
+          },
+          "completenessStatus": {
+            "$ref": "#/components/schemas/InventoryCompletenessStatus"
+          },
+          "packagingStatus": {
+            "$ref": "#/components/schemas/InventoryPackagingStatus"
+          },
+          "countryOfOrigin": {
+            "type": "string",
+            "nullable": true
+          },
+          "manufactureYear": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "length": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "width": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "height": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "dimensionUnit": {
+            "$ref": "#/components/schemas/DimensionUnit"
+          },
+          "weight": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "weightUnit": {
+            "$ref": "#/components/schemas/WeightUnit"
           }
         },
         "additionalProperties": false
@@ -9108,6 +9410,64 @@
           "notes": {
             "type": "string",
             "nullable": true
+          },
+          "ownershipType": {
+            "$ref": "#/components/schemas/InventoryOwnershipType"
+          },
+          "functionalStatus": {
+            "$ref": "#/components/schemas/InventoryFunctionalStatus"
+          },
+          "completenessStatus": {
+            "$ref": "#/components/schemas/InventoryCompletenessStatus"
+          },
+          "authenticityStatus": {
+            "$ref": "#/components/schemas/InventoryAuthenticityStatus"
+          },
+          "packagingStatus": {
+            "$ref": "#/components/schemas/InventoryPackagingStatus"
+          },
+          "manufacturerPartNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "serialNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "countryOfOrigin": {
+            "type": "string",
+            "nullable": true
+          },
+          "manufactureYear": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "length": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "width": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "height": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "dimensionUnit": {
+            "$ref": "#/components/schemas/DimensionUnit"
+          },
+          "weight": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "weightUnit": {
+            "$ref": "#/components/schemas/WeightUnit"
           }
         },
         "additionalProperties": false
@@ -9390,6 +9750,15 @@
         },
         "additionalProperties": false
       },
+      "WeightUnit": {
+        "enum": [
+          "Ounces",
+          "Pounds",
+          "Grams",
+          "Kilograms"
+        ],
+        "type": "string"
+      },
       "WorkTaskStatus": {
         "enum": [
           "Open",
@@ -9410,7 +9779,7 @@
       "name": "Dashboard"
     },
     {
-      "name": "HaulScout.Api"
+      "name": "HaulScout.Api, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
     },
     {
       "name": "Inventory"

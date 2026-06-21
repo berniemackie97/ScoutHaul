@@ -123,7 +123,22 @@ public static class DtoMapping
             InventoryLifecycle.Group(item.Status),
             InventoryLifecycle.IsSold(item.Status),
             item.CreatedAt,
-            item.UpdatedAt);
+            item.UpdatedAt,
+            item.OwnershipType,
+            item.FunctionalStatus,
+            item.CompletenessStatus,
+            item.AuthenticityStatus,
+            item.PackagingStatus,
+            item.ManufacturerPartNumber,
+            item.SerialNumber,
+            item.CountryOfOrigin,
+            item.ManufactureYear,
+            item.Length,
+            item.Width,
+            item.Height,
+            item.DimensionUnit,
+            item.Weight,
+            item.WeightUnit);
 
     public static InventoryPhotoDto ToDto(this InventoryPhoto item) => new(
         item.Id,

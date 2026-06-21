@@ -14,6 +14,9 @@ The admin is the operating system for Overhaul Trading. It owns every controlled
 - Reports reconcile to underlying transactions and expose drill-down evidence.
 - No placeholder metrics, fake save buttons, duplicate data entry, or fabricated market values.
 - Storefront content is managed under Marketing/Content when that module is built. A standalone Blog is not a primary operating module.
+- Categories, conditions, colors, ownership, functional state, completeness, authenticity, packaging, units, locations, channels, and other reporting dimensions use API-owned controlled vocabularies. Item forms select canonical values; they do not invent new master data inline.
+- Brands, models, warehouse locations, category schemas, and channel accounts have governed create/merge/retire workflows with aliases for imported legacy values. Free text is reserved for inherently unique identifiers or prose such as titles, serials, descriptions, disclosures, and notes.
+- Admin, mobile, storefront, imports, and integrations consume the same reference-data contract. The API canonicalizes casing, rejects unknown values, preserves flagged legacy values for correction, and prevents unsafe records from becoming publicly sellable.
 
 ## Historical records and channel-accounting invariants
 
