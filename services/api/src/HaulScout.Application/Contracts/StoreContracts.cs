@@ -48,6 +48,21 @@ public sealed record UpdateStoreListingRequest(
     string? MetaDescription,
     StoreListingStatus Status);
 
+// ── Store connection / settings (operator onboarding) ────────────
+
+/// <summary>
+/// The organization's storefront identity. <c>StoreDomain</c> is the public host the
+/// storefront resolves the org by; <c>null</c> means no public storefront is connected.
+/// </summary>
+public sealed record StoreSettingsDto(string Name, string? StoreDomain, bool IsLive);
+
+/// <summary>
+/// Sets the organization's storefront identity. The domain is normalized and validated, and
+/// must be globally unique (it is the storefront resolution key). A blank domain disconnects
+/// the storefront.
+/// </summary>
+public sealed record UpdateStoreSettingsRequest(string Name, string? StoreDomain);
+
 public sealed record StoreCategoryDto(
     Guid Id,
     string Name,

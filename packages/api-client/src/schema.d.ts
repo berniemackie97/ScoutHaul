@@ -4011,6 +4011,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/store/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["StoreSettingsDto"];
+                        "application/json": components["schemas"]["StoreSettingsDto"];
+                        "text/json": components["schemas"]["StoreSettingsDto"];
+                    };
+                };
+            };
+        };
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["UpdateStoreSettingsRequest"];
+                    "text/json": components["schemas"]["UpdateStoreSettingsRequest"];
+                    "application/*+json": components["schemas"]["UpdateStoreSettingsRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["StoreSettingsDto"];
+                        "application/json": components["schemas"]["StoreSettingsDto"];
+                        "text/json": components["schemas"]["StoreSettingsDto"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/tasks": {
         parameters: {
             query?: never;
@@ -5283,6 +5347,11 @@ export interface components {
         };
         /** @enum {string} */
         StoreListingStatus: "Draft" | "Active" | "Reserved" | "Sold" | "Archived";
+        StoreSettingsDto: {
+            name?: string | null;
+            storeDomain?: string | null;
+            isLive?: boolean;
+        };
         StorefrontListingDetailDto: {
             /** Format: uuid */
             id?: string;
@@ -5381,6 +5450,10 @@ export interface components {
             metaTitle?: string | null;
             metaDescription?: string | null;
             status?: components["schemas"]["StoreListingStatus"];
+        };
+        UpdateStoreSettingsRequest: {
+            name?: string | null;
+            storeDomain?: string | null;
         };
         UpdateTaskStatusRequest: {
             status?: components["schemas"]["WorkTaskStatus"];
