@@ -1,5 +1,6 @@
 using HaulScout.Application.Contracts;
 using HaulScout.Application.Services;
+using HaulScout.Domain;
 using HaulScout.Domain.Entities;
 using System.Text.Json;
 
@@ -119,6 +120,8 @@ public static class DtoMapping
                 .Select(photo => $"/api/inventory/{item.Id}/photos/{photo.Id}/thumbnail")
                 .FirstOrDefault(),
             item.IsArchived,
+            InventoryLifecycle.Group(item.Status),
+            InventoryLifecycle.IsSold(item.Status),
             item.CreatedAt,
             item.UpdatedAt);
 

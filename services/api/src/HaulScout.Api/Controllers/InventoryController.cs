@@ -344,6 +344,7 @@ public sealed class InventoryController(
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<InventoryItemDto>>> List(
         [FromQuery] InventoryStatus? status,
+        [FromQuery] InventoryLifecycleGroup? lifecycle,
         [FromQuery] bool includeArchived,
         CancellationToken cancellationToken)
     {
@@ -357,6 +358,14 @@ public sealed class InventoryController(
         if (status.HasValue)
         {
             query = query.Where(item => item.Status == status.Value);
+        }
+
+        // Order-aware filter: e.g. "Active" excludes Sold/Packed/Shipped/Delivered, so a shipped
+        // item never shows up under "not sold".
+        if (lifecycle.HasValue)
+        {
+            var groupStatuses = InventoryLifecycle.InGroup(lifecycle.Value).ToArray();
+            query = query.Where(item => groupStatuses.Contains(item.Status));
         }
 
         var items = await query

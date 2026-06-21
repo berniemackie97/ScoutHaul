@@ -26,6 +26,68 @@ export const MANUAL_INVENTORY_STATUSES: Array<{ value: InventoryStatus; label: s
 
 export const COMMERCE_MANAGED_STATUSES: InventoryStatus[] = ["Sold", "Packed", "Shipped", "Delivered", "Returned"];
 
+export type InventoryLifecycleGroup = components["schemas"]["InventoryLifecycleGroup"];
+
+// Full status list, ordered + grouped, for the lifecycle control. The operator can move an item to
+// any stage (corrections included); the UI confirms terminal moves and moving a sold item backward.
+export const INVENTORY_STATUS_GROUPS: Array<{ group: string; options: Array<{ value: InventoryStatus; label: string }> }> = [
+  {
+    group: "Active",
+    options: [
+      { value: "Draft", label: "Draft" },
+      { value: "Researching", label: "Researching" },
+      { value: "Watchlist", label: "Watchlist" },
+      { value: "Purchased", label: "Purchased" },
+      { value: "NeedsCleaning", label: "Needs cleaning" },
+      { value: "NeedsTesting", label: "Needs testing" },
+      { value: "NeedsRepair", label: "Needs repair" },
+      { value: "NeedsPhotos", label: "Needs photos" },
+      { value: "ReadyToList", label: "Ready to list" },
+      { value: "Listed", label: "Listed" },
+    ],
+  },
+  {
+    group: "Sold & fulfillment",
+    options: [
+      { value: "Sold", label: "Sold" },
+      { value: "Packed", label: "Packed" },
+      { value: "Shipped", label: "Shipped" },
+      { value: "Delivered", label: "Delivered" },
+    ],
+  },
+  {
+    group: "Closed",
+    options: [
+      { value: "Returned", label: "Returned" },
+      { value: "Donated", label: "Donated" },
+      { value: "Disposed", label: "Disposed" },
+    ],
+  },
+];
+
+// Order-aware group filters for the inventory list (maps to the API `lifecycle` query param).
+export const LIFECYCLE_FILTERS: Array<{ value: InventoryLifecycleGroup; label: string }> = [
+  { value: "Active", label: "Active (unsold)" },
+  { value: "Sold", label: "Sold & fulfilling" },
+  { value: "Returned", label: "Returned" },
+  { value: "Removed", label: "Removed" },
+];
+
+export const LIFECYCLE_GROUP_VALUES: InventoryLifecycleGroup[] = ["Active", "Sold", "Returned", "Removed"];
+
+export const TERMINAL_STATUSES: InventoryStatus[] = ["Donated", "Disposed"];
+
+const STATUS_RANK = new Map<InventoryStatus, number>(INVENTORY_STATUSES.map((status, index) => [status, index]));
+
+/** Position in the canonical lifecycle; higher = later. Mirrors the API's InventoryLifecycle.Rank. */
+export function statusRank(status: InventoryStatus): number {
+  return STATUS_RANK.get(status) ?? Number.MAX_SAFE_INTEGER;
+}
+
+export function isSoldStatus(status: InventoryStatus): boolean {
+  return (["Sold", "Packed", "Shipped", "Delivered"] as InventoryStatus[]).includes(status);
+}
+
 export function getInventoryCost(item: InventoryItem): number | null {
   return item.purchasePrice ?? item.sellerAskingPrice ?? null;
 }

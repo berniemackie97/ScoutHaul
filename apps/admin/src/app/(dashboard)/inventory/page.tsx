@@ -3,10 +3,13 @@ import { Boxes, DollarSign, ImageIcon, PackageCheck, Search } from "lucide-react
 import { Badge, Card, Input } from "@overhaul/ui";
 import {
   INVENTORY_STATUSES,
+  LIFECYCLE_FILTERS,
+  LIFECYCLE_GROUP_VALUES,
   getInventoryCost,
   getProjectedMetrics,
   inventoryStatusLabel,
   matchesInventorySearch,
+  type InventoryLifecycleGroup,
   type InventoryStatus,
 } from "@/features/inventory/inventory-operations";
 import { getApiAssetUrl, getApiClient } from "@/lib/api";
@@ -35,10 +38,13 @@ export default async function InventoryPage({
   const selectedStatus = typeof query.status === "string" && INVENTORY_STATUSES.includes(query.status as InventoryStatus)
     ? query.status as InventoryStatus
     : undefined;
+  const selectedLifecycle = typeof query.lifecycle === "string" && LIFECYCLE_GROUP_VALUES.includes(query.lifecycle as InventoryLifecycleGroup)
+    ? query.lifecycle as InventoryLifecycleGroup
+    : undefined;
 
   const api = await getApiClient();
   const { data } = await api.GET("/api/inventory", {
-    params: { query: { status: selectedStatus, includeArchived: false } },
+    params: { query: { status: selectedStatus, lifecycle: selectedLifecycle, includeArchived: false } },
   });
   const allItems = data ?? [];
   const items = search
@@ -63,13 +69,17 @@ export default async function InventoryPage({
         <Card className="p-4"><div className="flex items-center justify-between text-sm text-muted-foreground"><span>Capital deployed</span><DollarSign className="h-4 w-4" /></div><p className="mt-2 text-2xl font-semibold tabular-nums">{money(inventoryCost)}</p></Card>
       </div>
 
-      <form className="grid gap-3 rounded-xl border bg-card p-4 sm:grid-cols-[minmax(0,1fr)_220px_auto]">
+      <form className="grid gap-3 rounded-xl border bg-card p-4 sm:grid-cols-[minmax(0,1fr)_180px_200px_auto]">
         <label className="relative">
           <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
           <Input name="q" defaultValue={typeof query.q === "string" ? query.q : ""} placeholder="Search title, brand, category, barcode, or location" className="pl-9" />
         </label>
+        <select name="lifecycle" defaultValue={selectedLifecycle ?? ""} className="h-10 rounded-lg border border-input bg-background px-3 text-sm">
+          <option value="">All lifecycle groups</option>
+          {LIFECYCLE_FILTERS.map((group) => <option key={group.value} value={group.value}>{group.label}</option>)}
+        </select>
         <select name="status" defaultValue={selectedStatus ?? ""} className="h-10 rounded-lg border border-input bg-background px-3 text-sm">
-          <option value="">All lifecycle stages</option>
+          <option value="">Any exact stage</option>
           {INVENTORY_STATUSES.map((status) => <option key={status} value={status}>{inventoryStatusLabel(status)}</option>)}
         </select>
         <button type="submit" className="h-10 rounded-lg bg-brand-600 px-5 text-sm font-medium text-white hover:bg-brand-700">Apply</button>
@@ -77,7 +87,7 @@ export default async function InventoryPage({
 
       <div className="flex items-center justify-between text-sm">
         <span className="text-muted-foreground">{items.length} matching records</span>
-        {(search || selectedStatus) && <Link href="/inventory" className="text-brand-600 hover:underline">Clear filters</Link>}
+        {(search || selectedStatus || selectedLifecycle) && <Link href="/inventory" className="text-brand-600 hover:underline">Clear filters</Link>}
       </div>
 
       {items.length === 0 ? (
