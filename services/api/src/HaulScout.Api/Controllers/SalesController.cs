@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using HaulScout.Api.Authorization;
@@ -34,10 +35,19 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
         var sales = await query
             .OrderByDescending(item => item.SoldAt)
             .Take(200)
-            .Select(item => item.ToDto())
             .ToListAsync(cancellationToken);
 
-        return sales;
+        return sales.Select(item => item.ToDto()).ToList();
+    }
+
+    [HttpGet("{id:guid}")]
+    public async Task<ActionResult<SaleDto>> Get(Guid id, CancellationToken cancellationToken)
+    {
+        var sale = await db.Sales
+            .Include(item => item.InventoryItem)
+            .SingleOrDefaultAsync(item => item.Id == id && item.OrganizationId == currentUser.OrganizationId, cancellationToken);
+
+        return sale is null ? NotFound() : sale.ToDto();
     }
 
     [HttpPost]
@@ -57,9 +67,9 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
             return BadRequest("Platform and positive sold price are required.");
         }
 
-        if (request.PlatformFees < 0 || request.PaymentFees < 0 || request.ShippingCost < 0 || request.SuppliesCost < 0 || request.OtherCosts < 0)
+        if (request.PlatformFees < 0 || request.PaymentFees < 0 || request.ShippingCost < 0 || request.SuppliesCost < 0 || request.OtherCosts < 0 || request.SalesTaxCollected < 0)
         {
-            return BadRequest("Costs and fees cannot be negative.");
+            return BadRequest("Costs, fees, and tax cannot be negative.");
         }
 
         bool alreadySold = await db.Sales.AnyAsync(
@@ -113,6 +123,8 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
             ShippingCost = request.ShippingCost,
             SuppliesCost = request.SuppliesCost,
             OtherCosts = request.OtherCosts,
+            SalesTaxCollected = request.SalesTaxCollected,
+            TaxRemittedByPlatform = request.TaxRemittedByPlatform,
             NetProfit = financials.NetProfit,
             SoldAt = request.SoldAt ?? DateTimeOffset.UtcNow,
             Notes = TrimToNull(request.Notes)
@@ -175,6 +187,7 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
             financials.SoldPrice,
             financials.PurchaseCost,
             financials.TotalFeesAndCosts,
+            ResaleFinancialCalculator.SalesTaxOwed(sale.SalesTaxCollected, sale.TaxRemittedByPlatform),
             financials.NetProfit,
             financials.RoiPercent,
             financials.MarginPercent);
@@ -212,5 +225,110 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
         await db.SaveChangesAsync(cancellationToken);
         return sale.ToDto();
     }
+
+    [HttpPut("{id:guid}")]
+    [RequireOrganizationPermission(HaulScoutPermissions.ManageFinance)]
+    public async Task<ActionResult<SaleDto>> Update(Guid id, UpdateSaleRequest request, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(request.Reason))
+        {
+            return BadRequest("A reason is required to correct a sale.");
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Platform) || request.SoldPrice <= 0)
+        {
+            return BadRequest("Platform and a positive sold price are required.");
+        }
+
+        if (request.PlatformFees < 0 || request.PaymentFees < 0 || request.ShippingCost < 0
+            || request.SuppliesCost < 0 || request.OtherCosts < 0 || request.SalesTaxCollected < 0)
+        {
+            return BadRequest("Costs, fees, and tax cannot be negative.");
+        }
+
+        var sale = await db.Sales
+            .Include(item => item.InventoryItem)
+            .SingleOrDefaultAsync(item => item.Id == id && item.OrganizationId == currentUser.OrganizationId, cancellationToken);
+
+        if (sale is null)
+        {
+            return NotFound();
+        }
+
+        string before = SnapshotSale(sale);
+
+        sale.Platform = request.Platform.Trim();
+        sale.SoldPrice = request.SoldPrice;
+        sale.PlatformFees = request.PlatformFees;
+        sale.PaymentFees = request.PaymentFees;
+        sale.ShippingCost = request.ShippingCost;
+        sale.SuppliesCost = request.SuppliesCost;
+        sale.OtherCosts = request.OtherCosts;
+        sale.SalesTaxCollected = request.SalesTaxCollected;
+        sale.TaxRemittedByPlatform = request.TaxRemittedByPlatform;
+        sale.SoldAt = request.SoldAt;
+        sale.Notes = TrimToNull(request.Notes);
+
+        // Net profit is always recomputed from the corrected inputs (tax excluded); never trust a stored figure.
+        RealizedSaleFinancials financials = ResaleFinancialCalculator.CalculateRealizedSale(
+            sale.SoldPrice, sale.CostOfGoods, sale.PlatformFees, sale.PaymentFees,
+            sale.ShippingCost, sale.SuppliesCost, sale.OtherCosts);
+        sale.NetProfit = financials.NetProfit;
+
+        int nextVersion = await db.SaleCorrections
+            .CountAsync(item => item.SaleId == sale.Id && item.OrganizationId == currentUser.OrganizationId, cancellationToken) + 1;
+
+        db.SaleCorrections.Add(new SaleCorrection
+        {
+            OrganizationId = currentUser.OrganizationId,
+            SaleId = sale.Id,
+            CorrectedByUserId = currentUser.UserId,
+            Reason = request.Reason.Trim(),
+            BeforeJson = before,
+            AfterJson = SnapshotSale(sale),
+            Version = nextVersion,
+        });
+
+        await db.SaveChangesAsync(cancellationToken);
+        return sale.ToDto();
+    }
+
+    [HttpGet("{id:guid}/corrections")]
+    public async Task<ActionResult<IReadOnlyList<SaleCorrectionDto>>> ListCorrections(Guid id, CancellationToken cancellationToken)
+    {
+        bool saleExists = await db.Sales
+            .AnyAsync(item => item.Id == id && item.OrganizationId == currentUser.OrganizationId, cancellationToken);
+        if (!saleExists)
+        {
+            return NotFound();
+        }
+
+        var corrections = await db.SaleCorrections
+            .Include(item => item.CorrectedByUser)
+            .Where(item => item.SaleId == id && item.OrganizationId == currentUser.OrganizationId)
+            .OrderByDescending(item => item.Version)
+            .ToListAsync(cancellationToken);
+
+        return corrections.Select(item => item.ToDto()).ToList();
+    }
+
+    // Serializes a sale's financial state for the immutable before/after audit snapshot.
+    private static string SnapshotSale(Sale sale) => JsonSerializer.Serialize(new
+    {
+        sale.Platform,
+        sale.SoldPrice,
+        sale.CostOfGoods,
+        sale.PlatformFees,
+        sale.PaymentFees,
+        sale.ShippingCost,
+        sale.SuppliesCost,
+        sale.OtherCosts,
+        sale.SalesTaxCollected,
+        sale.TaxRemittedByPlatform,
+        sale.NetProfit,
+        sale.SoldAt,
+        Status = sale.Status.ToString(),
+        sale.Notes,
+    });
 
 }

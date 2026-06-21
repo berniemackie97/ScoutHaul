@@ -513,9 +513,12 @@ public sealed record ListingDto(
     DateTimeOffset? ListedAt,
     DateTimeOffset? EndedAt,
     string? Notes);
-public sealed record RecordSaleRequest(Guid InventoryItemId, Guid? ListingId, string Platform, decimal SoldPrice, decimal PlatformFees, decimal PaymentFees, decimal ShippingCost, decimal SuppliesCost, decimal OtherCosts, DateTimeOffset? SoldAt, string? Notes);
-public sealed record SaleDto(Guid Id, Guid InventoryItemId, string InventoryItemTitle, Guid? ListingId, string Platform, decimal SoldPrice, decimal CostOfGoods, decimal PlatformFees, decimal PaymentFees, decimal ShippingCost, decimal SuppliesCost, decimal OtherCosts, decimal NetProfit, SaleStatus Status, DateTimeOffset SoldAt, string? Notes);
-public sealed record RealizedProfitDto(Guid SaleId, decimal SoldPrice, decimal PurchaseCost, decimal TotalFeesAndCosts, decimal NetProfit, decimal RoiPercent, decimal MarginPercent);
+public sealed record RecordSaleRequest(Guid InventoryItemId, Guid? ListingId, string Platform, decimal SoldPrice, decimal PlatformFees, decimal PaymentFees, decimal ShippingCost, decimal SuppliesCost, decimal OtherCosts, DateTimeOffset? SoldAt, string? Notes, decimal SalesTaxCollected = 0, bool TaxRemittedByPlatform = true);
+/// <summary>Edits an existing sale. <c>Reason</c> is required and recorded with a before/after audit snapshot.</summary>
+public sealed record UpdateSaleRequest(string Platform, decimal SoldPrice, decimal PlatformFees, decimal PaymentFees, decimal ShippingCost, decimal SuppliesCost, decimal OtherCosts, decimal SalesTaxCollected, bool TaxRemittedByPlatform, DateTimeOffset SoldAt, string? Notes, string Reason);
+public sealed record SaleDto(Guid Id, Guid InventoryItemId, string InventoryItemTitle, Guid? ListingId, string Platform, decimal SoldPrice, decimal CostOfGoods, decimal PlatformFees, decimal PaymentFees, decimal ShippingCost, decimal SuppliesCost, decimal OtherCosts, decimal SalesTaxCollected, bool TaxRemittedByPlatform, decimal SalesTaxOwed, decimal NetProfit, SaleStatus Status, DateTimeOffset SoldAt, string? Notes);
+public sealed record SaleCorrectionDto(Guid Id, Guid SaleId, int Version, string Reason, string CorrectedBy, DateTimeOffset CorrectedAt, string BeforeJson, string AfterJson);
+public sealed record RealizedProfitDto(Guid SaleId, decimal SoldPrice, decimal PurchaseCost, decimal TotalFeesAndCosts, decimal SalesTaxOwed, decimal NetProfit, decimal RoiPercent, decimal MarginPercent);
 
 public sealed record CreateTaskRequest(Guid? InventoryItemId, Guid? AssignedToUserId, string Title, string? Description, DateTimeOffset? DueAt);
 public sealed record AssignTaskRequest(Guid? AssignedToUserId);
