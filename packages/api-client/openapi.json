@@ -1,7 +1,7 @@
 {
   "openapi": "3.0.4",
   "info": {
-    "title": "HaulScout.Api, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null",
+    "title": "HaulScout.Api",
     "version": "1.0"
   },
   "paths": {
@@ -273,7 +273,7 @@
     "/": {
       "get": {
         "tags": [
-          "HaulScout.Api, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+          "HaulScout.Api"
         ],
         "responses": {
           "200": {
@@ -5020,6 +5020,81 @@
         }
       }
     },
+    "/api/store/settings": {
+      "get": {
+        "tags": [
+          "StoreSettings"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoreSettingsDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoreSettingsDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoreSettingsDto"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "StoreSettings"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateStoreSettingsRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateStoreSettingsRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateStoreSettingsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoreSettingsDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoreSettingsDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoreSettingsDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/tasks": {
       "post": {
         "tags": [
@@ -8270,6 +8345,23 @@
         ],
         "type": "string"
       },
+      "StoreSettingsDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "storeDomain": {
+            "type": "string",
+            "nullable": true
+          },
+          "isLive": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
       "StorefrontListingDetailDto": {
         "type": "object",
         "properties": {
@@ -8563,6 +8655,20 @@
           },
           "status": {
             "$ref": "#/components/schemas/StoreListingStatus"
+          }
+        },
+        "additionalProperties": false
+      },
+      "UpdateStoreSettingsRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "storeDomain": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -9023,7 +9129,7 @@
       "name": "Dashboard"
     },
     {
-      "name": "HaulScout.Api, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+      "name": "HaulScout.Api"
     },
     {
       "name": "Inventory"
@@ -9066,6 +9172,9 @@
     },
     {
       "name": "Storefront"
+    },
+    {
+      "name": "StoreSettings"
     },
     {
       "name": "Tasks"

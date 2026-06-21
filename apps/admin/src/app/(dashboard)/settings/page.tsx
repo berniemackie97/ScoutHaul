@@ -1,8 +1,11 @@
 import { Badge, Card, CardContent, CardDescription, CardHeader, CardTitle } from "@overhaul/ui";
-import { Bell, Building2, CreditCard, LockKeyhole, ReceiptText, Settings2, Truck } from "lucide-react";
+import { Bell, CreditCard, LockKeyhole, ReceiptText, Settings2, Truck } from "lucide-react";
+import { getApiClient } from "@/lib/api";
+import { StoreConnectionForm } from "./store-connection-form";
 
-const modules = [
-  { title: "Business and storefront", description: "Legal identity, storefront branding, contact details, domains, policies, and document numbering.", icon: Building2 },
+export const dynamic = "force-dynamic";
+
+const plannedModules = [
   { title: "Payments and checkout", description: "Payment processors, accepted methods, capture rules, refunds, fraud controls, and webhook health.", icon: CreditCard },
   { title: "Shipping and fulfillment", description: "Warehouses, carriers, service levels, packaging, label defaults, local pickup, and return routing.", icon: Truck },
   { title: "Tax and accounting", description: "Tax registrations, calculation provider, reporting basis, fiscal periods, account mappings, and exports.", icon: ReceiptText },
@@ -10,7 +13,10 @@ const modules = [
   { title: "Access and governance", description: "Staff, roles, permissions, approvals, sessions, audit retention, integrations, and API credentials.", icon: LockKeyhole },
 ];
 
-export default function SettingsPage() {
+export default async function SettingsPage() {
+  const api = await getApiClient();
+  const { data: store } = await api.GET("/api/store/settings", {});
+
   return (
     <div className="space-y-6">
       <header>
@@ -19,26 +25,33 @@ export default function SettingsPage() {
         <p className="mt-1 max-w-3xl text-sm text-muted-foreground">The control plane for store behavior, financial policy, integrations, security, and staff access.</p>
       </header>
 
-      <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
-        Configuration persistence is not enabled yet. No settings shown here pretend to save; each module will ship with validated backend storage, permissions, and audit history.
-      </div>
+      <StoreConnectionForm
+        initial={{
+          name: store?.name ?? "",
+          storeDomain: store?.storeDomain ?? null,
+          isLive: store?.isLive ?? false,
+        }}
+      />
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {modules.map((module) => (
-          <Card key={module.title}>
-            <CardHeader>
-              <div className="mb-3 flex items-center justify-between">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted"><module.icon className="h-4 w-4" /></div>
-                <Badge variant="outline">Planned</Badge>
-              </div>
-              <CardTitle className="text-lg">{module.title}</CardTitle>
-              <CardDescription>{module.description}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-2 text-xs text-muted-foreground"><Settings2 className="h-3.5 w-3.5" /> Backend contract and audit controls required</div>
-            </CardContent>
-          </Card>
-        ))}
+      <div>
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">More modules</h2>
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {plannedModules.map((module) => (
+            <Card key={module.title}>
+              <CardHeader>
+                <div className="mb-3 flex items-center justify-between">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted"><module.icon className="h-4 w-4" /></div>
+                  <Badge variant="outline">Planned</Badge>
+                </div>
+                <CardTitle className="text-lg">{module.title}</CardTitle>
+                <CardDescription>{module.description}</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground"><Settings2 className="h-3.5 w-3.5" /> Backend contract and audit controls required</div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       </div>
     </div>
   );
