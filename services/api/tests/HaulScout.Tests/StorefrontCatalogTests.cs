@@ -45,6 +45,9 @@ public class StorefrontCatalogTests
             seed.InventoryItems.Add(new InventoryItem { Title = "Draft item", Status = InventoryStatus.Draft, Quantity = 1, EstimatedSalePrice = 20m });
             // Not sellable: listed but unpriced.
             seed.InventoryItems.Add(new InventoryItem { Title = "Unpriced", Status = InventoryStatus.Listed, Quantity = 1 });
+            // Not sellable: quarantined authenticity or customer-owned repair work.
+            seed.InventoryItems.Add(new InventoryItem { Title = "Counterfeit", Status = InventoryStatus.Listed, EstimatedSalePrice = 100m, AuthenticityStatus = InventoryAuthenticityStatus.Counterfeit });
+            seed.InventoryItems.Add(new InventoryItem { Title = "Customer repair", Status = InventoryStatus.Listed, EstimatedSalePrice = 100m, OwnershipType = InventoryOwnershipType.CustomerRepair });
             await seed.SaveChangesAsync();
         }
 
@@ -62,6 +65,48 @@ public class StorefrontCatalogTests
         Assert.Contains(page.Items, x => x.Title == "Listed item");
         Assert.Contains(page.Items, x => x.Title == "Listed single");
         Assert.All(page.Items, x => Assert.True(x.ListPrice > 0));
+    }
+
+    [Fact]
+    public async Task Detail_exposes_safe_structured_specs_without_private_identifiers()
+    {
+        var org = Guid.NewGuid();
+        var options = new DbContextOptionsBuilder<HaulScoutDbContext>()
+            .UseInMemoryDatabase(nameof(Detail_exposes_safe_structured_specs_without_private_identifiers))
+            .Options;
+        var seedTenant = new TenantContext();
+        seedTenant.SetOrganization(org);
+        await using (var seed = new HaulScoutDbContext(options, seedTenant))
+        {
+            seed.Organizations.Add(new Organization { Id = org, Name = "Overhaul Trading" });
+            seed.InventoryItems.Add(new InventoryItem
+            {
+                Title = "Nintendo Switch OLED",
+                Status = InventoryStatus.Listed,
+                EstimatedSalePrice = 250m,
+                Brand = "Nintendo",
+                Model = "Switch OLED",
+                Color = "White",
+                FunctionalStatus = InventoryFunctionalStatus.FullyFunctional,
+                CompletenessStatus = InventoryCompletenessStatus.Complete,
+                PackagingStatus = InventoryPackagingStatus.OriginalExcellent,
+                SerialNumber = "PRIVATE-SERIAL",
+                Weight = 3.2m,
+                WeightUnit = WeightUnit.Pounds,
+            });
+            await seed.SaveChangesAsync();
+        }
+
+        var tenant = new TenantContext();
+        await using var db = new HaulScoutDbContext(options, tenant);
+        var controller = NewController(db, tenant, org);
+        var browse = await controller.Browse(category: null, search: null, page: 1, pageSize: 24);
+        var detail = await controller.Detail(browse.Value!.Items.Single().Slug, CancellationToken.None);
+
+        Assert.Equal("Switch OLED", detail.Value!.Model);
+        Assert.Equal(InventoryFunctionalStatus.FullyFunctional, detail.Value.FunctionalStatus);
+        Assert.Equal(InventoryCompletenessStatus.Complete, detail.Value.CompletenessStatus);
+        Assert.Equal(3.2m, detail.Value.Weight);
     }
 
     [Fact]

@@ -41,7 +41,7 @@ public class InventoryPhotoServingTests
         // fetching the photo URL with no bearer token. Must still resolve via IgnoreQueryFilters.
         var anonTenant = new TenantContext();
         await using var db = new HaulScoutDbContext(options, anonTenant);
-        var controller = new InventoryController(db, null!, null!);
+        var controller = new InventoryController(db, null!, null!, null!);
 
         var result = await controller.GetPhotoThumbnail(itemId, photoId, CancellationToken.None);
 

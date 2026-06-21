@@ -7,6 +7,7 @@ import {
   StyleSheet,
   TextInput,
   View,
+  type ViewStyle,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from './Text';
@@ -32,6 +33,7 @@ type SelectFieldProps = {
   error?: string | null;
   clearable?: boolean;
   searchable?: boolean;
+  containerStyle?: ViewStyle;
 };
 
 export function SelectField({
@@ -44,6 +46,7 @@ export function SelectField({
   error,
   clearable = true,
   searchable = false,
+  containerStyle,
 }: SelectFieldProps) {
   const { colors: c, shadows: s } = useAppTheme();
   const [open, setOpen] = useState(false);
@@ -52,7 +55,7 @@ export function SelectField({
 
   return (
     <>
-      <View style={styles.field}>
+      <View style={[styles.field, containerStyle]}>
         <View style={styles.labelRow}>
           <Text variant="caption" color={error ? c.danger : c.textSecondary}>
             {label}

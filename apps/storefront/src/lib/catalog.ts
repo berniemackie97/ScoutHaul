@@ -7,8 +7,18 @@ export type Specimen = {
   sku?: string;
   title: string;
   brand?: string;
+  model?: string;
+  color?: string;
   category: string;
   condition: string;
+  size?: string;
+  functionalStatus?: string;
+  completenessStatus?: string;
+  packagingStatus?: string;
+  countryOfOrigin?: string;
+  manufactureYear?: number;
+  dimensions?: string;
+  weight?: string;
   price: number;
   compareAt?: number;
   era?: string;
@@ -57,8 +67,18 @@ export async function getListing(slug: string): Promise<Specimen | null> {
       slug: data.slug ?? "",
       title: data.title ?? "",
       brand: data.brand ?? undefined,
+      model: data.model ?? undefined,
+      color: data.color ?? undefined,
       category: data.category ?? "",
       condition: data.condition ?? "Good",
+      size: [data.sizeSystem, data.sizeValue].filter(Boolean).join(" ") || undefined,
+      functionalStatus: data.functionalStatus ? humanize(data.functionalStatus) : undefined,
+      completenessStatus: data.completenessStatus ? humanize(data.completenessStatus) : undefined,
+      packagingStatus: data.packagingStatus ? humanize(data.packagingStatus) : undefined,
+      countryOfOrigin: data.countryOfOrigin ?? undefined,
+      manufactureYear: data.manufactureYear ?? undefined,
+      dimensions: formatDimensions(data.length, data.width, data.height, data.dimensionUnit),
+      weight: data.weight == null ? undefined : `${data.weight} ${weightUnit(data.weightUnit)}`,
       price: data.listPrice ?? 0,
       compareAt: data.compareAtPrice ?? undefined,
       blurb: data.description ?? data.subtitle ?? "",
@@ -67,6 +87,21 @@ export async function getListing(slug: string): Promise<Specimen | null> {
   } catch {
     return null;
   }
+}
+
+function humanize(value: string): string {
+  return value.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/^./, letter => letter.toUpperCase());
+}
+
+function formatDimensions(length?: number | null, width?: number | null, height?: number | null, unit?: string): string | undefined {
+  const values = [length, width, height];
+  if (values.every(value => value == null)) return undefined;
+  const suffix = unit === "Centimeters" ? "cm" : "in";
+  return `${values.map(value => value ?? "—").join(" × ")} ${suffix}`;
+}
+
+function weightUnit(value?: string): string {
+  return ({ Ounces: "oz", Pounds: "lb", Grams: "g", Kilograms: "kg" } as Record<string, string>)[value ?? ""] ?? value ?? "";
 }
 
 export async function getRelated(slug: string, limit = 4): Promise<Specimen[]> {

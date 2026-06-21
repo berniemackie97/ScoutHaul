@@ -480,6 +480,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/inventory/reference-data": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["InventoryReferenceDataDto"];
+                        "application/json": components["schemas"]["InventoryReferenceDataDto"];
+                        "text/json": components["schemas"]["InventoryReferenceDataDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/inventory/{id}/photos": {
         parameters: {
             query?: never;
@@ -4613,6 +4650,8 @@ export interface components {
             warnings?: string[] | null;
         };
         /** @enum {string} */
+        DimensionUnit: "Inches" | "Centimeters";
+        /** @enum {string} */
         ExpenseCategory: "InventoryPurchase" | "Shipping" | "Supplies" | "PlatformFee" | "PaymentFee" | "Refund" | "Fuel" | "Storage" | "Other";
         ExpenseDto: {
             /** Format: uuid */
@@ -4630,6 +4669,12 @@ export interface components {
             /** Format: date-time */
             occurredAt?: string;
         };
+        /** @enum {string} */
+        InventoryAuthenticityStatus: "NotAssessed" | "Authentic" | "LikelyAuthentic" | "NeedsVerification" | "Replica" | "Counterfeit";
+        /** @enum {string} */
+        InventoryCompletenessStatus: "Unknown" | "Complete" | "MissingAccessories" | "MissingParts" | "Incomplete";
+        /** @enum {string} */
+        InventoryFunctionalStatus: "Unknown" | "Untested" | "FullyFunctional" | "FunctionalWithIssues" | "Intermittent" | "NonFunctional" | "PartsOnly";
         InventoryIssueDto: {
             /** Format: uuid */
             id?: string;
@@ -4695,9 +4740,33 @@ export interface components {
             createdAt?: string;
             /** Format: date-time */
             updatedAt?: string;
+            ownershipType?: components["schemas"]["InventoryOwnershipType"];
+            functionalStatus?: components["schemas"]["InventoryFunctionalStatus"];
+            completenessStatus?: components["schemas"]["InventoryCompletenessStatus"];
+            authenticityStatus?: components["schemas"]["InventoryAuthenticityStatus"];
+            packagingStatus?: components["schemas"]["InventoryPackagingStatus"];
+            manufacturerPartNumber?: string | null;
+            serialNumber?: string | null;
+            countryOfOrigin?: string | null;
+            /** Format: int32 */
+            manufactureYear?: number | null;
+            /** Format: double */
+            length?: number | null;
+            /** Format: double */
+            width?: number | null;
+            /** Format: double */
+            height?: number | null;
+            dimensionUnit?: components["schemas"]["DimensionUnit"];
+            /** Format: double */
+            weight?: number | null;
+            weightUnit?: components["schemas"]["WeightUnit"];
         };
         /** @enum {string} */
         InventoryLifecycleGroup: "Active" | "Sold" | "Returned" | "Removed";
+        /** @enum {string} */
+        InventoryOwnershipType: "Owned" | "Consigned" | "CustomerRepair" | "VendorManaged";
+        /** @enum {string} */
+        InventoryPackagingStatus: "NotApplicable" | "FactorySealed" | "OriginalExcellent" | "OriginalWorn" | "OriginalDamaged" | "ReplacementPackaging" | "LooseNoPackaging";
         InventoryPhotoDto: {
             /** Format: uuid */
             id?: string;
@@ -4726,6 +4795,24 @@ export interface components {
             photoUrls?: string[] | null;
             uploadedUrl?: string | null;
             photos?: components["schemas"]["InventoryPhotoDto"][] | null;
+        };
+        InventoryReferenceDataDto: {
+            categories?: components["schemas"]["InventoryReferenceOptionDto"][] | null;
+            brands?: components["schemas"]["InventoryReferenceOptionDto"][] | null;
+            models?: components["schemas"]["InventoryReferenceOptionDto"][] | null;
+            conditions?: components["schemas"]["InventoryReferenceOptionDto"][] | null;
+            colors?: components["schemas"]["InventoryReferenceOptionDto"][] | null;
+            sizeSystems?: components["schemas"]["InventoryReferenceOptionDto"][] | null;
+            sizes?: components["schemas"]["InventoryReferenceOptionDto"][] | null;
+            storageLocations?: components["schemas"]["InventoryReferenceOptionDto"][] | null;
+            countries?: components["schemas"]["InventoryReferenceOptionDto"][] | null;
+        };
+        InventoryReferenceOptionDto: {
+            value?: string | null;
+            label?: string | null;
+            group?: string | null;
+            parentValue?: string | null;
+            isLegacy?: boolean;
         };
         /** @enum {string} */
         InventoryStatus: "Draft" | "Researching" | "Watchlist" | "Purchased" | "NeedsCleaning" | "NeedsTesting" | "NeedsRepair" | "NeedsPhotos" | "ReadyToList" | "Listed" | "Sold" | "Packed" | "Shipped" | "Delivered" | "Returned" | "Donated" | "Disposed";
@@ -5505,6 +5592,26 @@ export interface components {
             metaDescription?: string | null;
             imageUrl?: string | null;
             category?: string | null;
+            model?: string | null;
+            color?: string | null;
+            sizeSystem?: string | null;
+            sizeValue?: string | null;
+            functionalStatus?: components["schemas"]["InventoryFunctionalStatus"];
+            completenessStatus?: components["schemas"]["InventoryCompletenessStatus"];
+            packagingStatus?: components["schemas"]["InventoryPackagingStatus"];
+            countryOfOrigin?: string | null;
+            /** Format: int32 */
+            manufactureYear?: number | null;
+            /** Format: double */
+            length?: number | null;
+            /** Format: double */
+            width?: number | null;
+            /** Format: double */
+            height?: number | null;
+            dimensionUnit?: components["schemas"]["DimensionUnit"];
+            /** Format: double */
+            weight?: number | null;
+            weightUnit?: components["schemas"]["WeightUnit"];
         };
         StorefrontListingDto: {
             /** Format: uuid */
@@ -5660,6 +5767,26 @@ export interface components {
             estimatedSalePrice?: number | null;
             barcode?: string | null;
             notes?: string | null;
+            ownershipType?: components["schemas"]["InventoryOwnershipType"];
+            functionalStatus?: components["schemas"]["InventoryFunctionalStatus"];
+            completenessStatus?: components["schemas"]["InventoryCompletenessStatus"];
+            authenticityStatus?: components["schemas"]["InventoryAuthenticityStatus"];
+            packagingStatus?: components["schemas"]["InventoryPackagingStatus"];
+            manufacturerPartNumber?: string | null;
+            serialNumber?: string | null;
+            countryOfOrigin?: string | null;
+            /** Format: int32 */
+            manufactureYear?: number | null;
+            /** Format: double */
+            length?: number | null;
+            /** Format: double */
+            width?: number | null;
+            /** Format: double */
+            height?: number | null;
+            dimensionUnit?: components["schemas"]["DimensionUnit"];
+            /** Format: double */
+            weight?: number | null;
+            weightUnit?: components["schemas"]["WeightUnit"];
         };
         UpsertMarketObservationRequest: {
             /** Format: uuid */
@@ -5747,6 +5874,8 @@ export interface components {
             searchQuery?: string | null;
             detectedText?: string | null;
         };
+        /** @enum {string} */
+        WeightUnit: "Ounces" | "Pounds" | "Grams" | "Kilograms";
         /** @enum {string} */
         WorkTaskStatus: "Open" | "InProgress" | "Blocked" | "Completed" | "Cancelled";
     };

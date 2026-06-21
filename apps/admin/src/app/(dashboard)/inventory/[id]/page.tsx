@@ -25,8 +25,12 @@ const date = (value: string | null | undefined) =>
 export default async function InventoryDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const api = await getApiClient();
-  const { data: item } = await api.GET("/api/inventory/{id}", { params: { path: { id } } });
+  const [{ data: item }, { data: referenceData }] = await Promise.all([
+    api.GET("/api/inventory/{id}", { params: { path: { id } } }),
+    api.GET("/api/inventory/reference-data"),
+  ]);
   if (!item?.id || !item.status) notFound();
+  if (!referenceData) throw new Error("Inventory reference data could not be loaded.");
 
   const photos: ManagedPhoto[] = (item.photos ?? []).flatMap((photo) => {
     const imageUrl = getApiAssetUrl(photo.thumbnailUrl);
@@ -57,7 +61,7 @@ export default async function InventoryDetailPage({ params }: { params: Promise<
       </header>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
-        <InventoryEditor item={item} />
+        <InventoryEditor item={item} referenceData={referenceData} />
 
         <aside className="space-y-6">
           <PhotoManager id={item.id} photos={photos} />

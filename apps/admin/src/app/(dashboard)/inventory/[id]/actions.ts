@@ -10,6 +10,13 @@ import {
 
 type UpsertInventoryItemRequest = components["schemas"]["UpsertInventoryItemRequest"];
 type InventoryStatus = components["schemas"]["InventoryStatus"];
+type OwnershipType = components["schemas"]["InventoryOwnershipType"];
+type FunctionalStatus = components["schemas"]["InventoryFunctionalStatus"];
+type CompletenessStatus = components["schemas"]["InventoryCompletenessStatus"];
+type AuthenticityStatus = components["schemas"]["InventoryAuthenticityStatus"];
+type PackagingStatus = components["schemas"]["InventoryPackagingStatus"];
+type DimensionUnit = components["schemas"]["DimensionUnit"];
+type WeightUnit = components["schemas"]["WeightUnit"];
 
 export type InventoryActionResult = {
   ok: boolean;
@@ -84,6 +91,21 @@ export async function updateInventoryItem(
     estimatedSalePrice: numberValue(formData, "estimatedSalePrice"),
     barcode: textValue(formData, "barcode"),
     notes: textValue(formData, "notes"),
+    ownershipType: textValue(formData, "ownershipType") as OwnershipType,
+    functionalStatus: textValue(formData, "functionalStatus") as FunctionalStatus,
+    completenessStatus: textValue(formData, "completenessStatus") as CompletenessStatus,
+    authenticityStatus: textValue(formData, "authenticityStatus") as AuthenticityStatus,
+    packagingStatus: textValue(formData, "packagingStatus") as PackagingStatus,
+    manufacturerPartNumber: textValue(formData, "manufacturerPartNumber"),
+    serialNumber: textValue(formData, "serialNumber"),
+    countryOfOrigin: textValue(formData, "countryOfOrigin"),
+    manufactureYear: numberValue(formData, "manufactureYear"),
+    length: numberValue(formData, "length"),
+    width: numberValue(formData, "width"),
+    height: numberValue(formData, "height"),
+    dimensionUnit: textValue(formData, "dimensionUnit") as DimensionUnit,
+    weight: numberValue(formData, "weight"),
+    weightUnit: textValue(formData, "weightUnit") as WeightUnit,
   };
 
   const result = await api.PUT("/api/inventory/{id}", {

@@ -47,6 +47,7 @@ export const api = {
   // Inventory
   inventory: inventoryApi.list,
   inventoryItem: inventoryApi.get,
+  inventoryReferenceData: inventoryApi.referenceData,
   createInventory: inventoryApi.create,
   updateInventory: inventoryApi.update,
   deleteInventory: inventoryApi.archive,

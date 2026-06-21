@@ -101,9 +101,42 @@ public sealed record UpsertInventoryItemRequest(
     decimal? PurchasePrice,
     decimal? EstimatedSalePrice,
     string? Barcode,
-    string? Notes);
+    string? Notes,
+    InventoryOwnershipType? OwnershipType = null,
+    InventoryFunctionalStatus? FunctionalStatus = null,
+    InventoryCompletenessStatus? CompletenessStatus = null,
+    InventoryAuthenticityStatus? AuthenticityStatus = null,
+    InventoryPackagingStatus? PackagingStatus = null,
+    string? ManufacturerPartNumber = null,
+    string? SerialNumber = null,
+    string? CountryOfOrigin = null,
+    int? ManufactureYear = null,
+    decimal? Length = null,
+    decimal? Width = null,
+    decimal? Height = null,
+    DimensionUnit? DimensionUnit = null,
+    decimal? Weight = null,
+    WeightUnit? WeightUnit = null);
 
 public sealed record ChangeInventoryStatusRequest(InventoryStatus Status);
+
+public sealed record InventoryReferenceOptionDto(
+    string Value,
+    string Label,
+    string? Group = null,
+    string? ParentValue = null,
+    bool IsLegacy = false);
+
+public sealed record InventoryReferenceDataDto(
+    IReadOnlyList<InventoryReferenceOptionDto> Categories,
+    IReadOnlyList<InventoryReferenceOptionDto> Brands,
+    IReadOnlyList<InventoryReferenceOptionDto> Models,
+    IReadOnlyList<InventoryReferenceOptionDto> Conditions,
+    IReadOnlyList<InventoryReferenceOptionDto> Colors,
+    IReadOnlyList<InventoryReferenceOptionDto> SizeSystems,
+    IReadOnlyList<InventoryReferenceOptionDto> Sizes,
+    IReadOnlyList<InventoryReferenceOptionDto> StorageLocations,
+    IReadOnlyList<InventoryReferenceOptionDto> Countries);
 
 public sealed record InventoryItemDto(
     Guid Id,
@@ -141,7 +174,22 @@ public sealed record InventoryItemDto(
     InventoryLifecycleGroup LifecycleGroup,
     bool IsSold,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    InventoryOwnershipType OwnershipType,
+    InventoryFunctionalStatus FunctionalStatus,
+    InventoryCompletenessStatus CompletenessStatus,
+    InventoryAuthenticityStatus AuthenticityStatus,
+    InventoryPackagingStatus PackagingStatus,
+    string? ManufacturerPartNumber,
+    string? SerialNumber,
+    string? CountryOfOrigin,
+    int? ManufactureYear,
+    decimal? Length,
+    decimal? Width,
+    decimal? Height,
+    DimensionUnit DimensionUnit,
+    decimal? Weight,
+    WeightUnit WeightUnit);
 
 public sealed record InventoryPhotoDto(
     Guid Id,

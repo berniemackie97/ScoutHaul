@@ -27,6 +27,69 @@ public enum InventoryStatus
     Disposed
 }
 
+public enum InventoryOwnershipType
+{
+    Owned,
+    Consigned,
+    CustomerRepair,
+    VendorManaged
+}
+
+public enum InventoryFunctionalStatus
+{
+    Unknown,
+    Untested,
+    FullyFunctional,
+    FunctionalWithIssues,
+    Intermittent,
+    NonFunctional,
+    PartsOnly
+}
+
+public enum InventoryCompletenessStatus
+{
+    Unknown,
+    Complete,
+    MissingAccessories,
+    MissingParts,
+    Incomplete
+}
+
+public enum InventoryAuthenticityStatus
+{
+    NotAssessed,
+    Authentic,
+    LikelyAuthentic,
+    NeedsVerification,
+    Replica,
+    Counterfeit
+}
+
+public enum InventoryPackagingStatus
+{
+    NotApplicable,
+    FactorySealed,
+    OriginalExcellent,
+    OriginalWorn,
+    OriginalDamaged,
+    ReplacementPackaging,
+    LooseNoPackaging
+}
+
+public enum DimensionUnit
+{
+    Inches,
+    Centimeters
+}
+
+public enum WeightUnit
+{
+    Ounces,
+    Pounds,
+    Grams,
+    Kilograms
+}
+
 public enum MarketObservationType
 {
     Sold,

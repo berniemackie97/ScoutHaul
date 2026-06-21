@@ -2,15 +2,16 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { api } from '../../src/api';
+import type { InventoryReferenceData, InventoryReferenceOption } from '../../src/api/inventory';
 import { Button } from '../../src/components/Button';
 import { ErrorBanner } from '../../src/components/ErrorBanner';
 import { ExpandableSection } from '../../src/components/ExpandableSection';
 import { LoadingState } from '../../src/components/LoadingState';
 import { Screen } from '../../src/components/Screen';
-import { SelectField } from '../../src/components/SelectField';
+import { SelectField, type SelectOption } from '../../src/components/SelectField';
 import { StatusPill } from '../../src/components/StatusPill';
 import { Text } from '../../src/components/Text';
 import { TextField } from '../../src/components/TextField';
@@ -22,6 +23,7 @@ import { takeIdentifyHandoff } from '../../src/features/scanner/identifyHandoff'
 import {
   categoryAttributeFields,
   categoryOptions,
+  colorOptions,
   conditionOptions,
   damageSeverityOptions,
   damageTypeOptions,
@@ -40,6 +42,22 @@ type LocalPhoto = {
 };
 
 type AttributeMap = Record<string, string>;
+
+function referenceOptions(
+  remote: InventoryReferenceOption[] | undefined,
+  fallback: SelectOption[],
+  current?: string,
+): SelectOption[] {
+  const options = remote?.map((option) => ({
+    value: option.value,
+    label: option.label,
+    group: option.group ?? undefined,
+  })) ?? fallback;
+  if (current && !options.some((option) => option.value === current)) {
+    return [...options, { value: current, label: `${current} (existing value)`, group: 'Existing data' }];
+  }
+  return options;
+}
 
 export default function EditInventoryScreen() {
   const { colors: c, shadows: s } = useAppTheme();
@@ -90,6 +108,7 @@ export default function EditInventoryScreen() {
   const [error, setError] = useState<string | null>(null);
   const [titleTouched, setTitleTouched] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [referenceData, setReferenceData] = useState<InventoryReferenceData | null>(null);
   // Guards loadItem against re-running on every focus (which would clobber
   // unsaved edits and any fields applied from the scanner handoff).
   const hasLoadedRef = useRef(false);
@@ -99,6 +118,32 @@ export default function EditInventoryScreen() {
     () => categoryAttributeFields[category] ?? [],
     [category],
   );
+
+  const controlledCategories = useMemo(() => referenceOptions(referenceData?.categories, categoryOptions, category), [referenceData, category]);
+  const controlledConditions = useMemo(() => referenceOptions(referenceData?.conditions, conditionOptions, condition), [referenceData, condition]);
+  const controlledColors = useMemo(() => referenceOptions(referenceData?.colors, colorOptions, color), [referenceData, color]);
+  const controlledSizeSystems = useMemo(() => referenceOptions(referenceData?.sizeSystems, sizeSystemOptions, sizeSystem), [referenceData, sizeSystem]);
+  const controlledBrands = useMemo(() => referenceOptions(referenceData?.brands, [], brand), [referenceData, brand]);
+  const controlledModels = useMemo(
+    () => referenceOptions(referenceData?.models.filter((option) => !option.parentValue || !brand || option.parentValue === brand), [], model),
+    [referenceData, brand, model],
+  );
+  const controlledSizes = useMemo(
+    () => referenceOptions(referenceData?.sizes.filter((option) => option.parentValue === sizeSystem), [], sizeValue),
+    [referenceData, sizeSystem, sizeValue],
+  );
+  const controlledStorageLocations = useMemo(
+    () => referenceOptions(referenceData?.storageLocations, [], storageLocation),
+    [referenceData, storageLocation],
+  );
+
+  useEffect(() => {
+    let active = true;
+    void api.inventoryReferenceData()
+      .then((data) => { if (active) setReferenceData(data); })
+      .catch(() => { /* Offline fallback remains intentionally available. */ });
+    return () => { active = false; };
+  }, []);
 
   // Section fill counts for collapsed badges
   const essentialsFilled = useMemo(() => {
@@ -481,7 +526,7 @@ export default function EditInventoryScreen() {
         <SelectField
           label="Category"
           value={category}
-          options={categoryOptions}
+          options={controlledCategories}
           onChange={(v) => {
             setCategory(v);
             if (v !== category) setAttributes({});
@@ -490,14 +535,14 @@ export default function EditInventoryScreen() {
           searchable
         />
         <View style={styles.row}>
-          <TextField label="Brand" value={brand} onChangeText={setBrand} placeholder="Nike, Sony, Lego" containerStyle={styles.flex} />
-          <TextField label="Model" value={model} onChangeText={setModel} placeholder="Style, model, SKU" containerStyle={styles.flex} />
+          <SelectField label="Brand" value={brand} options={controlledBrands} onChange={(value) => { setBrand(value); setModel(''); }} placeholder="Select approved brand..." searchable containerStyle={styles.flex} />
+          <SelectField label="Model" value={model} options={controlledModels} onChange={setModel} placeholder="Select approved model..." searchable containerStyle={styles.flex} />
         </View>
-        <TextField label="Color" value={color} onChangeText={setColor} placeholder="Black, red, multicolor" />
+        <SelectField label="Color" value={color} options={controlledColors} onChange={setColor} placeholder="Select color..." searchable />
         <SelectField
           label="Condition"
           value={condition}
-          options={conditionOptions}
+          options={controlledConditions}
           onChange={setCondition}
           placeholder="Select condition..."
           required
@@ -514,16 +559,18 @@ export default function EditInventoryScreen() {
         <SelectField
           label="Size system"
           value={sizeSystem}
-          options={sizeSystemOptions}
-          onChange={setSizeSystem}
+          options={controlledSizeSystems}
+          onChange={(value) => { setSizeSystem(value); setSizeValue(''); }}
           placeholder="Select sizing..."
         />
         {sizeSystem ? (
-          <TextField
+          <SelectField
             label="Size value"
             value={sizeValue}
-            onChangeText={setSizeValue}
-            placeholder={sizePlaceholder(sizeSystem)}
+            options={controlledSizes}
+            onChange={setSizeValue}
+            placeholder="Select size..."
+            searchable
           />
         ) : null}
         <TextField
@@ -632,11 +679,13 @@ export default function EditInventoryScreen() {
         filledCount={workFilled}
         totalCount={6}
       >
-        <TextField
+        <SelectField
           label="Storage / bin location"
           value={storageLocation}
-          onChangeText={setStorageLocation}
-          placeholder="Bin A4, shelf 2, photo station"
+          options={controlledStorageLocations}
+          onChange={setStorageLocation}
+          placeholder="Select approved storage location..."
+          searchable
         />
         <TextField
           label="Accessories included"

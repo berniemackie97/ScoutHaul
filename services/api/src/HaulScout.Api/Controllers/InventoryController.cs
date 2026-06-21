@@ -19,7 +19,8 @@ namespace HaulScout.Api.Controllers;
 public sealed class InventoryController(
     HaulScoutDbContext db,
     ICurrentUserContext currentUser,
-    InventoryPhotoStorageService photoStorage) : ControllerBase
+    InventoryPhotoStorageService photoStorage,
+    InventoryReferenceDataService referenceData) : ControllerBase
 {
     public sealed class UploadInventoryPhotoForm
     {
@@ -41,6 +42,13 @@ public sealed class InventoryController(
             return BadRequest("One or more inventory references do not belong to this organization.");
         }
 
+        (InventoryReferenceDataService.ControlledValues? controlledValues, string? controlledError) =
+            await referenceData.ResolveAsync(request, cancellationToken);
+        if (controlledError is not null)
+        {
+            return BadRequest(controlledError);
+        }
+
         var item = new InventoryItem
         {
             OrganizationId = currentUser.OrganizationId,
@@ -49,7 +57,7 @@ public sealed class InventoryController(
             PurchasedAt = request.PurchasePrice.HasValue ? DateTimeOffset.UtcNow : null
         };
 
-        Apply(request, item);
+        Apply(request, controlledValues!, item);
         db.InventoryItems.Add(item);
         await SyncInventoryPurchaseExpense(item, previousPurchasePrice: null, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
@@ -77,8 +85,15 @@ public sealed class InventoryController(
             return BadRequest("One or more inventory references do not belong to this organization.");
         }
 
+        (InventoryReferenceDataService.ControlledValues? controlledValues, string? controlledError) =
+            await referenceData.ResolveAsync(request, cancellationToken);
+        if (controlledError is not null)
+        {
+            return BadRequest(controlledError);
+        }
+
         decimal? previousPurchasePrice = item.PurchasePrice;
-        Apply(request, item);
+        Apply(request, controlledValues!, item);
         await SyncInventoryPurchaseExpense(item, previousPurchasePrice, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
 
@@ -91,6 +106,10 @@ public sealed class InventoryController(
         var item = await FindItem(id, cancellationToken);
         return item is null ? NotFound() : item.ToDto();
     }
+
+    [HttpGet("reference-data")]
+    public Task<InventoryReferenceDataDto> ReferenceData(CancellationToken cancellationToken) =>
+        referenceData.GetAsync(cancellationToken);
 
     [HttpPost("{id:guid}/photos")]
     [RequestSizeLimit(10_000_000)]
@@ -664,10 +683,23 @@ public sealed class InventoryController(
             return "Prices cannot be negative.";
         }
 
+        if (request.ManufactureYear is < 1800 || request.ManufactureYear > 2200)
+        {
+            return "Manufacture year must be between 1800 and 2200.";
+        }
+
+        if (request.Length is < 0 || request.Width is < 0 || request.Height is < 0 || request.Weight is < 0)
+        {
+            return "Dimensions and weight cannot be negative.";
+        }
+
         return null;
     }
 
-    private static void Apply(UpsertInventoryItemRequest request, InventoryItem item)
+    private static void Apply(
+        UpsertInventoryItemRequest request,
+        InventoryReferenceDataService.ControlledValues controlled,
+        InventoryItem item)
     {
         item.ProductIdentityId = request.ProductIdentityId;
         item.SourcingTripId = request.SourcingTripId;
@@ -675,16 +707,31 @@ public sealed class InventoryController(
         item.SourceLocationId = request.SourceLocationId;
         item.Title = request.Title.Trim();
         item.Description = TrimToNull(request.Description);
-        item.Category = TrimToNull(request.Category);
-        item.Brand = TrimToNull(request.Brand);
-        item.Model = TrimToNull(request.Model);
-        item.Color = TrimToNull(request.Color);
-        item.Condition = TrimToNull(request.Condition);
-        item.SizeSystem = TrimToNull(request.SizeSystem);
-        item.SizeValue = TrimToNull(request.SizeValue);
+        item.Category = controlled.Category;
+        item.Brand = controlled.Brand;
+        item.Model = controlled.Model;
+        item.Color = controlled.Color;
+        item.Condition = controlled.Condition;
+        item.OwnershipType = request.OwnershipType ?? item.OwnershipType;
+        item.FunctionalStatus = request.FunctionalStatus ?? item.FunctionalStatus;
+        item.CompletenessStatus = request.CompletenessStatus ?? item.CompletenessStatus;
+        item.AuthenticityStatus = request.AuthenticityStatus ?? item.AuthenticityStatus;
+        item.PackagingStatus = request.PackagingStatus ?? item.PackagingStatus;
+        item.SizeSystem = controlled.SizeSystem;
+        item.SizeValue = controlled.SizeValue;
+        if (request.ManufacturerPartNumber is not null) item.ManufacturerPartNumber = TrimToNull(request.ManufacturerPartNumber);
+        if (request.SerialNumber is not null) item.SerialNumber = TrimToNull(request.SerialNumber);
+        if (request.CountryOfOrigin is not null) item.CountryOfOrigin = TrimToNull(request.CountryOfOrigin)?.ToUpperInvariant();
+        if (request.ManufactureYear.HasValue) item.ManufactureYear = request.ManufactureYear;
+        if (request.Length.HasValue) item.Length = request.Length;
+        if (request.Width.HasValue) item.Width = request.Width;
+        if (request.Height.HasValue) item.Height = request.Height;
+        item.DimensionUnit = request.DimensionUnit ?? item.DimensionUnit;
+        if (request.Weight.HasValue) item.Weight = request.Weight;
+        item.WeightUnit = request.WeightUnit ?? item.WeightUnit;
         item.AttributesJson = NormalizeJsonObject(request.AttributesJson);
         item.MeasurementsJson = NormalizeJsonObject(request.MeasurementsJson);
-        item.StorageLocation = TrimToNull(request.StorageLocation);
+        item.StorageLocation = controlled.StorageLocation;
         item.Accessories = TrimToNull(request.Accessories);
         item.MissingParts = TrimToNull(request.MissingParts);
         item.TestingNotes = TrimToNull(request.TestingNotes);

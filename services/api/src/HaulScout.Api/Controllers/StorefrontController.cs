@@ -31,7 +31,10 @@ public sealed class StorefrontController(HaulScoutDbContext db, ITenantContext t
         db.InventoryItems.Where(i =>
             !i.IsArchived
             && (i.Status == InventoryStatus.Listed || i.Status == InventoryStatus.ReadyToList)
-            && (i.EstimatedSalePrice ?? i.SellerAskingPrice) > 0m);
+            && (i.EstimatedSalePrice ?? i.SellerAskingPrice) > 0m
+            && i.OwnershipType != InventoryOwnershipType.CustomerRepair
+            && i.AuthenticityStatus != InventoryAuthenticityStatus.Counterfeit
+            && i.AuthenticityStatus != InventoryAuthenticityStatus.NeedsVerification);
 
     [HttpGet("listings")]
     public async Task<ActionResult<StorefrontPageDto<StorefrontListingDto>>> Browse(
@@ -123,8 +126,23 @@ public sealed class StorefrontController(HaulScoutDbContext db, ITenantContext t
                 i.Title,
                 i.Description,
                 i.Brand,
+                i.Model,
                 i.Category,
+                i.Color,
                 i.Condition,
+                i.SizeSystem,
+                i.SizeValue,
+                i.FunctionalStatus,
+                i.CompletenessStatus,
+                i.PackagingStatus,
+                i.CountryOfOrigin,
+                i.ManufactureYear,
+                i.Length,
+                i.Width,
+                i.Height,
+                i.DimensionUnit,
+                i.Weight,
+                i.WeightUnit,
                 ListPrice = i.EstimatedSalePrice ?? i.SellerAskingPrice ?? 0m,
                 HeroPhotoId = i.Photos
                     .OrderByDescending(p => p.IsHero)
@@ -142,7 +160,9 @@ public sealed class StorefrontController(HaulScoutDbContext db, ITenantContext t
         return new StorefrontListingDetailDto(
             row.Id, BuildSlug(row.Title, row.Id), row.Title, null, row.Description,
             row.ListPrice, null, row.Brand, row.Condition, row.Title, row.Description,
-            PhotoUrl(row.HeroPhotoId), row.Category);
+            PhotoUrl(row.HeroPhotoId), row.Category, row.Model, row.Color, row.SizeSystem, row.SizeValue,
+            row.FunctionalStatus, row.CompletenessStatus, row.PackagingStatus, row.CountryOfOrigin,
+            row.ManufactureYear, row.Length, row.Width, row.Height, row.DimensionUnit, row.Weight, row.WeightUnit);
     }
 
     [HttpGet("categories")]
@@ -179,7 +199,10 @@ public sealed class StorefrontController(HaulScoutDbContext db, ITenantContext t
             .Where(p => p.Id == photoId
                 && p.InventoryItem!.Organization!.StoreDomain != null
                 && !p.InventoryItem.IsArchived
-                && (p.InventoryItem.Status == InventoryStatus.Listed || p.InventoryItem.Status == InventoryStatus.ReadyToList))
+                && (p.InventoryItem.Status == InventoryStatus.Listed || p.InventoryItem.Status == InventoryStatus.ReadyToList)
+                && p.InventoryItem.OwnershipType != InventoryOwnershipType.CustomerRepair
+                && p.InventoryItem.AuthenticityStatus != InventoryAuthenticityStatus.Counterfeit
+                && p.InventoryItem.AuthenticityStatus != InventoryAuthenticityStatus.NeedsVerification)
             .Select(p => new { Bytes = full ? p.OriginalBytes : p.ThumbnailBytes, p.ContentType })
             .FirstOrDefaultAsync(cancellationToken);
 

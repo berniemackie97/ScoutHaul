@@ -619,6 +619,11 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                     b.Property<string>("AttributesJson")
                         .HasColumnType("jsonb");
 
+                    b.Property<string>("AuthenticityStatus")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
                     b.Property<string>("Barcode")
                         .HasMaxLength(80)
                         .HasColumnType("character varying(80)");
@@ -638,9 +643,18 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                         .HasMaxLength(120)
                         .HasColumnType("character varying(120)");
 
+                    b.Property<string>("CompletenessStatus")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
                     b.Property<string>("Condition")
                         .HasMaxLength(120)
                         .HasColumnType("character varying(120)");
+
+                    b.Property<string>("CountryOfOrigin")
+                        .HasMaxLength(2)
+                        .HasColumnType("character varying(2)");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -648,18 +662,43 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                     b.Property<string>("Description")
                         .HasColumnType("text");
 
+                    b.Property<string>("DimensionUnit")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)");
+
                     b.Property<decimal?>("EstimatedSalePrice")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
+
+                    b.Property<string>("FunctionalStatus")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<decimal?>("Height")
                         .HasPrecision(12, 2)
                         .HasColumnType("numeric(12,2)");
 
                     b.Property<bool>("IsArchived")
                         .HasColumnType("boolean");
 
+                    b.Property<decimal?>("Length")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
+
                     b.Property<DateTimeOffset?>("ListedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("ListingNotes")
                         .HasColumnType("text");
+
+                    b.Property<int?>("ManufactureYear")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ManufacturerPartNumber")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
 
                     b.Property<string>("MeasurementsJson")
                         .HasColumnType("jsonb");
@@ -676,6 +715,16 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
 
                     b.Property<Guid>("OrganizationId")
                         .HasColumnType("uuid");
+
+                    b.Property<string>("OwnershipType")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<string>("PackagingStatus")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
 
                     b.Property<string>("PhotoLocalReferencesJson")
                         .HasColumnType("text");
@@ -696,6 +745,10 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                     b.Property<decimal?>("SellerAskingPrice")
                         .HasPrecision(12, 2)
                         .HasColumnType("numeric(12,2)");
+
+                    b.Property<string>("SerialNumber")
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)");
 
                     b.Property<string>("SizeSystem")
                         .HasMaxLength(80)
@@ -737,6 +790,19 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<decimal?>("Weight")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
+
+                    b.Property<string>("WeightUnit")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)");
+
+                    b.Property<decimal?>("Width")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
+
                     b.HasKey("Id");
 
                     b.HasIndex("ProductIdentityId");
@@ -747,9 +813,15 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("SourcingTripStopId");
 
+                    b.HasIndex("OrganizationId", "Brand");
+
+                    b.HasIndex("OrganizationId", "Category");
+
                     b.HasIndex("OrganizationId", "IsArchived");
 
                     b.HasIndex("OrganizationId", "Status");
+
+                    b.HasIndex("OrganizationId", "StorageLocation");
 
                     b.ToTable("InventoryItems", (string)null);
                 });
