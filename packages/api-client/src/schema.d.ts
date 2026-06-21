@@ -2528,6 +2528,80 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/sales/reference-data": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SalesReferenceDataDto"];
+                        "application/json": components["schemas"]["SalesReferenceDataDto"];
+                        "text/json": components["schemas"]["SalesReferenceDataDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sales/candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SaleCandidateDto"][];
+                        "application/json": components["schemas"]["SaleCandidateDto"][];
+                        "text/json": components["schemas"]["SaleCandidateDto"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/sales": {
         parameters: {
             query?: never;
@@ -2802,6 +2876,90 @@ export interface paths {
                 cookie?: never;
             };
             requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SaleDto"];
+                        "application/json": components["schemas"]["SaleDto"];
+                        "text/json": components["schemas"]["SaleDto"];
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/api/sales/{id}/shipment": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SaleShipmentDto"];
+                        "application/json": components["schemas"]["SaleShipmentDto"];
+                        "text/json": components["schemas"]["SaleShipmentDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sales/{id}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["SaleStatusTransitionRequest"];
+                    "text/json": components["schemas"]["SaleStatusTransitionRequest"];
+                    "application/*+json": components["schemas"]["SaleStatusTransitionRequest"];
+                };
+            };
             responses: {
                 /** @description OK */
                 200: {
@@ -5320,6 +5478,27 @@ export interface components {
             /** Format: date-time */
             createdAt?: string;
         };
+        SaleCandidateDto: {
+            /** Format: uuid */
+            inventoryItemId?: string;
+            title?: string | null;
+            status?: components["schemas"]["InventoryStatus"];
+            /** Format: double */
+            costOfGoods?: number;
+            /** Format: double */
+            expectedSalePrice?: number | null;
+            /** Format: uuid */
+            listingId?: string | null;
+            listingPlatform?: string | null;
+            /** Format: double */
+            listingPrice?: number | null;
+        };
+        SaleChannelOptionDto: {
+            value?: string | null;
+            label?: string | null;
+            group?: string | null;
+            isLegacy?: boolean;
+        };
         SaleCorrectionDto: {
             /** Format: uuid */
             id?: string;
@@ -5368,9 +5547,37 @@ export interface components {
             /** Format: date-time */
             soldAt?: string;
             notes?: string | null;
+            allowedTransitions?: components["schemas"]["SaleStatus"][] | null;
+        };
+        SaleShipmentDto: {
+            /** Format: uuid */
+            id?: string;
+            /** Format: uuid */
+            saleId?: string;
+            carrier?: string | null;
+            trackingNumber?: string | null;
+            /** Format: double */
+            cost?: number | null;
+            /** Format: date-time */
+            packedAt?: string | null;
+            /** Format: date-time */
+            shippedAt?: string | null;
+            /** Format: date-time */
+            deliveredAt?: string | null;
         };
         /** @enum {string} */
-        SaleStatus: "Recorded" | "Packed" | "Shipped" | "Delivered" | "Returned";
+        SaleStatus: "Recorded" | "Packed" | "Shipped" | "Delivered" | "ReturnRequested" | "Returned" | "Refunded" | "Cancelled";
+        SaleStatusTransitionRequest: {
+            status?: components["schemas"]["SaleStatus"];
+            /** Format: date-time */
+            occurredAt?: string | null;
+            reason?: string | null;
+            carrier?: string | null;
+            trackingNumber?: string | null;
+        };
+        SalesReferenceDataDto: {
+            channels?: components["schemas"]["SaleChannelOptionDto"][] | null;
+        };
         SessionBootstrapDto: {
             user?: components["schemas"]["SessionUserDto"];
             organizations?: components["schemas"]["OrganizationDto"][] | null;

@@ -136,4 +136,93 @@ public class SaleAccountingTests
         Assert.IsType<BadRequestObjectResult>(result.Result);
         Assert.Empty(await db.SaleCorrections.ToListAsync());
     }
+
+    [Fact]
+    public async Task Recording_rejects_a_future_sale_without_mutating_inventory()
+    {
+        var (db, org, user) = NewContext(nameof(Recording_rejects_a_future_sale_without_mutating_inventory));
+        await using var _ = db;
+        var item = new InventoryItem
+        {
+            OrganizationId = org,
+            Title = "Walnut Desk",
+            Status = InventoryStatus.Listed,
+            PurchasePrice = 75m,
+        };
+        db.InventoryItems.Add(item);
+        await db.SaveChangesAsync();
+        var controller = new SalesController(db, new StubCurrentUser(org, user));
+
+        var result = await controller.Record(new RecordSaleRequest(
+            item.Id, null, "eBay", 240m, 31m, 7m, 20m, 2m, 0m,
+            DateTimeOffset.UtcNow.AddDays(1), null), CancellationToken.None);
+
+        Assert.IsType<BadRequestObjectResult>(result.Result);
+        Assert.Empty(await db.Sales.ToListAsync());
+        Assert.Equal(InventoryStatus.Listed, item.Status);
+        Assert.Null(item.SoldAt);
+    }
+
+    [Fact]
+    public async Task Fulfillment_transitions_are_ordered_audited_and_create_one_shipment()
+    {
+        var (db, org, user) = NewContext(nameof(Fulfillment_transitions_are_ordered_audited_and_create_one_shipment));
+        await using var _ = db;
+        var sale = SeedSale(db, org);
+        sale.InventoryItem!.Status = InventoryStatus.Sold;
+        await db.SaveChangesAsync();
+        var controller = new SalesController(db, new StubCurrentUser(org, user));
+
+        await controller.Transition(sale.Id, new SaleStatusTransitionRequest(SaleStatus.Packed, sale.SoldAt.AddDays(1), null, null, null), CancellationToken.None);
+        await controller.Transition(sale.Id, new SaleStatusTransitionRequest(SaleStatus.Shipped, sale.SoldAt.AddDays(2), null, "USPS", "9400TEST"), CancellationToken.None);
+        var delivered = await controller.Transition(sale.Id, new SaleStatusTransitionRequest(SaleStatus.Delivered, sale.SoldAt.AddDays(5), null, null, null), CancellationToken.None);
+
+        Assert.Equal(SaleStatus.Delivered, delivered.Value!.Status);
+        Assert.Equal(InventoryStatus.Delivered, sale.InventoryItem.Status);
+        Shipment shipment = Assert.Single(await db.Shipments.Where(item => item.SaleId == sale.Id).ToListAsync());
+        Assert.Equal("USPS", shipment.Carrier);
+        Assert.NotNull(shipment.PackedAt);
+        Assert.NotNull(shipment.ShippedAt);
+        Assert.NotNull(shipment.DeliveredAt);
+        Assert.Equal(3, await db.SaleCorrections.CountAsync(item => item.SaleId == sale.Id));
+    }
+
+    [Fact]
+    public async Task Fulfillment_rejects_skipped_stages_and_requires_exception_reasons()
+    {
+        var (db, org, user) = NewContext(nameof(Fulfillment_rejects_skipped_stages_and_requires_exception_reasons));
+        await using var _ = db;
+        var sale = SeedSale(db, org);
+        var controller = new SalesController(db, new StubCurrentUser(org, user));
+
+        var skipped = await controller.Transition(sale.Id, new SaleStatusTransitionRequest(SaleStatus.Delivered, null, null, null, null), CancellationToken.None);
+        await controller.Transition(sale.Id, new SaleStatusTransitionRequest(SaleStatus.Packed, sale.SoldAt.AddDays(2), null, null, null), CancellationToken.None);
+        var chronologicallyInvalid = await controller.Transition(sale.Id, new SaleStatusTransitionRequest(SaleStatus.Shipped, sale.SoldAt.AddDays(1), null, null, null), CancellationToken.None);
+        var cancelledWithoutReason = await controller.Transition(sale.Id, new SaleStatusTransitionRequest(SaleStatus.Cancelled, null, null, null, null), CancellationToken.None);
+
+        Assert.IsType<ConflictObjectResult>(skipped.Result);
+        Assert.IsType<BadRequestObjectResult>(chronologicallyInvalid.Result);
+        Assert.IsType<BadRequestObjectResult>(cancelledWithoutReason.Result);
+    }
+
+    [Fact]
+    public async Task Return_and_refund_release_inventory_for_a_future_resale()
+    {
+        var (db, org, user) = NewContext(nameof(Return_and_refund_release_inventory_for_a_future_resale));
+        await using var _ = db;
+        var sale = SeedSale(db, org);
+        sale.Status = SaleStatus.Delivered;
+        sale.InventoryItem!.Status = InventoryStatus.Delivered;
+        await db.SaveChangesAsync();
+        var controller = new SalesController(db, new StubCurrentUser(org, user));
+
+        await controller.Transition(sale.Id, new SaleStatusTransitionRequest(SaleStatus.ReturnRequested, null, "Customer reported damage", null, null), CancellationToken.None);
+        await controller.Transition(sale.Id, new SaleStatusTransitionRequest(SaleStatus.Returned, null, "Return received and inspected", null, null), CancellationToken.None);
+        var refunded = await controller.Transition(sale.Id, new SaleStatusTransitionRequest(SaleStatus.Refunded, null, "Full refund issued", null, null), CancellationToken.None);
+
+        Assert.Equal(SaleStatus.Refunded, refunded.Value!.Status);
+        Assert.Equal(InventoryStatus.Returned, sale.InventoryItem.Status);
+        Assert.True(SaleWorkflow.ReleasesInventory(sale.Status));
+        Assert.False(SaleWorkflow.IsRealized(sale.Status));
+    }
 }

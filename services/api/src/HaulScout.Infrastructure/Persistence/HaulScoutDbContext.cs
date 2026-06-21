@@ -389,6 +389,7 @@ public sealed class HaulScoutDbContext(DbContextOptions<HaulScoutDbContext> opti
             entity.Property(item => item.Carrier).HasMaxLength(80);
             entity.Property(item => item.TrackingNumber).HasMaxLength(160);
             ConfigureMoney(entity.Property(item => item.Cost));
+            entity.HasIndex(item => new { item.OrganizationId, item.SaleId }).IsUnique();
             entity.HasOne(item => item.Sale).WithMany().HasForeignKey(item => item.SaleId);
         });
 

@@ -1886,6 +1886,9 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("SaleId");
 
+                    b.HasIndex("OrganizationId", "SaleId")
+                        .IsUnique();
+
                     b.ToTable("Shipments", (string)null);
                 });
 

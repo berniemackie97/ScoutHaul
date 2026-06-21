@@ -508,11 +508,31 @@ public sealed class InventoryController(
             return NotFound();
         }
 
+        bool hasActiveSale = await db.Sales.AnyAsync(
+            sale => sale.InventoryItemId == id
+                && sale.OrganizationId == currentUser.OrganizationId
+                && sale.Status != SaleStatus.Returned
+                && sale.Status != SaleStatus.Refunded
+                && sale.Status != SaleStatus.Cancelled,
+            cancellationToken);
+        if (hasActiveSale)
+        {
+            return Conflict("This item has an active sale. Change its stage through the sales workflow.");
+        }
+
+        if (request.Status is InventoryStatus.Sold
+            or InventoryStatus.Packed
+            or InventoryStatus.Shipped
+            or InventoryStatus.Delivered
+            or InventoryStatus.Returned)
+        {
+            return Conflict("Sale and fulfillment stages must be changed through the sales workflow.");
+        }
+
         item.Status = request.Status;
         var now = DateTimeOffset.UtcNow;
         item.PurchasedAt ??= request.Status == InventoryStatus.Purchased ? now : null;
         item.ListedAt ??= request.Status == InventoryStatus.Listed ? now : null;
-        item.SoldAt ??= request.Status == InventoryStatus.Sold ? now : null;
 
         await db.SaveChangesAsync(cancellationToken);
         return item.ToDto();

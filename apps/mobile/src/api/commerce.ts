@@ -1,14 +1,5 @@
 import { apiRequest } from './client';
-import type {
-  Budget,
-  BudgetSummary,
-  Expense,
-  ExpenseCategory,
-  Listing,
-  ListingStatus,
-  Sale,
-  SaleStatus,
-} from '../domain/types';
+import type { Budget, BudgetSummary, Expense, ExpenseCategory, Listing, ListingStatus, Sale, SaleStatus } from '../domain/types';
 
 export type CreateListingRequest = {
   inventoryItemId: string;
@@ -36,8 +27,20 @@ export type RecordSaleRequest = {
   shippingCost: number;
   suppliesCost: number;
   otherCosts: number;
+  salesTaxCollected: number;
+  taxRemittedByPlatform: boolean;
   soldAt: string;
   notes?: string | null;
+};
+
+export type SaleChannelOption = { value: string; label: string; group: string; isLegacy?: boolean };
+export type SalesReferenceData = { channels: SaleChannelOption[] };
+export type SaleStatusTransitionRequest = {
+  status: SaleStatus;
+  occurredAt?: string | null;
+  reason?: string | null;
+  carrier?: string | null;
+  trackingNumber?: string | null;
 };
 
 export type CreateBudgetRequest = {
@@ -65,7 +68,10 @@ export const commerceApi = {
   deleteListing: (id: string) => apiRequest<void>(`/api/listings/${id}`, { method: 'DELETE' }),
 
   sales: () => apiRequest<Sale[]>('/api/sales'),
+  sale: (id: string) => apiRequest<Sale>(`/api/sales/${id}`),
+  salesReferenceData: () => apiRequest<SalesReferenceData>('/api/sales/reference-data'),
   recordSale: (body: RecordSaleRequest) => apiRequest<Sale>('/api/sales', { method: 'POST', body }),
+  transitionSale: (id: string, body: SaleStatusTransitionRequest) => apiRequest<Sale>(`/api/sales/${id}/status`, { method: 'PATCH', body }),
   markSalePacked: (id: string) => apiRequest<Sale>(`/api/sales/${id}/packed`, { method: 'PATCH' }),
   markSaleShipped: (id: string) => apiRequest<Sale>(`/api/sales/${id}/shipped`, { method: 'PATCH' }),
   markSaleDelivered: (id: string) => apiRequest<Sale>(`/api/sales/${id}/delivered`, { method: 'PATCH' }),

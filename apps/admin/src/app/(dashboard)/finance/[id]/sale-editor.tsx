@@ -3,20 +3,11 @@
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
 import type { components } from "@overhaul/api-client";
-import {
-  Button,
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-  Input,
-  Label,
-  Textarea,
-} from "@overhaul/ui";
+import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Label, Textarea } from "@overhaul/ui";
 import { updateSale, type SaleActionResult } from "./actions";
 
 type SaleDto = components["schemas"]["SaleDto"];
+type Channel = components["schemas"]["SaleChannelOptionDto"];
 
 const initialState: SaleActionResult = { ok: false, message: "" };
 
@@ -38,7 +29,7 @@ function Money({ label, name, defaultValue }: { label: string; name: string; def
   );
 }
 
-export function SaleEditor({ sale }: { sale: SaleDto }) {
+export function SaleEditor({ sale, channels }: { sale: SaleDto; channels: Channel[] }) {
   const action = updateSale.bind(null, sale.id!);
   const [state, formAction] = useActionState(action, initialState);
   const soldDate = sale.soldAt ? new Date(sale.soldAt).toISOString().slice(0, 10) : "";
@@ -47,14 +38,33 @@ export function SaleEditor({ sale }: { sale: SaleDto }) {
     <Card>
       <CardHeader>
         <CardTitle className="text-lg">Correct this sale</CardTitle>
-        <CardDescription>Every change is recorded with a reason and a before/after snapshot. Net profit is recomputed from these inputs; tax is never part of net.</CardDescription>
+        <CardDescription>
+          Every change is recorded with a reason and a before/after snapshot. Net profit is recomputed from these inputs; tax is never part
+          of net.
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <form action={formAction} className="space-y-5">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="platform">Channel / platform</Label>
-              <Input id="platform" name="platform" defaultValue={sale.platform ?? ""} required />
+              <select
+                id="platform"
+                name="platform"
+                defaultValue={sale.platform ?? ""}
+                required
+                className="border-input bg-background h-10 w-full rounded-lg border px-3 text-sm"
+              >
+                {channels.flatMap((channel) =>
+                  channel.value
+                    ? [
+                        <option key={channel.value} value={channel.value}>
+                          {channel.label}
+                        </option>,
+                      ]
+                    : []
+                )}
+              </select>
             </div>
             <div className="space-y-2">
               <Label htmlFor="soldAt">Sold date</Label>
@@ -82,7 +92,9 @@ export function SaleEditor({ sale }: { sale: SaleDto }) {
               />
               <span>
                 <span className="font-medium">Platform collected &amp; remits the tax</span>
-                <span className="block text-xs text-muted-foreground">Marketplace facilitator — pass-through, not your liability. Uncheck if you owe it.</span>
+                <span className="text-muted-foreground block text-xs">
+                  Marketplace facilitator — pass-through, not your liability. Uncheck if you owe it.
+                </span>
               </span>
             </label>
           </div>
@@ -93,7 +105,9 @@ export function SaleEditor({ sale }: { sale: SaleDto }) {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="reason">Reason for this correction <span className="text-destructive">*</span></Label>
+            <Label htmlFor="reason">
+              Reason for this correction <span className="text-destructive">*</span>
+            </Label>
             <Input id="reason" name="reason" required placeholder="e.g. Actual eBay fee differed from the estimate" />
           </div>
 

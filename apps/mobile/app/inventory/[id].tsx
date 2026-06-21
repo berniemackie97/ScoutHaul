@@ -35,8 +35,13 @@ const workflowStages: WorkflowStage[] = [
   { status: 'ReadyToList', label: 'Ready', icon: 'checkmark-circle-outline' },
   { status: 'Listed', label: 'Listed', icon: 'pricetag-outline' },
   { status: 'Sold', label: 'Sold', icon: 'cash-outline' },
+  { status: 'Packed', label: 'Packed', icon: 'file-tray-full-outline' },
   { status: 'Shipped', label: 'Shipped', icon: 'airplane-outline' },
+  { status: 'Delivered', label: 'Delivered', icon: 'checkmark-done-outline' },
+  { status: 'Returned', label: 'Returned', icon: 'return-down-back-outline' },
 ];
+
+const saleManagedStatuses = new Set<InventoryStatus>(['Sold', 'Packed', 'Shipped', 'Delivered', 'Returned']);
 
 function stageTone(current: InventoryStatus, stage: InventoryStatus): ToneKey {
   const order = workflowStages.map((s) => s.status);
@@ -79,9 +84,16 @@ export default function InventoryDetailScreen() {
             createdAt: photo.createdAt,
           }))
         : [];
-      const legacyRemotePhotos = typedRemotePhotos.length > 0
-        ? []
-        : inv.photoUrls.map((uri) => ({ id: uri, inventoryItemId: id, localUri: resolvePhotoUrl(uri) ?? uri, isHero: false, createdAt: inv.updatedAt }));
+      const legacyRemotePhotos =
+        typedRemotePhotos.length > 0
+          ? []
+          : inv.photoUrls.map((uri) => ({
+              id: uri,
+              inventoryItemId: id,
+              localUri: resolvePhotoUrl(uri) ?? uri,
+              isHero: false,
+              createdAt: inv.updatedAt,
+            }));
       const remotePhotos = [...typedRemotePhotos, ...legacyRemotePhotos];
       setPhotos([...remotePhotos, ...localPhotos]);
       setError(null);
@@ -92,10 +104,18 @@ export default function InventoryDetailScreen() {
     }
   }
 
-  useFocusEffect(useCallback(() => { void load(); }, [id]));
+  useFocusEffect(
+    useCallback(() => {
+      void load();
+    }, [id])
+  );
 
   async function setStatus(status: InventoryStatus) {
     if (!id) return;
+    if (saleManagedStatuses.has(status)) {
+      router.push('/sales');
+      return;
+    }
     try {
       setItem(await api.changeInventoryStatus(id, status));
       setError(null);
@@ -116,14 +136,10 @@ export default function InventoryDetailScreen() {
 
   function confirmArchiveItem() {
     if (!item) return;
-    Alert.alert(
-      'Archive item?',
-      item.title,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Archive', style: 'destructive', onPress: () => void archiveItem() },
-      ],
-    );
+    Alert.alert('Archive item?', item.title, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Archive', style: 'destructive', onPress: () => void archiveItem() },
+    ]);
   }
 
   async function createDraftListing() {
@@ -166,9 +182,7 @@ export default function InventoryDetailScreen() {
   }
 
   const cost = item.purchasePrice ?? item.sellerAskingPrice;
-  const projectedProfit = item.estimatedSalePrice && cost
-    ? item.estimatedSalePrice - cost
-    : null;
+  const projectedProfit = item.estimatedSalePrice && cost ? item.estimatedSalePrice - cost : null;
   const attributes = parseAttributes(item.attributesJson);
 
   return (
@@ -176,7 +190,9 @@ export default function InventoryDetailScreen() {
       {error ? <ErrorBanner message={error} onRetry={() => void load()} /> : null}
 
       <View style={styles.titleRow}>
-        <Text variant="title" style={styles.titleText}>{item.title}</Text>
+        <Text variant="title" style={styles.titleText}>
+          {item.title}
+        </Text>
         <StatusPill label={item.status} tone={item.status === 'Sold' ? 'success' : item.status === 'Listed' ? 'info' : 'neutral'} />
       </View>
 
@@ -236,7 +252,12 @@ export default function InventoryDetailScreen() {
           label="Add Comp"
           icon="add-circle-outline"
           variant="secondary"
-          onPress={() => router.push({ pathname: '/comp-capture', params: { inventoryItemId: item.id, title: item.title } })}
+          onPress={() =>
+            router.push({
+              pathname: '/comp-capture',
+              params: { inventoryItemId: item.id, title: item.title },
+            })
+          }
         />
         <Button
           label="Marketplace"
@@ -246,34 +267,26 @@ export default function InventoryDetailScreen() {
         />
       </View>
       <View style={styles.actionRow}>
-        <Button
-          label="Create Listing"
-          icon="pricetag-outline"
-          variant="secondary"
-          onPress={() => void createDraftListing()}
-        />
+        <Button label="Create Listing" icon="pricetag-outline" variant="secondary" onPress={() => void createDraftListing()} />
         <Button
           label="Record Sale"
           icon="cash-outline"
           variant="secondary"
-          onPress={() => router.push({
-            pathname: '/record-sale',
-            params: {
-              inventoryItemId: item.id,
-              title: item.title,
-              listPrice: item.estimatedSalePrice != null ? String(item.estimatedSalePrice) : undefined,
-            },
-          })}
+          onPress={() =>
+            router.push({
+              pathname: '/record-sale',
+              params: {
+                inventoryItemId: item.id,
+                title: item.title,
+                listPrice: item.estimatedSalePrice != null ? String(item.estimatedSalePrice) : undefined,
+                purchaseCost: item.purchasePrice != null ? String(item.purchasePrice) : undefined,
+              },
+            })
+          }
         />
       </View>
       <View style={styles.actionRow}>
-        <Button
-          label="Archive"
-          icon="archive-outline"
-          variant="danger"
-          fullWidth
-          onPress={confirmArchiveItem}
-        />
+        <Button label="Archive" icon="archive-outline" variant="danger" fullWidth onPress={confirmArchiveItem} />
       </View>
 
       <SectionHeader title="Workflow" />
@@ -287,27 +300,18 @@ export default function InventoryDetailScreen() {
                 key={stage.status}
                 onPress={() => void setStatus(stage.status)}
                 accessibilityRole="button"
-                accessibilityLabel={`Set status to ${stage.label}`}
+                accessibilityLabel={
+                  saleManagedStatuses.has(stage.status) ? `Open sales workflow for ${stage.label}` : `Set status to ${stage.label}`
+                }
                 accessibilityState={{ selected: isCurrent }}
                 style={[styles.workflowStep, isCurrent && { backgroundColor: c.primaryLight }]}
               >
                 <Ionicons
                   name={stage.icon}
                   size={20}
-                  color={
-                    tone === 'success' ? c.success
-                      : tone === 'primary' ? c.primary
-                        : c.textMuted
-                  }
+                  color={tone === 'success' ? c.success : tone === 'primary' ? c.primary : c.textMuted}
                 />
-                <Text
-                  variant="label"
-                  color={
-                    tone === 'success' ? c.success
-                      : tone === 'primary' ? c.primary
-                        : c.textMuted
-                  }
-                >
+                <Text variant="label" color={tone === 'success' ? c.success : tone === 'primary' ? c.primary : c.textMuted}>
                   {stage.label}
                 </Text>
               </Pressable>
@@ -324,7 +328,12 @@ export default function InventoryDetailScreen() {
             title="No comps yet"
             message="Add a sold comp or active listing to strengthen confidence."
             actionLabel="Add Comp"
-            onAction={() => router.push({ pathname: '/comp-capture', params: { inventoryItemId: item.id, title: item.title } })}
+            onAction={() =>
+              router.push({
+                pathname: '/comp-capture',
+                params: { inventoryItemId: item.id, title: item.title },
+              })
+            }
           />
         </Card>
       ) : (
@@ -370,7 +379,9 @@ function DetailRow({ label, value, valueColor }: { label: string; value: string;
   return (
     <View style={styles.detailRow}>
       <Text variant="caption">{label}</Text>
-      <Text variant="bodyBold" color={valueColor}>{value}</Text>
+      <Text variant="bodyBold" color={valueColor}>
+        {value}
+      </Text>
     </View>
   );
 }

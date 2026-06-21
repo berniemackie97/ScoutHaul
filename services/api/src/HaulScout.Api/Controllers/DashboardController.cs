@@ -13,6 +13,9 @@ namespace HaulScout.Api.Controllers;
 [RequireOrganizationPermission(HaulScoutPermissions.ViewReports)]
 public sealed class DashboardController(HaulScoutDbContext db, ICurrentUserContext currentUser) : ControllerBase
 {
+    private static readonly SaleStatus[] ExcludedRevenueStatuses =
+        [SaleStatus.Returned, SaleStatus.Refunded, SaleStatus.Cancelled];
+
     [HttpGet("summary")]
     public async Task<ActionResult<DashboardSummaryDto>> Summary(CancellationToken cancellationToken)
     {
@@ -42,8 +45,10 @@ public sealed class DashboardController(HaulScoutDbContext db, ICurrentUserConte
         int activeListingsCount = await db.Listings.CountAsync(item => item.OrganizationId == organizationId && item.Status == ListingStatus.Active, cancellationToken);
         decimal totalInventoryCost = await currentInventoryQuery.SumAsync(item => (decimal?)(item.PurchasePrice ?? 0) ?? 0, cancellationToken);
         decimal estimatedInventoryValue = await currentInventoryQuery.SumAsync(item => (decimal?)(item.EstimatedSalePrice ?? 0) ?? 0, cancellationToken);
-        decimal grossSales = await db.Sales.Where(item => item.OrganizationId == organizationId).SumAsync(item => (decimal?)item.SoldPrice ?? 0, cancellationToken);
-        decimal netProfit = await db.Sales.Where(item => item.OrganizationId == organizationId).SumAsync(item => (decimal?)item.NetProfit ?? 0, cancellationToken);
+        var realizedSalesQuery = db.Sales.Where(item =>
+            item.OrganizationId == organizationId && !ExcludedRevenueStatuses.Contains(item.Status));
+        decimal grossSales = await realizedSalesQuery.SumAsync(item => (decimal?)item.SoldPrice ?? 0, cancellationToken);
+        decimal netProfit = await realizedSalesQuery.SumAsync(item => (decimal?)item.NetProfit ?? 0, cancellationToken);
         decimal cashDeployed = await currentInventoryQuery.SumAsync(item => (decimal?)(item.PurchasePrice ?? item.SellerAskingPrice ?? 0) ?? 0, cancellationToken);
         int unlistedCount = await currentInventoryQuery.CountAsync(item => unlistedStatuses.Contains(item.Status), cancellationToken);
         int staleCount = await currentInventoryQuery.CountAsync(item => item.CreatedAt <= staleCutoff && item.Status != InventoryStatus.Listed, cancellationToken);
