@@ -5417,6 +5417,10 @@ export interface components {
             averageSaleValue?: number;
             /** Format: double */
             netMarginPercent?: number;
+            /** Format: double */
+            salesTaxOwed?: number;
+            /** Format: double */
+            netIncomeAfterExpenses?: number;
         };
         ReportSaleRowDto: {
             /** Format: uuid */

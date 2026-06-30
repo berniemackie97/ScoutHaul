@@ -74,6 +74,29 @@ public sealed class BusinessReportCalculatorTests
         Assert.Equal(1, report.Aging.Single(bucket => bucket.Label == "181+ days").Count);
     }
 
+    [Fact]
+    public void Build_tracks_seller_owed_sales_tax_and_net_income_after_operating_expenses()
+    {
+        var report = BusinessReportCalculator.Build(
+            From,
+            ToExclusive,
+            [
+                // Marketplace remits the tax → pass-through, we owe nothing.
+                Sale("Marketplace sale", "eBay", 100, 40, 10, 3, 5, 0, 0, 42, SaleStatus.Delivered, From.AddHours(1), salesTaxCollected: 8, taxRemittedByPlatform: true),
+                // We collected the tax on our storefront → we owe it to the state.
+                Sale("Storefront sale", "Storefront", 200, 80, 20, 6, 8, 0, 0, 86, SaleStatus.Delivered, From.AddHours(2), salesTaxCollected: 15, taxRemittedByPlatform: false),
+            ],
+            [],
+            [new ReportExpenseInput(ExpenseCategory.Fuel, 30, From.AddHours(3))],
+            [],
+            [],
+            From.AddDays(3));
+
+        Assert.Equal(15, report.Kpis.SalesTaxOwed);            // only the storefront sale is seller-owed
+        Assert.Equal(128, report.Kpis.RealizedNetProfit);      // 42 + 86, tax excluded from both
+        Assert.Equal(98, report.Kpis.NetIncomeAfterExpenses);  // 128 realized profit − 30 operating expenses
+    }
+
     private static ReportSaleInput Sale(
         string title,
         string platform,
@@ -86,6 +109,8 @@ public sealed class BusinessReportCalculatorTests
         decimal other,
         decimal net,
         SaleStatus status,
-        DateTimeOffset soldAt) =>
-        new(Guid.NewGuid(), Guid.NewGuid(), title, platform, sold, purchase, platformFees, paymentFees, shipping, supplies, other, net, status, soldAt);
+        DateTimeOffset soldAt,
+        decimal salesTaxCollected = 0,
+        bool taxRemittedByPlatform = true) =>
+        new(Guid.NewGuid(), Guid.NewGuid(), title, platform, sold, purchase, platformFees, paymentFees, shipping, supplies, other, net, status, soldAt, salesTaxCollected, taxRemittedByPlatform);
 }

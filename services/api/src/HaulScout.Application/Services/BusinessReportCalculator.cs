@@ -17,7 +17,9 @@ public sealed record ReportSaleInput(
     decimal OtherCosts,
     decimal NetProfit,
     SaleStatus Status,
-    DateTimeOffset SoldAt);
+    DateTimeOffset SoldAt,
+    decimal SalesTaxCollected = 0,
+    bool TaxRemittedByPlatform = true);
 
 public sealed record ReportExpenseInput(ExpenseCategory Category, decimal Amount, DateTimeOffset OccurredAt);
 
@@ -163,6 +165,11 @@ public static class BusinessReportCalculator
         decimal netProfit = realized.Sum(item => item.NetProfit);
         decimal operatingExpenses = expenses.Where(item => item.Category != ExpenseCategory.InventoryPurchase).Sum(item => item.Amount);
         decimal inventorySpend = expenses.Where(item => item.Category == ExpenseCategory.InventoryPurchase).Sum(item => item.Amount);
+        // Sales tax we collected and must remit ourselves (marketplace-remitted tax is pass-through, excluded).
+        // It is a liability we hold, never revenue or profit — reported separately, not netted into income.
+        decimal salesTaxOwed = realized.Sum(item => item.TaxRemittedByPlatform ? 0m : Math.Max(0, item.SalesTaxCollected));
+        // True business net income for the period: realized profit on goods, less operating overhead.
+        decimal netIncomeAfterExpenses = netProfit - operatingExpenses;
         return new ReportKpiDto(
             realized.Length,
             sales.Count(item => item.Status is SaleStatus.Returned or SaleStatus.Refunded),
@@ -174,7 +181,9 @@ public static class BusinessReportCalculator
             operatingExpenses,
             inventorySpend,
             realized.Length == 0 ? 0 : grossSales / realized.Length,
-            grossSales == 0 ? 0 : netProfit / grossSales * 100);
+            grossSales == 0 ? 0 : netProfit / grossSales * 100,
+            salesTaxOwed,
+            netIncomeAfterExpenses);
     }
 
     private static ReportSaleRowDto ToSaleRow(ReportSaleInput sale)
