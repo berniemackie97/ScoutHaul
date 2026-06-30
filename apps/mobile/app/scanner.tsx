@@ -73,7 +73,7 @@ function toVisionOverrides(r: IdentifyResult): VisionOverrides {
 export default function BarcodeScannerScreen() {
   const { colors: c } = useAppTheme();
   const haptics = useHaptics();
-  const routeParams = useLocalSearchParams<{ sourcingTripId?: string; sourcingTripStopId?: string; mode?: ScanMode; fill?: string; context?: string }>();
+  const routeParams = useLocalSearchParams<{ sourcingTripId?: string; sourcingTripStopId?: string; mode?: ScanMode; fill?: string; context?: string; regenerate?: string }>();
   // "fill" mode: launched from an existing form (e.g. inventory edit) that wants
   // the identified fields handed *back* rather than pushed into a new record.
   const isFillMode = routeParams.fill === '1';
@@ -434,6 +434,9 @@ export default function BarcodeScannerScreen() {
     // Fill mode: hand the resolved fields back to the caller form and pop, so we
     // don't create a duplicate edit screen on top of the one that launched us.
     if (isFillMode) {
+      // Explicit "regenerate" from an existing record asks the AI to refresh the details, so the
+      // caller should overwrite its current fields rather than only fill blanks.
+      if (routeParams.regenerate === '1') params._overwrite = '1';
       setIdentifyHandoff(params);
       router.back();
       return;

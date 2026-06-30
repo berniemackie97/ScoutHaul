@@ -227,14 +227,19 @@ export default function EditInventoryScreen() {
     useCallback(() => {
       const h = takeIdentifyHandoff();
       if (!h) return;
-      setTitle((cur) => (cur.trim() ? cur : h.title ?? cur));
-      setBrand((cur) => (cur.trim() ? cur : h.brand ?? cur));
-      setModel((cur) => (cur.trim() ? cur : h.model ?? cur));
-      setCategory((cur) => (cur ? cur : h.category ?? cur));
-      setColor((cur) => (cur.trim() ? cur : h.color ?? cur));
-      setCondition((cur) => (cur ? cur : h.condition ?? cur));
-      setBarcode((cur) => (cur.trim() ? cur : h.barcode ?? cur));
-      setEstimatedSalePrice((cur) => (cur.trim() ? cur : h.estimatedSalePrice ?? cur));
+      // Explicit regenerate overwrites the AI-derived fields; the scan-to-add path only fills blanks
+      // so it never clobbers what the user typed.
+      const overwrite = h._overwrite === '1';
+      const apply = (next: string | undefined) => (cur: string) =>
+        overwrite ? (next ?? cur) : (cur.trim() ? cur : next ?? cur);
+      setTitle(apply(h.title));
+      setBrand(apply(h.brand));
+      setModel(apply(h.model));
+      setCategory(apply(h.category));
+      setColor(apply(h.color));
+      setCondition(apply(h.condition));
+      setBarcode(apply(h.barcode));
+      setEstimatedSalePrice(apply(h.estimatedSalePrice));
       if (h.photoUri) {
         const uri = h.photoUri;
         setPhotos((prev) => (prev.some((p) => p.uri === uri) ? prev : [...prev, { uri, isHero: prev.length === 0 }]));
@@ -359,7 +364,9 @@ export default function EditInventoryScreen() {
     const context = buildKnownFactsContext();
     router.push({
       pathname: '/scanner',
-      params: { mode: 'photo-identify', fill: '1', ...(context ? { context } : {}) },
+      // regenerate=1: this is an explicit re-run on an existing record, so the AI result should
+      // overwrite the current fields (using the typed facts as context), not just fill blanks.
+      params: { mode: 'photo-identify', fill: '1', regenerate: '1', ...(context ? { context } : {}) },
     });
   }
 
