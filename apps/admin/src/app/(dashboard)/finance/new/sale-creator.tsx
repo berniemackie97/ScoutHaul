@@ -37,6 +37,7 @@ export function SaleCreator({ candidates, channels }: { candidates: Candidate[];
   const [channel, setChannel] = useState("");
   const [soldPrice, setSoldPrice] = useState("");
   const [salesTax, setSalesTax] = useState("");
+  const [taxRemitted, setTaxRemitted] = useState(true);
   const [platformFees, setPlatformFees] = useState("");
   const [paymentFees, setPaymentFees] = useState("");
   const [shippingCost, setShippingCost] = useState("");
@@ -48,6 +49,8 @@ export function SaleCreator({ candidates, channels }: { candidates: Candidate[];
     0
   );
   const trueNet = (Number(soldPrice) || 0) - (selected?.costOfGoods ?? 0) - totalCosts;
+  // Tax we collected but the platform does NOT remit is a liability we owe the state — never part of net.
+  const taxOwed = taxRemitted ? 0 : Number(salesTax) || 0;
   const groups = useMemo(() => {
     const result = new Map<string, Channel[]>();
     for (const item of channels) {
@@ -128,7 +131,12 @@ export function SaleCreator({ candidates, channels }: { candidates: Candidate[];
             <MoneyField label="Sold price" name="soldPrice" value={soldPrice} onChange={setSoldPrice} />
             <MoneyField label="Sales tax collected" name="salesTaxCollected" value={salesTax} onChange={setSalesTax} />
             <label className="flex items-center gap-2 rounded-lg border p-3 text-sm sm:col-span-2">
-              <input type="checkbox" name="taxRemittedByPlatform" defaultChecked />
+              <input
+                type="checkbox"
+                name="taxRemittedByPlatform"
+                checked={taxRemitted}
+                onChange={(event) => setTaxRemitted(event.target.checked)}
+              />
               <span>
                 <strong>Marketplace facilitator remits tax</strong>
                 <span className="text-muted-foreground block text-xs">
@@ -179,7 +187,18 @@ export function SaleCreator({ candidates, channels }: { candidates: Candidate[];
               <span className="text-muted-foreground">Fees/costs</span>
               <span>-{currency(totalCosts)}</span>
             </div>
+            {(Number(salesTax) || 0) > 0 && (
+              <div className="flex justify-between border-t border-dashed pt-2">
+                <span className="text-muted-foreground">Sales tax {taxRemitted ? "(pass-through)" : "(you owe)"}</span>
+                <span className={taxOwed > 0 ? "text-amber-700" : "text-muted-foreground"}>{currency(taxRemitted ? Number(salesTax) || 0 : taxOwed)}</span>
+              </div>
+            )}
           </div>
+          {taxOwed > 0 && (
+            <p className="text-muted-foreground mt-3 text-xs">
+              Tax is excluded from net profit. {currency(taxOwed)} is a liability you owe the state.
+            </p>
+          )}
         </Card>
         {state.message && (
           <div className="border-destructive/30 bg-destructive/5 text-destructive rounded-lg border p-3 text-sm">{state.message}</div>
