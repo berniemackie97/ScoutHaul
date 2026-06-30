@@ -1,7 +1,7 @@
 {
   "openapi": "3.0.4",
   "info": {
-    "title": "HaulScout.Api, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null",
+    "title": "HaulScout.Api",
     "version": "1.0"
   },
   "paths": {
@@ -273,7 +273,7 @@
     "/": {
       "get": {
         "tags": [
-          "HaulScout.Api, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+          "HaulScout.Api"
         ],
         "responses": {
           "200": {
@@ -8134,6 +8134,14 @@
           "netMarginPercent": {
             "type": "number",
             "format": "double"
+          },
+          "salesTaxOwed": {
+            "type": "number",
+            "format": "double"
+          },
+          "netIncomeAfterExpenses": {
+            "type": "number",
+            "format": "double"
           }
         },
         "additionalProperties": false
@@ -10097,7 +10105,7 @@
       "name": "Dashboard"
     },
     {
-      "name": "HaulScout.Api, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+      "name": "HaulScout.Api"
     },
     {
       "name": "Inventory"

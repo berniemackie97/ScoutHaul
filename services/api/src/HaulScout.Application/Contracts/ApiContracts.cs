@@ -602,7 +602,9 @@ public sealed record ReportKpiDto(
     decimal OperatingExpenses,
     decimal InventorySpend,
     decimal AverageSaleValue,
-    decimal NetMarginPercent);
+    decimal NetMarginPercent,
+    decimal SalesTaxOwed,
+    decimal NetIncomeAfterExpenses);
 
 public sealed record ReportChangeDto(decimal Current, decimal Previous, decimal? PercentChange);
 public sealed record ReportComparisonDto(ReportChangeDto GrossSales, ReportChangeDto NetProfit, ReportChangeDto SalesCount, ReportChangeDto AverageSaleValue, ReportChangeDto OperatingExpenses);

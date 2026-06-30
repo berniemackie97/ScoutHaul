@@ -80,7 +80,9 @@ public sealed class ReportsController(HaulScoutDbContext db, ICurrentUserContext
                 item.OtherCosts,
                 item.NetProfit,
                 item.Status,
-                item.SoldAt))
+                item.SoldAt,
+                item.SalesTaxCollected,
+                item.TaxRemittedByPlatform))
             .ToListAsync(cancellationToken);
 
         List<ReportExpenseInput> expenses = await db.Expenses

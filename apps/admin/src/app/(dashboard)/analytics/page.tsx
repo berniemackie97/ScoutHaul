@@ -116,6 +116,11 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <Kpi label="Net income after expenses" value={money(kpis.netIncomeAfterExpenses)} detail="Realized profit less operating overhead" icon={TrendingUp} />
+        <Kpi label="Sales tax owed" value={money(kpis.salesTaxOwed)} detail="We collected it; owed to the state (not profit)" icon={ReceiptText} />
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Kpi label="Cost of goods" value={money(kpis.costOfGoods)} detail="Specific item acquisition costs" icon={Boxes} />
         <Kpi label="Gross profit" value={money(kpis.grossProfit)} detail="Sales less specific-item COGS" icon={TrendingUp} />
         <Kpi label="Transaction costs" value={money(kpis.saleCosts)} detail="Platform, payment, shipping, supplies, other" icon={ReceiptText} />
