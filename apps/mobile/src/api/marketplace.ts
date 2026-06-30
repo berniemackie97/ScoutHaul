@@ -60,9 +60,13 @@ export const marketplaceApi = {
   dashboard: () => apiRequest<DashboardSummary>('/api/dashboard/summary'),
 
   lookupBarcode: (barcode: string) =>
-    apiRequest<MarketplaceLookupResult>(`/api/marketplace-lookup/barcode/${encodeURIComponent(barcode)}`),
+    apiRequest<MarketplaceLookupResult>(
+      `/api/marketplace-lookup/barcode/${encodeURIComponent(barcode)}`
+    ),
   lookupSearch: (query: string) =>
-    apiRequest<MarketplaceLookupResult>(`/api/marketplace-lookup/search?q=${encodeURIComponent(query)}`),
+    apiRequest<MarketplaceLookupResult>(
+      `/api/marketplace-lookup/search?q=${encodeURIComponent(query)}`
+    ),
   marketplaceLinks: (query: string) =>
     apiRequest<MarketplaceSearchLinks>(`/api/marketplace-links?query=${encodeURIComponent(query)}`),
 
@@ -73,17 +77,30 @@ export const marketplaceApi = {
     apiRequest<ProductIdentity>('/api/product-identities', { method: 'POST', body }),
   updateProductIdentity: (id: string, body: CreateProductIdentityRequest) =>
     apiRequest<ProductIdentity>(`/api/product-identities/${id}`, { method: 'PUT', body }),
-  deleteProductIdentity: (id: string) => apiRequest<void>(`/api/product-identities/${id}`, { method: 'DELETE' }),
+  deleteProductIdentity: (id: string) =>
+    apiRequest<void>(`/api/product-identities/${id}`, { method: 'DELETE' }),
 
-  addComp: (body: CreateCompRequest) => apiRequest<MarketObservation>('/api/market-observations', { method: 'POST', body }),
+  addComp: (body: CreateCompRequest) =>
+    apiRequest<MarketObservation>('/api/market-observations', { method: 'POST', body }),
   comps: (params: string) => apiRequest<MarketObservation[]>(`/api/market-observations?${params}`),
-  analyze: (body: AnalyzeRequest) => apiRequest<MarketAnalysisResponse>('/api/market-analysis/calculate', { method: 'POST', body }),
+  analyze: (body: AnalyzeRequest) =>
+    apiRequest<MarketAnalysisResponse>('/api/market-analysis/calculate', { method: 'POST', body }),
 
-  visionIdentify: (imageBase64: string, signal?: AbortSignal, context?: string | null) =>
-    apiRequest<VisionIdentifyResult>('/api/vision/identify', { method: 'POST', body: { imageBase64, context: context || undefined }, signal }),
+  visionIdentify: (imageBase64?: string | null, signal?: AbortSignal, context?: string | null) =>
+    apiRequest<VisionIdentifyResult>('/api/vision/identify', {
+      method: 'POST',
+      body: { imageBase64: imageBase64 || undefined, context: context || undefined },
+      signal,
+    }),
 
-  providerStatus: () =>
-    apiRequest<MarketplaceProviderStatus>('/api/marketplace-lookup/status'),
+  visionIdentifyText: (context: string, signal?: AbortSignal) =>
+    apiRequest<VisionIdentifyResult>('/api/vision/identify', {
+      method: 'POST',
+      body: { context },
+      signal,
+    }),
+
+  providerStatus: () => apiRequest<MarketplaceProviderStatus>('/api/marketplace-lookup/status'),
 };
 
 export type MarketplaceProviderStatus = {
@@ -110,7 +127,7 @@ export type ProductIdentification = {
   estimatedResaleHigh: number | null;
   identifyingText: string | null;
   searchKeywords: string[];
-  confidence: 'high' | 'medium' | 'low';          // identification (variant) confidence
+  confidence: 'high' | 'medium' | 'low'; // identification (variant) confidence
   valuationConfidence?: 'high' | 'medium' | 'low' | null;
   priceRangeType?: 'tight' | 'moderate' | 'wide' | null;
   keyValueFactors?: string[];

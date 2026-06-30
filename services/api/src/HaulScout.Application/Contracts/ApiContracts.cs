@@ -645,7 +645,7 @@ public sealed record VisionIdentifyResult(
     string? DetectedText);
 
 /// <summary>
-/// Structured product identification + valuation from Gemini multimodal — the sole identifier.
+/// Structured product identification + valuation from Gemini — the sole identifier/appraiser for photo or typed details.
 /// </summary>
 public sealed record ProductIdentification(
     string? Name,

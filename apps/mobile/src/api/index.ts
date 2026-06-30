@@ -74,6 +74,7 @@ export const api = {
   comps: marketplaceApi.comps,
   analyze: marketplaceApi.analyze,
   visionIdentify: marketplaceApi.visionIdentify,
+  visionIdentifyText: marketplaceApi.visionIdentifyText,
   providerStatus: marketplaceApi.providerStatus,
 
   // Sourcing

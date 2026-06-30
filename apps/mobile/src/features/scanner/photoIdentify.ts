@@ -20,19 +20,41 @@ export type { IdentifyResult };
 // clean "not identified" result and let the user refine manually (we never fabricate an identity).
 
 // Tuning knobs, all in one place.
-const TARGET_WIDTH = 1536;          // downscale width — good detail, ~400–700KB on the wire
-const JPEG_QUALITY = 0.6;           // recompress quality after resize
-const MIN_BASE64_LENGTH = 100;      // shorter than this means the encode produced nothing usable
-const REQUEST_TIMEOUT_MS = 30_000;  // hard ceiling so a stalled backend can't hang the UI
+const TARGET_WIDTH = 1536; // downscale width — good detail, ~400–700KB on the wire
+const JPEG_QUALITY = 0.6; // recompress quality after resize
+const MIN_BASE64_LENGTH = 100; // shorter than this means the encode produced nothing usable
+const REQUEST_TIMEOUT_MS = 30_000; // hard ceiling so a stalled backend can't hang the UI
 
-const log = (...args: unknown[]) => { if (__DEV__) console.log('[Vision]', ...args); };
+const log = (...args: unknown[]) => {
+  if (__DEV__) console.log('[Vision]', ...args);
+};
 
 // ── Main ──
 
 // `context` = optional known facts (brand/condition/size/notes the user already entered) fed to the
 // model to sharpen identification + valuation.
-export async function identifyFromPhoto(photoUri: string, context?: string | null): Promise<IdentifyResult> {
-  const { vision, errorKind } = await callVisionApi(photoUri, context);
+export async function identifyFromPhoto(
+  photoUri: string,
+  context?: string | null
+): Promise<IdentifyResult> {
+  const base64 = await downscaleToBase64(photoUri);
+  if (!base64 || base64.length < MIN_BASE64_LENGTH) {
+    log('encode produced too few bytes, skipping:', base64?.length ?? 0);
+    return { ...emptyResult(), errorKind: 'error' };
+  }
+
+  const { vision, errorKind } = await callVisionApi(base64, context);
+  if (!vision) return { ...emptyResult(), errorKind };
+  return buildFromVision(vision);
+}
+
+// Text-only path: same Gemini identifier/appraiser, no camera. `details` should include whatever
+// the user knows — title, brand, model, condition, size, edition, defects, packaging, etc.
+export async function identifyFromDetails(details: string): Promise<IdentifyResult> {
+  const facts = details.trim();
+  if (!facts) return { ...emptyResult(), errorKind: null };
+
+  const { vision, errorKind } = await callVisionApi(null, facts);
   if (!vision) return { ...emptyResult(), errorKind };
   return buildFromVision(vision);
 }
@@ -54,11 +76,12 @@ function buildFromVision(vision: VisionIdentifyResult): IdentifyResult {
     };
   }
 
-  const searchQuery = vision.searchQuery
-    ?? (product.brand && product.model ? `${product.brand} ${product.model}` : null)
-    ?? product.name
-    ?? product.searchKeywords[0]
-    ?? '';
+  const searchQuery =
+    vision.searchQuery ??
+    (product.brand && product.model ? `${product.brand} ${product.model}` : null) ??
+    product.name ??
+    product.searchKeywords[0] ??
+    '';
 
   const alternateQueries = dedupeQueries(searchQuery, [
     ...(product.brand && product.model ? [`${product.brand} ${product.model}`] : []),
@@ -97,24 +120,31 @@ function buildFromVision(vision: VisionIdentifyResult): IdentifyResult {
 
 type VisionCall = { vision: VisionIdentifyResult | null; errorKind: VisionErrorKind | null };
 
-async function callVisionApi(photoUri: string, context?: string | null): Promise<VisionCall> {
-  const base64 = await downscaleToBase64(photoUri);
-  if (!base64 || base64.length < MIN_BASE64_LENGTH) {
-    log('encode produced too few bytes, skipping:', base64?.length ?? 0);
-    return { vision: null, errorKind: 'error' };
-  }
-
+async function callVisionApi(
+  imageBase64: string | null,
+  context?: string | null
+): Promise<VisionCall> {
   // Hard timeout: a stalled network/backend must surface as a clean failure, never a frozen overlay.
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
-    log('sending image…', Math.round(base64.length / 1024), 'KB');
-    const result = await api.visionIdentify(base64, controller.signal, context);
+    log(
+      imageBase64 ? 'sending image…' : 'sending typed details…',
+      imageBase64 ? Math.round(imageBase64.length / 1024) : 0,
+      'KB'
+    );
+    const result = imageBase64
+      ? await api.visionIdentify(imageBase64, controller.signal, context)
+      : await api.visionIdentifyText(context ?? '', controller.signal);
     log('result:', result.product?.name ?? '(not identified)', result.product?.confidence ?? '');
     return { vision: result, errorKind: null };
   } catch (error) {
     const errorKind = classifyVisionError(error, controller.signal.aborted);
-    console.error('[Vision] call failed:', errorKind, error instanceof Error ? error.message : String(error));
+    console.error(
+      '[Vision] call failed:',
+      errorKind,
+      error instanceof Error ? error.message : String(error)
+    );
     return { vision: null, errorKind };
   } finally {
     clearTimeout(timeout);
@@ -144,8 +174,14 @@ function classifyVisionError(error: unknown, aborted: boolean): VisionErrorKind 
 // rather than sending the raw full-res file that breaks the upload.
 async function downscaleToBase64(uri: string): Promise<string | null> {
   try {
-    const ref = await ImageManipulator.manipulate(uri).resize({ width: TARGET_WIDTH }).renderAsync();
-    const out = await ref.saveAsync({ compress: JPEG_QUALITY, format: SaveFormat.JPEG, base64: true });
+    const ref = await ImageManipulator.manipulate(uri)
+      .resize({ width: TARGET_WIDTH })
+      .renderAsync();
+    const out = await ref.saveAsync({
+      compress: JPEG_QUALITY,
+      format: SaveFormat.JPEG,
+      base64: true,
+    });
     return out.base64 ?? null;
   } catch (error) {
     console.warn('[Vision] image resize failed:', error);

@@ -7,8 +7,10 @@ public interface IVisionIdentificationService
     bool IsConfigured { get; }
 
     /// <summary>
-    /// Identify + value the product in the image. <paramref name="context"/> is optional known facts
-    /// the user supplied (brand/condition/size/notes); null = pure visual identification.
+    /// Identify + value a product. Provide a photo (<paramref name="imageBase64"/>), typed item facts
+    /// (<paramref name="context"/>), or both — at least one is required. Photo only = pure visual
+    /// identification; facts only = identification from the text (no photo); both = the facts are ground
+    /// truth and the photo refines the variant/condition. The prompt adapts to what is given.
     /// </summary>
-    Task<VisionIdentifyResult> IdentifyAsync(string imageBase64, string? context, CancellationToken cancellationToken);
+    Task<VisionIdentifyResult> IdentifyAsync(string? imageBase64, string? context, CancellationToken cancellationToken);
 }

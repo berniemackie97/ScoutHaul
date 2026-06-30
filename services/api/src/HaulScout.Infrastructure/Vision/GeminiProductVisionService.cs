@@ -24,7 +24,7 @@ internal sealed class GeminiProductVisionService(
 
     public bool IsConfigured => !string.IsNullOrWhiteSpace(configuration["Gemini:ApiKey"]);
 
-    public async Task<VisionIdentifyResult> IdentifyAsync(string imageBase64, string? context, CancellationToken cancellationToken)
+    public async Task<VisionIdentifyResult> IdentifyAsync(string? imageBase64, string? context, CancellationToken cancellationToken)
     {
         ProductIdentification? product = await IdentifyProductAsync(imageBase64, context, cancellationToken);
         return new VisionIdentifyResult(
@@ -42,10 +42,19 @@ internal sealed class GeminiProductVisionService(
         return p.SearchKeywords.Count > 0 ? p.SearchKeywords[0] : null;
     }
 
-    private const string SystemPrompt =
-        "You are an expert reseller appraiser with strong visual product knowledge. From the photo, do " +
-        "TWO separate jobs and keep their confidences separate: (1) IDENTIFY the main item, (2) ESTIMATE " +
-        "its used resale value.\n\n" +
+    // The prompt is composed from these sections so it adapts to the inputs: a photo, typed facts, or
+    // both. The valuation/range/comps rules are shared; only the IDENTIFY guidance changes by mode.
+    private const string IntroShared =
+        "You are an expert reseller appraiser with strong product knowledge. Do TWO separate jobs and keep " +
+        "their confidences separate: (1) IDENTIFY the main item, (2) ESTIMATE its used resale value.\n\n";
+
+    private const string BothInputsNote =
+        "INPUTS: a PHOTO of the item AND known facts the user typed. Trust the user's facts as ground truth " +
+        "for identity (brand/model/size/edition); use the photo to confirm them, pin the exact variant, and " +
+        "judge condition. If the photo clearly contradicts a stated fact, keep the user's fact for identity " +
+        "but record the conflict in missing_information.\n\n";
+
+    private const string PhotoIdentify =
         "FOCUS: if several objects are visible, identify the SINGLE most prominent item — the one centered " +
         "in the frame and closest to the camera. That is what the user is pointing at; ignore background " +
         "clutter, surfaces, and surrounding objects.\n\n" +
@@ -63,14 +72,26 @@ internal sealed class GeminiProductVisionService(
         "confidently infer from appearance; put unknowns in missing_information. Set variant_confidence = " +
         "certainty of the EXACT variant (high only when the specific brand/edition/model is clear from text " +
         "or unmistakable design; medium when you know the object type and likely product; low when only the " +
-        "broad category is clear).\n\n" +
+        "broad category is clear).\n\n";
+
+    private const string TextIdentify =
+        "INPUT: there is NO photo — only the known facts the user typed below. IDENTIFY the item from those " +
+        "facts plus your product knowledge. Use any brand, model number, size, set/edition, or year in the " +
+        "facts to pin the EXACT variant. Do NOT invent attributes the facts don't support and do NOT assume " +
+        "visual details you were not given; put unknowns in missing_information. If the facts are too sparse " +
+        "to pin the exact variant, name the specific object type / category and stay at that level. Set " +
+        "variant_confidence = how specifically the facts pin the item (high only when brand + model/variant " +
+        "are explicit; medium when the product type and likely model are clear; low when only the broad " +
+        "category is given).\n\n";
+
+    private const string ValueShared =
         "VALUE (used/secondhand resale ONLY — never retail, MSRP, replacement cost, or optimistic asking " +
         "price): Reason from typical SOLD prices on resale markets (eBay sold, Facebook Marketplace, Mercari, " +
         "Poshmark, StockX). You do NOT have live market data — never claim you checked listings. Assume typical " +
-        "USED condition unless the photo shows otherwise. low = quick-sale or lower-condition value; high = " +
-        "realistic private-party value in good used condition (NOT a rare-outlier price). Be CONSERVATIVE: do " +
-        "not assume the rare/high-value variant unless the image clearly proves it. Price damaged, incomplete, " +
-        "untested, counterfeit-risk, or missing-accessory items LOWER.\n\n" +
+        "USED condition unless told otherwise. low = quick-sale or lower-condition value; high = realistic " +
+        "private-party value in good used condition (NOT a rare-outlier price). Be CONSERVATIVE: do not assume " +
+        "the rare/high-value variant unless you can clearly tell. Price damaged, incomplete, untested, " +
+        "counterfeit-risk, or missing-accessory items LOWER.\n\n" +
         "RANGE WIDTH: Generic or variant-heavy items (e.g. iPhone, Nike Air Jordan 1, Pokemon card, Levi's " +
         "jeans, Rolex watch) get a WIDE range unless the exact variant is clear. Use tight only when BOTH the " +
         "product and its condition are clear; otherwise moderate or wide. price_range_type MUST match the width " +
@@ -85,7 +106,16 @@ internal sealed class GeminiProductVisionService(
         "listings — never invent URLs, exact dates, or claim you checked current listings. " +
         "Respond ONLY with valid JSON matching the schema.";
 
-    private async Task<ProductIdentification?> IdentifyProductAsync(string imageBase64, string? context, CancellationToken cancellationToken)
+    // Composes the system prompt for the given inputs. Photo present → visual identification (with a
+    // ground-truth note when facts are also given); facts only → text identification.
+    private static string BuildSystemPrompt(bool hasImage, bool hasFacts) =>
+        IntroShared
+        + (hasImage
+            ? (hasFacts ? BothInputsNote : "") + PhotoIdentify
+            : TextIdentify)
+        + ValueShared;
+
+    private async Task<ProductIdentification?> IdentifyProductAsync(string? imageBase64, string? context, CancellationToken cancellationToken)
     {
         string? apiKey = configuration["Gemini:ApiKey"];
         if (string.IsNullOrWhiteSpace(apiKey))
@@ -94,15 +124,26 @@ internal sealed class GeminiProductVisionService(
             return null;
         }
 
-        // System prompt → (optional) user-provided known facts → image. Known facts are ground truth
-        // the model should trust to nail the exact variant and refine the valuation.
-        var parts = new List<object> { new { text = SystemPrompt } };
+        bool hasImage = !string.IsNullOrWhiteSpace(imageBase64);
         string? knownFacts = context?.Trim();
-        if (!string.IsNullOrWhiteSpace(knownFacts))
+        bool hasFacts = !string.IsNullOrWhiteSpace(knownFacts);
+        if (!hasImage && !hasFacts)
+        {
+            // Nothing to identify from. The controller guards this; fail closed here too.
+            return null;
+        }
+
+        // Dynamic prompt → (optional) user-provided known facts → (optional) image. Facts are ground
+        // truth the model trusts to nail the exact variant and refine the valuation.
+        var parts = new List<object> { new { text = BuildSystemPrompt(hasImage, hasFacts) } };
+        if (hasFacts)
         {
             parts.Add(new { text = "Known facts provided by the user (treat as ground truth; use to disambiguate the variant and refine valuation):\n" + knownFacts });
         }
-        parts.Add(new { inline_data = new { mime_type = "image/jpeg", data = imageBase64 } });
+        if (hasImage)
+        {
+            parts.Add(new { inline_data = new { mime_type = "image/jpeg", data = imageBase64 } });
+        }
 
         var requestBody = new
         {

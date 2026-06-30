@@ -13,7 +13,7 @@ public sealed class VisionController(
     IHttpClientFactory httpClientFactory) : ControllerBase
 {
     /// <summary>
-    /// Identify a product from a photo using Gemini multimodal. Returns a specific product name,
+    /// Identify a product from a photo, typed facts, or both. Returns a specific product name,
     /// brand, model, category, condition, a conservative used-resale valuation, and comp price points.
     /// </summary>
     [HttpPost("identify")]
@@ -31,12 +31,19 @@ public sealed class VisionController(
             return StatusCode(503, new { title = "Vision service not configured", detail = "Gemini API key (Gemini__ApiKey) is not set." });
         }
 
-        if (string.IsNullOrWhiteSpace(request.ImageBase64) && string.IsNullOrWhiteSpace(request.ImageUrl))
+        if (string.IsNullOrWhiteSpace(request.ImageBase64)
+            && string.IsNullOrWhiteSpace(request.ImageUrl)
+            && string.IsNullOrWhiteSpace(request.Context))
         {
-            return BadRequest(new { title = "Image required", detail = "Provide imageBase64 or imageUrl." });
+            return BadRequest(new { title = "Input required", detail = "Provide imageBase64, imageUrl, or typed item details in context." });
         }
 
-        string imageBase64 = request.ImageBase64 ?? "";
+        if (request.Context?.Length > 4_000)
+        {
+            return BadRequest(new { title = "Typed details too long", detail = "Keep item details under 4,000 characters." });
+        }
+
+        string? imageBase64 = string.IsNullOrWhiteSpace(request.ImageBase64) ? null : request.ImageBase64;
 
         // If URL provided instead of base64, download and convert via IHttpClientFactory
         if (string.IsNullOrWhiteSpace(imageBase64) && !string.IsNullOrWhiteSpace(request.ImageUrl))
@@ -55,10 +62,13 @@ public sealed class VisionController(
         }
 
         // Strip data URI prefix if present (e.g., "data:image/jpeg;base64,...")
-        int commaIndex = imageBase64.IndexOf(',');
-        if (commaIndex >= 0)
+        if (!string.IsNullOrWhiteSpace(imageBase64))
         {
-            imageBase64 = imageBase64[(commaIndex + 1)..];
+            int commaIndex = imageBase64.IndexOf(',');
+            if (commaIndex >= 0)
+            {
+                imageBase64 = imageBase64[(commaIndex + 1)..];
+            }
         }
 
         try
