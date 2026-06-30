@@ -42,10 +42,15 @@ export default function ScoutScreen() {
       setRecentLoading(true);
       api
         .inventory()
-        .then((items) => { setRecentItems(items.slice(0, 5)); setRecentError(null); })
-        .catch((e: unknown) => setRecentError(e instanceof Error ? e.message : 'Failed to load recent items'))
+        .then((items) => {
+          setRecentItems(items.slice(0, 5));
+          setRecentError(null);
+        })
+        .catch((e: unknown) =>
+          setRecentError(e instanceof Error ? e.message : 'Failed to load recent items')
+        )
         .finally(() => setRecentLoading(false));
-    }, [connectivity.isOnline]),
+    }, [connectivity.isOnline])
   );
 
   function handleSearch() {
@@ -57,8 +62,8 @@ export default function ScoutScreen() {
   const actions: ActionTile[] = [
     {
       icon: 'search-outline',
-      label: 'Search',
-      sub: 'Find by name',
+      label: 'Typed Search',
+      sub: 'No photo needed',
       color: c.info,
       bg: c.infoLight,
       onPress: () => router.push('/manual-search'),
@@ -101,8 +106,13 @@ export default function ScoutScreen() {
       >
         <View style={styles.heroDecor1} />
         <View style={styles.header}>
-          <Text variant="title" color="#FFFFFF">Scout</Text>
-          <StatusPill label={connectivity.label} tone={connectivity.isOnline ? 'success' : 'warning'} />
+          <Text variant="title" color="#FFFFFF">
+            Scout
+          </Text>
+          <StatusPill
+            label={connectivity.label}
+            tone={connectivity.isOnline ? 'success' : 'warning'}
+          />
         </View>
       </LinearGradient>
 
@@ -122,8 +132,12 @@ export default function ScoutScreen() {
           <View style={[styles.scanIconRing, { borderColor: 'rgba(255,255,255,0.25)' }]}>
             <Ionicons name="barcode-outline" size={28} color={c.textInverse} />
           </View>
-          <Text variant="bodyBold" color={c.textInverse}>Scan Barcode</Text>
-          <Text variant="caption" color="rgba(255,255,255,0.6)">UPC, EAN, ISBN, QR</Text>
+          <Text variant="bodyBold" color={c.textInverse}>
+            Scan Barcode
+          </Text>
+          <Text variant="caption" color="rgba(255,255,255,0.6)">
+            UPC, EAN, ISBN, QR
+          </Text>
         </Pressable>
 
         <Pressable
@@ -140,8 +154,12 @@ export default function ScoutScreen() {
           <View style={[styles.scanIconRing, { borderColor: 'rgba(255,255,255,0.25)' }]}>
             <Ionicons name="camera-outline" size={28} color={c.textInverse} />
           </View>
-          <Text variant="bodyBold" color={c.textInverse}>Photo ID</Text>
-          <Text variant="caption" color="rgba(255,255,255,0.6)">AI visual search</Text>
+          <Text variant="bodyBold" color={c.textInverse}>
+            Photo ID
+          </Text>
+          <Text variant="caption" color="rgba(255,255,255,0.6)">
+            Use camera + facts
+          </Text>
         </Pressable>
       </View>
 
@@ -149,7 +167,7 @@ export default function ScoutScreen() {
       <SearchBar
         value={searchQuery}
         onChangeText={setSearchQuery}
-        placeholder="Search marketplaces..."
+        placeholder="Type item details for comps..."
         onSubmit={handleSearch}
       />
 
@@ -170,8 +188,12 @@ export default function ScoutScreen() {
             <View style={[styles.actionIcon, { backgroundColor: action.bg }]}>
               <Ionicons name={action.icon} size={22} color={action.color} />
             </View>
-            <Text variant="bodyBold" numberOfLines={1}>{action.label}</Text>
-            <Text variant="label" color={c.textMuted} numberOfLines={1}>{action.sub}</Text>
+            <Text variant="bodyBold" numberOfLines={1}>
+              {action.label}
+            </Text>
+            <Text variant="label" color={c.textMuted} numberOfLines={1}>
+              {action.sub}
+            </Text>
           </Pressable>
         ))}
       </View>
@@ -182,9 +204,13 @@ export default function ScoutScreen() {
       {recentItems.length > 0 ? (
         <>
           <View style={styles.sectionRow}>
-            <Text variant="bodyBold" color={c.textSecondary}>Recent Items</Text>
+            <Text variant="bodyBold" color={c.textSecondary}>
+              Recent Items
+            </Text>
             <Pressable onPress={() => router.push('/(tabs)/inventory')} hitSlop={8}>
-              <Text variant="caption" color={c.primary}>See All</Text>
+              <Text variant="caption" color={c.primary}>
+                See All
+              </Text>
             </Pressable>
           </View>
           <Card>
@@ -194,19 +220,26 @@ export default function ScoutScreen() {
                 onPress={() => router.push(`/inventory/${item.id}`)}
                 style={({ pressed }) => [
                   styles.recentItem,
-                  i < recentItems.length - 1 && { borderBottomWidth: 1, borderBottomColor: c.borderLight },
+                  i < recentItems.length - 1 && {
+                    borderBottomWidth: 1,
+                    borderBottomColor: c.borderLight,
+                  },
                   pressed && { backgroundColor: c.surfaceAlt },
                 ]}
                 accessibilityRole="button"
                 accessibilityLabel={item.title}
               >
                 <View style={styles.recentInfo}>
-                  <Text variant="bodyBold" numberOfLines={1}>{item.title}</Text>
+                  <Text variant="bodyBold" numberOfLines={1}>
+                    {item.title}
+                  </Text>
                   <View style={styles.recentMeta}>
                     {item.barcode ? (
                       <View style={styles.metaChip}>
                         <Ionicons name="barcode-outline" size={12} color={c.textMuted} />
-                        <Text variant="label" color={c.textMuted}>{item.barcode}</Text>
+                        <Text variant="label" color={c.textMuted}>
+                          {item.barcode}
+                        </Text>
                       </View>
                     ) : null}
                     <StatusPill label={item.status} tone={statusTone(item.status)} size="sm" />
@@ -214,9 +247,13 @@ export default function ScoutScreen() {
                 </View>
                 <View style={styles.recentPrice}>
                   {item.estimatedSalePrice ? (
-                    <Text variant="bodyBold" color={c.primary}>{formatMoney(item.estimatedSalePrice)}</Text>
+                    <Text variant="bodyBold" color={c.primary}>
+                      {formatMoney(item.estimatedSalePrice)}
+                    </Text>
                   ) : item.purchasePrice ? (
-                    <Text variant="caption" color={c.textMuted}>{formatMoney(item.purchasePrice)}</Text>
+                    <Text variant="caption" color={c.textMuted}>
+                      {formatMoney(item.purchasePrice)}
+                    </Text>
                   ) : null}
                   <Ionicons name="chevron-forward" size={16} color={c.textMuted} />
                 </View>
@@ -228,7 +265,6 @@ export default function ScoutScreen() {
     </Screen>
   );
 }
-
 
 const styles = StyleSheet.create({
   heroGradient: {

@@ -48,6 +48,22 @@ public sealed class GeminiProductVisionTests
             });
     }
 
+    private sealed class CaptureHandler(string responseJson, HttpStatusCode status = HttpStatusCode.OK) : HttpMessageHandler
+    {
+        public string? RequestBody { get; private set; }
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            RequestBody = request.Content is null
+                ? null
+                : await request.Content.ReadAsStringAsync(cancellationToken);
+            return new HttpResponseMessage(status)
+            {
+                Content = new StringContent(responseJson, Encoding.UTF8, "application/json"),
+            };
+        }
+    }
+
     // Returns the queued responses in order; repeats the last one once exhausted.
     private sealed class SequenceHandler(params (HttpStatusCode Status, string Body)[] responses) : HttpMessageHandler
     {
@@ -69,6 +85,41 @@ public sealed class GeminiProductVisionTests
             .AddInMemoryCollection(new Dictionary<string, string?> { ["Gemini:ApiKey"] = "test-key" })
             .Build();
         return new GeminiProductVisionService(new HttpClient(handler), config, NullLogger<GeminiProductVisionService>.Instance);
+    }
+
+    [Fact]
+    public async Task Text_only_identification_sends_adaptive_prompt_without_image_part()
+    {
+        string ok = GeminiEnvelope("""{"name":"Sony WH-1000XM4 Headphones","brand":"Sony","model":"WH-1000XM4","category":"Electronics","confidence":"high","searchKeywords":["Sony WH-1000XM4"]}""");
+        var handler = new CaptureHandler(ok);
+
+        ProductIdentification? result = (await ServiceWith(handler).IdentifyAsync(
+            null,
+            "Sony WH-1000XM4 headphones, black, used good condition",
+            CancellationToken.None)).Product;
+
+        Assert.NotNull(result);
+        Assert.Equal("Sony", result.Brand);
+        Assert.Contains("there is NO photo", handler.RequestBody!);
+        Assert.Contains("Known facts provided by the user", handler.RequestBody!);
+        Assert.DoesNotContain("inline_data", handler.RequestBody!);
+    }
+
+    [Fact]
+    public async Task Photo_with_context_sends_ground_truth_facts_and_image_part()
+    {
+        string ok = GeminiEnvelope("""{"name":"Vintage Pyrex Bowl","category":"Kitchen","confidence":"medium","searchKeywords":["vintage pyrex bowl"]}""");
+        var handler = new CaptureHandler(ok);
+
+        ProductIdentification? result = (await ServiceWith(handler).IdentifyAsync(
+            new string('A', 200),
+            "User says the bottom stamp reads Pyrex 403, yellow, mixing bowl",
+            CancellationToken.None)).Product;
+
+        Assert.NotNull(result);
+        Assert.Contains("PHOTO of the item AND known facts", handler.RequestBody!);
+        Assert.Contains("Known facts provided by the user", handler.RequestBody!);
+        Assert.Contains("inline_data", handler.RequestBody!);
     }
 
     [Fact]
