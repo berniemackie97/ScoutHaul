@@ -38,6 +38,14 @@ export function ListingGenerator({ item }: { item: InventoryItem }) {
   const [isPending, startTransition] = useTransition();
   const listing: GeneratedListing | undefined = state.listing;
 
+  const generatorNotes = [
+    item.notes,
+    item.listingNotes ? `Listing notes: ${item.listingNotes}` : null,
+    item.testingNotes ? `Testing notes: ${item.testingNotes}` : null,
+    item.accessories ? `Included accessories: ${item.accessories}` : null,
+    item.missingParts ? `Missing parts/flaws: ${item.missingParts}` : null,
+  ].filter((value): value is string => Boolean(value?.trim())).join("\n");
+
   function run() {
     startTransition(async () => {
       const result = await generateListing({
@@ -49,7 +57,8 @@ export function ListingGenerator({ item }: { item: InventoryItem }) {
         color: item.color,
         sizeSystem: item.sizeSystem,
         sizeValue: item.sizeValue,
-        notes: item.notes,
+        attributesJson: item.attributesJson,
+        notes: generatorNotes || null,
       });
       setState(result);
     });
@@ -110,6 +119,14 @@ export function ListingGenerator({ item }: { item: InventoryItem }) {
                         {comp.status}
                         {comp.condition ? ` · ${comp.condition}` : ""}
                         {comp.note ? ` · ${comp.note}` : ""}
+                        {comp.sourceUrl ? (
+                          <>
+                            {" · "}
+                            <a href={comp.sourceUrl} target="_blank" rel="noreferrer" className="text-brand-600 hover:underline">
+                              Open
+                            </a>
+                          </>
+                        ) : null}
                       </span>
                     </li>
                   ))}

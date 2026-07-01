@@ -4,6 +4,7 @@ using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using HaulScout.Application.Contracts;
+using HaulScout.Application.Services;
 using HaulScout.Infrastructure.Vision;
 
 namespace HaulScout.Tests.Vision;
@@ -13,13 +14,15 @@ public sealed class GeminiResaleEstimatorTests
     private sealed class CountingHandler(string body, HttpStatusCode status = HttpStatusCode.OK) : HttpMessageHandler
     {
         public int CallCount { get; private set; }
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        public string? LastRequestBody { get; private set; }
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             CallCount++;
-            return Task.FromResult(new HttpResponseMessage(status)
+            LastRequestBody = request.Content is null ? null : await request.Content.ReadAsStringAsync(cancellationToken);
+            return new HttpResponseMessage(status)
             {
                 Content = new StringContent(body, Encoding.UTF8, "application/json"),
-            });
+            };
         }
     }
 
@@ -43,7 +46,7 @@ public sealed class GeminiResaleEstimatorTests
         var handler = new CountingHandler(Envelope("""{"low":150,"high":220,"rationale":"eBay sold avg"}"""));
         var sut = Build(handler, new MemoryCache(new MemoryCacheOptions()));
 
-        ResaleEstimate? result = await sut.EstimateAsync("Sony WH-1000XM4", CancellationToken.None);
+        ResaleEstimate? result = await sut.EstimateAsync("Sony WH-1000XM4", null, CancellationToken.None);
 
         Assert.NotNull(result);
         Assert.Equal(150m, result.Low);
@@ -66,7 +69,7 @@ public sealed class GeminiResaleEstimatorTests
         """;
         var sut = Build(new CountingHandler(Envelope(inner)), new MemoryCache(new MemoryCacheOptions()));
 
-        ResaleEstimate? result = await sut.EstimateAsync("Sony WH-1000XM4", CancellationToken.None);
+        ResaleEstimate? result = await sut.EstimateAsync("Sony WH-1000XM4", null, CancellationToken.None);
 
         Assert.NotNull(result);
         Assert.NotNull(result.Comps);
@@ -76,14 +79,34 @@ public sealed class GeminiResaleEstimatorTests
     }
 
     [Fact]
+    public async Task Includes_ebay_sold_completed_search_url_in_grounded_prompt()
+    {
+        var handler = new CountingHandler(Envelope("""{"low":55,"high":80}"""));
+        var sut = Build(handler, new MemoryCache(new MemoryCacheOptions()));
+        var hints = ResaleSearchHintBuilder.FromQuery("Pokemon Gardevoir Sylveon GX 130/214 Unbroken Bonds");
+
+        ResaleEstimate? result = await sut.EstimateAsync(
+            "Pokemon Gardevoir Sylveon GX 130/214 Unbroken Bonds",
+            hints,
+            CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.NotNull(handler.LastRequestBody);
+        Assert.Contains("PRIMARY SOLD-COMP SEARCH TARGETS", handler.LastRequestBody);
+        Assert.Contains("LH_Sold=1", handler.LastRequestBody);
+        Assert.Contains("LH_Complete=1", handler.LastRequestBody);
+        Assert.Contains("Pokemon%20Gardevoir%20Sylveon%20GX%20130%2F214%20Unbroken%20Bonds", handler.LastRequestBody);
+    }
+
+    [Fact]
     public async Task Caches_by_product_so_repeat_calls_hit_no_api()
     {
         var handler = new CountingHandler(Envelope("""{"low":10,"high":20}"""));
         var cache = new MemoryCache(new MemoryCacheOptions());
         var sut = Build(handler, cache);
 
-        var a = await sut.EstimateAsync("Pyrex 4-Cup Measuring Cup", CancellationToken.None);
-        var b = await sut.EstimateAsync("  pyrex   4-cup   measuring cup ", CancellationToken.None); // same, normalized
+        var a = await sut.EstimateAsync("Pyrex 4-Cup Measuring Cup", null, CancellationToken.None);
+        var b = await sut.EstimateAsync("  pyrex   4-cup   measuring cup ", null, CancellationToken.None); // same, normalized
 
         Assert.NotNull(a);
         Assert.NotNull(b);
@@ -98,8 +121,8 @@ public sealed class GeminiResaleEstimatorTests
         var cache = new MemoryCache(new MemoryCacheOptions());
         var sut = Build(handler, cache);
 
-        await sut.EstimateAsync("Product A", CancellationToken.None);
-        await sut.EstimateAsync("Product B", CancellationToken.None);
+        await sut.EstimateAsync("Product A", null, CancellationToken.None);
+        await sut.EstimateAsync("Product B", null, CancellationToken.None);
 
         Assert.Equal(2, handler.CallCount);
     }
@@ -112,9 +135,9 @@ public sealed class GeminiResaleEstimatorTests
         var cache = new MemoryCache(new MemoryCacheOptions());
         var sut = Build(handler, cache);
 
-        await sut.EstimateAsync("Nike Air Jordan 1 Chicago 2015", CancellationToken.None);
-        await sut.EstimateAsync("Nike Air Jordan 1 Bred 2023", CancellationToken.None);
-        await sut.EstimateAsync("Nike Air Jordan 1 Royal", CancellationToken.None);
+        await sut.EstimateAsync("Nike Air Jordan 1 Chicago 2015", null, CancellationToken.None);
+        await sut.EstimateAsync("Nike Air Jordan 1 Bred 2023", null, CancellationToken.None);
+        await sut.EstimateAsync("Nike Air Jordan 1 Royal", null, CancellationToken.None);
 
         Assert.Equal(3, handler.CallCount); // each variant estimated separately
     }
@@ -127,8 +150,8 @@ public sealed class GeminiResaleEstimatorTests
         var cache = new MemoryCache(new MemoryCacheOptions());
         var sut = Build(handler, cache);
 
-        await sut.EstimateAsync("Sony WH-1000XM4!", CancellationToken.None);
-        await sut.EstimateAsync("  sony   wh 1000xm4 ", CancellationToken.None);
+        await sut.EstimateAsync("Sony WH-1000XM4!", null, CancellationToken.None);
+        await sut.EstimateAsync("  sony   wh 1000xm4 ", null, CancellationToken.None);
 
         Assert.Equal(1, handler.CallCount);
     }
@@ -141,6 +164,6 @@ public sealed class GeminiResaleEstimatorTests
             new MemoryCache(new MemoryCacheOptions()), NullLogger<GeminiResaleEstimator>.Instance);
 
         Assert.False(sut.IsConfigured);
-        Assert.Null(await sut.EstimateAsync("anything", CancellationToken.None));
+        Assert.Null(await sut.EstimateAsync("anything", null, CancellationToken.None));
     }
 }

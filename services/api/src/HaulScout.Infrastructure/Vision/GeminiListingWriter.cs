@@ -11,8 +11,8 @@ namespace HaulScout.Infrastructure.Vision;
 /// <summary>
 /// Generates ready-to-post marketplace listings with Gemini. Pulls real sold/active comps + a used
 /// resale range from <see cref="IResaleEstimator"/> (grounded Google Search, cached), then writes an
-/// optimized title, an honest description, and a competitive suggested list price positioned against
-/// those comps. Reuses the shared free Gemini key.
+/// optimized title and honest description. The final suggested list price is deterministic and comes
+/// from <see cref="ListingPriceAdvisor"/>, not from the copy model.
 /// </summary>
 internal sealed class GeminiListingWriter(
     HttpClient httpClient,
@@ -33,25 +33,27 @@ internal sealed class GeminiListingWriter(
         }
 
         string details = BuildDetails(request);
+        ResaleSearchHints searchHints = ResaleSearchHintBuilder.FromListingRequest(request);
 
         // Real sold/active comps + a used resale range (grounded, cached) drive the suggested price.
-        ResaleEstimate? estimate = await resaleEstimator.EstimateAsync(details, cancellationToken);
+        ResaleEstimate? estimate = await resaleEstimator.EstimateAsync(details, searchHints, cancellationToken);
 
-        ListingCopyDto? copy = await GenerateCopyAsync(details, estimate, apiKey, cancellationToken);
+        ListingPriceAdvice priceAdvice = ListingPriceAdvisor.Calculate(request, estimate);
+
+        ListingCopyDto? copy = await GenerateCopyAsync(details, estimate, priceAdvice, apiKey, cancellationToken);
         if (copy is null || string.IsNullOrWhiteSpace(copy.Title))
         {
             return null;
         }
 
-        decimal? suggested = copy.ListPrice > 0 ? copy.ListPrice : estimate?.High;
         return new GeneratedListingDto(
             ListingTitle: copy.Title!.Trim(),
             ListingDescription: (copy.Description ?? string.Empty).Trim(),
-            SuggestedListPrice: suggested is > 0 ? decimal.Round(suggested.Value, 2) : null,
+            SuggestedListPrice: priceAdvice.SuggestedListPrice,
             EstimatedResaleLow: estimate?.Low,
             EstimatedResaleHigh: estimate?.High,
-            PriceRationale: Clean(copy.PriceRationale) ?? estimate?.Rationale,
-            Comps: estimate?.Comps ?? []);
+            PriceRationale: priceAdvice.PriceRationale ?? Clean(copy.PriceRationale) ?? estimate?.Rationale,
+            Comps: priceAdvice.PricingComps.Count > 0 ? priceAdvice.PricingComps : estimate?.Comps ?? []);
     }
 
     private static string BuildDetails(GenerateListingRequest r)
@@ -68,6 +70,7 @@ internal sealed class GeminiListingWriter(
         Add("Color", r.Color);
         string size = string.Join(" ", new[] { r.SizeSystem, r.SizeValue }.Where(s => !string.IsNullOrWhiteSpace(s)).Select(s => s!.Trim()));
         if (size.Length > 0) lines.Add($"Size: {size}");
+        Add("Structured attributes JSON", r.AttributesJson);
         Add("Notes", r.Notes);
         return string.Join("\n", lines);
     }
@@ -75,19 +78,24 @@ internal sealed class GeminiListingWriter(
     private const string SystemPrompt =
         "You are an expert reseller who writes high-converting secondhand marketplace listings (eBay, " +
         "Poshmark, Mercari, Facebook Marketplace). From the item details — and the real comps provided — " +
-        "produce THREE things:\n" +
+        "produce TWO things:\n" +
         "1) title: a keyword-rich marketplace title, MAX 80 characters. Front-load brand + model + the most " +
         "searched attributes (type, size, color, edition/year). No ALL-CAPS spam, no emojis, no fabricated " +
-        "specs.\n" +
+        "specs. For trading cards, include TCG/franchise, card name, exact card number, set, variant/rarity, " +
+        "and condition when known.\n" +
         "2) description: an honest, scannable description a buyer trusts — what it is, key features/specs, " +
-        "condition (state wear/flaws plainly), what's included, and a short reason to buy. Never invent " +
+        "condition (state wear/flaws plainly), what's included, and a short reason to buy. Use concise buyer-" +
+        "friendly bullets when helpful. Avoid generic openers like \"This listing is for\". Never invent " +
         "attributes, measurements, authenticity, or completeness that are not in the details.\n" +
-        "3) listPrice + priceRationale: a competitive USD asking price positioned against the comps — realistic " +
-        "for good used condition with a little room for offers, NOT a rare outlier. If comps are absent, price " +
-        "conservatively from typical used resale. One-line rationale referencing the comps/range.\n" +
+        "Pricing is handled by the app. Do NOT choose or mention a list price in the title/description.\n" +
         "Respond ONLY with valid JSON matching the schema.";
 
-    private async Task<ListingCopyDto?> GenerateCopyAsync(string details, ResaleEstimate? estimate, string apiKey, CancellationToken cancellationToken)
+    private async Task<ListingCopyDto?> GenerateCopyAsync(
+        string details,
+        ResaleEstimate? estimate,
+        ListingPriceAdvice priceAdvice,
+        string apiKey,
+        CancellationToken cancellationToken)
     {
         var context = new StringBuilder();
         context.Append("ITEM DETAILS:\n").Append(details).Append("\n\n");
@@ -104,6 +112,12 @@ internal sealed class GeminiListingWriter(
                     context.Append($"- ${c.Price:0.##} [{c.Status}]{cond}{note}\n");
                 }
             }
+        }
+        if (priceAdvice.SuggestedListPrice is { } suggestedPrice)
+        {
+            context.Append("\nAPP-CALCULATED LIST PRICE: $")
+                .Append(suggestedPrice.ToString("0.##"))
+                .Append(". Use it only as market context; do not include the price in copy.\n");
         }
 
         var requestBody = new
@@ -204,8 +218,7 @@ internal sealed class GeminiListingWriter(
         {
             title = new { type = "string", description = "Marketplace title, max 80 chars, keyword-rich" },
             description = new { type = "string", description = "Honest scannable listing description" },
-            listPrice = new { type = "number", description = "Competitive USD asking price positioned against comps" },
-            priceRationale = new { type = "string", description = "One-line reason for the price" },
+            priceRationale = new { type = "string", description = "Optional one-line market context, without choosing a price" },
         },
         required = new[] { "title", "description" },
     };
