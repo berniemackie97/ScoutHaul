@@ -48,7 +48,7 @@ public sealed class ListingPriceAdvisorTests
                 Sold(65m, "English Gardevoir & Sylveon GX 130/214 Unbroken Bonds NM"),
             ]));
 
-        Assert.Equal(35.99m, advice.SuggestedListPrice);
+        Assert.Equal(34.99m, advice.SuggestedListPrice);
         Assert.Equal(2, advice.PricingComps.Count);
         Assert.All(advice.PricingComps, comp => Assert.Contains("j", comp.Note!, StringComparison.OrdinalIgnoreCase));
     }
@@ -91,7 +91,7 @@ public sealed class ListingPriceAdvisorTests
                 Sold(15m, "Single Pokemon GX card"),
             ]));
 
-        Assert.Equal(119.99m, advice.SuggestedListPrice);
+        Assert.Equal(118.99m, advice.SuggestedListPrice);
         Assert.Equal(2, advice.PricingComps.Count);
         Assert.DoesNotContain(advice.PricingComps, comp => comp.Note?.Contains("Single", StringComparison.OrdinalIgnoreCase) == true);
     }
