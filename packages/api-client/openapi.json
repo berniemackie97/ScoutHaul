@@ -1070,6 +1070,54 @@
         }
       }
     },
+    "/api/listing/generate": {
+      "post": {
+        "tags": [
+          "Listing"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenerateListingRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenerateListingRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenerateListingRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/GeneratedListingDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GeneratedListingDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GeneratedListingDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/listings": {
       "post": {
         "tags": [
@@ -6329,6 +6377,92 @@
         },
         "additionalProperties": false
       },
+      "GenerateListingRequest": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "brand": {
+            "type": "string",
+            "nullable": true
+          },
+          "model": {
+            "type": "string",
+            "nullable": true
+          },
+          "category": {
+            "type": "string",
+            "nullable": true
+          },
+          "condition": {
+            "type": "string",
+            "nullable": true
+          },
+          "color": {
+            "type": "string",
+            "nullable": true
+          },
+          "sizeSystem": {
+            "type": "string",
+            "nullable": true
+          },
+          "sizeValue": {
+            "type": "string",
+            "nullable": true
+          },
+          "attributesJson": {
+            "type": "string",
+            "nullable": true
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "GeneratedListingDto": {
+        "type": "object",
+        "properties": {
+          "listingTitle": {
+            "type": "string",
+            "nullable": true
+          },
+          "listingDescription": {
+            "type": "string",
+            "nullable": true
+          },
+          "suggestedListPrice": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "estimatedResaleLow": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "estimatedResaleHigh": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "priceRationale": {
+            "type": "string",
+            "nullable": true
+          },
+          "comps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ResaleComp"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "InventoryAuthenticityStatus": {
         "enum": [
           "NotAssessed",
@@ -10109,6 +10243,9 @@
     },
     {
       "name": "Inventory"
+    },
+    {
+      "name": "Listing"
     },
     {
       "name": "Listings"

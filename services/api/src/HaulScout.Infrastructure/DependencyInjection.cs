@@ -48,6 +48,14 @@ public static class DependencyInjection
             client.DefaultRequestHeaders.Add("Accept", "application/json");
         });
 
+        // Listing generator (Gemini) — writes title + description and a comp-backed suggested list
+        // price from an item's details. Reuses the resale estimator for grounded comps.
+        services.AddHttpClient<IListingGenerationService, GeminiListingWriter>(client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(30);
+            client.DefaultRequestHeaders.Add("Accept", "application/json");
+        });
+
         // Marketplace pricing — tried in order. PriceCharting for collectibles (free token),
         // Keepa for Amazon price history, SerpApi for Google Shopping. All need API keys.
         services.AddScoped<IMarketplaceLookupService, CompositeMarketplaceLookupService>();

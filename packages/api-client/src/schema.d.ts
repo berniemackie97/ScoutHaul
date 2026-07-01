@@ -921,6 +921,49 @@ export interface paths {
         };
         trace?: never;
     };
+    "/api/listing/generate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["GenerateListingRequest"];
+                    "text/json": components["schemas"]["GenerateListingRequest"];
+                    "application/*+json": components["schemas"]["GenerateListingRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["GeneratedListingDto"];
+                        "application/json": components["schemas"]["GeneratedListingDto"];
+                        "text/json": components["schemas"]["GeneratedListingDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/listings": {
         parameters: {
             query?: never;
@@ -4826,6 +4869,30 @@ export interface components {
             amount?: number;
             /** Format: date-time */
             occurredAt?: string;
+        };
+        GenerateListingRequest: {
+            title?: string | null;
+            brand?: string | null;
+            model?: string | null;
+            category?: string | null;
+            condition?: string | null;
+            color?: string | null;
+            sizeSystem?: string | null;
+            sizeValue?: string | null;
+            attributesJson?: string | null;
+            notes?: string | null;
+        };
+        GeneratedListingDto: {
+            listingTitle?: string | null;
+            listingDescription?: string | null;
+            /** Format: double */
+            suggestedListPrice?: number | null;
+            /** Format: double */
+            estimatedResaleLow?: number | null;
+            /** Format: double */
+            estimatedResaleHigh?: number | null;
+            priceRationale?: string | null;
+            comps?: components["schemas"]["ResaleComp"][] | null;
         };
         /** @enum {string} */
         InventoryAuthenticityStatus: "NotAssessed" | "Authentic" | "LikelyAuthentic" | "NeedsVerification" | "Replica" | "Counterfeit";
