@@ -1,0 +1,18 @@
+<Project>
+
+  <!--
+    Transitive NuGet audit suppression (applies to every project under services/api).
+
+    GHSA-v5pm-xwqc-g5wc (NU1903, "high") affects Microsoft.OpenApi, pulled transitively by
+    Swashbuckle.AspNetCore 10.x. The advisory affects all 2.x releases; the fix is in Microsoft.OpenApi
+    3.x, which is a breaking change Swashbuckle 10.x is NOT built against (forcing 3.x breaks swagger
+    generation at runtime). The vulnerability concerns PARSING untrusted OpenAPI documents — this API
+    only GENERATES and serves its own swagger doc, so the attack vector does not apply to us.
+
+    Remove this suppression once Swashbuckle ships a release built on a patched Microsoft.OpenApi.
+  -->
+  <ItemGroup>
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-v5pm-xwqc-g5wc" />
+  </ItemGroup>
+
+</Project>
