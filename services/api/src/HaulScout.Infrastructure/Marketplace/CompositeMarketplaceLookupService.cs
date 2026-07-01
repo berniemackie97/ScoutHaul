@@ -58,7 +58,8 @@ internal sealed class CompositeMarketplaceLookupService(
         }
         try
         {
-            return await resaleEstimator.EstimateAsync(description, cancellationToken);
+            ResaleSearchHints searchHints = ResaleSearchHintBuilder.FromQuery(description);
+            return await resaleEstimator.EstimateAsync(description, searchHints, cancellationToken);
         }
         catch (Exception ex)
         {

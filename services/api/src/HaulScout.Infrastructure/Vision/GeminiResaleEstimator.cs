@@ -33,23 +33,32 @@ internal sealed class GeminiResaleEstimator(
         "You are an expert reseller appraiser. Use Google Search to find REAL, RECENT resale comps for the " +
         "product below, then estimate its USED/secondhand resale value in USD — NEVER retail, MSRP, or " +
         "optimistic asking price.\n" +
-        "Search eBay SOLD/completed listings first (the gold standard), then active eBay/Facebook Marketplace/" +
-        "Mercari/Poshmark/StockX. Use the ACTUAL prices you find. low = quick-sale / lower-condition value; " +
-        "high = realistic private-party value in good used condition (not a rare outlier). Assume typical used " +
-        "condition unless stated. Be CONSERVATIVE; price damaged/incomplete/untested/counterfeit-risk LOWER. " +
+        "Search eBay SOLD/completed listings first (the gold standard). If an eBay sold/completed search URL " +
+        "is provided below, open/use that exact sold-only search before trying broader searches. Only mark a " +
+        "comp as \"sold\" when the source clearly proves sold/completed; otherwise " +
+        "mark it \"active\" or omit it. After sold comps, use active eBay/Facebook Marketplace/Mercari/Poshmark/" +
+        "StockX only as weaker support. Use the ACTUAL prices you find.\n" +
+        "For trading cards and collectibles, raw, graded, alternate-language, proxy/reprint/custom/fan-art/gold/" +
+        "metal, lots/bundles, sealed packs, and different card numbers are DIFFERENT products. Exclude them " +
+        "unless the item facts explicitly say that exact variant. Exact identifiers like card number, set name, " +
+        "edition, model number, SKU, size, colorway, and condition must match when present.\n" +
+        "low = quick-sale / lower-condition value; high = realistic private-party list value in matching condition " +
+        "(not a rare outlier). Be CONSERVATIVE; price damaged/incomplete/untested/counterfeit-risk LOWER. " +
         "Generic or variant-heavy items get a WIDE range unless the exact variant is clear (price_range_type " +
         "must match). Set valuation_confidence by how good the comps are.\n" +
         "comps: list the 3-8 REAL listings you actually found — each with its price, status (\"sold\" or " +
-        "\"active\"), condition, a short note, and the source URL if available. Do NOT fabricate prices; only " +
-        "report what the search returned.\n" +
+        "\"active\"), condition, a short note containing marketplace + listing title/date/variant evidence, and " +
+        "the source URL if available. Do NOT fabricate prices; only report what the search returned.\n" +
         "Respond with ONLY a JSON object (no prose, no markdown fences) of shape: " +
         "{\"low\":number,\"high\":number,\"priceRangeType\":\"tight|moderate|wide\"," +
         "\"valuationConfidence\":\"high|medium|low\",\"keyValueFactors\":[string]," +
         "\"missingInformation\":[string],\"recommendedNextSteps\":[string],\"rationale\":string," +
-        "\"comps\":[{\"price\":number,\"status\":\"sold|active\",\"condition\":string,\"note\":string,\"sourceUrl\":string}]}.\n" +
-        "Product: ";
+        "\"comps\":[{\"price\":number,\"status\":\"sold|active\",\"condition\":string,\"note\":string,\"sourceUrl\":string}]}.\n";
 
-    public async Task<ResaleEstimate?> EstimateAsync(string productDescription, CancellationToken cancellationToken)
+    public async Task<ResaleEstimate?> EstimateAsync(
+        string productDescription,
+        ResaleSearchHints? searchHints,
+        CancellationToken cancellationToken)
     {
         string? apiKey = configuration["Gemini:ApiKey"];
         if (string.IsNullOrWhiteSpace(apiKey) || string.IsNullOrWhiteSpace(productDescription))
@@ -65,7 +74,7 @@ internal sealed class GeminiResaleEstimator(
             return cached;
         }
 
-        ResaleEstimate? estimate = await FetchEstimateAsync(productDescription, apiKey, cancellationToken);
+        ResaleEstimate? estimate = await FetchEstimateAsync(productDescription, searchHints, apiKey, cancellationToken);
 
         // Cache successes (24h) and misses (10m, so a transient failure isn't stuck for a day).
         cache.Set(cacheKey, estimate, estimate is not null ? CacheTtl : TimeSpan.FromMinutes(10));
@@ -97,7 +106,11 @@ internal sealed class GeminiResaleEstimator(
         return key.Length > 160 ? key[..160] : key;
     }
 
-    private async Task<ResaleEstimate?> FetchEstimateAsync(string productDescription, string apiKey, CancellationToken cancellationToken)
+    private async Task<ResaleEstimate?> FetchEstimateAsync(
+        string productDescription,
+        ResaleSearchHints? searchHints,
+        string apiKey,
+        CancellationToken cancellationToken)
     {
         // Grounded with Google Search → REAL recent sold/active listings, not training-knowledge
         // guesses. Note: the google_search tool cannot be combined with responseSchema, so we
@@ -107,7 +120,7 @@ internal sealed class GeminiResaleEstimator(
         {
             contents = new[]
             {
-                new { parts = new object[] { new { text = Prompt + productDescription.Trim() } } },
+                new { parts = new object[] { new { text = BuildPrompt(productDescription, searchHints) } } },
             },
             tools = new object[] { new { google_search = new { } } },
             generationConfig = new { temperature = 0.2 },
@@ -154,6 +167,29 @@ internal sealed class GeminiResaleEstimator(
         }
 
         return null;
+    }
+
+    private static string BuildPrompt(string productDescription, ResaleSearchHints? searchHints)
+    {
+        var sb = new StringBuilder(Prompt);
+        sb.Append("\nPRODUCT FACTS:\n").Append(productDescription.Trim()).Append('\n');
+
+        if (searchHints is not null && !string.IsNullOrWhiteSpace(searchHints.SearchQuery))
+        {
+            sb.Append("\nPRIMARY SOLD-COMP SEARCH TARGETS:\n")
+                .Append("- Normalized query: ").Append(searchHints.SearchQuery.Trim()).Append('\n');
+
+            if (!string.IsNullOrWhiteSpace(searchHints.EbaySoldCompletedUrl))
+            {
+                sb.Append("- eBay sold/completed URL: ")
+                    .Append(searchHints.EbaySoldCompletedUrl.Trim())
+                    .Append('\n');
+            }
+
+            sb.Append("Use the eBay sold/completed URL as the first source for sold comps. If the URL returns mismatched variants, refine from its query while preserving sold/completed filters.\n");
+        }
+
+        return sb.ToString();
     }
 
     private ResaleEstimate? Parse(string payload)

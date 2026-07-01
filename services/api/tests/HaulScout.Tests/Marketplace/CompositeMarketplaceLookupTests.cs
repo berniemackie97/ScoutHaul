@@ -68,14 +68,14 @@ public sealed class CompositeMarketplaceLookupTests
     private sealed class NoEstimator : IResaleEstimator
     {
         public bool IsConfigured => false;
-        public Task<ResaleEstimate?> EstimateAsync(string d, CancellationToken ct) => Task.FromResult<ResaleEstimate?>(null);
+        public Task<ResaleEstimate?> EstimateAsync(string d, ResaleSearchHints? searchHints, CancellationToken ct) => Task.FromResult<ResaleEstimate?>(null);
     }
 
     private sealed class StubEstimator(ResaleEstimate? estimate) : IResaleEstimator
     {
         public bool IsConfigured => true;
         public int CallCount { get; private set; }
-        public Task<ResaleEstimate?> EstimateAsync(string d, CancellationToken ct)
+        public Task<ResaleEstimate?> EstimateAsync(string d, ResaleSearchHints? searchHints, CancellationToken ct)
         {
             CallCount++;
             return Task.FromResult(estimate);

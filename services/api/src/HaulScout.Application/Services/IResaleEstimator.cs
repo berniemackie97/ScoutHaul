@@ -10,5 +10,12 @@ namespace HaulScout.Application.Services;
 public interface IResaleEstimator
 {
     bool IsConfigured { get; }
-    Task<ResaleEstimate?> EstimateAsync(string productDescription, CancellationToken cancellationToken);
+    Task<ResaleEstimate?> EstimateAsync(
+        string productDescription,
+        ResaleSearchHints? searchHints,
+        CancellationToken cancellationToken);
 }
+
+public sealed record ResaleSearchHints(
+    string SearchQuery,
+    string EbaySoldCompletedUrl);
