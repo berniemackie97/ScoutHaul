@@ -669,3 +669,28 @@ public sealed record ProductIdentification(
     // Rough condition-quality rating inferred from the photo: new | like-new | good | fair | poor |
     // for-parts. Distinct from the free-text Condition. Additive — null when not assessed.
     string? ConditionQuality = null);
+
+public sealed record GenerateListingRequest(
+    string Title,
+    string? Brand = null,
+    string? Model = null,
+    string? Category = null,
+    string? Condition = null,
+    string? Color = null,
+    string? SizeSystem = null,
+    string? SizeValue = null,
+    string? AttributesJson = null,
+    string? Notes = null);
+
+/// <summary>
+/// A ready-to-post listing generated from an item's details: title + description copy, plus a
+/// competitive suggested list price backed by real sold/active comps and the resale range.
+/// </summary>
+public sealed record GeneratedListingDto(
+    string ListingTitle,
+    string ListingDescription,
+    decimal? SuggestedListPrice,
+    decimal? EstimatedResaleLow,
+    decimal? EstimatedResaleHigh,
+    string? PriceRationale,
+    IReadOnlyList<ResaleComp> Comps);

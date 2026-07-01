@@ -11,6 +11,7 @@ import { getApiAssetUrl, getApiClient } from "@/lib/api";
 import { InventoryEditor } from "./inventory-editor";
 import { PhotoManager, type ManagedPhoto } from "./photo-manager";
 import { StatusControl } from "./status-control";
+import { ListingGenerator } from "./listing-generator";
 
 export const dynamic = "force-dynamic";
 
@@ -65,6 +66,7 @@ export default async function InventoryDetailPage({ params }: { params: Promise<
 
         <aside className="space-y-6">
           <PhotoManager id={item.id} photos={photos} />
+          <ListingGenerator item={item} />
           <StatusControl id={item.id} status={item.status} />
 
           <Card>
