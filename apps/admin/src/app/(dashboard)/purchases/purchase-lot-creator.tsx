@@ -111,8 +111,8 @@ export function PurchaseLotCreator({ candidates }: { candidates: InventoryItem[]
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Allocate to inventory</CardTitle>
-            <CardDescription>Select existing inventory records. Manual mode requires the selected manual costs to equal landed cost.</CardDescription>
+            <CardTitle className="text-lg">Allocate to inventory <span className="text-muted-foreground text-sm font-normal">(optional)</span></CardTitle>
+            <CardDescription>Attach existing inventory now, or save the lot and itemize new pieces on the lot page. Manual mode requires the selected manual costs to equal landed cost.</CardDescription>
           </CardHeader>
           <CardContent>
             {candidates.length === 0 ? (

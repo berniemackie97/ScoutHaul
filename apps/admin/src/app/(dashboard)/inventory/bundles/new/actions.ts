@@ -2,21 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import type { InventoryStatus } from "@/features/inventory/inventory-operations";
+import type { components } from "@overhaul/api-client";
 import { getApiClient } from "@/lib/api";
 
-type CreateInventoryBundleRequest = {
-  title: string;
-  description: string | null;
-  category: string | null;
-  estimatedSalePrice: number | null;
-  status: InventoryStatus;
-  componentInventoryItemIds: string[];
-  notes: string | null;
-};
-type UntypedApi = {
-  POST: (path: string, init: { body: CreateInventoryBundleRequest }) => Promise<{ data?: { id?: string }; error?: unknown }>;
-};
+type CreateInventoryBundleRequest = components["schemas"]["CreateInventoryBundleRequest"];
 
 export type BundleActionResult = { ok: boolean; message: string };
 
@@ -60,12 +49,12 @@ export async function createBundle(_previous: BundleActionResult, formData: Form
     description: text(formData, "description"),
     category: text(formData, "category"),
     estimatedSalePrice,
-    status: (text(formData, "status") ?? "ReadyToList") as InventoryStatus,
+    status: (text(formData, "status") ?? "ReadyToList") as CreateInventoryBundleRequest["status"],
     componentInventoryItemIds: [...new Set(componentInventoryItemIds)],
     notes: text(formData, "notes"),
   };
 
-  const api = (await getApiClient()) as unknown as UntypedApi;
+  const api = await getApiClient();
   const result = await api.POST("/api/inventory/bundles", { body });
   if (!result.data?.id) return { ok: false, message: errorMessage(result.error) };
 

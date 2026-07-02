@@ -5,6 +5,246 @@
     "version": "1.0"
   },
   "paths": {
+    "/api/acquisition-lots": {
+      "get": {
+        "tags": [
+          "AcquisitionLots"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AcquisitionLotDto"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AcquisitionLotDto"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AcquisitionLotDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "AcquisitionLots"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertAcquisitionLotRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertAcquisitionLotRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertAcquisitionLotRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcquisitionLotDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcquisitionLotDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcquisitionLotDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/acquisition-lots/{id}": {
+      "get": {
+        "tags": [
+          "AcquisitionLots"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcquisitionLotDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcquisitionLotDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcquisitionLotDto"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "AcquisitionLots"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertAcquisitionLotRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertAcquisitionLotRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertAcquisitionLotRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcquisitionLotDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcquisitionLotDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcquisitionLotDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/acquisition-lots/{id}/items": {
+      "post": {
+        "tags": [
+          "AcquisitionLots"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddLotItemsRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddLotItemsRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddLotItemsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcquisitionLotDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcquisitionLotDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcquisitionLotDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/budgets": {
       "post": {
         "tags": [
@@ -234,6 +474,93 @@
               "text/json": {
                 "schema": {
                   "$ref": "#/components/schemas/BudgetSummaryDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/customers": {
+      "get": {
+        "tags": [
+          "Customers"
+        ],
+        "parameters": [
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CustomerSummaryDto"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CustomerSummaryDto"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CustomerSummaryDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/customers/{id}": {
+      "get": {
+        "tags": [
+          "Customers"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerDetailDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerDetailDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerDetailDto"
                 }
               }
             }
@@ -529,6 +856,54 @@
               "text/json": {
                 "schema": {
                   "$ref": "#/components/schemas/InventoryReferenceDataDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/inventory/bundles": {
+      "post": {
+        "tags": [
+          "Inventory"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateInventoryBundleRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateInventoryBundleRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateInventoryBundleRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/InventoryItemDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InventoryItemDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InventoryItemDto"
                 }
               }
             }
@@ -1750,6 +2125,159 @@
               "text/json": {
                 "schema": {
                   "$ref": "#/components/schemas/MarketplaceProviderStatusDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/orders": {
+      "get": {
+        "tags": [
+          "Orders"
+        ],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/OrderSummaryDto"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/OrderSummaryDto"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/OrderSummaryDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/orders/{id}": {
+      "get": {
+        "tags": [
+          "Orders"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderDetailDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderDetailDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderDetailDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/orders/{id}/status": {
+      "patch": {
+        "tags": [
+          "Orders"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateOrderStatusRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateOrderStatusRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateOrderStatusRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderDetailDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderDetailDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderDetailDto"
                 }
               }
             }
@@ -3251,6 +3779,54 @@
               "text/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SalesReferenceDataDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sales/fee-estimate": {
+      "post": {
+        "tags": [
+          "Sales"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EstimateChannelFeesRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EstimateChannelFeesRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/EstimateChannelFeesRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChannelFeeEstimateDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChannelFeeEstimateDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChannelFeeEstimateDto"
                 }
               }
             }
@@ -5767,6 +6343,163 @@
   },
   "components": {
     "schemas": {
+      "AcquisitionLotAllocationMethod": {
+        "enum": [
+          "Equal",
+          "WeightedByExpectedValue",
+          "Manual"
+        ],
+        "type": "string"
+      },
+      "AcquisitionLotDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "supplierName": {
+            "type": "string",
+            "nullable": true
+          },
+          "sourceLocationId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "sourcingTripId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "sourcingTripStopId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "purchasedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "purchaseSubtotal": {
+            "type": "number",
+            "format": "double"
+          },
+          "shippingCost": {
+            "type": "number",
+            "format": "double"
+          },
+          "taxCost": {
+            "type": "number",
+            "format": "double"
+          },
+          "feeCost": {
+            "type": "number",
+            "format": "double"
+          },
+          "otherCost": {
+            "type": "number",
+            "format": "double"
+          },
+          "totalLandedCost": {
+            "type": "number",
+            "format": "double"
+          },
+          "totalAllocatedCost": {
+            "type": "number",
+            "format": "double"
+          },
+          "allocationMethod": {
+            "$ref": "#/components/schemas/AcquisitionLotAllocationMethod"
+          },
+          "externalReference": {
+            "type": "string",
+            "nullable": true
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AcquisitionLotItemDto"
+            },
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "AcquisitionLotItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "inventoryItemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "inventoryItemTitle": {
+            "type": "string",
+            "nullable": true
+          },
+          "inventoryItemStatus": {
+            "$ref": "#/components/schemas/InventoryStatus"
+          },
+          "allocatedCost": {
+            "type": "number",
+            "format": "double"
+          },
+          "allocationWeight": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "AcquisitionLotItemInputDto": {
+        "type": "object",
+        "properties": {
+          "inventoryItemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "manualAllocatedCost": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "allocationWeight": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "AddExpenseRequest": {
         "type": "object",
         "properties": {
@@ -5814,6 +6547,19 @@
           "sourcingTripStopId": {
             "type": "string",
             "format": "uuid",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "AddLotItemsRequest": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NewLotItemDto"
+            },
             "nullable": true
           }
         },
@@ -6021,6 +6767,121 @@
         },
         "additionalProperties": false
       },
+      "ChannelFeeEstimateDto": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string",
+            "nullable": true
+          },
+          "feeProfileId": {
+            "type": "string",
+            "nullable": true
+          },
+          "feeProfileLabel": {
+            "type": "string",
+            "nullable": true
+          },
+          "soldPrice": {
+            "type": "number",
+            "format": "double"
+          },
+          "estimatedPlatformFees": {
+            "type": "number",
+            "format": "double"
+          },
+          "estimatedPaymentFees": {
+            "type": "number",
+            "format": "double"
+          },
+          "estimatedTotalFees": {
+            "type": "number",
+            "format": "double"
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ChannelFeeProfileDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "nullable": true
+          },
+          "label": {
+            "type": "string",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "isDefault": {
+            "type": "boolean"
+          },
+          "platformRules": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChannelFeeRuleDto"
+            },
+            "nullable": true
+          },
+          "paymentRules": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChannelFeeRuleDto"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ChannelFeeRuleDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "percent": {
+            "type": "number",
+            "format": "double"
+          },
+          "fixedAmount": {
+            "type": "number",
+            "format": "double"
+          },
+          "appliesAboveAmount": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "appliesUpToAmount": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "minimumFee": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "maximumFee": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "CompleteSourcingStopRequest": {
         "type": "object",
         "properties": {
@@ -6087,6 +6948,44 @@
           },
           "isRequired": {
             "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CreateInventoryBundleRequest": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "category": {
+            "type": "string",
+            "nullable": true
+          },
+          "estimatedSalePrice": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "status": {
+            "$ref": "#/components/schemas/InventoryStatus"
+          },
+          "componentInventoryItemIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "nullable": true
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -6233,6 +7132,161 @@
         },
         "additionalProperties": false
       },
+      "CustomerAddressDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "label": {
+            "type": "string",
+            "nullable": true
+          },
+          "recipientName": {
+            "type": "string",
+            "nullable": true
+          },
+          "line1": {
+            "type": "string",
+            "nullable": true
+          },
+          "line2": {
+            "type": "string",
+            "nullable": true
+          },
+          "city": {
+            "type": "string",
+            "nullable": true
+          },
+          "region": {
+            "type": "string",
+            "nullable": true
+          },
+          "postalCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "country": {
+            "type": "string",
+            "nullable": true
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true
+          },
+          "isDefault": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CustomerDetailDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "email": {
+            "type": "string",
+            "nullable": true
+          },
+          "displayName": {
+            "type": "string",
+            "nullable": true
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true
+          },
+          "acceptsMarketing": {
+            "type": "boolean"
+          },
+          "storeCreditBalance": {
+            "type": "number",
+            "format": "double"
+          },
+          "orderCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "lifetimeSpend": {
+            "type": "number",
+            "format": "double"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lastOrderAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "addresses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CustomerAddressDto"
+            },
+            "nullable": true
+          },
+          "orders": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrderSummaryDto"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "CustomerSummaryDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "email": {
+            "type": "string",
+            "nullable": true
+          },
+          "displayName": {
+            "type": "string",
+            "nullable": true
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true
+          },
+          "acceptsMarketing": {
+            "type": "boolean"
+          },
+          "storeCreditBalance": {
+            "type": "number",
+            "format": "double"
+          },
+          "orderCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "lifetimeSpend": {
+            "type": "number",
+            "format": "double"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lastOrderAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "DashboardSummaryDto": {
         "type": "object",
         "properties": {
@@ -6323,6 +7377,24 @@
         ],
         "type": "string"
       },
+      "EstimateChannelFeesRequest": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string",
+            "nullable": true
+          },
+          "feeProfileId": {
+            "type": "string",
+            "nullable": true
+          },
+          "soldPrice": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "additionalProperties": false
+      },
       "ExpenseCategory": {
         "enum": [
           "InventoryPurchase",
@@ -6376,6 +7448,14 @@
           }
         },
         "additionalProperties": false
+      },
+      "FulfillmentStatus": {
+        "enum": [
+          "Unfulfilled",
+          "Partial",
+          "Fulfilled"
+        ],
+        "type": "string"
       },
       "GenerateListingRequest": {
         "type": "object",
@@ -6473,6 +7553,43 @@
           "Counterfeit"
         ],
         "type": "string"
+      },
+      "InventoryBundleComponentDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "bundleInventoryItemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "componentInventoryItemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "componentTitle": {
+            "type": "string",
+            "nullable": true
+          },
+          "componentStatus": {
+            "$ref": "#/components/schemas/InventoryStatus"
+          },
+          "quantity": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "costSnapshot": {
+            "type": "number",
+            "format": "double"
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
       },
       "InventoryCompletenessStatus": {
         "enum": [
@@ -6683,6 +7800,34 @@
           },
           "isArchived": {
             "type": "boolean"
+          },
+          "isBundle": {
+            "type": "boolean"
+          },
+          "bundleComponentCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "bundleComponents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InventoryBundleComponentDto"
+            },
+            "nullable": true
+          },
+          "acquisitionLotId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "acquisitionLotName": {
+            "type": "string",
+            "nullable": true
+          },
+          "acquisitionAllocatedCost": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
           },
           "lifecycleGroup": {
             "$ref": "#/components/schemas/InventoryLifecycleGroup"
@@ -6977,6 +8122,7 @@
           "NeedsRepair",
           "NeedsPhotos",
           "ReadyToList",
+          "Bundled",
           "Listed",
           "Sold",
           "Packed",
@@ -7479,6 +8625,290 @@
         },
         "additionalProperties": false
       },
+      "NewLotItemDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "category": {
+            "type": "string",
+            "nullable": true
+          },
+          "brand": {
+            "type": "string",
+            "nullable": true
+          },
+          "condition": {
+            "type": "string",
+            "nullable": true
+          },
+          "estimatedSalePrice": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "manualAllocatedCost": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "allocationWeight": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "storageLocation": {
+            "type": "string",
+            "nullable": true
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "OrderDetailDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "orderNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "$ref": "#/components/schemas/OrderStatus"
+          },
+          "paymentStatus": {
+            "$ref": "#/components/schemas/PaymentStatus"
+          },
+          "fulfillmentStatus": {
+            "$ref": "#/components/schemas/FulfillmentStatus"
+          },
+          "email": {
+            "type": "string",
+            "nullable": true
+          },
+          "customerName": {
+            "type": "string",
+            "nullable": true
+          },
+          "customerId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "subtotal": {
+            "type": "number",
+            "format": "double"
+          },
+          "discountTotal": {
+            "type": "number",
+            "format": "double"
+          },
+          "taxTotal": {
+            "type": "number",
+            "format": "double"
+          },
+          "shippingTotal": {
+            "type": "number",
+            "format": "double"
+          },
+          "grandTotal": {
+            "type": "number",
+            "format": "double"
+          },
+          "currency": {
+            "type": "string",
+            "nullable": true
+          },
+          "costOfGoods": {
+            "type": "number",
+            "format": "double"
+          },
+          "grossMargin": {
+            "type": "number",
+            "format": "double"
+          },
+          "shipToName": {
+            "type": "string",
+            "nullable": true
+          },
+          "shipToLine1": {
+            "type": "string",
+            "nullable": true
+          },
+          "shipToLine2": {
+            "type": "string",
+            "nullable": true
+          },
+          "shipToCity": {
+            "type": "string",
+            "nullable": true
+          },
+          "shipToRegion": {
+            "type": "string",
+            "nullable": true
+          },
+          "shipToPostalCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "shipToCountry": {
+            "type": "string",
+            "nullable": true
+          },
+          "isLocalPickup": {
+            "type": "boolean"
+          },
+          "customerNote": {
+            "type": "string",
+            "nullable": true
+          },
+          "stripePaymentIntentId": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "paidAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "cancelledAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrderLineDto"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "OrderLineDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "inventoryItemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "titleSnapshot": {
+            "type": "string",
+            "nullable": true
+          },
+          "skuSnapshot": {
+            "type": "string",
+            "nullable": true
+          },
+          "unitPrice": {
+            "type": "number",
+            "format": "double"
+          },
+          "quantity": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "lineTotal": {
+            "type": "number",
+            "format": "double"
+          },
+          "unitCostSnapshot": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "OrderStatus": {
+        "enum": [
+          "Pending",
+          "Paid",
+          "Fulfilling",
+          "Shipped",
+          "Delivered",
+          "Cancelled",
+          "Refunded"
+        ],
+        "type": "string"
+      },
+      "OrderSummaryDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "orderNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "$ref": "#/components/schemas/OrderStatus"
+          },
+          "paymentStatus": {
+            "$ref": "#/components/schemas/PaymentStatus"
+          },
+          "fulfillmentStatus": {
+            "$ref": "#/components/schemas/FulfillmentStatus"
+          },
+          "email": {
+            "type": "string",
+            "nullable": true
+          },
+          "customerName": {
+            "type": "string",
+            "nullable": true
+          },
+          "customerId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "grandTotal": {
+            "type": "number",
+            "format": "double"
+          },
+          "currency": {
+            "type": "string",
+            "nullable": true
+          },
+          "itemCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "isLocalPickup": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "paidAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "OrganizationDto": {
         "type": "object",
         "properties": {
@@ -7736,6 +9166,16 @@
           }
         },
         "additionalProperties": false
+      },
+      "PaymentStatus": {
+        "enum": [
+          "Pending",
+          "Paid",
+          "PartiallyRefunded",
+          "Refunded",
+          "Failed"
+        ],
+        "type": "string"
       },
       "PermissionCatalogDto": {
         "type": "object",
@@ -8493,6 +9933,13 @@
           },
           "isLegacy": {
             "type": "boolean"
+          },
+          "feeProfiles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChannelFeeProfileDto"
+            },
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -9525,6 +10972,15 @@
         },
         "additionalProperties": false
       },
+      "UpdateOrderStatusRequest": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/OrderStatus"
+          }
+        },
+        "additionalProperties": false
+      },
       "UpdateOrganizationMemberRoleRequest": {
         "type": "object",
         "properties": {
@@ -9721,6 +11177,78 @@
         "properties": {
           "status": {
             "$ref": "#/components/schemas/WorkTaskStatus"
+          }
+        },
+        "additionalProperties": false
+      },
+      "UpsertAcquisitionLotRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "purchasedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "purchaseSubtotal": {
+            "type": "number",
+            "format": "double"
+          },
+          "shippingCost": {
+            "type": "number",
+            "format": "double"
+          },
+          "taxCost": {
+            "type": "number",
+            "format": "double"
+          },
+          "feeCost": {
+            "type": "number",
+            "format": "double"
+          },
+          "otherCost": {
+            "type": "number",
+            "format": "double"
+          },
+          "allocationMethod": {
+            "$ref": "#/components/schemas/AcquisitionLotAllocationMethod"
+          },
+          "supplierName": {
+            "type": "string",
+            "nullable": true
+          },
+          "sourceLocationId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "sourcingTripId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "sourcingTripStopId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "externalReference": {
+            "type": "string",
+            "nullable": true
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AcquisitionLotItemInputDto"
+            },
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -10233,7 +11761,13 @@
   },
   "tags": [
     {
+      "name": "AcquisitionLots"
+    },
+    {
       "name": "Budgets"
+    },
+    {
+      "name": "Customers"
     },
     {
       "name": "Dashboard"
@@ -10261,6 +11795,9 @@
     },
     {
       "name": "MarketplaceLookup"
+    },
+    {
+      "name": "Orders"
     },
     {
       "name": "Organizations"

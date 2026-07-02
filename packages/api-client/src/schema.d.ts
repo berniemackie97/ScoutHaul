@@ -4,6 +4,183 @@
  */
 
 export interface paths {
+    "/api/acquisition-lots": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["AcquisitionLotDto"][];
+                        "application/json": components["schemas"]["AcquisitionLotDto"][];
+                        "text/json": components["schemas"]["AcquisitionLotDto"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["UpsertAcquisitionLotRequest"];
+                    "text/json": components["schemas"]["UpsertAcquisitionLotRequest"];
+                    "application/*+json": components["schemas"]["UpsertAcquisitionLotRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["AcquisitionLotDto"];
+                        "application/json": components["schemas"]["AcquisitionLotDto"];
+                        "text/json": components["schemas"]["AcquisitionLotDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/acquisition-lots/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["AcquisitionLotDto"];
+                        "application/json": components["schemas"]["AcquisitionLotDto"];
+                        "text/json": components["schemas"]["AcquisitionLotDto"];
+                    };
+                };
+            };
+        };
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["UpsertAcquisitionLotRequest"];
+                    "text/json": components["schemas"]["UpsertAcquisitionLotRequest"];
+                    "application/*+json": components["schemas"]["UpsertAcquisitionLotRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["AcquisitionLotDto"];
+                        "application/json": components["schemas"]["AcquisitionLotDto"];
+                        "text/json": components["schemas"]["AcquisitionLotDto"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/acquisition-lots/{id}/items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["AddLotItemsRequest"];
+                    "text/json": components["schemas"]["AddLotItemsRequest"];
+                    "application/*+json": components["schemas"]["AddLotItemsRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["AcquisitionLotDto"];
+                        "application/json": components["schemas"]["AcquisitionLotDto"];
+                        "text/json": components["schemas"]["AcquisitionLotDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/budgets": {
         parameters: {
             query?: never;
@@ -243,6 +420,84 @@ export interface paths {
                         "text/plain": components["schemas"]["BudgetSummaryDto"];
                         "application/json": components["schemas"]["BudgetSummaryDto"];
                         "text/json": components["schemas"]["BudgetSummaryDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/customers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    search?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["CustomerSummaryDto"][];
+                        "application/json": components["schemas"]["CustomerSummaryDto"][];
+                        "text/json": components["schemas"]["CustomerSummaryDto"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/customers/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["CustomerDetailDto"];
+                        "application/json": components["schemas"]["CustomerDetailDto"];
+                        "text/json": components["schemas"]["CustomerDetailDto"];
                     };
                 };
             };
@@ -511,6 +766,49 @@ export interface paths {
         };
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/inventory/bundles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["CreateInventoryBundleRequest"];
+                    "text/json": components["schemas"]["CreateInventoryBundleRequest"];
+                    "application/*+json": components["schemas"]["CreateInventoryBundleRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["InventoryItemDto"];
+                        "application/json": components["schemas"]["InventoryItemDto"];
+                        "text/json": components["schemas"]["InventoryItemDto"];
+                    };
+                };
+            };
+        };
         delete?: never;
         options?: never;
         head?: never;
@@ -1484,6 +1782,130 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    status?: string;
+                    search?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["OrderSummaryDto"][];
+                        "application/json": components["schemas"]["OrderSummaryDto"][];
+                        "text/json": components["schemas"]["OrderSummaryDto"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orders/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["OrderDetailDto"];
+                        "application/json": components["schemas"]["OrderDetailDto"];
+                        "text/json": components["schemas"]["OrderDetailDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orders/{id}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["UpdateOrderStatusRequest"];
+                    "text/json": components["schemas"]["UpdateOrderStatusRequest"];
+                    "application/*+json": components["schemas"]["UpdateOrderStatusRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["OrderDetailDto"];
+                        "application/json": components["schemas"]["OrderDetailDto"];
+                        "text/json": components["schemas"]["OrderDetailDto"];
+                    };
+                };
+            };
+        };
         trace?: never;
     };
     "/api/organizations": {
@@ -2602,6 +3024,49 @@ export interface paths {
         };
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sales/fee-estimate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["EstimateChannelFeesRequest"];
+                    "text/json": components["schemas"]["EstimateChannelFeesRequest"];
+                    "application/*+json": components["schemas"]["EstimateChannelFeesRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ChannelFeeEstimateDto"];
+                        "application/json": components["schemas"]["ChannelFeeEstimateDto"];
+                        "text/json": components["schemas"]["ChannelFeeEstimateDto"];
+                    };
+                };
+            };
+        };
         delete?: never;
         options?: never;
         head?: never;
@@ -4657,6 +5122,66 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** @enum {string} */
+        AcquisitionLotAllocationMethod: "Equal" | "WeightedByExpectedValue" | "Manual";
+        AcquisitionLotDto: {
+            /** Format: uuid */
+            id?: string;
+            name?: string | null;
+            supplierName?: string | null;
+            /** Format: uuid */
+            sourceLocationId?: string | null;
+            /** Format: uuid */
+            sourcingTripId?: string | null;
+            /** Format: uuid */
+            sourcingTripStopId?: string | null;
+            /** Format: date-time */
+            purchasedAt?: string;
+            /** Format: double */
+            purchaseSubtotal?: number;
+            /** Format: double */
+            shippingCost?: number;
+            /** Format: double */
+            taxCost?: number;
+            /** Format: double */
+            feeCost?: number;
+            /** Format: double */
+            otherCost?: number;
+            /** Format: double */
+            totalLandedCost?: number;
+            /** Format: double */
+            totalAllocatedCost?: number;
+            allocationMethod?: components["schemas"]["AcquisitionLotAllocationMethod"];
+            externalReference?: string | null;
+            notes?: string | null;
+            items?: components["schemas"]["AcquisitionLotItemDto"][] | null;
+            /** Format: date-time */
+            createdAt?: string;
+            /** Format: date-time */
+            updatedAt?: string;
+        };
+        AcquisitionLotItemDto: {
+            /** Format: uuid */
+            id?: string;
+            /** Format: uuid */
+            inventoryItemId?: string;
+            inventoryItemTitle?: string | null;
+            inventoryItemStatus?: components["schemas"]["InventoryStatus"];
+            /** Format: double */
+            allocatedCost?: number;
+            /** Format: double */
+            allocationWeight?: number | null;
+            notes?: string | null;
+        };
+        AcquisitionLotItemInputDto: {
+            /** Format: uuid */
+            inventoryItemId?: string;
+            /** Format: double */
+            manualAllocatedCost?: number | null;
+            /** Format: double */
+            allocationWeight?: number | null;
+            notes?: string | null;
+        };
         AddExpenseRequest: {
             /** Format: uuid */
             inventoryItemId?: string | null;
@@ -4676,6 +5201,9 @@ export interface components {
             inventoryItemId?: string;
             /** Format: uuid */
             sourcingTripStopId?: string | null;
+        };
+        AddLotItemsRequest: {
+            items?: components["schemas"]["NewLotItemDto"][] | null;
         };
         AddOrganizationMemberRequest: {
             email?: string | null;
@@ -4744,6 +5272,44 @@ export interface components {
         ChangeInventoryStatusRequest: {
             status?: components["schemas"]["InventoryStatus"];
         };
+        ChannelFeeEstimateDto: {
+            platform?: string | null;
+            feeProfileId?: string | null;
+            feeProfileLabel?: string | null;
+            /** Format: double */
+            soldPrice?: number;
+            /** Format: double */
+            estimatedPlatformFees?: number;
+            /** Format: double */
+            estimatedPaymentFees?: number;
+            /** Format: double */
+            estimatedTotalFees?: number;
+            notes?: string | null;
+        };
+        ChannelFeeProfileDto: {
+            id?: string | null;
+            label?: string | null;
+            description?: string | null;
+            isDefault?: boolean;
+            platformRules?: components["schemas"]["ChannelFeeRuleDto"][] | null;
+            paymentRules?: components["schemas"]["ChannelFeeRuleDto"][] | null;
+        };
+        ChannelFeeRuleDto: {
+            name?: string | null;
+            /** Format: double */
+            percent?: number;
+            /** Format: double */
+            fixedAmount?: number;
+            /** Format: double */
+            appliesAboveAmount?: number | null;
+            /** Format: double */
+            appliesUpToAmount?: number | null;
+            /** Format: double */
+            minimumFee?: number | null;
+            /** Format: double */
+            maximumFee?: number | null;
+            notes?: string | null;
+        };
         CompleteSourcingStopRequest: {
             force?: boolean;
         };
@@ -4765,6 +5331,16 @@ export interface components {
         CreateChecklistItemRequest: {
             text?: string | null;
             isRequired?: boolean;
+        };
+        CreateInventoryBundleRequest: {
+            title?: string | null;
+            description?: string | null;
+            category?: string | null;
+            /** Format: double */
+            estimatedSalePrice?: number | null;
+            status?: components["schemas"]["InventoryStatus"];
+            componentInventoryItemIds?: string[] | null;
+            notes?: string | null;
         };
         CreateListingRequest: {
             /** Format: uuid */
@@ -4816,6 +5392,58 @@ export interface components {
             /** Format: date-time */
             dueAt?: string | null;
         };
+        CustomerAddressDto: {
+            /** Format: uuid */
+            id?: string;
+            label?: string | null;
+            recipientName?: string | null;
+            line1?: string | null;
+            line2?: string | null;
+            city?: string | null;
+            region?: string | null;
+            postalCode?: string | null;
+            country?: string | null;
+            phone?: string | null;
+            isDefault?: boolean;
+        };
+        CustomerDetailDto: {
+            /** Format: uuid */
+            id?: string;
+            email?: string | null;
+            displayName?: string | null;
+            phone?: string | null;
+            acceptsMarketing?: boolean;
+            /** Format: double */
+            storeCreditBalance?: number;
+            /** Format: int32 */
+            orderCount?: number;
+            /** Format: double */
+            lifetimeSpend?: number;
+            /** Format: date-time */
+            createdAt?: string;
+            /** Format: date-time */
+            lastOrderAt?: string | null;
+            addresses?: components["schemas"]["CustomerAddressDto"][] | null;
+            orders?: components["schemas"]["OrderSummaryDto"][] | null;
+        };
+        CustomerSummaryDto: {
+            /** Format: uuid */
+            id?: string;
+            email?: string | null;
+            displayName?: string | null;
+            phone?: string | null;
+            acceptsMarketing?: boolean;
+            /** Format: double */
+            storeCreditBalance?: number;
+            /** Format: int32 */
+            orderCount?: number;
+            /** Format: double */
+            lifetimeSpend?: number;
+            /** Format: date-time */
+            createdAt?: string;
+            /** Format: date-time */
+            lastOrderAt?: string | null;
+        };
         DashboardSummaryDto: {
             /** Format: int32 */
             currentInventoryCount?: number;
@@ -4852,6 +5480,12 @@ export interface components {
         };
         /** @enum {string} */
         DimensionUnit: "Inches" | "Centimeters";
+        EstimateChannelFeesRequest: {
+            platform?: string | null;
+            feeProfileId?: string | null;
+            /** Format: double */
+            soldPrice?: number;
+        };
         /** @enum {string} */
         ExpenseCategory: "InventoryPurchase" | "Shipping" | "Supplies" | "PlatformFee" | "PaymentFee" | "Refund" | "Fuel" | "Storage" | "Other";
         ExpenseDto: {
@@ -4870,6 +5504,8 @@ export interface components {
             /** Format: date-time */
             occurredAt?: string;
         };
+        /** @enum {string} */
+        FulfillmentStatus: "Unfulfilled" | "Partial" | "Fulfilled";
         GenerateListingRequest: {
             title?: string | null;
             brand?: string | null;
@@ -4896,6 +5532,21 @@ export interface components {
         };
         /** @enum {string} */
         InventoryAuthenticityStatus: "NotAssessed" | "Authentic" | "LikelyAuthentic" | "NeedsVerification" | "Replica" | "Counterfeit";
+        InventoryBundleComponentDto: {
+            /** Format: uuid */
+            id?: string;
+            /** Format: uuid */
+            bundleInventoryItemId?: string;
+            /** Format: uuid */
+            componentInventoryItemId?: string;
+            componentTitle?: string | null;
+            componentStatus?: components["schemas"]["InventoryStatus"];
+            /** Format: int32 */
+            quantity?: number;
+            /** Format: double */
+            costSnapshot?: number;
+            notes?: string | null;
+        };
         /** @enum {string} */
         InventoryCompletenessStatus: "Unknown" | "Complete" | "MissingAccessories" | "MissingParts" | "Incomplete";
         /** @enum {string} */
@@ -4959,6 +5610,15 @@ export interface components {
             photos?: components["schemas"]["InventoryPhotoDto"][] | null;
             heroPhotoThumbnailUrl?: string | null;
             isArchived?: boolean;
+            isBundle?: boolean;
+            /** Format: int32 */
+            bundleComponentCount?: number;
+            bundleComponents?: components["schemas"]["InventoryBundleComponentDto"][] | null;
+            /** Format: uuid */
+            acquisitionLotId?: string | null;
+            acquisitionLotName?: string | null;
+            /** Format: double */
+            acquisitionAllocatedCost?: number | null;
             lifecycleGroup?: components["schemas"]["InventoryLifecycleGroup"];
             isSold?: boolean;
             /** Format: date-time */
@@ -5040,7 +5700,7 @@ export interface components {
             isLegacy?: boolean;
         };
         /** @enum {string} */
-        InventoryStatus: "Draft" | "Researching" | "Watchlist" | "Purchased" | "NeedsCleaning" | "NeedsTesting" | "NeedsRepair" | "NeedsPhotos" | "ReadyToList" | "Listed" | "Sold" | "Packed" | "Shipped" | "Delivered" | "Returned" | "Donated" | "Disposed";
+        InventoryStatus: "Draft" | "Researching" | "Watchlist" | "Purchased" | "NeedsCleaning" | "NeedsTesting" | "NeedsRepair" | "NeedsPhotos" | "ReadyToList" | "Bundled" | "Listed" | "Sold" | "Packed" | "Shipped" | "Delivered" | "Returned" | "Donated" | "Disposed";
         ListingDto: {
             /** Format: uuid */
             id?: string;
@@ -5202,6 +5862,104 @@ export interface components {
             query?: string | null;
             links?: components["schemas"]["MarketplaceSearchLinkDto"][] | null;
         };
+        NewLotItemDto: {
+            title?: string | null;
+            category?: string | null;
+            brand?: string | null;
+            condition?: string | null;
+            /** Format: double */
+            estimatedSalePrice?: number | null;
+            /** Format: double */
+            manualAllocatedCost?: number | null;
+            /** Format: double */
+            allocationWeight?: number | null;
+            storageLocation?: string | null;
+            notes?: string | null;
+        };
+        OrderDetailDto: {
+            /** Format: uuid */
+            id?: string;
+            orderNumber?: string | null;
+            status?: components["schemas"]["OrderStatus"];
+            paymentStatus?: components["schemas"]["PaymentStatus"];
+            fulfillmentStatus?: components["schemas"]["FulfillmentStatus"];
+            email?: string | null;
+            customerName?: string | null;
+            /** Format: uuid */
+            customerId?: string | null;
+            /** Format: double */
+            subtotal?: number;
+            /** Format: double */
+            discountTotal?: number;
+            /** Format: double */
+            taxTotal?: number;
+            /** Format: double */
+            shippingTotal?: number;
+            /** Format: double */
+            grandTotal?: number;
+            currency?: string | null;
+            /** Format: double */
+            costOfGoods?: number;
+            /** Format: double */
+            grossMargin?: number;
+            shipToName?: string | null;
+            shipToLine1?: string | null;
+            shipToLine2?: string | null;
+            shipToCity?: string | null;
+            shipToRegion?: string | null;
+            shipToPostalCode?: string | null;
+            shipToCountry?: string | null;
+            isLocalPickup?: boolean;
+            customerNote?: string | null;
+            stripePaymentIntentId?: string | null;
+            /** Format: date-time */
+            createdAt?: string;
+            /** Format: date-time */
+            paidAt?: string | null;
+            /** Format: date-time */
+            cancelledAt?: string | null;
+            lines?: components["schemas"]["OrderLineDto"][] | null;
+        };
+        OrderLineDto: {
+            /** Format: uuid */
+            id?: string;
+            /** Format: uuid */
+            inventoryItemId?: string;
+            titleSnapshot?: string | null;
+            skuSnapshot?: string | null;
+            /** Format: double */
+            unitPrice?: number;
+            /** Format: int32 */
+            quantity?: number;
+            /** Format: double */
+            lineTotal?: number;
+            /** Format: double */
+            unitCostSnapshot?: number | null;
+        };
+        /** @enum {string} */
+        OrderStatus: "Pending" | "Paid" | "Fulfilling" | "Shipped" | "Delivered" | "Cancelled" | "Refunded";
+        OrderSummaryDto: {
+            /** Format: uuid */
+            id?: string;
+            orderNumber?: string | null;
+            status?: components["schemas"]["OrderStatus"];
+            paymentStatus?: components["schemas"]["PaymentStatus"];
+            fulfillmentStatus?: components["schemas"]["FulfillmentStatus"];
+            email?: string | null;
+            customerName?: string | null;
+            /** Format: uuid */
+            customerId?: string | null;
+            /** Format: double */
+            grandTotal?: number;
+            currency?: string | null;
+            /** Format: int32 */
+            itemCount?: number;
+            isLocalPickup?: boolean;
+            /** Format: date-time */
+            createdAt?: string;
+            /** Format: date-time */
+            paidAt?: string | null;
+        };
         OrganizationDto: {
             /** Format: uuid */
             id?: string;
@@ -5295,6 +6053,8 @@ export interface components {
             /** Format: date-time */
             joinedAt?: string;
         };
+        /** @enum {string} */
+        PaymentStatus: "Pending" | "Paid" | "PartiallyRefunded" | "Refunded" | "Failed";
         PermissionCatalogDto: {
             permissions?: string[] | null;
         };
@@ -5569,6 +6329,7 @@ export interface components {
             label?: string | null;
             group?: string | null;
             isLegacy?: boolean;
+            feeProfiles?: components["schemas"]["ChannelFeeProfileDto"][] | null;
         };
         SaleCorrectionDto: {
             /** Format: uuid */
@@ -5929,6 +6690,9 @@ export interface components {
             status?: components["schemas"]["ListingStatus"];
             notes?: string | null;
         };
+        UpdateOrderStatusRequest: {
+            status?: components["schemas"]["OrderStatus"];
+        };
         UpdateOrganizationMemberRoleRequest: {
             /** Format: uuid */
             roleId?: string | null;
@@ -6000,6 +6764,32 @@ export interface components {
         };
         UpdateTaskStatusRequest: {
             status?: components["schemas"]["WorkTaskStatus"];
+        };
+        UpsertAcquisitionLotRequest: {
+            name?: string | null;
+            /** Format: date-time */
+            purchasedAt?: string | null;
+            /** Format: double */
+            purchaseSubtotal?: number;
+            /** Format: double */
+            shippingCost?: number;
+            /** Format: double */
+            taxCost?: number;
+            /** Format: double */
+            feeCost?: number;
+            /** Format: double */
+            otherCost?: number;
+            allocationMethod?: components["schemas"]["AcquisitionLotAllocationMethod"];
+            supplierName?: string | null;
+            /** Format: uuid */
+            sourceLocationId?: string | null;
+            /** Format: uuid */
+            sourcingTripId?: string | null;
+            /** Format: uuid */
+            sourcingTripStopId?: string | null;
+            externalReference?: string | null;
+            notes?: string | null;
+            items?: components["schemas"]["AcquisitionLotItemInputDto"][] | null;
         };
         UpsertInventoryIssueRequest: {
             issueType?: string | null;

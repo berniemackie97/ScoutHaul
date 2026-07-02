@@ -194,10 +194,17 @@ export function InventoryEditor({ item, referenceData }: { item: InventoryItem; 
       </Card>
 
       <Card>
-        <CardHeader><CardTitle className="text-lg">Cost and valuation</CardTitle><CardDescription>Specific-item cost basis and expected sale value used by budgets and profit reporting.</CardDescription></CardHeader>
+        <CardHeader>
+          <CardTitle className="text-lg">Cost and valuation</CardTitle>
+          <CardDescription>
+            {item.acquisitionLotId
+              ? "Cost basis is allocated from an acquisition lot. Change the landed cost or allocation on the lot page to keep it in sync — editing here overrides only this item."
+              : "Specific-item cost basis and expected sale value used by budgets and profit reporting."}
+          </CardDescription>
+        </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-3">
           <Field label="Seller asking price" name="sellerAskingPrice" type="number" defaultValue={item.sellerAskingPrice} />
-          <Field label="Acquisition cost" name="purchasePrice" type="number" defaultValue={item.purchasePrice} />
+          <Field label={item.acquisitionLotId ? "Acquisition cost (allocated)" : "Acquisition cost"} name="purchasePrice" type="number" defaultValue={item.purchasePrice} />
           <Field label="Estimated sale price" name="estimatedSalePrice" type="number" defaultValue={item.estimatedSalePrice} />
         </CardContent>
       </Card>

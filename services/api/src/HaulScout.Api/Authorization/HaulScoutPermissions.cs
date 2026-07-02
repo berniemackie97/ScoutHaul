@@ -12,6 +12,7 @@ public static class HaulScoutPermissions
     public const string ManageBudgets = "budgets.manage";
     public const string ManageFinance = "finance.manage";
     public const string ManageListings = "listings.manage";
+    public const string ManageOrders = "orders.manage";
     public const string ManageTasks = "tasks.manage";
     public const string ViewReports = "reports.view";
 
@@ -27,6 +28,7 @@ public static class HaulScoutPermissions
         ManageBudgets,
         ManageFinance,
         ManageListings,
+        ManageOrders,
         ManageTasks,
         ViewReports
     ];
@@ -38,6 +40,7 @@ public static class HaulScoutPermissions
         ManageBudgets,
         ManageFinance,
         ManageListings,
+        ManageOrders,
         ManageTasks,
         ViewReports
     ];
