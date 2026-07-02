@@ -817,3 +817,104 @@ public sealed record GeneratedListingDto(
     decimal? EstimatedResaleHigh,
     string? PriceRationale,
     IReadOnlyList<ResaleComp> Comps);
+
+// ── Storefront orders ──────────────────────────────────────────────────────
+public sealed record OrderLineDto(
+    Guid Id,
+    Guid InventoryItemId,
+    string TitleSnapshot,
+    string? SkuSnapshot,
+    decimal UnitPrice,
+    int Quantity,
+    decimal LineTotal,
+    decimal? UnitCostSnapshot);
+
+public sealed record OrderSummaryDto(
+    Guid Id,
+    string OrderNumber,
+    OrderStatus Status,
+    PaymentStatus PaymentStatus,
+    FulfillmentStatus FulfillmentStatus,
+    string Email,
+    string? CustomerName,
+    Guid? CustomerId,
+    decimal GrandTotal,
+    string Currency,
+    int ItemCount,
+    bool IsLocalPickup,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset? PaidAt);
+
+public sealed record OrderDetailDto(
+    Guid Id,
+    string OrderNumber,
+    OrderStatus Status,
+    PaymentStatus PaymentStatus,
+    FulfillmentStatus FulfillmentStatus,
+    string Email,
+    string? CustomerName,
+    Guid? CustomerId,
+    decimal Subtotal,
+    decimal DiscountTotal,
+    decimal TaxTotal,
+    decimal ShippingTotal,
+    decimal GrandTotal,
+    string Currency,
+    decimal CostOfGoods,
+    decimal GrossMargin,
+    string? ShipToName,
+    string? ShipToLine1,
+    string? ShipToLine2,
+    string? ShipToCity,
+    string? ShipToRegion,
+    string? ShipToPostalCode,
+    string? ShipToCountry,
+    bool IsLocalPickup,
+    string? CustomerNote,
+    string? StripePaymentIntentId,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset? PaidAt,
+    DateTimeOffset? CancelledAt,
+    IReadOnlyList<OrderLineDto> Lines);
+
+public sealed record UpdateOrderStatusRequest(OrderStatus Status);
+
+// ── Storefront customers ───────────────────────────────────────────────────
+public sealed record CustomerAddressDto(
+    Guid Id,
+    string? Label,
+    string RecipientName,
+    string Line1,
+    string? Line2,
+    string City,
+    string Region,
+    string PostalCode,
+    string Country,
+    string? Phone,
+    bool IsDefault);
+
+public sealed record CustomerSummaryDto(
+    Guid Id,
+    string Email,
+    string? DisplayName,
+    string? Phone,
+    bool AcceptsMarketing,
+    decimal StoreCreditBalance,
+    int OrderCount,
+    decimal LifetimeSpend,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset? LastOrderAt);
+
+public sealed record CustomerDetailDto(
+    Guid Id,
+    string Email,
+    string? DisplayName,
+    string? Phone,
+    bool AcceptsMarketing,
+    decimal StoreCreditBalance,
+    int OrderCount,
+    decimal LifetimeSpend,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset? LastOrderAt,
+    IReadOnlyList<CustomerAddressDto> Addresses,
+    IReadOnlyList<OrderSummaryDto> Orders);

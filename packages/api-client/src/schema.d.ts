@@ -432,6 +432,84 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/customers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    search?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["CustomerSummaryDto"][];
+                        "application/json": components["schemas"]["CustomerSummaryDto"][];
+                        "text/json": components["schemas"]["CustomerSummaryDto"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/customers/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["CustomerDetailDto"];
+                        "application/json": components["schemas"]["CustomerDetailDto"];
+                        "text/json": components["schemas"]["CustomerDetailDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/dashboard/summary": {
         parameters: {
             query?: never;
@@ -1704,6 +1782,130 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    status?: string;
+                    search?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["OrderSummaryDto"][];
+                        "application/json": components["schemas"]["OrderSummaryDto"][];
+                        "text/json": components["schemas"]["OrderSummaryDto"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orders/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["OrderDetailDto"];
+                        "application/json": components["schemas"]["OrderDetailDto"];
+                        "text/json": components["schemas"]["OrderDetailDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orders/{id}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["UpdateOrderStatusRequest"];
+                    "text/json": components["schemas"]["UpdateOrderStatusRequest"];
+                    "application/*+json": components["schemas"]["UpdateOrderStatusRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["OrderDetailDto"];
+                        "application/json": components["schemas"]["OrderDetailDto"];
+                        "text/json": components["schemas"]["OrderDetailDto"];
+                    };
+                };
+            };
+        };
         trace?: never;
     };
     "/api/organizations": {
@@ -5190,6 +5392,58 @@ export interface components {
             /** Format: date-time */
             dueAt?: string | null;
         };
+        CustomerAddressDto: {
+            /** Format: uuid */
+            id?: string;
+            label?: string | null;
+            recipientName?: string | null;
+            line1?: string | null;
+            line2?: string | null;
+            city?: string | null;
+            region?: string | null;
+            postalCode?: string | null;
+            country?: string | null;
+            phone?: string | null;
+            isDefault?: boolean;
+        };
+        CustomerDetailDto: {
+            /** Format: uuid */
+            id?: string;
+            email?: string | null;
+            displayName?: string | null;
+            phone?: string | null;
+            acceptsMarketing?: boolean;
+            /** Format: double */
+            storeCreditBalance?: number;
+            /** Format: int32 */
+            orderCount?: number;
+            /** Format: double */
+            lifetimeSpend?: number;
+            /** Format: date-time */
+            createdAt?: string;
+            /** Format: date-time */
+            lastOrderAt?: string | null;
+            addresses?: components["schemas"]["CustomerAddressDto"][] | null;
+            orders?: components["schemas"]["OrderSummaryDto"][] | null;
+        };
+        CustomerSummaryDto: {
+            /** Format: uuid */
+            id?: string;
+            email?: string | null;
+            displayName?: string | null;
+            phone?: string | null;
+            acceptsMarketing?: boolean;
+            /** Format: double */
+            storeCreditBalance?: number;
+            /** Format: int32 */
+            orderCount?: number;
+            /** Format: double */
+            lifetimeSpend?: number;
+            /** Format: date-time */
+            createdAt?: string;
+            /** Format: date-time */
+            lastOrderAt?: string | null;
+        };
         DashboardSummaryDto: {
             /** Format: int32 */
             currentInventoryCount?: number;
@@ -5250,6 +5504,8 @@ export interface components {
             /** Format: date-time */
             occurredAt?: string;
         };
+        /** @enum {string} */
+        FulfillmentStatus: "Unfulfilled" | "Partial" | "Fulfilled";
         GenerateListingRequest: {
             title?: string | null;
             brand?: string | null;
@@ -5620,6 +5876,90 @@ export interface components {
             storageLocation?: string | null;
             notes?: string | null;
         };
+        OrderDetailDto: {
+            /** Format: uuid */
+            id?: string;
+            orderNumber?: string | null;
+            status?: components["schemas"]["OrderStatus"];
+            paymentStatus?: components["schemas"]["PaymentStatus"];
+            fulfillmentStatus?: components["schemas"]["FulfillmentStatus"];
+            email?: string | null;
+            customerName?: string | null;
+            /** Format: uuid */
+            customerId?: string | null;
+            /** Format: double */
+            subtotal?: number;
+            /** Format: double */
+            discountTotal?: number;
+            /** Format: double */
+            taxTotal?: number;
+            /** Format: double */
+            shippingTotal?: number;
+            /** Format: double */
+            grandTotal?: number;
+            currency?: string | null;
+            /** Format: double */
+            costOfGoods?: number;
+            /** Format: double */
+            grossMargin?: number;
+            shipToName?: string | null;
+            shipToLine1?: string | null;
+            shipToLine2?: string | null;
+            shipToCity?: string | null;
+            shipToRegion?: string | null;
+            shipToPostalCode?: string | null;
+            shipToCountry?: string | null;
+            isLocalPickup?: boolean;
+            customerNote?: string | null;
+            stripePaymentIntentId?: string | null;
+            /** Format: date-time */
+            createdAt?: string;
+            /** Format: date-time */
+            paidAt?: string | null;
+            /** Format: date-time */
+            cancelledAt?: string | null;
+            lines?: components["schemas"]["OrderLineDto"][] | null;
+        };
+        OrderLineDto: {
+            /** Format: uuid */
+            id?: string;
+            /** Format: uuid */
+            inventoryItemId?: string;
+            titleSnapshot?: string | null;
+            skuSnapshot?: string | null;
+            /** Format: double */
+            unitPrice?: number;
+            /** Format: int32 */
+            quantity?: number;
+            /** Format: double */
+            lineTotal?: number;
+            /** Format: double */
+            unitCostSnapshot?: number | null;
+        };
+        /** @enum {string} */
+        OrderStatus: "Pending" | "Paid" | "Fulfilling" | "Shipped" | "Delivered" | "Cancelled" | "Refunded";
+        OrderSummaryDto: {
+            /** Format: uuid */
+            id?: string;
+            orderNumber?: string | null;
+            status?: components["schemas"]["OrderStatus"];
+            paymentStatus?: components["schemas"]["PaymentStatus"];
+            fulfillmentStatus?: components["schemas"]["FulfillmentStatus"];
+            email?: string | null;
+            customerName?: string | null;
+            /** Format: uuid */
+            customerId?: string | null;
+            /** Format: double */
+            grandTotal?: number;
+            currency?: string | null;
+            /** Format: int32 */
+            itemCount?: number;
+            isLocalPickup?: boolean;
+            /** Format: date-time */
+            createdAt?: string;
+            /** Format: date-time */
+            paidAt?: string | null;
+        };
         OrganizationDto: {
             /** Format: uuid */
             id?: string;
@@ -5713,6 +6053,8 @@ export interface components {
             /** Format: date-time */
             joinedAt?: string;
         };
+        /** @enum {string} */
+        PaymentStatus: "Pending" | "Paid" | "PartiallyRefunded" | "Refunded" | "Failed";
         PermissionCatalogDto: {
             permissions?: string[] | null;
         };
@@ -6347,6 +6689,9 @@ export interface components {
             listPrice?: number;
             status?: components["schemas"]["ListingStatus"];
             notes?: string | null;
+        };
+        UpdateOrderStatusRequest: {
+            status?: components["schemas"]["OrderStatus"];
         };
         UpdateOrganizationMemberRoleRequest: {
             /** Format: uuid */

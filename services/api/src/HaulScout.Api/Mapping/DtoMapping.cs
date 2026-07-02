@@ -381,6 +381,114 @@ public static class DtoMapping
         item.DueAt,
         item.CreatedAt);
 
+    public static OrderLineDto ToDto(this OrderLine item) => new(
+        item.Id,
+        item.InventoryItemId,
+        item.TitleSnapshot,
+        item.SkuSnapshot,
+        item.UnitPrice,
+        item.Quantity,
+        item.LineTotal,
+        item.UnitCostSnapshot);
+
+    public static OrderSummaryDto ToSummaryDto(this Order item) => new(
+        item.Id,
+        item.OrderNumber,
+        item.Status,
+        item.PaymentStatus,
+        item.FulfillmentStatus,
+        item.Email,
+        item.Customer?.DisplayName,
+        item.CustomerId,
+        item.GrandTotal,
+        item.Currency,
+        item.Lines.Sum(line => line.Quantity),
+        item.IsLocalPickup,
+        item.CreatedAt,
+        item.PaidAt);
+
+    public static OrderDetailDto ToDetailDto(this Order item)
+    {
+        decimal cogs = item.Lines.Sum(line => (line.UnitCostSnapshot ?? 0) * line.Quantity);
+        return new(
+            item.Id,
+            item.OrderNumber,
+            item.Status,
+            item.PaymentStatus,
+            item.FulfillmentStatus,
+            item.Email,
+            item.Customer?.DisplayName,
+            item.CustomerId,
+            item.Subtotal,
+            item.DiscountTotal,
+            item.TaxTotal,
+            item.ShippingTotal,
+            item.GrandTotal,
+            item.Currency,
+            cogs,
+            item.Subtotal - item.DiscountTotal - cogs,
+            item.ShipToName,
+            item.ShipToLine1,
+            item.ShipToLine2,
+            item.ShipToCity,
+            item.ShipToRegion,
+            item.ShipToPostalCode,
+            item.ShipToCountry,
+            item.IsLocalPickup,
+            item.CustomerNote,
+            item.StripePaymentIntentId,
+            item.CreatedAt,
+            item.PaidAt,
+            item.CancelledAt,
+            item.Lines.OrderBy(line => line.TitleSnapshot).Select(line => line.ToDto()).ToList());
+    }
+
+    public static CustomerAddressDto ToDto(this CustomerAddress item) => new(
+        item.Id,
+        item.Label,
+        item.RecipientName,
+        item.Line1,
+        item.Line2,
+        item.City,
+        item.Region,
+        item.PostalCode,
+        item.Country,
+        item.Phone,
+        item.IsDefault);
+
+    // Lifetime spend counts only captured (paid) orders; a pending/cancelled order is not revenue yet.
+    private static decimal LifetimeSpend(Customer item) =>
+        item.Orders.Where(order => order.PaymentStatus == PaymentStatus.Paid).Sum(order => order.GrandTotal);
+
+    private static DateTimeOffset? LastOrderAt(Customer item) =>
+        item.Orders.Count > 0 ? item.Orders.Max(order => order.CreatedAt) : null;
+
+    public static CustomerSummaryDto ToSummaryDto(this Customer item) => new(
+        item.Id,
+        item.Email,
+        item.DisplayName,
+        item.Phone,
+        item.AcceptsMarketing,
+        item.StoreCreditBalance,
+        item.Orders.Count,
+        LifetimeSpend(item),
+        item.CreatedAt,
+        LastOrderAt(item));
+
+    public static CustomerDetailDto ToDetailDto(this Customer item) => new(
+        item.Id,
+        item.Email,
+        item.DisplayName,
+        item.Phone,
+        item.AcceptsMarketing,
+        item.StoreCreditBalance,
+        item.Orders.Count,
+        LifetimeSpend(item),
+        item.CreatedAt,
+        LastOrderAt(item),
+        item.Addresses.OrderByDescending(address => address.IsDefault).Select(address => address.ToDto()).ToList(),
+        item.Orders.OrderByDescending(order => order.CreatedAt).Select(order => order.ToSummaryDto()).ToList());
+
     private static IReadOnlyList<string> ParsePhotoUrls(string? value)
     {
         if (string.IsNullOrWhiteSpace(value))
