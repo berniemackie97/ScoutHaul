@@ -79,10 +79,18 @@ export default async function InventoryDetailPage({ params }: { params: Promise<
             <CardContent className="space-y-3 text-sm">
               <div className="flex justify-between gap-4"><span className="text-muted-foreground">Acquisition cost</span><span className="font-medium tabular-nums">{money(cost)}</span></div>
               {inventoryItem.acquisitionLotId && (
-                <div className="flex justify-between gap-4">
-                  <span className="text-muted-foreground">Acquisition lot</span>
-                  <Link href="/purchases" className="font-medium text-brand-700 hover:underline">{inventoryItem.acquisitionLotName ?? "View lot"}</Link>
-                </div>
+                <>
+                  <div className="flex justify-between gap-4">
+                    <span className="text-muted-foreground">From lot</span>
+                    <Link href={`/purchases/${inventoryItem.acquisitionLotId}`} className="font-medium text-brand-700 hover:underline">{inventoryItem.acquisitionLotName ?? "View lot"}</Link>
+                  </div>
+                  {inventoryItem.acquisitionAllocatedCost != null && (
+                    <div className="flex justify-between gap-4">
+                      <span className="text-muted-foreground">Allocated share</span>
+                      <span className="font-medium tabular-nums">{money(inventoryItem.acquisitionAllocatedCost)}</span>
+                    </div>
+                  )}
+                </>
               )}
               <div className="flex justify-between gap-4"><span className="text-muted-foreground">Expected sale</span><span className="font-medium tabular-nums">{money(inventoryItem.estimatedSalePrice)}</span></div>
               <div className="flex justify-between gap-4 border-t pt-3"><span className="text-muted-foreground">Projected gross profit</span><span className="font-medium tabular-nums">{money(projectedProfit)}</span></div>

@@ -55,6 +55,102 @@ public sealed class AcquisitionLotsController(HaulScoutDbContext db, ICurrentUse
         return await Upsert(id, request, cancellationToken);
     }
 
+    /// <summary>
+    /// Itemize a lot: create draft inventory items directly inside it, then re-allocate landed cost across
+    /// all items (existing + new) using the lot's current allocation method. This is the natural sourcing
+    /// order — record the lot first, then inventory each item out of it.
+    /// </summary>
+    [HttpPost("{id:guid}/items")]
+    public async Task<ActionResult<AcquisitionLotDto>> AddItems(Guid id, AddLotItemsRequest request, CancellationToken cancellationToken)
+    {
+        if (request.Items is null || request.Items.Count == 0)
+        {
+            return BadRequest("Provide at least one item to add to the lot.");
+        }
+
+        if (request.Items.Any(item => string.IsNullOrWhiteSpace(item.Title)))
+        {
+            return BadRequest("Every new lot item needs a title.");
+        }
+
+        var lot = await db.AcquisitionLots
+            .Include(item => item.Items)
+            .SingleOrDefaultAsync(item => item.Id == id && item.OrganizationId == currentUser.OrganizationId, cancellationToken);
+        if (lot is null)
+        {
+            return NotFound();
+        }
+
+        // Creating the items and re-allocating must be atomic: if allocation fails (e.g. a manual lot no
+        // longer balances) the new draft items must not be left orphaned without a lot.
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+
+        var created = new List<(InventoryItem Item, NewLotItemDto Input)>();
+        foreach (var input in request.Items)
+        {
+            var item = new InventoryItem
+            {
+                OrganizationId = currentUser.OrganizationId,
+                Title = input.Title.Trim(),
+                Category = TrimToNull(input.Category),
+                Brand = TrimToNull(input.Brand),
+                Condition = TrimToNull(input.Condition),
+                StorageLocation = TrimToNull(input.StorageLocation),
+                EstimatedSalePrice = input.EstimatedSalePrice,
+                Notes = TrimToNull(input.Notes),
+                Status = InventoryStatus.Purchased,
+                PurchasedAt = lot.PurchasedAt,
+            };
+            db.InventoryItems.Add(item);
+            created.Add((item, input));
+        }
+
+        // Persist so the new items have identities before we re-run the shared allocation machinery.
+        await db.SaveChangesAsync(cancellationToken);
+
+        // Preserve each existing item's allocation as its manual input so a Manual-method lot keeps its
+        // hand-set costs; Equal/Weighted methods ignore these and re-split across the full set.
+        var mergedItems = lot.Items
+            .Select(existing => new AcquisitionLotItemInputDto(
+                existing.InventoryItemId,
+                ManualAllocatedCost: existing.AllocatedCost,
+                AllocationWeight: existing.AllocationWeight,
+                Notes: existing.Notes))
+            .Concat(created.Select(entry => new AcquisitionLotItemInputDto(
+                entry.Item.Id,
+                ManualAllocatedCost: entry.Input.ManualAllocatedCost,
+                AllocationWeight: entry.Input.AllocationWeight,
+                Notes: TrimToNull(entry.Input.Notes))))
+            .ToList();
+
+        var mergedRequest = new UpsertAcquisitionLotRequest(
+            lot.Name,
+            lot.PurchasedAt,
+            lot.PurchaseSubtotal,
+            lot.ShippingCost,
+            lot.TaxCost,
+            lot.FeeCost,
+            lot.OtherCost,
+            lot.AllocationMethod,
+            lot.SupplierName,
+            lot.SourceLocationId,
+            lot.SourcingTripId,
+            lot.SourcingTripStopId,
+            lot.ExternalReference,
+            lot.Notes,
+            mergedItems);
+
+        var result = await Upsert(id, mergedRequest, cancellationToken);
+        if (result.Result is not null)
+        {
+            // Upsert produced an error response (BadRequest/NotFound/Conflict); roll back the new items.
+            return result;
+        }
+
+        await transaction.CommitAsync(cancellationToken);
+        return result;
+    }
+
     private IQueryable<AcquisitionLot> QueryLots() =>
         db.AcquisitionLots
             .Include(item => item.Items)
@@ -316,6 +412,12 @@ public sealed class AcquisitionLotsController(HaulScoutDbContext db, ICurrentUse
 
     private static Dictionary<Guid, decimal> Allocate(UpsertAcquisitionLotRequest request, IReadOnlyList<InventoryItem> items)
     {
+        // A costs-only lot with nothing itemized yet allocates to nothing; the full landed cost stays unallocated.
+        if (items.Count == 0)
+        {
+            return new Dictionary<Guid, decimal>();
+        }
+
         decimal total = RoundMoney(TotalLandedCost(request));
         Dictionary<Guid, AcquisitionLotItemInputDto> inputs = request.Items
             .GroupBy(item => item.InventoryItemId)
@@ -423,11 +525,7 @@ public sealed class AcquisitionLotsController(HaulScoutDbContext db, ICurrentUse
             return "Acquisition lot name is required.";
         }
 
-        if (request.Items is null || request.Items.Select(item => item.InventoryItemId).Distinct().Count() == 0)
-        {
-            return "Select at least one inventory item for the acquisition lot.";
-        }
-
+        // Items may be empty: record a costs-only lot now, itemize it later via POST {id}/items.
         if (request.PurchasedAt?.UtcDateTime.Date > DateTime.UtcNow.Date)
         {
             return "Purchase date cannot be in the future.";
@@ -443,22 +541,24 @@ public sealed class AcquisitionLotsController(HaulScoutDbContext db, ICurrentUse
             return "Total landed cost must be greater than zero.";
         }
 
-        if (request.AllocationMethod == AcquisitionLotAllocationMethod.Manual
-            && request.Items.Any(item => item.ManualAllocatedCost is null or < 0))
-        {
-            return "Manual allocation requires a non-negative allocated cost for every item.";
-        }
+        var items = request.Items ?? [];
 
-        if (request.AllocationMethod == AcquisitionLotAllocationMethod.Manual)
+        // Manual allocation only has to balance once the lot has been itemized.
+        if (items.Count > 0 && request.AllocationMethod == AcquisitionLotAllocationMethod.Manual)
         {
-            decimal manualTotal = request.Items.Sum(item => item.ManualAllocatedCost ?? 0);
+            if (items.Any(item => item.ManualAllocatedCost is null or < 0))
+            {
+                return "Manual allocation requires a non-negative allocated cost for every item.";
+            }
+
+            decimal manualTotal = items.Sum(item => item.ManualAllocatedCost ?? 0);
             if (Math.Abs(RoundMoney(manualTotal) - RoundMoney(TotalLandedCost(request))) > 0.01m)
             {
                 return "Manual allocations must equal the lot's landed cost.";
             }
         }
 
-        if (request.Items.Any(item => item.AllocationWeight is < 0))
+        if (items.Any(item => item.AllocationWeight is < 0))
         {
             return "Allocation weights cannot be negative.";
         }

@@ -13,30 +13,14 @@ const money = (value: number | null | undefined) =>
 const date = (value: string | null | undefined) =>
   value ? new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(new Date(value)) : "—";
 
-type AcquisitionLot = {
-  id?: string;
-  name?: string | null;
-  supplierName?: string | null;
-  externalReference?: string | null;
-  purchasedAt?: string | null;
-  allocationMethod?: string | null;
-  totalLandedCost?: number | null;
-  totalAllocatedCost?: number | null;
-  items?: unknown[] | null;
-};
-
-type UntypedApi = {
-  GET: (path: string, init?: unknown) => Promise<{ data?: unknown }>;
-};
-
 export default async function PurchasesPage() {
-  const api = (await getApiClient()) as unknown as UntypedApi;
+  const api = await getApiClient();
   const [{ data: lots }, { data: inventory }] = await Promise.all([
     api.GET("/api/acquisition-lots"),
     api.GET("/api/inventory", { params: { query: { lifecycle: "Active", includeArchived: false } } }),
   ]);
 
-  const acquisitionLots = (lots ?? []) as AcquisitionLot[];
+  const acquisitionLots = lots ?? [];
   const candidates = ((inventory ?? []) as InventoryItem[]).filter((item) => !item.acquisitionLotId && item.status !== "Bundled");
   const totalSpend = acquisitionLots.reduce((sum, lot) => sum + (lot.totalLandedCost ?? 0), 0);
   const allocated = acquisitionLots.reduce((sum, lot) => sum + (lot.totalAllocatedCost ?? 0), 0);
@@ -85,10 +69,10 @@ export default async function PurchasesPage() {
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {acquisitionLots.map((lot, index) => (
-                  <tr key={lot.id ?? index} className="hover:bg-muted/30">
+                {acquisitionLots.map((lot) => (
+                  <tr key={lot.id} className="hover:bg-muted/30">
                     <td className="px-4 py-3">
-                      <p className="font-medium">{lot.name ?? "Untitled lot"}</p>
+                      <Link href={`/purchases/${lot.id}`} className="font-medium hover:underline">{lot.name || "Untitled lot"}</Link>
                       <p className="text-xs text-muted-foreground">{[lot.supplierName, lot.externalReference].filter(Boolean).join(" · ") || "No supplier/reference"}</p>
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">{date(lot.purchasedAt)}</td>

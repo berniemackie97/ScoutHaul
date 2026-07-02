@@ -229,6 +229,21 @@ public sealed record AcquisitionLotItemDto(
     decimal? AllocationWeight,
     string? Notes);
 
+/// <summary>A new inventory item to create directly inside an acquisition lot ("itemize the lot").</summary>
+public sealed record NewLotItemDto(
+    string Title,
+    string? Category = null,
+    string? Brand = null,
+    string? Condition = null,
+    decimal? EstimatedSalePrice = null,
+    decimal? ManualAllocatedCost = null,
+    decimal? AllocationWeight = null,
+    string? StorageLocation = null,
+    string? Notes = null);
+
+/// <summary>Creates draft inventory items inside an existing lot, then re-allocates landed cost across all items.</summary>
+public sealed record AddLotItemsRequest(IReadOnlyList<NewLotItemDto> Items);
+
 public sealed record AcquisitionLotDto(
     Guid Id,
     string Name,
