@@ -4,9 +4,9 @@ import { useState, useTransition } from "react";
 import { Copy, Sparkles } from "lucide-react";
 import type { components } from "@overhaul/api-client";
 import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle } from "@overhaul/ui";
+import type { InventoryItem } from "@/features/inventory/inventory-operations";
 import { generateListing, type ListingGenResult } from "./listing-actions";
 
-type InventoryItem = components["schemas"]["InventoryItemDto"];
 type GeneratedListing = components["schemas"]["GeneratedListingDto"];
 
 const money = (value: number | null | undefined) =>

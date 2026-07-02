@@ -22,6 +22,8 @@ public sealed class InventoryController(
     InventoryPhotoStorageService photoStorage,
     InventoryReferenceDataService referenceData) : ControllerBase
 {
+    private static readonly SaleStatus[] ReleasedSaleStatuses = [SaleStatus.Returned, SaleStatus.Refunded, SaleStatus.Cancelled];
+
     public sealed class UploadInventoryPhotoForm
     {
         public IFormFile? File { get; set; }
@@ -110,6 +112,110 @@ public sealed class InventoryController(
     [HttpGet("reference-data")]
     public Task<InventoryReferenceDataDto> ReferenceData(CancellationToken cancellationToken) =>
         referenceData.GetAsync(cancellationToken);
+
+    [HttpPost("bundles")]
+    public async Task<ActionResult<InventoryItemDto>> CreateBundle(CreateInventoryBundleRequest request, CancellationToken cancellationToken)
+    {
+        string? validation = ValidateBundle(request);
+        if (validation is not null)
+        {
+            return BadRequest(validation);
+        }
+
+        Guid[] componentIds = request.ComponentInventoryItemIds.Distinct().ToArray();
+        var components = await db.InventoryItems
+            .Include(item => item.Sales)
+            .Where(item => componentIds.Contains(item.Id) && item.OrganizationId == currentUser.OrganizationId)
+            .ToListAsync(cancellationToken);
+
+        if (components.Count != componentIds.Length)
+        {
+            return NotFound("One or more bundle components were not found.");
+        }
+
+        var blocked = components
+            .Where(item => item.IsArchived
+                || item.IsBundle
+                || item.Status is InventoryStatus.Bundled
+                    or InventoryStatus.Sold
+                    or InventoryStatus.Packed
+                    or InventoryStatus.Shipped
+                    or InventoryStatus.Delivered
+                    or InventoryStatus.Returned
+                    or InventoryStatus.Donated
+                    or InventoryStatus.Disposed
+                || item.Sales.Any(sale => !ReleasedSaleStatuses.Contains(sale.Status)))
+            .Select(item => item.Title)
+            .ToArray();
+        if (blocked.Length > 0)
+        {
+            return Conflict($"These items cannot be bundled because they are unavailable, sold, archived, or already bundled: {string.Join(", ", blocked)}.");
+        }
+
+        InventoryStatus bundleStatus = request.Status ?? InventoryStatus.ReadyToList;
+        if (bundleStatus is InventoryStatus.Bundled
+            or InventoryStatus.Sold
+            or InventoryStatus.Packed
+            or InventoryStatus.Shipped
+            or InventoryStatus.Delivered
+            or InventoryStatus.Returned
+            or InventoryStatus.Donated
+            or InventoryStatus.Disposed)
+        {
+            return BadRequest("A new bundle must start in an unsold listing-prep stage.");
+        }
+
+        var bundle = new InventoryItem
+        {
+            OrganizationId = currentUser.OrganizationId,
+            Title = request.Title.Trim(),
+            Description = TrimToNull(request.Description),
+            Category = TrimToNull(request.Category) ?? components.Select(item => item.Category).FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)),
+            EstimatedSalePrice = request.EstimatedSalePrice,
+            PurchasePrice = components.Sum(item => item.PurchasePrice ?? 0),
+            Status = bundleStatus,
+            IsBundle = true,
+            PurchasedAt = components
+                .Where(item => item.PurchasedAt.HasValue)
+                .Select(item => item.PurchasedAt)
+                .OrderBy(item => item)
+                .FirstOrDefault(),
+            Notes = TrimToNull(request.Notes)
+        };
+
+        db.InventoryItems.Add(bundle);
+        foreach (var component in components.OrderBy(item => item.Title))
+        {
+            component.Status = InventoryStatus.Bundled;
+            db.InventoryBundleComponents.Add(new InventoryBundleComponent
+            {
+                OrganizationId = currentUser.OrganizationId,
+                BundleInventoryItem = bundle,
+                ComponentInventoryItemId = component.Id,
+                Quantity = Math.Max(1, component.Quantity),
+                CostSnapshot = component.PurchasePrice ?? 0,
+                TitleSnapshot = component.Title,
+            });
+        }
+
+        db.AuditLogs.Add(new AuditLog
+        {
+            OrganizationId = currentUser.OrganizationId,
+            ActorUserId = currentUser.UserId,
+            EntityName = nameof(InventoryItem),
+            Action = "BundleCreated",
+            DetailsJson = JsonSerializer.Serialize(new
+            {
+                BundleTitle = bundle.Title,
+                ComponentInventoryItemIds = componentIds,
+                ComponentCount = componentIds.Length,
+            })
+        });
+
+        await db.SaveChangesAsync(cancellationToken);
+        await db.Entry(bundle).Collection(item => item.BundleComponents).LoadAsync(cancellationToken);
+        return CreatedAtAction(nameof(Get), new { id = bundle.Id }, bundle.ToDto());
+    }
 
     [HttpPost("{id:guid}/photos")]
     [RequestSizeLimit(10_000_000)]
@@ -389,6 +495,9 @@ public sealed class InventoryController(
 
         var items = await query
             .Include(item => item.Photos)
+            .Include(item => item.AcquisitionLotItems)
+                .ThenInclude(item => item.AcquisitionLot)
+            .Include(item => item.BundleComponents)
             .OrderByDescending(item => item.UpdatedAt)
             .Take(200)
             .Select(item => item.ToDto())
@@ -520,13 +629,14 @@ public sealed class InventoryController(
             return Conflict("This item has an active sale. Change its stage through the sales workflow.");
         }
 
-        if (request.Status is InventoryStatus.Sold
+        if (request.Status is InventoryStatus.Bundled
+            or InventoryStatus.Sold
             or InventoryStatus.Packed
             or InventoryStatus.Shipped
             or InventoryStatus.Delivered
             or InventoryStatus.Returned)
         {
-            return Conflict("Sale and fulfillment stages must be changed through the sales workflow.");
+            return Conflict("Bundle, sale, and fulfillment stages must be changed through their dedicated workflows.");
         }
 
         item.Status = request.Status;
@@ -556,6 +666,10 @@ public sealed class InventoryController(
         db.InventoryItems
             .Include(item => item.Photos)
             .Include(item => item.Issues)
+            .Include(item => item.AcquisitionLotItems)
+                .ThenInclude(item => item.AcquisitionLot)
+            .Include(item => item.BundleComponents)
+                .ThenInclude(item => item.ComponentInventoryItem)
             .SingleOrDefaultAsync(
             item => item.Id == id && item.OrganizationId == currentUser.OrganizationId,
             cancellationToken);
@@ -711,6 +825,26 @@ public sealed class InventoryController(
         if (request.Length is < 0 || request.Width is < 0 || request.Height is < 0 || request.Weight is < 0)
         {
             return "Dimensions and weight cannot be negative.";
+        }
+
+        return null;
+    }
+
+    private static string? ValidateBundle(CreateInventoryBundleRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.Title))
+        {
+            return "Bundle title is required.";
+        }
+
+        if (request.EstimatedSalePrice is < 0)
+        {
+            return "Estimated sale price cannot be negative.";
+        }
+
+        if (request.ComponentInventoryItemIds is null || request.ComponentInventoryItemIds.Distinct().Count() < 2)
+        {
+            return "Select at least two distinct inventory items to build a bundle.";
         }
 
         return null;

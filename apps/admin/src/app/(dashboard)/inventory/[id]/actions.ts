@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import type { components } from "@overhaul/api-client";
+import type { InventoryStatus } from "@/features/inventory/inventory-operations";
 import {
   getApiAccessToken,
   getApiBaseUrl,
@@ -9,7 +10,6 @@ import {
 } from "@/lib/api";
 
 type UpsertInventoryItemRequest = components["schemas"]["UpsertInventoryItemRequest"];
-type InventoryStatus = components["schemas"]["InventoryStatus"];
 type OwnershipType = components["schemas"]["InventoryOwnershipType"];
 type FunctionalStatus = components["schemas"]["InventoryFunctionalStatus"];
 type CompletenessStatus = components["schemas"]["InventoryCompletenessStatus"];
@@ -128,7 +128,7 @@ export async function changeInventoryStatus(
   const api = await getApiClient();
   const result = await api.PATCH("/api/inventory/{id}/status", {
     params: { path: { id } },
-    body: { status },
+    body: { status: status as components["schemas"]["InventoryStatus"] },
   });
   if (!result.data) {
     return initialFailure(errorMessage(result.error, "Inventory status could not be changed."));

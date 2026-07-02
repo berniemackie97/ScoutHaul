@@ -26,6 +26,9 @@ public sealed class HaulScoutDbContext(DbContextOptions<HaulScoutDbContext> opti
     public DbSet<OrganizationInviteCode> OrganizationInviteCodes => Set<OrganizationInviteCode>();
     public DbSet<ProductIdentity> ProductIdentities => Set<ProductIdentity>();
     public DbSet<InventoryItem> InventoryItems => Set<InventoryItem>();
+    public DbSet<AcquisitionLot> AcquisitionLots => Set<AcquisitionLot>();
+    public DbSet<AcquisitionLotItem> AcquisitionLotItems => Set<AcquisitionLotItem>();
+    public DbSet<InventoryBundleComponent> InventoryBundleComponents => Set<InventoryBundleComponent>();
     public DbSet<InventoryPhoto> InventoryPhotos => Set<InventoryPhoto>();
     public DbSet<InventoryIssue> InventoryIssues => Set<InventoryIssue>();
     public DbSet<MarketObservation> MarketObservations => Set<MarketObservation>();
@@ -225,6 +228,7 @@ public sealed class HaulScoutDbContext(DbContextOptions<HaulScoutDbContext> opti
             ConfigureMoney(entity.Property(item => item.EstimatedSalePrice));
             entity.HasIndex(item => new { item.OrganizationId, item.Status });
             entity.HasIndex(item => new { item.OrganizationId, item.IsArchived });
+            entity.HasIndex(item => new { item.OrganizationId, item.IsBundle });
             entity.HasIndex(item => new { item.OrganizationId, item.Category });
             entity.HasIndex(item => new { item.OrganizationId, item.Brand });
             entity.HasIndex(item => new { item.OrganizationId, item.StorageLocation });
@@ -233,6 +237,55 @@ public sealed class HaulScoutDbContext(DbContextOptions<HaulScoutDbContext> opti
             entity.HasOne(item => item.SourceLocation).WithMany().HasForeignKey(item => item.SourceLocationId).OnDelete(DeleteBehavior.SetNull);
             entity.HasOne(item => item.SourcingTrip).WithMany(item => item.Items).HasForeignKey(item => item.SourcingTripId).OnDelete(DeleteBehavior.SetNull);
             entity.HasOne(item => item.SourcingTripStop).WithMany(item => item.Items).HasForeignKey(item => item.SourcingTripStopId).OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<AcquisitionLot>(entity =>
+        {
+            entity.ToTable("AcquisitionLots");
+            entity.Property(item => item.Name).HasMaxLength(240).IsRequired();
+            entity.Property(item => item.SupplierName).HasMaxLength(240);
+            entity.Property(item => item.ExternalReference).HasMaxLength(240);
+            entity.Property(item => item.AllocationMethod).HasConversion<string>().HasMaxLength(40);
+            ConfigureMoney(entity.Property(item => item.PurchaseSubtotal));
+            ConfigureMoney(entity.Property(item => item.ShippingCost));
+            ConfigureMoney(entity.Property(item => item.TaxCost));
+            ConfigureMoney(entity.Property(item => item.FeeCost));
+            ConfigureMoney(entity.Property(item => item.OtherCost));
+            entity.HasIndex(item => new { item.OrganizationId, item.PurchasedAt });
+            entity.HasIndex(item => new { item.OrganizationId, item.SupplierName });
+            entity.HasOne(item => item.Organization).WithMany().HasForeignKey(item => item.OrganizationId);
+            entity.HasOne(item => item.SourceLocation).WithMany().HasForeignKey(item => item.SourceLocationId).OnDelete(DeleteBehavior.SetNull);
+            entity.HasOne(item => item.SourcingTrip).WithMany().HasForeignKey(item => item.SourcingTripId).OnDelete(DeleteBehavior.SetNull);
+            entity.HasOne(item => item.SourcingTripStop).WithMany().HasForeignKey(item => item.SourcingTripStopId).OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<AcquisitionLotItem>(entity =>
+        {
+            entity.ToTable("AcquisitionLotItems");
+            ConfigureMoney(entity.Property(item => item.AllocatedCost));
+            ConfigureMoney(entity.Property(item => item.AllocationWeight));
+            entity.HasIndex(item => new { item.OrganizationId, item.AcquisitionLotId });
+            entity.HasIndex(item => new { item.OrganizationId, item.InventoryItemId }).IsUnique();
+            entity.HasOne(item => item.AcquisitionLot).WithMany(item => item.Items).HasForeignKey(item => item.AcquisitionLotId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(item => item.InventoryItem).WithMany(item => item.AcquisitionLotItems).HasForeignKey(item => item.InventoryItemId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<InventoryBundleComponent>(entity =>
+        {
+            entity.ToTable("InventoryBundleComponents");
+            entity.Property(item => item.TitleSnapshot).HasMaxLength(300).IsRequired();
+            ConfigureMoney(entity.Property(item => item.CostSnapshot));
+            entity.HasIndex(item => new { item.OrganizationId, item.BundleInventoryItemId });
+            entity.HasIndex(item => new { item.OrganizationId, item.ComponentInventoryItemId });
+            entity.HasIndex(item => new { item.BundleInventoryItemId, item.ComponentInventoryItemId }).IsUnique();
+            entity.HasOne(item => item.BundleInventoryItem)
+                .WithMany(item => item.BundleComponents)
+                .HasForeignKey(item => item.BundleInventoryItemId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(item => item.ComponentInventoryItem)
+                .WithMany(item => item.ComponentOfBundles)
+                .HasForeignKey(item => item.ComponentInventoryItemId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<InventoryPhoto>(entity =>
@@ -400,6 +453,8 @@ public sealed class HaulScoutDbContext(DbContextOptions<HaulScoutDbContext> opti
             entity.Property(item => item.Description).HasMaxLength(300).IsRequired();
             ConfigureMoney(entity.Property(item => item.Amount));
             entity.HasIndex(item => new { item.OrganizationId, item.OccurredAt });
+            entity.HasIndex(item => new { item.OrganizationId, item.AcquisitionLotId });
+            entity.HasOne(item => item.AcquisitionLot).WithMany().HasForeignKey(item => item.AcquisitionLotId).OnDelete(DeleteBehavior.SetNull);
             entity.HasOne<SourcingTripStop>().WithMany().HasForeignKey(item => item.SourcingTripStopId).OnDelete(DeleteBehavior.SetNull);
         });
 

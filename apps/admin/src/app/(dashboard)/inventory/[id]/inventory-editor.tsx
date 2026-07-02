@@ -14,9 +14,9 @@ import {
   Label,
   Textarea,
 } from "@overhaul/ui";
+import type { InventoryItem } from "@/features/inventory/inventory-operations";
 import { updateInventoryItem, type InventoryActionResult } from "./actions";
 
-type InventoryItem = components["schemas"]["InventoryItemDto"];
 type ReferenceData = components["schemas"]["InventoryReferenceDataDto"];
 type ReferenceOption = components["schemas"]["InventoryReferenceOptionDto"];
 

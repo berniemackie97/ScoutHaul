@@ -27,8 +27,31 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
         var channels = SalesChannelCatalog.Channels.ToList();
         channels.AddRange(existing
             .Where(value => channels.All(option => !string.Equals(option.Value, value, StringComparison.OrdinalIgnoreCase)))
-            .Select(value => new SaleChannelOptionDto(value, $"{value} (legacy — standardize)", "Legacy data", true)));
+            .Select(value => new SaleChannelOptionDto(value, $"{value} (legacy — standardize)", "Legacy data", true, [])));
         return new SalesReferenceDataDto(channels);
+    }
+
+    [HttpPost("fee-estimate")]
+    public async Task<ActionResult<ChannelFeeEstimateDto>> EstimateFees(EstimateChannelFeesRequest request, CancellationToken cancellationToken)
+    {
+        string? channel = SalesChannelCatalog.CanonicalValue(request.Platform, await ExistingChannels(cancellationToken));
+        if (channel is null)
+        {
+            return BadRequest("Select a controlled sales channel.");
+        }
+
+        if (request.SoldPrice < 0)
+        {
+            return BadRequest("Sold price cannot be negative.");
+        }
+
+        ChannelFeeProfileDto? profile = SalesChannelCatalog.FindProfile(channel, request.FeeProfileId);
+        if (profile is null)
+        {
+            return BadRequest("Select a valid fee profile for this sales channel.");
+        }
+
+        return ChannelFeeCalculator.Estimate(channel, profile, request.SoldPrice);
     }
 
     [HttpGet("candidates")]
@@ -38,6 +61,7 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
             .AsNoTracking()
             .Where(item => item.OrganizationId == currentUser.OrganizationId
                 && !item.IsArchived
+                && item.Status != InventoryStatus.Bundled
                 && !item.Sales.Any(sale => !ReleasedInventoryStatuses.Contains(sale.Status)))
             .OrderByDescending(item => item.UpdatedAt)
             .Take(500)
@@ -103,7 +127,10 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
     [RequireOrganizationPermission(HaulScoutPermissions.ManageFinance)]
     public async Task<ActionResult<SaleDto>> Record(RecordSaleRequest request, CancellationToken cancellationToken)
     {
-        var item = await db.InventoryItems.SingleOrDefaultAsync(
+        var item = await db.InventoryItems
+            .Include(inventoryItem => inventoryItem.BundleComponents)
+                .ThenInclude(component => component.ComponentInventoryItem)
+            .SingleOrDefaultAsync(
             inventoryItem => inventoryItem.Id == request.InventoryItemId && inventoryItem.OrganizationId == currentUser.OrganizationId,
             cancellationToken);
 
@@ -188,6 +215,7 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
 
         item.Status = InventoryStatus.Sold;
         item.SoldAt = sale.SoldAt;
+        ApplyBundleComponentInventoryStatus(item, InventoryStatus.Sold, sale.SoldAt);
 
         if (listing is not null)
         {
@@ -283,6 +311,8 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
     {
         var sale = await db.Sales
             .Include(item => item.InventoryItem)
+                .ThenInclude(item => item!.BundleComponents)
+                    .ThenInclude(item => item.ComponentInventoryItem)
             .Include(item => item.Listing)
             .SingleOrDefaultAsync(item => item.Id == id && item.OrganizationId == currentUser.OrganizationId, cancellationToken);
 
@@ -347,6 +377,15 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
             {
                 sale.InventoryItem.SoldAt = null;
             }
+
+            ApplyBundleComponentInventoryStatus(
+                sale.InventoryItem,
+                request.Status == SaleStatus.Cancelled
+                    ? InventoryStatus.Bundled
+                    : request.Status == SaleStatus.ReturnRequested
+                        ? sale.InventoryItem.Status
+                        : SaleWorkflow.InventoryStatusFor(request.Status, sale.ListingId.HasValue),
+                request.Status == SaleStatus.Cancelled ? null : sale.SoldAt);
         }
 
         if (sale.Listing is not null && request.Status == SaleStatus.Cancelled)
@@ -428,6 +467,8 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
 
         var sale = await db.Sales
             .Include(item => item.InventoryItem)
+                .ThenInclude(item => item!.BundleComponents)
+                    .ThenInclude(item => item.ComponentInventoryItem)
             .Include(item => item.Listing)
             .SingleOrDefaultAsync(item => item.Id == id && item.OrganizationId == currentUser.OrganizationId, cancellationToken);
 
@@ -451,6 +492,13 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
         sale.SoldAt = request.SoldAt;
         sale.Notes = TrimToNull(request.Notes);
         if (sale.InventoryItem is not null) sale.InventoryItem.SoldAt = request.SoldAt;
+        if (sale.InventoryItem is not null && !ReleasedInventoryStatuses.Contains(sale.Status))
+        {
+            ApplyBundleComponentInventoryStatus(
+                sale.InventoryItem,
+                SaleWorkflow.InventoryStatusFor(sale.Status, sale.ListingId.HasValue),
+                request.SoldAt);
+        }
         if (sale.Listing is not null && sale.Listing.Status == ListingStatus.Sold) sale.Listing.EndedAt = request.SoldAt;
 
         MarketObservation? observation = await db.MarketObservations
@@ -536,6 +584,30 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
             AfterJson = SnapshotSale(sale),
             Version = nextVersion,
         });
+    }
+
+    private static void ApplyBundleComponentInventoryStatus(
+        InventoryItem inventoryItem,
+        InventoryStatus componentStatus,
+        DateTimeOffset? soldAt)
+    {
+        if (!inventoryItem.IsBundle)
+        {
+            return;
+        }
+
+        foreach (var componentLink in inventoryItem.BundleComponents)
+        {
+            if (componentLink.ComponentInventoryItem is null)
+            {
+                continue;
+            }
+
+            componentLink.ComponentInventoryItem.Status = componentStatus;
+            componentLink.ComponentInventoryItem.SoldAt = InventoryLifecycle.IsSold(componentStatus) || componentStatus == InventoryStatus.Returned
+                ? soldAt
+                : null;
+        }
     }
 
     private async Task<List<string>> ExistingChannels(CancellationToken cancellationToken)

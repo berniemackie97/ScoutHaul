@@ -142,6 +142,8 @@ public sealed class Expense : EntityBase, IOrganizationScoped
 {
     public Guid OrganizationId { get; set; }
     public Guid? InventoryItemId { get; set; }
+    public Guid? AcquisitionLotId { get; set; }
+    public AcquisitionLot? AcquisitionLot { get; set; }
     public Guid? SourcingTripId { get; set; }
     public Guid? SourcingTripStopId { get; set; }
     public ExpenseCategory Category { get; set; } = ExpenseCategory.Other;

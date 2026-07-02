@@ -120,6 +120,24 @@ public static class DtoMapping
                 .Select(photo => $"/api/inventory/{item.Id}/photos/{photo.Id}/thumbnail")
                 .FirstOrDefault(),
             item.IsArchived,
+            item.IsBundle,
+            item.BundleComponents.Count,
+            item.BundleComponents
+                .OrderBy(component => component.ComponentInventoryItem != null ? component.ComponentInventoryItem.Title : component.TitleSnapshot)
+                .Select(component => component.ToDto())
+                .ToArray(),
+            item.AcquisitionLotItems
+                .OrderByDescending(lotItem => lotItem.UpdatedAt)
+                .Select(lotItem => (Guid?)lotItem.AcquisitionLotId)
+                .FirstOrDefault(),
+            item.AcquisitionLotItems
+                .OrderByDescending(lotItem => lotItem.UpdatedAt)
+                .Select(lotItem => lotItem.AcquisitionLot != null ? lotItem.AcquisitionLot.Name : null)
+                .FirstOrDefault(),
+            item.AcquisitionLotItems
+                .OrderByDescending(lotItem => lotItem.UpdatedAt)
+                .Select(lotItem => (decimal?)lotItem.AllocatedCost)
+                .FirstOrDefault(),
             InventoryLifecycle.Group(item.Status),
             InventoryLifecycle.IsSold(item.Status),
             item.CreatedAt,
@@ -139,6 +157,50 @@ public static class DtoMapping
             item.DimensionUnit,
             item.Weight,
             item.WeightUnit);
+
+    public static AcquisitionLotDto ToDto(this AcquisitionLot item) => new(
+        item.Id,
+        item.Name,
+        item.SupplierName,
+        item.SourceLocationId,
+        item.SourcingTripId,
+        item.SourcingTripStopId,
+        item.PurchasedAt,
+        item.PurchaseSubtotal,
+        item.ShippingCost,
+        item.TaxCost,
+        item.FeeCost,
+        item.OtherCost,
+        item.TotalLandedCost,
+        item.Items.Sum(lotItem => lotItem.AllocatedCost),
+        item.AllocationMethod,
+        item.ExternalReference,
+        item.Notes,
+        item.Items
+            .OrderBy(lotItem => lotItem.InventoryItem!.Title)
+            .Select(lotItem => lotItem.ToDto())
+            .ToArray(),
+        item.CreatedAt,
+        item.UpdatedAt);
+
+    public static AcquisitionLotItemDto ToDto(this AcquisitionLotItem item) => new(
+        item.Id,
+        item.InventoryItemId,
+        item.InventoryItem?.Title ?? string.Empty,
+        item.InventoryItem?.Status ?? InventoryStatus.Draft,
+        item.AllocatedCost,
+        item.AllocationWeight,
+        item.Notes);
+
+    public static InventoryBundleComponentDto ToDto(this InventoryBundleComponent item) => new(
+        item.Id,
+        item.BundleInventoryItemId,
+        item.ComponentInventoryItemId,
+        item.ComponentInventoryItem?.Title ?? item.TitleSnapshot,
+        item.ComponentInventoryItem?.Status ?? InventoryStatus.Draft,
+        item.Quantity,
+        item.CostSnapshot,
+        item.Notes);
 
     public static InventoryPhotoDto ToDto(this InventoryPhoto item) => new(
         item.Id,

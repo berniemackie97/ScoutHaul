@@ -92,6 +92,7 @@ public sealed class InventoryItem : EntityBase, IOrganizationScoped
     public string? Barcode { get; set; }
     public string? PhotoLocalReferencesJson { get; set; }
     public bool IsArchived { get; set; }
+    public bool IsBundle { get; set; }
     public DateTimeOffset? PurchasedAt { get; set; }
     public DateTimeOffset? ListedAt { get; set; }
     public int Quantity { get; set; } = 1;
@@ -101,7 +102,61 @@ public sealed class InventoryItem : EntityBase, IOrganizationScoped
     public ICollection<InventoryIssue> Issues { get; set; } = [];
     public ICollection<Listing> Listings { get; set; } = [];
     public ICollection<Sale> Sales { get; set; } = [];
+    public ICollection<AcquisitionLotItem> AcquisitionLotItems { get; set; } = [];
+    public ICollection<InventoryBundleComponent> BundleComponents { get; set; } = [];
+    public ICollection<InventoryBundleComponent> ComponentOfBundles { get; set; } = [];
     public StoreListing? StoreListing { get; set; }
+}
+
+public sealed class AcquisitionLot : EntityBase, IOrganizationScoped
+{
+    public Guid OrganizationId { get; set; }
+    public Organization? Organization { get; set; }
+    public required string Name { get; set; }
+    public string? SupplierName { get; set; }
+    public Guid? SourceLocationId { get; set; }
+    public SourceLocation? SourceLocation { get; set; }
+    public Guid? SourcingTripId { get; set; }
+    public SourcingTrip? SourcingTrip { get; set; }
+    public Guid? SourcingTripStopId { get; set; }
+    public SourcingTripStop? SourcingTripStop { get; set; }
+    public DateTimeOffset PurchasedAt { get; set; } = DateTimeOffset.UtcNow;
+    public decimal PurchaseSubtotal { get; set; }
+    public decimal ShippingCost { get; set; }
+    public decimal TaxCost { get; set; }
+    public decimal FeeCost { get; set; }
+    public decimal OtherCost { get; set; }
+    public AcquisitionLotAllocationMethod AllocationMethod { get; set; } = AcquisitionLotAllocationMethod.Equal;
+    public string? ExternalReference { get; set; }
+    public string? Notes { get; set; }
+    public ICollection<AcquisitionLotItem> Items { get; set; } = [];
+
+    public decimal TotalLandedCost => PurchaseSubtotal + ShippingCost + TaxCost + FeeCost + OtherCost;
+}
+
+public sealed class AcquisitionLotItem : EntityBase, IOrganizationScoped
+{
+    public Guid OrganizationId { get; set; }
+    public Guid AcquisitionLotId { get; set; }
+    public AcquisitionLot? AcquisitionLot { get; set; }
+    public Guid InventoryItemId { get; set; }
+    public InventoryItem? InventoryItem { get; set; }
+    public decimal AllocatedCost { get; set; }
+    public decimal? AllocationWeight { get; set; }
+    public string? Notes { get; set; }
+}
+
+public sealed class InventoryBundleComponent : EntityBase, IOrganizationScoped
+{
+    public Guid OrganizationId { get; set; }
+    public Guid BundleInventoryItemId { get; set; }
+    public InventoryItem? BundleInventoryItem { get; set; }
+    public Guid ComponentInventoryItemId { get; set; }
+    public InventoryItem? ComponentInventoryItem { get; set; }
+    public int Quantity { get; set; } = 1;
+    public decimal CostSnapshot { get; set; }
+    public required string TitleSnapshot { get; set; }
+    public string? Notes { get; set; }
 }
 
 public sealed class InventoryPhoto : EntityBase, IOrganizationScoped
