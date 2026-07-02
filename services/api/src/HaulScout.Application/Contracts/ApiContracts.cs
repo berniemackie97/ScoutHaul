@@ -171,6 +171,12 @@ public sealed record InventoryItemDto(
     IReadOnlyList<InventoryPhotoDto> Photos,
     string? HeroPhotoThumbnailUrl,
     bool IsArchived,
+    bool IsBundle,
+    int BundleComponentCount,
+    IReadOnlyList<InventoryBundleComponentDto> BundleComponents,
+    Guid? AcquisitionLotId,
+    string? AcquisitionLotName,
+    decimal? AcquisitionAllocatedCost,
     InventoryLifecycleGroup LifecycleGroup,
     bool IsSold,
     DateTimeOffset CreatedAt,
@@ -190,6 +196,79 @@ public sealed record InventoryItemDto(
     DimensionUnit DimensionUnit,
     decimal? Weight,
     WeightUnit WeightUnit);
+
+public sealed record AcquisitionLotItemInputDto(
+    Guid InventoryItemId,
+    decimal? ManualAllocatedCost = null,
+    decimal? AllocationWeight = null,
+    string? Notes = null);
+
+public sealed record UpsertAcquisitionLotRequest(
+    string Name,
+    DateTimeOffset? PurchasedAt,
+    decimal PurchaseSubtotal,
+    decimal ShippingCost,
+    decimal TaxCost,
+    decimal FeeCost,
+    decimal OtherCost,
+    AcquisitionLotAllocationMethod AllocationMethod,
+    string? SupplierName,
+    Guid? SourceLocationId,
+    Guid? SourcingTripId,
+    Guid? SourcingTripStopId,
+    string? ExternalReference,
+    string? Notes,
+    IReadOnlyList<AcquisitionLotItemInputDto> Items);
+
+public sealed record AcquisitionLotItemDto(
+    Guid Id,
+    Guid InventoryItemId,
+    string InventoryItemTitle,
+    InventoryStatus InventoryItemStatus,
+    decimal AllocatedCost,
+    decimal? AllocationWeight,
+    string? Notes);
+
+public sealed record AcquisitionLotDto(
+    Guid Id,
+    string Name,
+    string? SupplierName,
+    Guid? SourceLocationId,
+    Guid? SourcingTripId,
+    Guid? SourcingTripStopId,
+    DateTimeOffset PurchasedAt,
+    decimal PurchaseSubtotal,
+    decimal ShippingCost,
+    decimal TaxCost,
+    decimal FeeCost,
+    decimal OtherCost,
+    decimal TotalLandedCost,
+    decimal TotalAllocatedCost,
+    AcquisitionLotAllocationMethod AllocationMethod,
+    string? ExternalReference,
+    string? Notes,
+    IReadOnlyList<AcquisitionLotItemDto> Items,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset UpdatedAt);
+
+public sealed record CreateInventoryBundleRequest(
+    string Title,
+    string? Description,
+    string? Category,
+    decimal? EstimatedSalePrice,
+    InventoryStatus? Status,
+    IReadOnlyList<Guid> ComponentInventoryItemIds,
+    string? Notes);
+
+public sealed record InventoryBundleComponentDto(
+    Guid Id,
+    Guid BundleInventoryItemId,
+    Guid ComponentInventoryItemId,
+    string ComponentTitle,
+    InventoryStatus ComponentStatus,
+    int Quantity,
+    decimal CostSnapshot,
+    string? Notes);
 
 public sealed record InventoryPhotoDto(
     Guid Id,
@@ -567,9 +646,38 @@ public sealed record RecordSaleRequest(Guid InventoryItemId, Guid? ListingId, st
 /// <summary>Edits an existing sale. <c>Reason</c> is required and recorded with a before/after audit snapshot.</summary>
 public sealed record UpdateSaleRequest(string Platform, decimal SoldPrice, decimal PlatformFees, decimal PaymentFees, decimal ShippingCost, decimal SuppliesCost, decimal OtherCosts, decimal SalesTaxCollected, bool TaxRemittedByPlatform, DateTimeOffset SoldAt, string? Notes, string Reason);
 public sealed record SaleStatusTransitionRequest(SaleStatus Status, DateTimeOffset? OccurredAt, string? Reason, string? Carrier, string? TrackingNumber);
-public sealed record SaleChannelOptionDto(string Value, string Label, string Group, bool IsLegacy = false);
+public sealed record ChannelFeeRuleDto(
+    string Name,
+    decimal Percent = 0,
+    decimal FixedAmount = 0,
+    decimal? AppliesAboveAmount = null,
+    decimal? AppliesUpToAmount = null,
+    decimal? MinimumFee = null,
+    decimal? MaximumFee = null,
+    string? Notes = null);
+
+public sealed record ChannelFeeProfileDto(
+    string Id,
+    string Label,
+    string Description,
+    bool IsDefault,
+    IReadOnlyList<ChannelFeeRuleDto> PlatformRules,
+    IReadOnlyList<ChannelFeeRuleDto> PaymentRules);
+
+/// <summary>
+/// A controlled sales channel plus selectable fee profiles. Profiles are estimates only; the recorded sale
+/// stores the actual assessed platform/payment fees so reconciliation can correct marketplace differences.
+/// </summary>
+public sealed record SaleChannelOptionDto(
+    string Value,
+    string Label,
+    string Group,
+    bool IsLegacy = false,
+    IReadOnlyList<ChannelFeeProfileDto>? FeeProfiles = null);
 public sealed record SalesReferenceDataDto(IReadOnlyList<SaleChannelOptionDto> Channels);
 public sealed record SaleCandidateDto(Guid InventoryItemId, string Title, InventoryStatus Status, decimal CostOfGoods, decimal? ExpectedSalePrice, Guid? ListingId, string? ListingPlatform, decimal? ListingPrice);
+public sealed record EstimateChannelFeesRequest(string Platform, string FeeProfileId, decimal SoldPrice);
+public sealed record ChannelFeeEstimateDto(string Platform, string FeeProfileId, string FeeProfileLabel, decimal SoldPrice, decimal EstimatedPlatformFees, decimal EstimatedPaymentFees, decimal EstimatedTotalFees, string? Notes);
 public sealed record SaleShipmentDto(Guid Id, Guid SaleId, string? Carrier, string? TrackingNumber, decimal? Cost, DateTimeOffset? PackedAt, DateTimeOffset? ShippedAt, DateTimeOffset? DeliveredAt);
 public sealed record SaleDto(Guid Id, Guid InventoryItemId, string InventoryItemTitle, Guid? ListingId, string Platform, decimal SoldPrice, decimal CostOfGoods, decimal PlatformFees, decimal PaymentFees, decimal ShippingCost, decimal SuppliesCost, decimal OtherCosts, decimal SalesTaxCollected, bool TaxRemittedByPlatform, decimal SalesTaxOwed, decimal NetProfit, SaleStatus Status, DateTimeOffset SoldAt, string? Notes, IReadOnlyList<SaleStatus> AllowedTransitions);
 public sealed record SaleCorrectionDto(Guid Id, Guid SaleId, int Version, string Reason, string CorrectedBy, DateTimeOffset CorrectedAt, string BeforeJson, string AfterJson);

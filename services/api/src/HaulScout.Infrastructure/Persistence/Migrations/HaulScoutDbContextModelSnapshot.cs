@@ -100,6 +100,135 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                     b.ToTable("AuditLogs", (string)null);
                 });
 
+            modelBuilder.Entity("HaulScout.Domain.Entities.AcquisitionLot", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("AllocationMethod")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ExternalReference")
+                        .HasMaxLength(240)
+                        .HasColumnType("character varying(240)");
+
+                    b.Property<decimal>("FeeCost")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(240)
+                        .HasColumnType("character varying(240)");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("OtherCost")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
+
+                    b.Property<DateTimeOffset>("PurchasedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("PurchaseSubtotal")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
+
+                    b.Property<decimal>("ShippingCost")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
+
+                    b.Property<Guid?>("SourceLocationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("SourcingTripId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("SourcingTripStopId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("SupplierName")
+                        .HasMaxLength(240)
+                        .HasColumnType("character varying(240)");
+
+                    b.Property<decimal>("TaxCost")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SourceLocationId");
+
+                    b.HasIndex("SourcingTripId");
+
+                    b.HasIndex("SourcingTripStopId");
+
+                    b.HasIndex("OrganizationId", "PurchasedAt");
+
+                    b.HasIndex("OrganizationId", "SupplierName");
+
+                    b.ToTable("AcquisitionLots", (string)null);
+                });
+
+            modelBuilder.Entity("HaulScout.Domain.Entities.AcquisitionLotItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("AcquisitionLotId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("AllocatedCost")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
+
+                    b.Property<decimal?>("AllocationWeight")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("InventoryItemId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AcquisitionLotId");
+
+                    b.HasIndex("InventoryItemId");
+
+                    b.HasIndex("OrganizationId", "AcquisitionLotId");
+
+                    b.HasIndex("OrganizationId", "InventoryItemId")
+                        .IsUnique();
+
+                    b.ToTable("AcquisitionLotItems", (string)null);
+                });
+
             modelBuilder.Entity("HaulScout.Domain.Entities.Budget", b =>
                 {
                     b.Property<Guid>("Id")
@@ -433,6 +562,9 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                         .HasMaxLength(300)
                         .HasColumnType("character varying(300)");
 
+                    b.Property<Guid?>("AcquisitionLotId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid?>("InventoryItemId")
                         .HasColumnType("uuid");
 
@@ -453,7 +585,11 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("AcquisitionLotId");
+
                     b.HasIndex("SourcingTripStopId");
+
+                    b.HasIndex("OrganizationId", "AcquisitionLotId");
 
                     b.HasIndex("OrganizationId", "OccurredAt");
 
@@ -683,6 +819,9 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                     b.Property<bool>("IsArchived")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("IsBundle")
+                        .HasColumnType("boolean");
+
                     b.Property<decimal?>("Length")
                         .HasPrecision(12, 2)
                         .HasColumnType("numeric(12,2)");
@@ -819,11 +958,63 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("OrganizationId", "IsArchived");
 
+                    b.HasIndex("OrganizationId", "IsBundle");
+
                     b.HasIndex("OrganizationId", "Status");
 
                     b.HasIndex("OrganizationId", "StorageLocation");
 
                     b.ToTable("InventoryItems", (string)null);
+                });
+
+            modelBuilder.Entity("HaulScout.Domain.Entities.InventoryBundleComponent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("BundleInventoryItemId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ComponentInventoryItemId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("CostSnapshot")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("TitleSnapshot")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ComponentInventoryItemId");
+
+                    b.HasIndex("BundleInventoryItemId", "ComponentInventoryItemId")
+                        .IsUnique();
+
+                    b.HasIndex("OrganizationId", "BundleInventoryItemId");
+
+                    b.HasIndex("OrganizationId", "ComponentInventoryItemId");
+
+                    b.ToTable("InventoryBundleComponents", (string)null);
                 });
 
             modelBuilder.Entity("HaulScout.Domain.Entities.InventoryPhoto", b =>
@@ -2329,6 +2520,57 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                     b.Navigation("Organization");
                 });
 
+            modelBuilder.Entity("HaulScout.Domain.Entities.AcquisitionLot", b =>
+                {
+                    b.HasOne("HaulScout.Domain.Entities.Organization", "Organization")
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("HaulScout.Domain.Entities.SourceLocation", "SourceLocation")
+                        .WithMany()
+                        .HasForeignKey("SourceLocationId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("HaulScout.Domain.Entities.SourcingTrip", "SourcingTrip")
+                        .WithMany()
+                        .HasForeignKey("SourcingTripId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("HaulScout.Domain.Entities.SourcingTripStop", "SourcingTripStop")
+                        .WithMany()
+                        .HasForeignKey("SourcingTripStopId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Organization");
+
+                    b.Navigation("SourceLocation");
+
+                    b.Navigation("SourcingTrip");
+
+                    b.Navigation("SourcingTripStop");
+                });
+
+            modelBuilder.Entity("HaulScout.Domain.Entities.AcquisitionLotItem", b =>
+                {
+                    b.HasOne("HaulScout.Domain.Entities.AcquisitionLot", "AcquisitionLot")
+                        .WithMany("Items")
+                        .HasForeignKey("AcquisitionLotId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("HaulScout.Domain.Entities.InventoryItem", "InventoryItem")
+                        .WithMany("AcquisitionLotItems")
+                        .HasForeignKey("InventoryItemId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("AcquisitionLot");
+
+                    b.Navigation("InventoryItem");
+                });
+
             modelBuilder.Entity("HaulScout.Domain.Entities.BuyRecommendation", b =>
                 {
                     b.HasOne("HaulScout.Domain.Entities.MarketAnalysis", "MarketAnalysis")
@@ -2392,10 +2634,17 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("HaulScout.Domain.Entities.Expense", b =>
                 {
+                    b.HasOne("HaulScout.Domain.Entities.AcquisitionLot", "AcquisitionLot")
+                        .WithMany()
+                        .HasForeignKey("AcquisitionLotId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("HaulScout.Domain.Entities.SourcingTripStop", null)
                         .WithMany()
                         .HasForeignKey("SourcingTripStopId")
                         .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("AcquisitionLot");
                 });
 
             modelBuilder.Entity("HaulScout.Domain.Entities.ExternalAuthAccount", b =>
@@ -2472,6 +2721,25 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                     b.Navigation("SourcingTrip");
 
                     b.Navigation("SourcingTripStop");
+                });
+
+            modelBuilder.Entity("HaulScout.Domain.Entities.InventoryBundleComponent", b =>
+                {
+                    b.HasOne("HaulScout.Domain.Entities.InventoryItem", "BundleInventoryItem")
+                        .WithMany("BundleComponents")
+                        .HasForeignKey("BundleInventoryItemId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("HaulScout.Domain.Entities.InventoryItem", "ComponentInventoryItem")
+                        .WithMany("ComponentOfBundles")
+                        .HasForeignKey("ComponentInventoryItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("BundleInventoryItem");
+
+                    b.Navigation("ComponentInventoryItem");
                 });
 
             modelBuilder.Entity("HaulScout.Domain.Entities.InventoryPhoto", b =>
@@ -2892,6 +3160,11 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                     b.Navigation("StoreListing");
                 });
 
+            modelBuilder.Entity("HaulScout.Domain.Entities.AcquisitionLot", b =>
+                {
+                    b.Navigation("Items");
+                });
+
             modelBuilder.Entity("HaulScout.Domain.Entities.AppUser", b =>
                 {
                     b.Navigation("ExternalAccounts");
@@ -2917,6 +3190,12 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("HaulScout.Domain.Entities.InventoryItem", b =>
                 {
+                    b.Navigation("AcquisitionLotItems");
+
+                    b.Navigation("BundleComponents");
+
+                    b.Navigation("ComponentOfBundles");
+
                     b.Navigation("Issues");
 
                     b.Navigation("Listings");

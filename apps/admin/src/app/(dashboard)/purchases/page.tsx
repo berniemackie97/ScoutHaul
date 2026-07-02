@@ -1,0 +1,108 @@
+import Link from "next/link";
+import { ArrowRight, ReceiptText } from "lucide-react";
+import { Badge, Card } from "@overhaul/ui";
+import type { InventoryItem } from "@/features/inventory/inventory-operations";
+import { getApiClient } from "@/lib/api";
+import { PurchaseLotCreator } from "./purchase-lot-creator";
+
+export const dynamic = "force-dynamic";
+
+const money = (value: number | null | undefined) =>
+  typeof value === "number" ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value) : "—";
+
+const date = (value: string | null | undefined) =>
+  value ? new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(new Date(value)) : "—";
+
+type AcquisitionLot = {
+  id?: string;
+  name?: string | null;
+  supplierName?: string | null;
+  externalReference?: string | null;
+  purchasedAt?: string | null;
+  allocationMethod?: string | null;
+  totalLandedCost?: number | null;
+  totalAllocatedCost?: number | null;
+  items?: unknown[] | null;
+};
+
+type UntypedApi = {
+  GET: (path: string, init?: unknown) => Promise<{ data?: unknown }>;
+};
+
+export default async function PurchasesPage() {
+  const api = (await getApiClient()) as unknown as UntypedApi;
+  const [{ data: lots }, { data: inventory }] = await Promise.all([
+    api.GET("/api/acquisition-lots"),
+    api.GET("/api/inventory", { params: { query: { lifecycle: "Active", includeArchived: false } } }),
+  ]);
+
+  const acquisitionLots = (lots ?? []) as AcquisitionLot[];
+  const candidates = ((inventory ?? []) as InventoryItem[]).filter((item) => !item.acquisitionLotId && item.status !== "Bundled");
+  const totalSpend = acquisitionLots.reduce((sum, lot) => sum + (lot.totalLandedCost ?? 0), 0);
+  const allocated = acquisitionLots.reduce((sum, lot) => sum + (lot.totalAllocatedCost ?? 0), 0);
+
+  return (
+    <div className="space-y-6">
+      <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+        <div>
+          <p className="text-sm text-muted-foreground">Operations</p>
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight">Purchases &amp; acquisition lots</h1>
+          <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
+            Record a receipt, pallet, haul, auction pickup, or loose lot once, then allocate landed cost to each inventory record for accurate COGS and historical profit.
+          </p>
+        </div>
+        <Link href="/inventory" className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border px-4 text-sm font-medium hover:bg-muted">
+          Inventory <ArrowRight className="h-4 w-4" />
+        </Link>
+      </header>
+
+      <div className="grid gap-4 sm:grid-cols-3">
+        <Card className="p-5"><div className="flex items-center justify-between text-sm text-muted-foreground"><span>Total lot spend</span><ReceiptText className="h-4 w-4" /></div><p className="mt-3 text-3xl font-semibold tabular-nums">{money(totalSpend)}</p></Card>
+        <Card className="p-5"><p className="text-sm text-muted-foreground">Allocated COGS</p><p className="mt-3 text-3xl font-semibold tabular-nums">{money(allocated)}</p></Card>
+        <Card className="p-5"><p className="text-sm text-muted-foreground">Open candidates</p><p className="mt-3 text-3xl font-semibold tabular-nums">{candidates.length}</p></Card>
+      </div>
+
+      <PurchaseLotCreator candidates={candidates} />
+
+      <section className="space-y-3">
+        <div>
+          <h2 className="text-lg font-semibold">Recorded acquisition lots</h2>
+          <p className="text-sm text-muted-foreground">Each lot creates one purchase expense and allocated item-level cost basis.</p>
+        </div>
+        {acquisitionLots.length === 0 ? (
+          <p className="rounded-xl border border-dashed bg-muted/20 p-10 text-center text-sm text-muted-foreground">No acquisition lots recorded yet.</p>
+        ) : (
+          <div className="overflow-x-auto rounded-xl border bg-card">
+            <table className="w-full text-sm">
+              <thead className="border-b bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
+                <tr>
+                  <th className="px-4 py-3 font-medium">Lot</th>
+                  <th className="px-4 py-3 font-medium">Purchased</th>
+                  <th className="px-4 py-3 font-medium">Allocation</th>
+                  <th className="px-4 py-3 text-right font-medium">Items</th>
+                  <th className="px-4 py-3 text-right font-medium">Landed cost</th>
+                  <th className="px-4 py-3 text-right font-medium">Allocated</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {acquisitionLots.map((lot, index) => (
+                  <tr key={lot.id ?? index} className="hover:bg-muted/30">
+                    <td className="px-4 py-3">
+                      <p className="font-medium">{lot.name ?? "Untitled lot"}</p>
+                      <p className="text-xs text-muted-foreground">{[lot.supplierName, lot.externalReference].filter(Boolean).join(" · ") || "No supplier/reference"}</p>
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground">{date(lot.purchasedAt)}</td>
+                    <td className="px-4 py-3"><Badge variant="secondary">{lot.allocationMethod}</Badge></td>
+                    <td className="px-4 py-3 text-right tabular-nums">{lot.items?.length ?? 0}</td>
+                    <td className="px-4 py-3 text-right tabular-nums">{money(lot.totalLandedCost)}</td>
+                    <td className="px-4 py-3 text-right tabular-nums">{money(lot.totalAllocatedCost)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}

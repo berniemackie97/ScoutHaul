@@ -13,6 +13,7 @@ public static class InventoryStatusRules
         InventoryStatus.NeedsRepair,
         InventoryStatus.NeedsPhotos,
         InventoryStatus.ReadyToList,
+        InventoryStatus.Bundled,
         InventoryStatus.Listed,
         InventoryStatus.Packed
     ];

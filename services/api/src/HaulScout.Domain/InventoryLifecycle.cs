@@ -38,6 +38,7 @@ public static class InventoryLifecycle
         InventoryStatus.NeedsRepair,
         InventoryStatus.NeedsPhotos,
         InventoryStatus.ReadyToList,
+        InventoryStatus.Bundled,
         InventoryStatus.Listed,
         InventoryStatus.Sold,
         InventoryStatus.Packed,

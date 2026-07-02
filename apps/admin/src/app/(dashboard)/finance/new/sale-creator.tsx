@@ -7,7 +7,27 @@ import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Inpu
 import { createSale, type CreateSaleResult } from "./actions";
 
 type Candidate = components["schemas"]["SaleCandidateDto"];
-type Channel = components["schemas"]["SaleChannelOptionDto"];
+type FeeRule = {
+  name?: string | null;
+  percent?: number | null;
+  fixedAmount?: number | null;
+  appliesAboveAmount?: number | null;
+  appliesUpToAmount?: number | null;
+  minimumFee?: number | null;
+  maximumFee?: number | null;
+  notes?: string | null;
+};
+type FeeProfile = {
+  id?: string | null;
+  label?: string | null;
+  description?: string | null;
+  isDefault?: boolean | null;
+  platformRules?: FeeRule[] | null;
+  paymentRules?: FeeRule[] | null;
+};
+type Channel = components["schemas"]["SaleChannelOptionDto"] & {
+  feeProfiles?: FeeProfile[] | null;
+};
 const initial: CreateSaleResult = { ok: false, message: "" };
 const selectClass = "h-10 w-full rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring";
 const currency = (value: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value);
@@ -35,6 +55,7 @@ export function SaleCreator({ candidates, channels }: { candidates: Candidate[];
   const [state, action] = useActionState(createSale, initial);
   const [candidateId, setCandidateId] = useState("");
   const [channel, setChannel] = useState("");
+  const [feeProfileId, setFeeProfileId] = useState("");
   const [soldPrice, setSoldPrice] = useState("");
   const [salesTax, setSalesTax] = useState("");
   const [taxRemitted, setTaxRemitted] = useState(true);
@@ -51,6 +72,36 @@ export function SaleCreator({ candidates, channels }: { candidates: Candidate[];
   const trueNet = (Number(soldPrice) || 0) - (selected?.costOfGoods ?? 0) - totalCosts;
   // Tax we collected but the platform does NOT remit is a liability we owe the state — never part of net.
   const taxOwed = taxRemitted ? 0 : Number(salesTax) || 0;
+
+  const selectedChannel = channels.find((option) => option.value === channel);
+  const feeProfiles = selectedChannel?.feeProfiles ?? [];
+  const selectedFeeProfile = feeProfiles.find((profile) => profile.id === feeProfileId) ?? feeProfiles.find((profile) => profile.isDefault) ?? feeProfiles[0];
+  const salePrice = Number(soldPrice) || 0;
+  const round2 = (value: number) => Math.round(value * 100) / 100;
+  function estimateRule(rule: FeeRule): number {
+    const above = Math.max(0, rule.appliesAboveAmount ?? 0);
+    const upTo = rule.appliesUpToAmount ?? salePrice;
+    const basis = Math.max(0, Math.min(salePrice, upTo) - above);
+    if (basis <= 0 && (rule.percent ?? 0) > 0) return 0;
+    let fee = (basis * Math.max(0, rule.percent ?? 0)) / 100 + Math.max(0, rule.fixedAmount ?? 0);
+    if (rule.minimumFee != null) fee = Math.max(fee, rule.minimumFee);
+    if (rule.maximumFee != null) fee = Math.min(fee, rule.maximumFee);
+    return round2(fee);
+  }
+  const estimateRules = (rules: FeeRule[] | null | undefined) => round2((rules ?? []).reduce((sum, rule) => sum + estimateRule(rule), 0));
+  const estPlatformFee = selectedFeeProfile ? estimateRules(selectedFeeProfile.platformRules) : 0;
+  const estPaymentFee = selectedFeeProfile ? estimateRules(selectedFeeProfile.paymentRules) : 0;
+  const showFeeEstimate = salePrice > 0 && (estPlatformFee > 0 || estPaymentFee > 0);
+  function applyFeeEstimate() {
+    setPlatformFees(String(estPlatformFee));
+    setPaymentFees(String(estPaymentFee));
+  }
+  function chooseChannel(value: string) {
+    setChannel(value);
+    const nextChannel = channels.find((option) => option.value === value);
+    const defaultProfile = nextChannel?.feeProfiles?.find((profile: FeeProfile) => profile.isDefault) ?? nextChannel?.feeProfiles?.[0];
+    setFeeProfileId(defaultProfile?.id ?? "");
+  }
   const groups = useMemo(() => {
     const result = new Map<string, Channel[]>();
     for (const item of channels) {
@@ -65,7 +116,7 @@ export function SaleCreator({ candidates, channels }: { candidates: Candidate[];
     const item = candidates.find((candidate) => candidate.inventoryItemId === id);
     if (!item) return;
     setSoldPrice(String(item.listingPrice ?? item.expectedSalePrice ?? ""));
-    if (item.listingPlatform) setChannel(item.listingPlatform);
+    if (item.listingPlatform) chooseChannel(item.listingPlatform);
   }
 
   return (
@@ -104,7 +155,7 @@ export function SaleCreator({ candidates, channels }: { candidates: Candidate[];
                 id="platform"
                 name="platform"
                 value={channel}
-                onChange={(event) => setChannel(event.target.value)}
+                onChange={(event) => chooseChannel(event.target.value)}
                 className={selectClass}
                 required
               >
@@ -123,6 +174,21 @@ export function SaleCreator({ candidates, channels }: { candidates: Candidate[];
                   </optgroup>
                 ))}
               </select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="feeProfile">Fee profile</Label>
+              <select
+                id="feeProfile"
+                value={selectedFeeProfile?.id ?? ""}
+                onChange={(event) => setFeeProfileId(event.target.value)}
+                className={selectClass}
+                disabled={!feeProfiles.length}
+              >
+                {feeProfiles.length === 0 ? <option value="">Manual fees</option> : feeProfiles.map((profile) => (
+                  <option key={profile.id ?? profile.label ?? "profile"} value={profile.id ?? ""}>{profile.label ?? profile.id ?? "Fee profile"}</option>
+                ))}
+              </select>
+              {selectedFeeProfile?.description && <p className="text-muted-foreground text-xs">{selectedFeeProfile.description}</p>}
             </div>
             <div className="space-y-2">
               <Label htmlFor="soldAt">Sold date</Label>
@@ -154,6 +220,20 @@ export function SaleCreator({ candidates, channels }: { candidates: Candidate[];
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {showFeeEstimate && (
+              <button
+                type="button"
+                onClick={applyFeeEstimate}
+                className="flex items-center justify-between gap-3 rounded-lg border border-dashed border-brand-300 bg-brand-50/40 p-3 text-left text-sm transition hover:bg-brand-50 sm:col-span-2 lg:col-span-3"
+              >
+                <span className="text-muted-foreground">
+                  Estimated {selectedChannel?.label} / {selectedFeeProfile?.label} fees: platform{" "}
+                  <span className="text-foreground font-medium">{currency(estPlatformFee)}</span> · payment{" "}
+                  <span className="text-foreground font-medium">{currency(estPaymentFee)}</span>
+                </span>
+                <span className="text-brand-600 shrink-0 font-medium">Apply</span>
+              </button>
+            )}
             <MoneyField label="Platform fees" name="platformFees" value={platformFees} onChange={setPlatformFees} />
             <MoneyField label="Payment fees" name="paymentFees" value={paymentFees} onChange={setPaymentFees} />
             <MoneyField label="Shipping cost" name="shippingCost" value={shippingCost} onChange={setShippingCost} />

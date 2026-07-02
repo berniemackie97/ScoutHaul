@@ -1,7 +1,25 @@
 import type { components } from "@overhaul/api-client";
 
-export type InventoryItem = components["schemas"]["InventoryItemDto"];
-export type InventoryStatus = components["schemas"]["InventoryStatus"];
+export type InventoryStatus = components["schemas"]["InventoryStatus"] | "Bundled";
+export type InventoryBundleComponent = {
+  id?: string;
+  bundleInventoryItemId?: string;
+  componentInventoryItemId?: string;
+  componentTitle?: string | null;
+  componentStatus?: InventoryStatus;
+  quantity?: number;
+  costSnapshot?: number;
+  notes?: string | null;
+};
+export type InventoryItem = Omit<components["schemas"]["InventoryItemDto"], "status"> & {
+  status?: InventoryStatus;
+  isBundle?: boolean;
+  bundleComponentCount?: number;
+  bundleComponents?: InventoryBundleComponent[] | null;
+  acquisitionLotId?: string | null;
+  acquisitionLotName?: string | null;
+  acquisitionAllocatedCost?: number | null;
+};
 
 export const INVENTORY_STATUSES: InventoryStatus[] = [
   "Draft",
@@ -13,6 +31,7 @@ export const INVENTORY_STATUSES: InventoryStatus[] = [
   "NeedsRepair",
   "NeedsPhotos",
   "ReadyToList",
+  "Bundled",
   "Listed",
   "Sold",
   "Packed",
@@ -60,6 +79,7 @@ export const INVENTORY_STATUS_GROUPS: Array<{
       { value: "NeedsRepair", label: "Needs repair" },
       { value: "NeedsPhotos", label: "Needs photos" },
       { value: "ReadyToList", label: "Ready to list" },
+      { value: "Bundled", label: "Bundled component" },
       { value: "Listed", label: "Listed" },
     ],
   },

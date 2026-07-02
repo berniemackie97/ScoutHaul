@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Boxes, DollarSign, ImageIcon, PackageCheck, Search } from "lucide-react";
+import { Boxes, DollarSign, ImageIcon, PackageCheck, Plus, Search } from "lucide-react";
 import { Badge, Card, Input } from "@overhaul/ui";
 import {
   INVENTORY_STATUSES,
@@ -9,6 +9,7 @@ import {
   getProjectedMetrics,
   inventoryStatusLabel,
   matchesInventorySearch,
+  type InventoryItem,
   type InventoryLifecycleGroup,
   type InventoryStatus,
 } from "@/features/inventory/inventory-operations";
@@ -44,9 +45,9 @@ export default async function InventoryPage({
 
   const api = await getApiClient();
   const { data } = await api.GET("/api/inventory", {
-    params: { query: { status: selectedStatus, lifecycle: selectedLifecycle, includeArchived: false } },
+    params: { query: { status: selectedStatus as never, lifecycle: selectedLifecycle, includeArchived: false } },
   });
-  const allItems = data ?? [];
+  const allItems = (data ?? []) as InventoryItem[];
   const items = search
     ? allItems.filter((item) => matchesInventorySearch(item, search))
     : allItems;
@@ -57,10 +58,15 @@ export default async function InventoryPage({
 
   return (
     <div className="space-y-6">
-      <header>
-        <p className="text-sm text-muted-foreground">Operations</p>
-        <h1 className="mt-1 text-2xl font-semibold tracking-tight">Inventory control</h1>
-        <p className="mt-1 text-sm text-muted-foreground">The authoritative record for every item across intake, preparation, listing, sale, and fulfillment.</p>
+      <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+        <div>
+          <p className="text-sm text-muted-foreground">Operations</p>
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight">Inventory control</h1>
+          <p className="mt-1 text-sm text-muted-foreground">The authoritative record for every item across intake, preparation, listing, sale, and fulfillment.</p>
+        </div>
+        <Link href="/inventory/bundles/new" className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-brand-600 px-4 text-sm font-medium text-white hover:bg-brand-700">
+          <Plus className="h-4 w-4" /> Build bundle
+        </Link>
       </header>
 
       <div className="grid gap-4 sm:grid-cols-3">
@@ -110,6 +116,12 @@ export default async function InventoryPage({
                 const thumbnail = getApiAssetUrl(item.heroPhotoThumbnailUrl);
                 const cost = getInventoryCost(item);
                 const { profit: projectedProfit } = getProjectedMetrics(item);
+                const subtitle = [
+                  item.brand,
+                  item.model,
+                  item.category,
+                  item.isBundle ? `${item.bundleComponentCount ?? 0} components` : null,
+                ].filter(Boolean).join(" · ") || "Uncategorized";
                 return (
                   <tr key={item.id} className="transition-colors hover:bg-muted/30">
                     <td className="p-0">
@@ -122,7 +134,7 @@ export default async function InventoryPage({
                         </div>
                         <div className="min-w-0">
                           <p className="truncate font-medium text-foreground">{item.title}</p>
-                          <p className="truncate text-xs text-muted-foreground">{[item.brand, item.model, item.category].filter(Boolean).join(" · ") || "Uncategorized"}</p>
+                          <p className="truncate text-xs text-muted-foreground">{subtitle}</p>
                         </div>
                       </Link>
                     </td>

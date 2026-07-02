@@ -17,6 +17,7 @@ public enum InventoryStatus
     NeedsRepair,
     NeedsPhotos,
     ReadyToList,
+    Bundled,
     Listed,
     Sold,
     Packed,
@@ -216,6 +217,13 @@ public enum ExpenseCategory
     Fuel,
     Storage,
     Other
+}
+
+public enum AcquisitionLotAllocationMethod
+{
+    Equal,
+    WeightedByExpectedValue,
+    Manual
 }
 
 // ── Storefront commerce ──────────────────────────────────────────
