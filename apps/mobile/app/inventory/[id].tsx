@@ -267,6 +267,13 @@ export default function InventoryDetailScreen() {
         />
       </View>
       <View style={styles.actionRow}>
+        <Button
+          label="Generate Listing"
+          icon="sparkles-outline"
+          onPress={() => router.push({ pathname: '/generate-listing', params: { id: item.id } })}
+        />
+      </View>
+      <View style={styles.actionRow}>
         <Button label="Create Listing" icon="pricetag-outline" variant="secondary" onPress={() => void createDraftListing()} />
         <Button
           label="Record Sale"

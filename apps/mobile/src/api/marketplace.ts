@@ -100,7 +100,34 @@ export const marketplaceApi = {
       signal,
     }),
 
+  // Generate a ready-to-post marketplace listing (title, description, comp-backed price) from item details.
+  generateListing: (body: GenerateListingRequest, signal?: AbortSignal) =>
+    apiRequest<GeneratedListing>('/api/listing/generate', { method: 'POST', body, signal }),
+
   providerStatus: () => apiRequest<MarketplaceProviderStatus>('/api/marketplace-lookup/status'),
+};
+
+export type GenerateListingRequest = {
+  title: string;
+  brand?: string | null;
+  model?: string | null;
+  category?: string | null;
+  condition?: string | null;
+  color?: string | null;
+  sizeSystem?: string | null;
+  sizeValue?: string | null;
+  attributesJson?: string | null;
+  notes?: string | null;
+};
+
+export type GeneratedListing = {
+  listingTitle: string;
+  listingDescription: string;
+  suggestedListPrice: number | null;
+  estimatedResaleLow: number | null;
+  estimatedResaleHigh: number | null;
+  priceRationale: string | null;
+  comps: ResaleComp[];
 };
 
 export type MarketplaceProviderStatus = {
