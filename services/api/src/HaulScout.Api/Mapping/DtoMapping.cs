@@ -489,6 +489,35 @@ public static class DtoMapping
         item.Addresses.OrderByDescending(address => address.IsDefault).Select(address => address.ToDto()).ToList(),
         item.Orders.OrderByDescending(order => order.CreatedAt).Select(order => order.ToSummaryDto()).ToList());
 
+    public static ChannelAccountDto ToDto(this ChannelAccount item) => new(
+        item.Id,
+        item.Channel,
+        item.DisplayName,
+        item.ExternalAccountId,
+        item.DefaultFeeProfileId,
+        item.IsNativelySynced,
+        item.IsActive,
+        item.ConnectedAt,
+        item.Notes,
+        item.Listings.Count(listing => listing.Status == ChannelListingStatus.Active));
+
+    public static ChannelListingDto ToDto(this ChannelListing item) => new(
+        item.Id,
+        item.InventoryItemId,
+        item.ChannelAccountId,
+        item.ChannelAccount?.DisplayName ?? string.Empty,
+        item.ChannelAccount?.Channel ?? string.Empty,
+        item.Status,
+        item.ExternalListingId,
+        item.ExternalUrl,
+        item.ListedPrice,
+        item.Quantity,
+        item.ImageHash,
+        item.ListedAt,
+        item.SoldAt,
+        item.LastSyncedAt,
+        item.LastError);
+
     private static IReadOnlyList<string> ParsePhotoUrls(string? value)
     {
         if (string.IsNullOrWhiteSpace(value))

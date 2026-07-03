@@ -432,6 +432,157 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/channel-accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ChannelAccountDto"][];
+                        "application/json": components["schemas"]["ChannelAccountDto"][];
+                        "text/json": components["schemas"]["ChannelAccountDto"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["UpsertChannelAccountRequest"];
+                    "text/json": components["schemas"]["UpsertChannelAccountRequest"];
+                    "application/*+json": components["schemas"]["UpsertChannelAccountRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ChannelAccountDto"];
+                        "application/json": components["schemas"]["ChannelAccountDto"];
+                        "text/json": components["schemas"]["ChannelAccountDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/channel-accounts/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ChannelAccountDto"];
+                        "application/json": components["schemas"]["ChannelAccountDto"];
+                        "text/json": components["schemas"]["ChannelAccountDto"];
+                    };
+                };
+            };
+        };
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["UpsertChannelAccountRequest"];
+                    "text/json": components["schemas"]["UpsertChannelAccountRequest"];
+                    "application/*+json": components["schemas"]["UpsertChannelAccountRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ChannelAccountDto"];
+                        "application/json": components["schemas"]["ChannelAccountDto"];
+                        "text/json": components["schemas"]["ChannelAccountDto"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/customers": {
         parameters: {
             query?: never;
@@ -5272,6 +5423,21 @@ export interface components {
         ChangeInventoryStatusRequest: {
             status?: components["schemas"]["InventoryStatus"];
         };
+        ChannelAccountDto: {
+            /** Format: uuid */
+            id?: string;
+            channel?: string | null;
+            displayName?: string | null;
+            externalAccountId?: string | null;
+            defaultFeeProfileId?: string | null;
+            isNativelySynced?: boolean;
+            isActive?: boolean;
+            /** Format: date-time */
+            connectedAt?: string | null;
+            notes?: string | null;
+            /** Format: int32 */
+            activeListingCount?: number;
+        };
         ChannelFeeEstimateDto: {
             platform?: string | null;
             feeProfileId?: string | null;
@@ -6790,6 +6956,14 @@ export interface components {
             externalReference?: string | null;
             notes?: string | null;
             items?: components["schemas"]["AcquisitionLotItemInputDto"][] | null;
+        };
+        UpsertChannelAccountRequest: {
+            channel?: string | null;
+            displayName?: string | null;
+            externalAccountId?: string | null;
+            defaultFeeProfileId?: string | null;
+            isActive?: boolean;
+            notes?: string | null;
         };
         UpsertInventoryIssueRequest: {
             issueType?: string | null;

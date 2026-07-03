@@ -918,3 +918,41 @@ public sealed record CustomerDetailDto(
     DateTimeOffset? LastOrderAt,
     IReadOnlyList<CustomerAddressDto> Addresses,
     IReadOnlyList<OrderSummaryDto> Orders);
+
+// ── Channel accounts (cross-listing foundation) ────────────────────────────
+public sealed record ChannelAccountDto(
+    Guid Id,
+    string Channel,
+    string DisplayName,
+    string? ExternalAccountId,
+    string? DefaultFeeProfileId,
+    bool IsNativelySynced,
+    bool IsActive,
+    DateTimeOffset? ConnectedAt,
+    string? Notes,
+    int ActiveListingCount);
+
+public sealed record UpsertChannelAccountRequest(
+    string Channel,
+    string DisplayName,
+    string? ExternalAccountId,
+    string? DefaultFeeProfileId,
+    bool IsActive,
+    string? Notes);
+
+public sealed record ChannelListingDto(
+    Guid Id,
+    Guid InventoryItemId,
+    Guid ChannelAccountId,
+    string ChannelAccountName,
+    string Channel,
+    ChannelListingStatus Status,
+    string? ExternalListingId,
+    string? ExternalUrl,
+    decimal? ListedPrice,
+    int? Quantity,
+    string? ImageHash,
+    DateTimeOffset? ListedAt,
+    DateTimeOffset? SoldAt,
+    DateTimeOffset? LastSyncedAt,
+    string? LastError);

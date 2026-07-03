@@ -85,6 +85,16 @@ public static class SalesChannelCatalog
         [
             new("standard", "Standard commission", "Simple commission estimate. Actual small-order minimums should be entered from payout data.", true, [Percent("Commission", 20m)], []),
         ]),
+        new("Depop", "Depop", "Marketplaces", FeeProfiles:
+        [
+            new("standard", "Standard selling fee", "Starter marketplace + payment processing estimate. Depop fee structures vary by region — reconcile from payout data.", true, [Percent("Selling fee", 10m)], [Percent("Payment processing", 2.9m), Fixed("Payment fixed", 0.30m)]),
+            NoFees("no-fee", "No seller fee (fee-free region)"),
+        ]),
+        new("Vinted", "Vinted", "Marketplaces", FeeProfiles:
+        [
+            // On Vinted the buyer pays the Buyer Protection fee; the seller typically pays nothing.
+            NoFees("seller-free", "Seller pays no fee (buyer-paid protection)"),
+        ]),
         new("Whatnot", "Whatnot", "Marketplaces", FeeProfiles:
         [
             new("standard", "Standard seller", "Starter marketplace + processing estimate.", true, [Percent("Marketplace fee", 8m)], [Percent("Payment processing", 2.9m), Fixed("Payment fixed", 0.30m)]),

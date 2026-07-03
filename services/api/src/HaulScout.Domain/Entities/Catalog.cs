@@ -105,6 +105,7 @@ public sealed class InventoryItem : EntityBase, IOrganizationScoped
     public ICollection<AcquisitionLotItem> AcquisitionLotItems { get; set; } = [];
     public ICollection<InventoryBundleComponent> BundleComponents { get; set; } = [];
     public ICollection<InventoryBundleComponent> ComponentOfBundles { get; set; } = [];
+    public ICollection<ChannelListing> ChannelListings { get; set; } = [];
     public StoreListing? StoreListing { get; set; }
 }
 
