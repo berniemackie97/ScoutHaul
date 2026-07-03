@@ -583,6 +583,110 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/inventory/{itemId}/channel-listings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    itemId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ChannelListingDto"][];
+                        "application/json": components["schemas"]["ChannelListingDto"][];
+                        "text/json": components["schemas"]["ChannelListingDto"][];
+                    };
+                };
+            };
+        };
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    itemId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["UpsertChannelListingRequest"];
+                    "text/json": components["schemas"]["UpsertChannelListingRequest"];
+                    "application/*+json": components["schemas"]["UpsertChannelListingRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ChannelListingDto"];
+                        "application/json": components["schemas"]["ChannelListingDto"];
+                        "text/json": components["schemas"]["ChannelListingDto"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/inventory/{itemId}/channel-listings/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    itemId: string;
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/customers": {
         parameters: {
             query?: never;
@@ -5476,6 +5580,33 @@ export interface components {
             maximumFee?: number | null;
             notes?: string | null;
         };
+        ChannelListingDto: {
+            /** Format: uuid */
+            id?: string;
+            /** Format: uuid */
+            inventoryItemId?: string;
+            /** Format: uuid */
+            channelAccountId?: string;
+            channelAccountName?: string | null;
+            channel?: string | null;
+            status?: components["schemas"]["ChannelListingStatus"];
+            externalListingId?: string | null;
+            externalUrl?: string | null;
+            /** Format: double */
+            listedPrice?: number | null;
+            /** Format: int32 */
+            quantity?: number | null;
+            imageHash?: string | null;
+            /** Format: date-time */
+            listedAt?: string | null;
+            /** Format: date-time */
+            soldAt?: string | null;
+            /** Format: date-time */
+            lastSyncedAt?: string | null;
+            lastError?: string | null;
+        };
+        /** @enum {string} */
+        ChannelListingStatus: "NotListed" | "Draft" | "Active" | "Sold" | "Delisted" | "Error";
         CompleteSourcingStopRequest: {
             force?: boolean;
         };
@@ -6964,6 +7095,18 @@ export interface components {
             defaultFeeProfileId?: string | null;
             isActive?: boolean;
             notes?: string | null;
+        };
+        UpsertChannelListingRequest: {
+            /** Format: uuid */
+            channelAccountId?: string;
+            status?: components["schemas"]["ChannelListingStatus"];
+            /** Format: double */
+            listedPrice?: number | null;
+            /** Format: int32 */
+            quantity?: number | null;
+            externalListingId?: string | null;
+            externalUrl?: string | null;
+            imageHash?: string | null;
         };
         UpsertInventoryIssueRequest: {
             issueType?: string | null;

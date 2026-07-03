@@ -683,6 +683,144 @@
         }
       }
     },
+    "/api/inventory/{itemId}/channel-listings": {
+      "get": {
+        "tags": [
+          "ChannelListings"
+        ],
+        "parameters": [
+          {
+            "name": "itemId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ChannelListingDto"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ChannelListingDto"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ChannelListingDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "ChannelListings"
+        ],
+        "parameters": [
+          {
+            "name": "itemId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertChannelListingRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertChannelListingRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertChannelListingRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChannelListingDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChannelListingDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChannelListingDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/inventory/{itemId}/channel-listings/{id}": {
+      "delete": {
+        "tags": [
+          "ChannelListings"
+        ],
+        "parameters": [
+          {
+            "name": "itemId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
     "/api/customers": {
       "get": {
         "tags": [
@@ -7129,6 +7267,87 @@
         },
         "additionalProperties": false
       },
+      "ChannelListingDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "inventoryItemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "channelAccountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "channelAccountName": {
+            "type": "string",
+            "nullable": true
+          },
+          "channel": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "$ref": "#/components/schemas/ChannelListingStatus"
+          },
+          "externalListingId": {
+            "type": "string",
+            "nullable": true
+          },
+          "externalUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "listedPrice": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "quantity": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "imageHash": {
+            "type": "string",
+            "nullable": true
+          },
+          "listedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "soldAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "lastSyncedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "lastError": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ChannelListingStatus": {
+        "enum": [
+          "NotListed",
+          "Draft",
+          "Active",
+          "Sold",
+          "Delisted",
+          "Error"
+        ],
+        "type": "string"
+      },
       "CompleteSourcingStopRequest": {
         "type": "object",
         "properties": {
@@ -11529,6 +11748,41 @@
         },
         "additionalProperties": false
       },
+      "UpsertChannelListingRequest": {
+        "type": "object",
+        "properties": {
+          "channelAccountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ChannelListingStatus"
+          },
+          "listedPrice": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "quantity": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "externalListingId": {
+            "type": "string",
+            "nullable": true
+          },
+          "externalUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "imageHash": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "UpsertInventoryIssueRequest": {
         "type": "object",
         "properties": {
@@ -12044,6 +12298,9 @@
     },
     {
       "name": "ChannelAccounts"
+    },
+    {
+      "name": "ChannelListings"
     },
     {
       "name": "Customers"

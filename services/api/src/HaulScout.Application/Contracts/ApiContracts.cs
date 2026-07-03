@@ -956,3 +956,13 @@ public sealed record ChannelListingDto(
     DateTimeOffset? SoldAt,
     DateTimeOffset? LastSyncedAt,
     string? LastError);
+
+/// <summary>Create or update the state of one item on one channel account (the cross-list panel writes this).</summary>
+public sealed record UpsertChannelListingRequest(
+    Guid ChannelAccountId,
+    ChannelListingStatus Status,
+    decimal? ListedPrice,
+    int? Quantity,
+    string? ExternalListingId,
+    string? ExternalUrl,
+    string? ImageHash);
