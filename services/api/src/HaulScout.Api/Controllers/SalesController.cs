@@ -241,6 +241,13 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
             Notes = "Created from recorded sale."
         });
 
+        // Reflect the sale across channels: the channel it sold on → Sold, every other live channel → PendingDelist.
+        var channelListings = await db.ChannelListings
+            .Include(listing => listing.ChannelAccount)
+            .Where(listing => listing.InventoryItemId == item.Id && listing.OrganizationId == currentUser.OrganizationId)
+            .ToListAsync(cancellationToken);
+        ChannelListingSync.ApplySale(channelListings, channel, DateTimeOffset.UtcNow);
+
         await db.SaveChangesAsync(cancellationToken);
         return CreatedAtAction(nameof(GetProfit), new { id = sale.Id }, sale.ToDto());
     }
