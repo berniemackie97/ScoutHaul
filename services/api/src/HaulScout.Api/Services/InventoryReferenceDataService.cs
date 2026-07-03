@@ -40,7 +40,8 @@ public sealed class InventoryReferenceDataService(HaulScoutDbContext db, ICurren
         List<string?> storageValues = await inventoryQuery.Select(item => item.StorageLocation).Distinct().ToListAsync(cancellationToken);
         List<string?> countries = await inventoryQuery.Select(item => item.CountryOfOrigin).Distinct().ToListAsync(cancellationToken);
 
-        InventoryReferenceOptionDto[] brands = Dynamic(
+        InventoryReferenceOptionDto[] brands = MergeBrands(
+            InventoryReferenceCatalog.Brands,
             inventoryBrands.Concat(productBrands));
         InventoryReferenceOptionDto[] models = DynamicWithParent(
             inventoryModels.Select(item => (item.Model, item.Brand))
@@ -145,6 +146,24 @@ public sealed class InventoryReferenceDataService(HaulScoutDbContext db, ICurren
                 || !string.Equals(option.ParentValue, parent, StringComparison.OrdinalIgnoreCase)))
             {
                 options.Add(Legacy(value, parent));
+            }
+        }
+        return options.ToArray();
+    }
+
+    // Curated brands (category-scoped via ParentValue) plus any brand already used in this org, added as a
+    // universal option (no parent) so it shows under every category and stays resolvable.
+    private static InventoryReferenceOptionDto[] MergeBrands(
+        IReadOnlyList<InventoryReferenceOptionDto> fixedBrands,
+        IEnumerable<string?> existingValues)
+    {
+        var options = fixedBrands.ToList();
+        var known = new HashSet<string>(fixedBrands.Select(option => option.Value), StringComparer.OrdinalIgnoreCase);
+        foreach (string value in Clean(existingValues))
+        {
+            if (known.Add(value))
+            {
+                options.Add(new InventoryReferenceOptionDto(value, value));
             }
         }
         return options.ToArray();
