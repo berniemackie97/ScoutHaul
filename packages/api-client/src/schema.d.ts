@@ -7048,6 +7048,7 @@ export interface components {
             /** Format: double */
             weight?: number | null;
             weightUnit?: components["schemas"]["WeightUnit"];
+            imageUrls?: string[] | null;
         };
         StorefrontListingDto: {
             /** Format: uuid */

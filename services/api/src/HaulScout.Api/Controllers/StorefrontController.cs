@@ -144,11 +144,11 @@ public sealed class StorefrontController(HaulScoutDbContext db, ITenantContext t
                 i.Weight,
                 i.WeightUnit,
                 ListPrice = i.EstimatedSalePrice ?? i.SellerAskingPrice ?? 0m,
-                HeroPhotoId = i.Photos
+                PhotoIds = i.Photos
                     .OrderByDescending(p => p.IsHero)
                     .ThenBy(p => p.SortOrder)
-                    .Select(p => (Guid?)p.Id)
-                    .FirstOrDefault(),
+                    .Select(p => p.Id)
+                    .ToList(),
             })
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -157,12 +157,19 @@ public sealed class StorefrontController(HaulScoutDbContext db, ITenantContext t
             return NotFound();
         }
 
+        var gallery = row.PhotoIds
+            .Select(id => PhotoUrl(id))
+            .Where(url => url is not null)
+            .Select(url => url!)
+            .ToList();
+
         return new StorefrontListingDetailDto(
             row.Id, BuildSlug(row.Title, row.Id), row.Title, null, row.Description,
             row.ListPrice, null, row.Brand, row.Condition, row.Title, row.Description,
-            PhotoUrl(row.HeroPhotoId), row.Category, row.Model, row.Color, row.SizeSystem, row.SizeValue,
+            gallery.FirstOrDefault(), row.Category, row.Model, row.Color, row.SizeSystem, row.SizeValue,
             row.FunctionalStatus, row.CompletenessStatus, row.PackagingStatus, row.CountryOfOrigin,
-            row.ManufactureYear, row.Length, row.Width, row.Height, row.DimensionUnit, row.Weight, row.WeightUnit);
+            row.ManufactureYear, row.Length, row.Width, row.Height, row.DimensionUnit, row.Weight, row.WeightUnit,
+            gallery);
     }
 
     [HttpGet("categories")]
