@@ -12,6 +12,7 @@ type ReferenceOption = components["schemas"]["InventoryReferenceOptionDto"];
 const initial: NewInventoryResult = { ok: false, message: "" };
 const selectClass = "h-10 w-full rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50";
 const sizedCategories = new Set(["Clothing", "Shoes", "Handbags", "Baby"]);
+const otherValue = "Other";
 
 const ownershipOptions = [
   ["Owned", "Owned inventory"],
@@ -57,23 +58,25 @@ function EnumField({ label, name, options }: { label: string; name: string; opti
 function OptionField({ label, name, value, options, onChange, disabled = false }: {
   label: string; name: string; value: string; options: ReferenceOption[]; onChange?: (value: string) => void; disabled?: boolean;
 }) {
+  const approvedOptions = useMemo(() => options.filter((option) => !option.isLegacy && option.value && option.label), [options]);
+  const effectiveValue = normalizeOptionValue(value, approvedOptions);
   const groups = useMemo(() => {
     const map = new Map<string, ReferenceOption[]>();
-    for (const option of options) {
-      if (!option.value || !option.label) continue;
-      map.set(option.group ?? "Options", [...(map.get(option.group ?? "Options") ?? []), option]);
+    for (const option of approvedOptions) {
+      const group = option.group ?? "";
+      map.set(group, [...(map.get(group) ?? []), option]);
     }
     return map;
-  }, [options]);
-  const named = [...groups.keys()].some((group) => group !== "Options");
+  }, [approvedOptions]);
+  const named = [...groups.keys()].some((group) => group.length > 0);
   return (
     <div className="space-y-2">
       <Label htmlFor={name}>{label}</Label>
       <select
         id={name}
         name={name}
-        value={onChange ? value : undefined}
-        defaultValue={onChange ? undefined : value}
+        value={onChange ? effectiveValue : undefined}
+        defaultValue={onChange ? undefined : effectiveValue}
         onChange={(event) => onChange?.(event.target.value)}
         className={selectClass}
         disabled={disabled}
@@ -93,17 +96,28 @@ function OptionField({ label, name, value, options, onChange, disabled = false }
   );
 }
 
+function normalizeOptionValue(value: string, options: ReferenceOption[]) {
+  if (!value) return "";
+  if (options.some((option) => option.value?.toLowerCase() === value.toLowerCase())) return value;
+  return options.some((option) => option.value === otherValue) ? otherValue : "";
+}
+
 export function ItemCreator({ referenceData }: { referenceData: ReferenceData }) {
   const [state, action] = useActionState(createInventoryItem, initial);
   const [category, setCategory] = useState("");
   const [brand, setBrand] = useState("");
   const [model, setModel] = useState("");
+  const [storageLocation, setStorageLocation] = useState("");
   const [sizeSystem, setSizeSystem] = useState("");
   const [sizeValue, setSizeValue] = useState("");
 
-  const brands = (referenceData.brands ?? []).filter((option) => !option.parentValue || !category || option.parentValue === category);
-  const models = (referenceData.models ?? []).filter((option) => !option.parentValue || !brand || option.parentValue === brand);
-  const sizes = (referenceData.sizes ?? []).filter((option) => !option.parentValue || option.parentValue === sizeSystem);
+  const categories = referenceData.categories ?? [];
+  const safeCategory = normalizeOptionValue(category, categories);
+  const brands = (referenceData.brands ?? []).filter((option) => !option.isLegacy && (!option.parentValue || !safeCategory || option.parentValue === safeCategory));
+  const safeBrand = normalizeOptionValue(brand, brands);
+  const models = (referenceData.models ?? []).filter((option) => !option.isLegacy && (!option.parentValue || !safeBrand || option.parentValue === safeBrand));
+  const safeSizeSystem = normalizeOptionValue(sizeSystem, referenceData.sizeSystems ?? []);
+  const sizes = (referenceData.sizes ?? []).filter((option) => !option.isLegacy && (!option.parentValue || option.parentValue === safeSizeSystem));
   const showSizing = category === "" || sizedCategories.has(category);
 
   return (
@@ -119,12 +133,12 @@ export function ItemCreator({ referenceData }: { referenceData: ReferenceData })
               <Label htmlFor="title">Title</Label>
               <Input id="title" name="title" required placeholder="e.g. Super Mario 64, N64, complete in box" />
             </div>
-            <OptionField label="Category" name="category" value={category} options={referenceData.categories ?? []} onChange={(value) => { setCategory(value); setBrand(""); setModel(""); }} />
+            <OptionField label="Category" name="category" value={category} options={categories} onChange={(value) => { setCategory(value); setBrand(""); setModel(""); }} />
             <OptionField label="Brand" name="brand" value={brand} options={brands} onChange={(value) => { setBrand(value); setModel(""); }} />
-            <OptionField label="Model" name="model" value={model} options={models} onChange={setModel} disabled={models.length === 0} />
+            <OptionField label="Model / product line" name="model" value={model} options={models} onChange={setModel} disabled={!safeBrand || models.length === 0} />
             <OptionField label="Color" name="color" value="" options={referenceData.colors ?? []} />
             <OptionField label="Condition" name="condition" value="" options={referenceData.conditions ?? []} />
-            <Field label="Storage location" name="storageLocation" placeholder="Bin A3" />
+            <OptionField label="Storage location" name="storageLocation" value={storageLocation} options={referenceData.storageLocations ?? []} onChange={setStorageLocation} />
             {showSizing && <OptionField label="Size system" name="sizeSystem" value={sizeSystem} options={referenceData.sizeSystems ?? []} onChange={(value) => { setSizeSystem(value); setSizeValue(""); }} />}
             {showSizing && <OptionField label="Size" name="sizeValue" value={sizeValue} options={sizes} onChange={setSizeValue} disabled={!sizeSystem} />}
           </CardContent>

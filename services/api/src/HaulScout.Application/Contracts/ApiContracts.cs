@@ -843,7 +843,11 @@ public sealed record OrderSummaryDto(
     int ItemCount,
     bool IsLocalPickup,
     DateTimeOffset CreatedAt,
-    DateTimeOffset? PaidAt);
+    DateTimeOffset? PaidAt,
+    string? ShippingCarrier,
+    string? TrackingNumber,
+    DateTimeOffset? ShippedAt,
+    DateTimeOffset? DeliveredAt);
 
 public sealed record OrderDetailDto(
     Guid Id,
@@ -871,13 +875,27 @@ public sealed record OrderDetailDto(
     string? ShipToCountry,
     bool IsLocalPickup,
     string? CustomerNote,
+    string? ShippingCarrier,
+    string? TrackingNumber,
+    string? TrackingUrl,
     string? StripePaymentIntentId,
     DateTimeOffset CreatedAt,
     DateTimeOffset? PaidAt,
+    DateTimeOffset? ShippedAt,
+    DateTimeOffset? DeliveredAt,
     DateTimeOffset? CancelledAt,
     IReadOnlyList<OrderLineDto> Lines);
 
 public sealed record UpdateOrderStatusRequest(OrderStatus Status);
+
+public sealed record UpdateOrderTrackingRequest(
+    string? ShippingCarrier,
+    string? TrackingNumber,
+    string? TrackingUrl,
+    DateTimeOffset? ShippedAt,
+    DateTimeOffset? DeliveredAt,
+    bool MarkShipped,
+    bool MarkDelivered);
 
 // ── Storefront customers ───────────────────────────────────────────────────
 public sealed record CustomerAddressDto(

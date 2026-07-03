@@ -1006,7 +1006,9 @@ export interface paths {
         post?: never;
         delete: {
             parameters: {
-                query?: never;
+                query?: {
+                    hard?: boolean;
+                };
                 header?: never;
                 path: {
                     id: string;
@@ -2184,6 +2186,51 @@ export interface paths {
                     "application/json": components["schemas"]["UpdateOrderStatusRequest"];
                     "text/json": components["schemas"]["UpdateOrderStatusRequest"];
                     "application/*+json": components["schemas"]["UpdateOrderStatusRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["OrderDetailDto"];
+                        "application/json": components["schemas"]["OrderDetailDto"];
+                        "text/json": components["schemas"]["OrderDetailDto"];
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/api/orders/{id}/tracking": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["UpdateOrderTrackingRequest"];
+                    "text/json": components["schemas"]["UpdateOrderTrackingRequest"];
+                    "application/*+json": components["schemas"]["UpdateOrderTrackingRequest"];
                 };
             };
             responses: {
@@ -6248,11 +6295,18 @@ export interface components {
             shipToCountry?: string | null;
             isLocalPickup?: boolean;
             customerNote?: string | null;
+            shippingCarrier?: string | null;
+            trackingNumber?: string | null;
+            trackingUrl?: string | null;
             stripePaymentIntentId?: string | null;
             /** Format: date-time */
             createdAt?: string;
             /** Format: date-time */
             paidAt?: string | null;
+            /** Format: date-time */
+            shippedAt?: string | null;
+            /** Format: date-time */
+            deliveredAt?: string | null;
             /** Format: date-time */
             cancelledAt?: string | null;
             lines?: components["schemas"]["OrderLineDto"][] | null;
@@ -6296,6 +6350,12 @@ export interface components {
             createdAt?: string;
             /** Format: date-time */
             paidAt?: string | null;
+            shippingCarrier?: string | null;
+            trackingNumber?: string | null;
+            /** Format: date-time */
+            shippedAt?: string | null;
+            /** Format: date-time */
+            deliveredAt?: string | null;
         };
         OrganizationDto: {
             /** Format: uuid */
@@ -7029,6 +7089,17 @@ export interface components {
         };
         UpdateOrderStatusRequest: {
             status?: components["schemas"]["OrderStatus"];
+        };
+        UpdateOrderTrackingRequest: {
+            shippingCarrier?: string | null;
+            trackingNumber?: string | null;
+            trackingUrl?: string | null;
+            /** Format: date-time */
+            shippedAt?: string | null;
+            /** Format: date-time */
+            deliveredAt?: string | null;
+            markShipped?: boolean;
+            markDelivered?: boolean;
         };
         UpdateOrganizationMemberRoleRequest: {
             /** Format: uuid */

@@ -55,6 +55,7 @@ public static class InventoryReferenceCatalog
         Option("Fair", "Fair"),
         Option("Poor", "Poor"),
         Option("For parts", "For parts / not working"),
+        Option("Other", "Other"),
     ];
 
     public static readonly InventoryReferenceOptionDto[] Colors =
@@ -82,39 +83,58 @@ public static class InventoryReferenceCatalog
         Option("Shoe UK", "Shoe UK"),
         Option("Youth", "Youth / Kids"),
         Option("One size", "One Size"),
+        Option("Other", "Other"),
     ];
 
     public static readonly InventoryReferenceOptionDto[] Sizes = BuildSizes();
 
-    // Curated brands tagged by category (ParentValue = category). The reference service also folds in any
-    // brands already typed into inventory as universal options, so this list guides without limiting.
+    // Curated brands tagged by category (ParentValue = category). Legacy organization values are intentionally
+    // not folded into dropdowns; operators use the explicit "Other" option until a value is promoted into this catalog.
     public static readonly InventoryReferenceOptionDto[] Brands = BuildBrands();
+
+    // Curated model/line/set options tagged by brand (ParentValue = brand). This is not meant to replace unique
+    // identifiers, titles, serials, set numbers, or listing descriptions; it standardizes the broad model dimension.
+    public static readonly InventoryReferenceOptionDto[] Models = BuildModels();
 
     private static InventoryReferenceOptionDto[] BuildBrands()
     {
         var brands = new List<InventoryReferenceOptionDto>();
-        B(brands, "Video Games", "Nintendo", "Sony", "Microsoft", "Sega", "Atari", "SNK", "Bandai Namco", "Capcom", "Square Enix", "Ubisoft", "Electronic Arts", "Activision", "Rockstar Games", "Konami", "Valve", "2K");
-        B(brands, "Clothing", "Nike", "Adidas", "Lululemon", "The North Face", "Patagonia", "Levi's", "Carhartt", "Ralph Lauren", "Polo Ralph Lauren", "Tommy Hilfiger", "Champion", "Under Armour", "Columbia", "Gap", "Old Navy", "Zara", "H&M", "Supreme", "Gymshark", "Vineyard Vines", "Free People", "Anthropologie", "Gucci", "Louis Vuitton", "Burberry");
-        B(brands, "Shoes", "Nike", "Jordan", "Adidas", "New Balance", "Vans", "Converse", "Dr. Martens", "Timberland", "Reebok", "Puma", "ASICS", "Birkenstock", "UGG", "Crocs", "Salomon", "Hoka", "On", "Clarks", "Sperry");
-        B(brands, "Handbags", "Coach", "Michael Kors", "Kate Spade", "Fossil", "Tory Burch", "Louis Vuitton", "Gucci", "Prada", "Chanel", "Dooney & Bourke", "Longchamp");
-        B(brands, "Watches", "Seiko", "Casio", "Citizen", "Fossil", "Timex", "Bulova", "Invicta", "Garmin", "Apple", "Rolex", "Omega", "Tag Heuer", "Movado");
-        B(brands, "Jewelry", "Pandora", "Tiffany & Co.", "Swarovski", "David Yurman", "Kay", "James Avery", "Alex and Ani");
-        B(brands, "Tech", "Apple", "Dell", "HP", "Lenovo", "ASUS", "Acer", "Microsoft", "Razer", "MSI", "Logitech", "Samsung", "LG", "Intel", "AMD", "NVIDIA");
-        B(brands, "Phones", "Apple", "Samsung", "Google", "Motorola", "OnePlus", "LG", "Nokia", "OtterBox", "Spigen");
-        B(brands, "Cameras", "Canon", "Nikon", "Sony", "Fujifilm", "Panasonic", "Olympus", "Leica", "GoPro", "DJI", "Polaroid");
-        B(brands, "Audio", "Bose", "Sony", "JBL", "Beats", "Sennheiser", "Sonos", "Apple", "Audio-Technica", "Marshall", "Ultimate Ears", "Anker");
-        B(brands, "TV", "Samsung", "LG", "Sony", "Vizio", "TCL", "Hisense", "Roku", "Panasonic");
-        B(brands, "Electronics", "Apple", "Samsung", "Sony", "LG", "Anker", "Logitech", "Belkin", "Amazon");
-        B(brands, "Appliances", "KitchenAid", "Dyson", "Ninja", "Instant Pot", "Cuisinart", "Breville", "Vitamix", "Keurig", "Nespresso", "Shark", "Hamilton Beach", "Crock-Pot");
-        B(brands, "Toys", "LEGO", "Hasbro", "Mattel", "Funko", "Fisher-Price", "Playmobil", "Hot Wheels", "Nerf", "Barbie", "Bandai", "Melissa & Doug", "Squishmallows");
-        B(brands, "Collectibles", "Pokémon", "Panini", "Topps", "Upper Deck", "Wizards of the Coast", "Konami", "Funko", "Hallmark", "Bowman");
-        B(brands, "Musical Instruments", "Fender", "Gibson", "Yamaha", "Roland", "Korg", "Ibanez", "Shure", "Epiphone", "Casio", "Boss");
-        B(brands, "Tools", "DeWalt", "Milwaukee", "Makita", "Bosch", "Ryobi", "Craftsman", "Stanley", "Snap-on", "RIDGID", "Black+Decker", "Kobalt");
-        B(brands, "Sporting Goods", "Wilson", "Spalding", "Titleist", "Callaway", "TaylorMade", "Yeti", "Coleman", "Shimano", "Nike", "Adidas");
-        B(brands, "Fitness", "Bowflex", "NordicTrack", "Peloton", "Rogue", "Theragun", "Fitbit", "Garmin");
-        B(brands, "Baby", "Graco", "Chicco", "Fisher-Price", "Britax", "Evenflo", "Medela", "Baby Brezza");
-        B(brands, "Pet Supplies", "Kong", "PetSafe", "Furbo", "Chewy", "Blue Buffalo");
-        B(brands, "Automotive", "Bosch", "ACDelco", "Mobil 1", "K&N", "WeatherTech", "Garmin");
+        B(brands, "Video Games", "Nintendo", "Sony", "Microsoft", "Sega", "Atari", "SNK", "Bandai Namco", "Capcom", "Square Enix", "Ubisoft", "Electronic Arts", "Activision", "Rockstar Games", "Konami", "Valve", "2K", "Bethesda", "Take-Two", "THQ Nordic", "Limited Run Games", "GameStop");
+        B(brands, "Clothing", "Nike", "Adidas", "Lululemon", "The North Face", "Patagonia", "Levi's", "Carhartt", "Ralph Lauren", "Polo Ralph Lauren", "Tommy Hilfiger", "Champion", "Under Armour", "Columbia", "Gap", "Old Navy", "Zara", "H&M", "Supreme", "Gymshark", "Vineyard Vines", "Free People", "Anthropologie", "Gucci", "Louis Vuitton", "Burberry", "J.Crew", "Madewell", "American Eagle", "Abercrombie & Fitch", "Hollister", "Aritzia", "Urban Outfitters", "Banana Republic", "Talbots", "Ann Taylor", "Eileen Fisher", "Harley-Davidson", "Disney", "MLB", "NFL", "NBA", "NHL");
+        B(brands, "Shoes", "Nike", "Jordan", "Adidas", "New Balance", "Vans", "Converse", "Dr. Martens", "Timberland", "Reebok", "Puma", "ASICS", "Birkenstock", "UGG", "Crocs", "Salomon", "Hoka", "On", "Clarks", "Sperry", "Brooks", "Saucony", "Merrell", "Keen", "Sorel", "Steve Madden", "Cole Haan", "Allen Edmonds");
+        B(brands, "Handbags", "Coach", "Michael Kors", "Kate Spade", "Fossil", "Tory Burch", "Louis Vuitton", "Gucci", "Prada", "Chanel", "Dooney & Bourke", "Longchamp", "MCM", "Marc Jacobs", "Rebecca Minkoff", "Vera Bradley", "Tumi", "Herschel");
+        B(brands, "Watches", "Seiko", "Casio", "Citizen", "Fossil", "Timex", "Bulova", "Invicta", "Garmin", "Apple", "Rolex", "Omega", "Tag Heuer", "Movado", "Tissot", "Hamilton", "Orient", "Swatch", "G-Shock");
+        B(brands, "Jewelry", "Pandora", "Tiffany & Co.", "Swarovski", "David Yurman", "Kay", "James Avery", "Alex and Ani", "Kendra Scott", "Cartier", "Van Cleef & Arpels", "Brighton", "Silpada");
+        B(brands, "Tech", "Apple", "Dell", "HP", "Lenovo", "ASUS", "Acer", "Microsoft", "Razer", "MSI", "Logitech", "Samsung", "LG", "Intel", "AMD", "NVIDIA", "Corsair", "Alienware", "Ubiquiti", "Netgear", "TP-Link", "Synology", "Western Digital", "Seagate");
+        B(brands, "Phones", "Apple", "Samsung", "Google", "Motorola", "OnePlus", "LG", "Nokia", "OtterBox", "Spigen", "Case-Mate", "Anker", "Belkin");
+        B(brands, "Cameras", "Canon", "Nikon", "Sony", "Fujifilm", "Panasonic", "Olympus", "Leica", "GoPro", "DJI", "Polaroid", "Kodak", "Pentax", "Sigma", "Tamron");
+        B(brands, "Audio", "Bose", "Sony", "JBL", "Beats", "Sennheiser", "Sonos", "Apple", "Audio-Technica", "Marshall", "Ultimate Ears", "Anker", "Shure", "Yamaha", "Pioneer", "Denon", "Klipsch", "Harman Kardon", "Skullcandy");
+        B(brands, "TV", "Samsung", "LG", "Sony", "Vizio", "TCL", "Hisense", "Roku", "Panasonic", "Philips", "Sharp", "Insignia");
+        B(brands, "Electronics", "Apple", "Samsung", "Sony", "LG", "Anker", "Logitech", "Belkin", "Amazon", "Google", "Meta", "Ring", "Eero", "Philips Hue", "Nintendo", "Microsoft");
+        B(brands, "Appliances", "KitchenAid", "Dyson", "Ninja", "Instant Pot", "Cuisinart", "Breville", "Vitamix", "Keurig", "Nespresso", "Shark", "Hamilton Beach", "Crock-Pot", "Bissell", "Hoover", "Miele", "iRobot", "Black+Decker");
+        B(brands, "Toys", "LEGO", "Hasbro", "Mattel", "Funko", "Fisher-Price", "Playmobil", "Hot Wheels", "Nerf", "Barbie", "Bandai", "Melissa & Doug", "Squishmallows", "Spin Master", "Jakks Pacific", "Disney", "Nintendo", "Pokémon");
+        B(brands, "Collectibles", "Pokémon", "Nintendo", "Panini", "Topps", "Upper Deck", "Wizards of the Coast", "Konami", "Funko", "Hallmark", "Bowman", "Magic: The Gathering", "Yu-Gi-Oh!", "Disney", "Marvel", "DC", "McFarlane Toys", "NECA", "Hot Wheels", "LEGO", "PSA", "CGC", "BGS");
+        B(brands, "Books", "Penguin Random House", "HarperCollins", "Simon & Schuster", "Macmillan", "Scholastic", "DK", "Marvel", "DC");
+        B(brands, "Media", "Disney", "Criterion", "Warner Bros.", "Universal", "Sony Pictures", "Paramount", "Nintendo", "PlayStation", "Xbox");
+        B(brands, "Musical Instruments", "Fender", "Gibson", "Yamaha", "Roland", "Korg", "Ibanez", "Shure", "Epiphone", "Casio", "Boss", "Martin", "Taylor", "Squier", "Pearl", "Zildjian", "Alesis");
+        B(brands, "Furniture", "IKEA", "West Elm", "Pottery Barn", "Ashley", "La-Z-Boy", "Herman Miller", "Steelcase", "Restoration Hardware");
+        B(brands, "Decor", "Pottery Barn", "West Elm", "Anthropologie", "IKEA", "Crate & Barrel", "Yankee Candle", "Lenox", "Waterford");
+        B(brands, "Home", "IKEA", "Pyrex", "CorningWare", "Le Creuset", "Lodge", "OXO", "KitchenAid", "Williams Sonoma", "Crate & Barrel", "Threshold");
+        B(brands, "Tools", "DeWalt", "Milwaukee", "Makita", "Bosch", "Ryobi", "Craftsman", "Stanley", "Snap-on", "RIDGID", "Black+Decker", "Kobalt", "Husky", "Dremel", "Metabo", "Festool", "Hilti");
+        B(brands, "Garden", "Stihl", "Husqvarna", "EGO", "Ryobi", "DeWalt", "Greenworks", "Toro", "Scotts", "Fiskars");
+        B(brands, "Office", "Herman Miller", "Steelcase", "Staples", "HP", "Canon", "Brother", "Epson", "Fellowes", "Logitech");
+        B(brands, "Crafts", "Cricut", "Silhouette", "Singer", "Brother", "Janome", "DMC", "Fiskars", "Michaels", "Sizzix");
+        B(brands, "Sporting Goods", "Wilson", "Spalding", "Titleist", "Callaway", "TaylorMade", "Yeti", "Coleman", "Shimano", "Nike", "Adidas", "Rawlings", "Easton", "Mizuno", "Garmin", "The North Face", "Patagonia");
+        B(brands, "Fitness", "Bowflex", "NordicTrack", "Peloton", "Rogue", "Theragun", "Fitbit", "Garmin", "Concept2", "Schwinn", "Bowmar", "Hydro Flask");
+        B(brands, "Health & Beauty", "Dyson", "Shark", "Revlon", "Conair", "T3", "ghd", "Clinique", "MAC", "Estée Lauder", "Dior", "Chanel", "Fenty Beauty", "The Ordinary");
+        B(brands, "Baby", "Graco", "Chicco", "Fisher-Price", "Britax", "Evenflo", "Medela", "Baby Brezza", "UPPAbaby", "Nuna", "Doona", "Cybex", "Ergobaby");
+        B(brands, "Pet Supplies", "Kong", "PetSafe", "Furbo", "Chewy", "Blue Buffalo", "Ruffwear", "Kurgo", "Petmate", "Fluval");
+        B(brands, "Automotive", "Bosch", "ACDelco", "Mobil 1", "K&N", "WeatherTech", "Garmin", "Michelin", "Goodyear", "Meguiar's", "Chemical Guys", "NOCO");
+        B(brands, "Industrial", "3M", "Honeywell", "Fluke", "Grainger", "Klein Tools", "Milwaukee", "DeWalt", "Makita");
+        foreach (string category in Categories.Select(category => category.Value))
+        {
+            B(brands, category, "Other");
+        }
         return brands
             .DistinctBy(brand => $"{brand.ParentValue}{brand.Value}")
             .ToArray();
@@ -122,6 +142,48 @@ public static class InventoryReferenceCatalog
 
     private static void B(List<InventoryReferenceOptionDto> target, string category, params string[] names) =>
         target.AddRange(names.Select(name => new InventoryReferenceOptionDto(name, name, category, category)));
+
+    private static InventoryReferenceOptionDto[] BuildModels()
+    {
+        var models = new List<InventoryReferenceOptionDto>();
+        M(models, "Nintendo", "NES", "SNES", "Nintendo 64", "GameCube", "Wii", "Wii U", "Switch", "Switch Lite", "Switch OLED", "Game Boy", "Game Boy Color", "Game Boy Advance", "Nintendo DS", "Nintendo 3DS", "Amiibo");
+        M(models, "Sony", "PlayStation", "PlayStation 2", "PlayStation 3", "PlayStation 4", "PlayStation 5", "PSP", "PS Vita", "Walkman", "Alpha", "Cyber-shot", "Bravia");
+        M(models, "Microsoft", "Xbox", "Xbox 360", "Xbox One", "Xbox Series S", "Xbox Series X", "Surface", "Zune");
+        M(models, "Apple", "iPhone", "iPad", "MacBook", "MacBook Air", "MacBook Pro", "iMac", "Mac mini", "Apple Watch", "AirPods", "HomePod", "Apple TV");
+        M(models, "Samsung", "Galaxy S", "Galaxy Note", "Galaxy Z Fold", "Galaxy Z Flip", "Galaxy Tab", "Galaxy Watch", "QLED", "The Frame");
+        M(models, "Google", "Pixel", "Pixel Pro", "Pixel Watch", "Nest", "Chromecast");
+        M(models, "Pokémon", "Base Set", "Jungle", "Fossil", "Team Rocket", "Gym Heroes", "Neo", "EX", "Diamond & Pearl", "Black & White", "XY", "Sun & Moon", "Sword & Shield", "Scarlet & Violet", "Japanese", "Promo", "Elite Trainer Box");
+        M(models, "Magic: The Gathering", "Alpha", "Beta", "Unlimited", "Revised", "Commander", "Modern", "Standard", "Collector Booster", "Set Booster", "Draft Booster");
+        M(models, "Yu-Gi-Oh!", "LOB", "MRD", "PSV", "Structure Deck", "Starter Deck", "Tin", "Booster Box");
+        M(models, "LEGO", "Star Wars", "Technic", "City", "Creator", "Ideas", "Icons", "Harry Potter", "Marvel", "Ninjago", "Speed Champions", "Minifigures");
+        M(models, "Nike", "Air Force 1", "Air Max", "Air Jordan", "Dunk", "Blazer", "Cortez", "Pegasus", "Vapormax");
+        M(models, "Jordan", "Jordan 1", "Jordan 2", "Jordan 3", "Jordan 4", "Jordan 5", "Jordan 6", "Jordan 11", "Jordan 12", "Jordan Retro");
+        M(models, "Adidas", "Ultraboost", "NMD", "Samba", "Gazelle", "Stan Smith", "Superstar", "Yeezy");
+        M(models, "Coach", "Tabby", "Rogue", "Willow", "Pillow Tabby", "Swinger", "Court", "Legacy");
+        M(models, "Louis Vuitton", "Neverfull", "Speedy", "Alma", "Pochette", "Keepall", "Noé", "Sarah Wallet");
+        M(models, "Canon", "EOS", "Rebel", "PowerShot", "EF Lens", "RF Lens");
+        M(models, "Nikon", "D Series", "Z Series", "Coolpix", "Nikkor Lens");
+        M(models, "Fujifilm", "X Series", "Instax", "FinePix");
+        M(models, "GoPro", "Hero", "Max", "Session");
+        M(models, "DJI", "Mavic", "Mini", "Air", "Phantom", "Osmo");
+        M(models, "DeWalt", "20V MAX", "FLEXVOLT", "Atomic", "XR");
+        M(models, "Milwaukee", "M12", "M18", "Fuel", "Packout");
+        M(models, "Makita", "LXT", "XGT", "CXT");
+
+        foreach (string brand in Brands.Select(brand => brand.Value).Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            M(models, brand, "Other");
+        }
+
+        return models
+            .DistinctBy(model => $"{model.ParentValue}{model.Value}")
+            .OrderBy(model => model.ParentValue)
+            .ThenBy(model => model.Value)
+            .ToArray();
+    }
+
+    private static void M(List<InventoryReferenceOptionDto> target, string brand, params string[] names) =>
+        target.AddRange(names.Select(name => new InventoryReferenceOptionDto(name, name, ParentValue: brand)));
 
     public static readonly InventoryReferenceOptionDto[] Countries = CultureInfo
         .GetCultures(CultureTypes.SpecificCultures)
@@ -148,10 +210,15 @@ public static class InventoryReferenceCatalog
         Add(sizes, "Shoe UK", HalfSteps(1, 14));
         Add(sizes, "Youth", ["Newborn", "0–3M", "3–6M", "6–9M", "9–12M", "12–18M", "18–24M", "2T", "3T", "4T", "5T", "6", "7", "8", "10", "12", "14", "16"]);
         Add(sizes, "One size", ["One size"]);
+        Add(sizes, "Other", ["Other"]);
 
         string[] waists = ["26", "28", "30", "31", "32", "33", "34", "36", "38", "40", "42", "44", "46", "48"];
         string[] inseams = ["28", "30", "32", "34", "36"];
         Add(sizes, "Waist/Inseam", waists.SelectMany(waist => inseams.Select(inseam => $"{waist}×{inseam}")).ToArray());
+        foreach (string parent in SizeSystems.Select(system => system.Value).Where(value => value != "Other"))
+        {
+            Add(sizes, parent, ["Other"]);
+        }
         return sizes.ToArray();
     }
 

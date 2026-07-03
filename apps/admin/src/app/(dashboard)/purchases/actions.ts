@@ -13,10 +13,14 @@ export type PurchaseActionResult = { ok: boolean; message: string };
 
 export async function createPurchaseLot(_previous: PurchaseActionResult, formData: FormData): Promise<PurchaseActionResult> {
   const name = textField(formData, "name");
-  if (!name) return { ok: false, message: "Lot name is required." };
+  const purchaseKind = textField(formData, "purchaseKind") === "Single" ? "Single" : "Lot";
+  if (!name) return { ok: false, message: purchaseKind === "Single" ? "Purchase name is required." : "Lot name is required." };
 
   // Items are optional: you can record a costs-only lot and itemize it on the lot page afterward.
   const selectedIds = formData.getAll("inventoryItemId").filter((value): value is string => typeof value === "string" && value.length > 0);
+  if (purchaseKind === "Single" && selectedIds.length !== 1) {
+    return { ok: false, message: "A single-item purchase must be attached to exactly one inventory item." };
+  }
 
   const costs = ["purchaseSubtotal", "shippingCost", "taxCost", "feeCost", "otherCost"].map((field) => moneyField(formData, field));
   if (costs.some((value) => !Number.isFinite(value))) {

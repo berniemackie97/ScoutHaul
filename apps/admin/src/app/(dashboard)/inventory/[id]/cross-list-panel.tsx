@@ -51,9 +51,9 @@ function Row({ itemId, account, listing }: { itemId: string; account: Account; l
 
   return (
     <div className="rounded-lg border p-3">
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <span className="font-medium">{account.displayName}</span>
+      <div className="flex flex-col gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="min-w-0 break-words font-medium">{account.displayName}</span>
           <Badge variant="secondary">{account.channel}</Badge>
           {account.isNativelySynced && <Badge variant="success">Native</Badge>}
         </div>
@@ -71,17 +71,20 @@ function Row({ itemId, account, listing }: { itemId: string; account: Account; l
           )}
         </div>
       </div>
-      <form action={save} className="mt-3 grid gap-2 sm:grid-cols-[130px_110px_1fr_auto]">
-        <select value={status} onChange={(event) => setStatus(event.target.value)} className={selectClass} aria-label="Status">
-          {STATUSES.map((option) => (
-            <option key={option} value={option}>
-              {option}
-            </option>
-          ))}
-        </select>
-        <Input name="listedPrice" type="number" step="0.01" min="0" placeholder="Price" defaultValue={money(listing?.listedPrice).replace("$", "") || undefined} className="h-9" />
+      <form action={save} className="mt-3 space-y-2">
+        <div className="grid gap-2 sm:grid-cols-2">
+          <select value={status} onChange={(event) => setStatus(event.target.value)} className={selectClass} aria-label="Status">
+            {STATUSES.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
+          <Input name="listedPrice" type="number" step="0.01" min="0" placeholder="Price" defaultValue={money(listing?.listedPrice).replace("$", "") || undefined} className="h-9" />
+        </div>
         <Input name="externalUrl" placeholder="Listing URL" defaultValue={listing?.externalUrl ?? undefined} className="h-9" />
-        <button type="submit" disabled={pending} className="bg-brand-600 hover:bg-brand-700 h-9 rounded-lg px-3 text-sm font-medium text-white disabled:opacity-50">
+        <Input name="externalListingId" placeholder="Marketplace listing ID / SKU (optional)" defaultValue={listing?.externalListingId ?? undefined} className="h-9" />
+        <button type="submit" disabled={pending} className="bg-brand-600 hover:bg-brand-700 h-9 w-full rounded-lg px-3 text-sm font-medium text-white disabled:opacity-50">
           {pending ? "…" : "Save"}
         </button>
       </form>

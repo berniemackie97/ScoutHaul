@@ -649,7 +649,10 @@ public sealed class InventoryController(
     }
 
     [HttpDelete("{id:guid}")]
-    public async Task<IActionResult> Archive(Guid id, CancellationToken cancellationToken)
+    public async Task<IActionResult> Delete(
+        Guid id,
+        [FromQuery] bool hard = false,
+        CancellationToken cancellationToken = default)
     {
         var item = await FindItem(id, cancellationToken);
         if (item is null)
@@ -657,9 +660,116 @@ public sealed class InventoryController(
             return NotFound();
         }
 
+        if (hard)
+        {
+            string? blockReason = await ValidateHardDelete(item, cancellationToken);
+            if (blockReason is not null)
+            {
+                return Conflict(blockReason);
+            }
+
+            await RemoveInventoryItemGraph(item, cancellationToken);
+            await db.SaveChangesAsync(cancellationToken);
+            return NoContent();
+        }
+
         item.IsArchived = true;
+        if (item.IsBundle)
+        {
+            ReleaseBundleComponents(item);
+        }
+
+        db.AuditLogs.Add(new AuditLog
+        {
+            OrganizationId = currentUser.OrganizationId,
+            ActorUserId = currentUser.UserId,
+            EntityName = nameof(InventoryItem),
+            EntityId = item.Id,
+            Action = "InventoryArchived",
+            DetailsJson = JsonSerializer.Serialize(new { item.Title, item.Status, item.IsBundle })
+        });
+
         await db.SaveChangesAsync(cancellationToken);
         return NoContent();
+    }
+
+    private async Task<string?> ValidateHardDelete(InventoryItem item, CancellationToken cancellationToken)
+    {
+        bool hasSaleHistory = await db.Sales.AnyAsync(
+            sale => sale.InventoryItemId == item.Id && sale.OrganizationId == currentUser.OrganizationId,
+            cancellationToken);
+        if (hasSaleHistory)
+        {
+            return "This inventory item has sale history. Archive it instead so financial reporting and corrections remain intact.";
+        }
+
+        bool hasOrderHistory = await db.OrderLines.AnyAsync(
+            line => line.InventoryItemId == item.Id && line.OrganizationId == currentUser.OrganizationId,
+            cancellationToken);
+        if (hasOrderHistory)
+        {
+            return "This inventory item is attached to a customer order. Archive it instead so customer/order history remains intact.";
+        }
+
+        bool isBundleComponent = await db.InventoryBundleComponents.AnyAsync(
+            component => component.ComponentInventoryItemId == item.Id && component.OrganizationId == currentUser.OrganizationId,
+            cancellationToken);
+        if (isBundleComponent)
+        {
+            return "This item is inside a bundle. Delete or edit the bundle before deleting the component item.";
+        }
+
+        return null;
+    }
+
+    private async Task RemoveInventoryItemGraph(InventoryItem item, CancellationToken cancellationToken)
+    {
+        ReleaseBundleComponents(item);
+
+        var channelListings = await db.ChannelListings
+            .Where(listing => listing.InventoryItemId == item.Id && listing.OrganizationId == currentUser.OrganizationId)
+            .ToListAsync(cancellationToken);
+        db.ChannelListings.RemoveRange(channelListings);
+
+        var expenses = await db.Expenses
+            .Where(expense => expense.InventoryItemId == item.Id && expense.OrganizationId == currentUser.OrganizationId)
+            .ToListAsync(cancellationToken);
+        db.Expenses.RemoveRange(expenses);
+
+        var observations = await db.MarketObservations
+            .Where(observation => observation.InventoryItemId == item.Id && observation.OrganizationId == currentUser.OrganizationId)
+            .ToListAsync(cancellationToken);
+        foreach (var observation in observations)
+        {
+            observation.InventoryItemId = null;
+        }
+
+        db.InventoryItems.Remove(item);
+        db.AuditLogs.Add(new AuditLog
+        {
+            OrganizationId = currentUser.OrganizationId,
+            ActorUserId = currentUser.UserId,
+            EntityName = nameof(InventoryItem),
+            EntityId = item.Id,
+            Action = "InventoryDeleted",
+            DetailsJson = JsonSerializer.Serialize(new { item.Title, item.Status, item.IsBundle })
+        });
+    }
+
+    private static void ReleaseBundleComponents(InventoryItem item)
+    {
+        if (!item.IsBundle)
+        {
+            return;
+        }
+
+        foreach (var component in item.BundleComponents)
+        {
+            if (component.ComponentInventoryItem is not null && component.ComponentInventoryItem.Status == InventoryStatus.Bundled)
+            {
+                component.ComponentInventoryItem.Status = InventoryStatus.ReadyToList;
+            }
+        }
     }
 
     private Task<InventoryItem?> FindItem(Guid id, CancellationToken cancellationToken) =>

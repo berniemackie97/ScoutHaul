@@ -599,6 +599,9 @@ public sealed class HaulScoutDbContext(DbContextOptions<HaulScoutDbContext> opti
             entity.Property(item => item.ShipToPostalCode).HasMaxLength(32);
             entity.Property(item => item.ShipToCountry).HasMaxLength(2);
             entity.Property(item => item.CustomerNote).HasMaxLength(2000);
+            entity.Property(item => item.ShippingCarrier).HasMaxLength(80);
+            entity.Property(item => item.TrackingNumber).HasMaxLength(160);
+            entity.Property(item => item.TrackingUrl).HasMaxLength(1500);
             ConfigureMoney(entity.Property(item => item.Subtotal));
             ConfigureMoney(entity.Property(item => item.DiscountTotal));
             ConfigureMoney(entity.Property(item => item.TaxTotal));

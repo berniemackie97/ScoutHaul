@@ -18,10 +18,10 @@ public sealed class InventoryReferenceDataServiceTests
     }
 
     [Fact]
-    public async Task Reference_data_combines_canonical_options_with_existing_organization_values()
+    public async Task Reference_data_returns_curated_options_without_promoting_legacy_values()
     {
         Guid organizationId = Guid.NewGuid();
-        await using HaulScoutDbContext db = NewContext(organizationId, nameof(Reference_data_combines_canonical_options_with_existing_organization_values));
+        await using HaulScoutDbContext db = NewContext(organizationId, nameof(Reference_data_returns_curated_options_without_promoting_legacy_values));
         db.InventoryItems.Add(new InventoryItem
         {
             Title = "Existing item",
@@ -36,30 +36,37 @@ public sealed class InventoryReferenceDataServiceTests
         InventoryReferenceDataDto data = await service.GetAsync(CancellationToken.None);
 
         Assert.Contains(data.Categories, option => option.Value == "Collectibles" && option.IsLegacy == false);
-        Assert.Contains(data.Categories, option => option.Value == "Collectablez" && option.IsLegacy);
+        Assert.DoesNotContain(data.Categories, option => option.Value == "Collectablez");
         Assert.Contains(data.Brands, option => option.Value == "Nintendo");
         Assert.Contains(data.Models, option => option.Value == "Switch OLED" && option.ParentValue == "Nintendo");
         Assert.Contains(data.StorageLocations, option => option.Value == "Warehouse A / Bin 12");
+        Assert.Contains(data.StorageLocations, option => option.Value == "Other");
         Assert.Contains(data.Countries, option => option.Value == "US");
+        Assert.DoesNotContain(data.Categories, option => option.IsLegacy);
+        Assert.DoesNotContain(data.Brands, option => option.IsLegacy);
+        Assert.DoesNotContain(data.Models, option => option.IsLegacy);
     }
 
     [Fact]
-    public async Task Resolution_canonicalizes_case_and_rejects_unapproved_values()
+    public async Task Resolution_canonicalizes_case_and_maps_unapproved_values_to_other()
     {
         Guid organizationId = Guid.NewGuid();
-        await using HaulScoutDbContext db = NewContext(organizationId, nameof(Resolution_canonicalizes_case_and_rejects_unapproved_values));
+        await using HaulScoutDbContext db = NewContext(organizationId, nameof(Resolution_canonicalizes_case_and_maps_unapproved_values_to_other));
         db.ProductIdentities.Add(new ProductIdentity { Title = "Console", Brand = "Nintendo", Model = "Switch OLED" });
         await db.SaveChangesAsync();
 
         var service = new InventoryReferenceDataService(db, new StubCurrentUser(organizationId));
-        var accepted = await service.ResolveAsync(Request(category: "collectibles", brand: "nintendo", model: "switch oled"), CancellationToken.None);
-        var rejected = await service.ResolveAsync(Request(category: "Collectibels", brand: "Nintendo", model: "Switch OLED"), CancellationToken.None);
+        var accepted = await service.ResolveAsync(Request(category: "video games", brand: "nintendo", model: "switch oled"), CancellationToken.None);
+        var corrected = await service.ResolveAsync(Request(category: "Collectibels", brand: "Nintenndo", model: "Switch-ish"), CancellationToken.None);
 
         Assert.Null(accepted.Error);
-        Assert.Equal("Collectibles", accepted.Values!.Category);
+        Assert.Equal("Video Games", accepted.Values!.Category);
         Assert.Equal("Nintendo", accepted.Values.Brand);
         Assert.Equal("Switch OLED", accepted.Values.Model);
-        Assert.Contains("Category must be selected", rejected.Error);
+        Assert.Null(corrected.Error);
+        Assert.Equal("Other", corrected.Values!.Category);
+        Assert.Equal("Other", corrected.Values.Brand);
+        Assert.Equal("Other", corrected.Values.Model);
     }
 
     private static HaulScoutDbContext NewContext(Guid organizationId, string databaseName)
