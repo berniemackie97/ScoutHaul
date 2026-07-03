@@ -19,17 +19,43 @@ function SubmitButton({ kind }: { kind: PurchaseKind }) {
   return <Button type="submit" disabled={pending}>{pending ? "Saving…" : kind === "Single" ? "Record single-item purchase" : "Record acquisition lot"}</Button>;
 }
 
-function NumberField({ name, label, value, onChange }: { name: string; label: string; value: string; onChange: (value: string) => void }) {
+function NumberField({
+  name,
+  label,
+  value,
+  onChange,
+  error,
+}: {
+  name: string;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  error?: string;
+}) {
   return (
     <div className="space-y-2">
       <Label htmlFor={name}>{label}</Label>
-      <Input id={name} name={name} type="number" step="0.01" min="0" value={value} onChange={(event) => onChange(event.target.value)} />
+      <Input
+        id={name}
+        name={name}
+        type="number"
+        step="0.01"
+        min="0"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        aria-invalid={error ? "true" : undefined}
+      />
+      {error && <p className="text-destructive text-xs">{error}</p>}
     </div>
   );
 }
 
 export function PurchaseLotCreator({ candidates }: { candidates: InventoryItem[] }) {
   const [state, action] = useActionState(createPurchaseLot, initial);
+  const values = state.values ?? {};
+  const fieldErrors = state.fieldErrors ?? {};
+  const formKey = state.formKey ?? "initial";
+  const valueFor = (name: string, fallback = "") => values[name] ?? fallback;
   const [purchaseKind, setPurchaseKind] = useState<PurchaseKind>("Single");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [allocationMethod, setAllocationMethod] = useState<AllocationMethod>("Equal");
@@ -45,6 +71,18 @@ export function PurchaseLotCreator({ candidates }: { candidates: InventoryItem[]
   );
   const landedCost = [purchaseSubtotal, shippingCost, taxCost, feeCost, otherCost].reduce((sum, value) => sum + (Number(value) || 0), 0);
   const equalAllocation = selectedItems.length > 0 ? landedCost / selectedItems.length : 0;
+
+  useEffect(() => {
+    if (!state.values) return;
+    setPurchaseKind(state.values.purchaseKind === "Lot" ? "Lot" : "Single");
+    setAllocationMethod((state.values.allocationMethod as AllocationMethod | undefined) ?? "Equal");
+    setPurchaseSubtotal(state.values.purchaseSubtotal ?? "");
+    setShippingCost(state.values.shippingCost ?? "");
+    setTaxCost(state.values.taxCost ?? "");
+    setFeeCost(state.values.feeCost ?? "");
+    setOtherCost(state.values.otherCost ?? "");
+    setSelected(new Set((state.values.selectedInventoryItemIds ?? "").split("|").filter(Boolean)));
+  }, [state.formKey, state.values]);
 
   useEffect(() => {
     if (purchaseKind !== "Single" || selected.size <= 1) return;
@@ -88,19 +126,37 @@ export function PurchaseLotCreator({ candidates }: { candidates: InventoryItem[]
             </div>
             <div className="space-y-2 sm:col-span-2">
               <Label htmlFor="name">{purchaseKind === "Single" ? "Purchase name" : "Lot name"}</Label>
-              <Input id="name" name="name" required placeholder={purchaseKind === "Single" ? "e.g. Gardevoir & Sylveon GX purchase" : "e.g. Goodwill bins 2026-07-02, auction lot 114"} />
+              <Input
+                key={`name:${formKey}`}
+                id="name"
+                name="name"
+                required
+                placeholder={purchaseKind === "Single" ? "e.g. Gardevoir & Sylveon GX purchase" : "e.g. Goodwill bins 2026-07-02, auction lot 114"}
+                defaultValue={valueFor("name")}
+                aria-invalid={fieldErrors.name ? "true" : undefined}
+              />
+              {fieldErrors.name && <p className="text-destructive text-xs">{fieldErrors.name}</p>}
             </div>
             <div className="space-y-2">
               <Label htmlFor="supplierName">Supplier / source</Label>
-              <Input id="supplierName" name="supplierName" placeholder="Goodwill, Facebook seller, auction house…" />
+              <Input key={`supplierName:${formKey}`} id="supplierName" name="supplierName" placeholder="Goodwill, Facebook seller, auction house…" defaultValue={valueFor("supplierName")} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="externalReference">Receipt / invoice / order #</Label>
-              <Input id="externalReference" name="externalReference" />
+              <Input key={`externalReference:${formKey}`} id="externalReference" name="externalReference" defaultValue={valueFor("externalReference")} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="purchasedAt">Purchase date</Label>
-              <Input id="purchasedAt" name="purchasedAt" type="date" defaultValue={today()} required />
+              <Input
+                key={`purchasedAt:${formKey}`}
+                id="purchasedAt"
+                name="purchasedAt"
+                type="date"
+                defaultValue={valueFor("purchasedAt", today())}
+                required
+                aria-invalid={fieldErrors.purchasedAt ? "true" : undefined}
+              />
+              {fieldErrors.purchasedAt && <p className="text-destructive text-xs">{fieldErrors.purchasedAt}</p>}
             </div>
             <div className="space-y-2">
               <Label htmlFor="allocationMethod">Allocation method</Label>
@@ -126,11 +182,11 @@ export function PurchaseLotCreator({ candidates }: { candidates: InventoryItem[]
             <CardDescription>Subtotal plus shipping/tax/fees/other becomes the total cost basis allocated to items.</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-3 lg:grid-cols-5">
-            <NumberField name="purchaseSubtotal" label="Purchase subtotal" value={purchaseSubtotal} onChange={setPurchaseSubtotal} />
-            <NumberField name="shippingCost" label="Inbound shipping" value={shippingCost} onChange={setShippingCost} />
-            <NumberField name="taxCost" label="Tax" value={taxCost} onChange={setTaxCost} />
-            <NumberField name="feeCost" label="Buyer fees" value={feeCost} onChange={setFeeCost} />
-            <NumberField name="otherCost" label="Other landed cost" value={otherCost} onChange={setOtherCost} />
+            <NumberField name="purchaseSubtotal" label="Purchase subtotal" value={purchaseSubtotal} onChange={setPurchaseSubtotal} error={fieldErrors.purchaseSubtotal} />
+            <NumberField name="shippingCost" label="Inbound shipping" value={shippingCost} onChange={setShippingCost} error={fieldErrors.shippingCost} />
+            <NumberField name="taxCost" label="Tax" value={taxCost} onChange={setTaxCost} error={fieldErrors.taxCost} />
+            <NumberField name="feeCost" label="Buyer fees" value={feeCost} onChange={setFeeCost} error={fieldErrors.feeCost} />
+            <NumberField name="otherCost" label="Other landed cost" value={otherCost} onChange={setOtherCost} error={fieldErrors.otherCost} />
           </CardContent>
         </Card>
 
@@ -147,6 +203,7 @@ export function PurchaseLotCreator({ candidates }: { candidates: InventoryItem[]
             </CardDescription>
           </CardHeader>
           <CardContent>
+            {fieldErrors.inventoryItemId && <p className="text-destructive mb-3 text-sm">{fieldErrors.inventoryItemId}</p>}
             {candidates.length === 0 ? (
               <p className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">No unassigned active inventory candidates found.</p>
             ) : (
@@ -178,8 +235,34 @@ export function PurchaseLotCreator({ candidates }: { candidates: InventoryItem[]
                           </td>
                           <td className="px-3 py-2 text-right tabular-nums">{money(item.purchasePrice)}</td>
                           <td className="px-3 py-2 text-right tabular-nums">{money(item.estimatedSalePrice)}</td>
-                          <td className="px-3 py-2"><Input name={`manualCost:${item.id}`} type="number" step="0.01" min="0" disabled={!checked || purchaseKind === "Single" || allocationMethod !== "Manual"} placeholder={allocationMethod === "Equal" ? money(equalAllocation) : ""} /></td>
-                          <td className="px-3 py-2"><Input name={`weight:${item.id}`} type="number" step="0.01" min="0" disabled={!checked || purchaseKind === "Single" || allocationMethod !== "WeightedByExpectedValue"} placeholder={item.estimatedSalePrice != null ? String(item.estimatedSalePrice) : ""} /></td>
+                          <td className="px-3 py-2">
+                            <Input
+                              key={`manualCost:${item.id}:${formKey}`}
+                              name={`manualCost:${item.id}`}
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              disabled={!checked || purchaseKind === "Single" || allocationMethod !== "Manual"}
+                              placeholder={allocationMethod === "Equal" ? money(equalAllocation) : ""}
+                              defaultValue={valueFor(`manualCost:${item.id}`)}
+                              aria-invalid={fieldErrors[`manualCost:${item.id}`] ? "true" : undefined}
+                            />
+                            {fieldErrors[`manualCost:${item.id}`] && <p className="text-destructive mt-1 text-xs">{fieldErrors[`manualCost:${item.id}`]}</p>}
+                          </td>
+                          <td className="px-3 py-2">
+                            <Input
+                              key={`weight:${item.id}:${formKey}`}
+                              name={`weight:${item.id}`}
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              disabled={!checked || purchaseKind === "Single" || allocationMethod !== "WeightedByExpectedValue"}
+                              placeholder={item.estimatedSalePrice != null ? String(item.estimatedSalePrice) : ""}
+                              defaultValue={valueFor(`weight:${item.id}`)}
+                              aria-invalid={fieldErrors[`weight:${item.id}`] ? "true" : undefined}
+                            />
+                            {fieldErrors[`weight:${item.id}`] && <p className="text-destructive mt-1 text-xs">{fieldErrors[`weight:${item.id}`]}</p>}
+                          </td>
                         </tr>
                       );
                     })}
@@ -192,7 +275,7 @@ export function PurchaseLotCreator({ candidates }: { candidates: InventoryItem[]
 
         <Card>
           <CardHeader><CardTitle className="text-lg">Notes</CardTitle></CardHeader>
-          <CardContent><Textarea name="notes" rows={3} placeholder="Receipt context, payment account, condition exceptions, follow-up work…" /></CardContent>
+          <CardContent><Textarea key={`notes:${formKey}`} name="notes" rows={3} placeholder="Receipt context, payment account, condition exceptions, follow-up work…" defaultValue={valueFor("notes")} /></CardContent>
         </Card>
       </div>
 

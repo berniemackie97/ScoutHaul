@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useMemo, useState } from "react";
+import { useActionState, useEffect, useMemo, useState } from "react";
 import { useFormStatus } from "react-dom";
 import type { components } from "@overhaul/api-client";
 import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Label, Textarea } from "@overhaul/ui";
@@ -35,28 +35,81 @@ function SubmitButton() {
   return <Button type="submit" disabled={pending}>{pending ? "Creating…" : "Create item"}</Button>;
 }
 
-function Field({ label, name, type = "text", placeholder, step, min }: { label: string; name: string; type?: string; placeholder?: string; step?: string; min?: string }) {
+function Field({
+  label,
+  name,
+  type = "text",
+  placeholder,
+  step,
+  min,
+  defaultValue,
+  error,
+  formKey,
+}: {
+  label: string;
+  name: string;
+  type?: string;
+  placeholder?: string;
+  step?: string;
+  min?: string;
+  defaultValue?: string | number | null;
+  error?: string;
+  formKey?: string;
+}) {
   return (
     <div className="space-y-2">
       <Label htmlFor={name}>{label}</Label>
-      <Input id={name} name={name} type={type} placeholder={placeholder} step={step} min={min} />
+      <Input
+        key={`${name}:${formKey ?? "initial"}`}
+        id={name}
+        name={name}
+        type={type}
+        placeholder={placeholder}
+        step={step}
+        min={min}
+        defaultValue={defaultValue ?? ""}
+        aria-invalid={error ? "true" : undefined}
+      />
+      {error && <p className="text-destructive text-xs">{error}</p>}
     </div>
   );
 }
 
-function EnumField({ label, name, options }: { label: string; name: string; options: readonly (readonly [string, string])[] }) {
+function EnumField({
+  label,
+  name,
+  options,
+  defaultValue,
+  error,
+  formKey,
+}: {
+  label: string;
+  name: string;
+  options: readonly (readonly [string, string])[];
+  defaultValue?: string;
+  error?: string;
+  formKey?: string;
+}) {
   return (
     <div className="space-y-2">
       <Label htmlFor={name}>{label}</Label>
-      <select id={name} name={name} className={selectClass} defaultValue={options[0]?.[0]}>
+      <select
+        key={`${name}:${formKey ?? "initial"}`}
+        id={name}
+        name={name}
+        className={selectClass}
+        defaultValue={defaultValue ?? options[0]?.[0]}
+        aria-invalid={error ? "true" : undefined}
+      >
         {options.map(([value, text]) => <option key={value} value={value}>{text}</option>)}
       </select>
+      {error && <p className="text-destructive text-xs">{error}</p>}
     </div>
   );
 }
 
-function OptionField({ label, name, value, options, onChange, disabled = false }: {
-  label: string; name: string; value: string; options: ReferenceOption[]; onChange?: (value: string) => void; disabled?: boolean;
+function OptionField({ label, name, value, options, onChange, disabled = false, error, formKey }: {
+  label: string; name: string; value: string; options: ReferenceOption[]; onChange?: (value: string) => void; disabled?: boolean; error?: string; formKey?: string;
 }) {
   const approvedOptions = useMemo(() => options.filter((option) => !option.isLegacy && option.value && option.label), [options]);
   const effectiveValue = normalizeOptionValue(value, approvedOptions);
@@ -73,6 +126,7 @@ function OptionField({ label, name, value, options, onChange, disabled = false }
     <div className="space-y-2">
       <Label htmlFor={name}>{label}</Label>
       <select
+        key={`${name}:${onChange ? "controlled" : formKey ?? "initial"}`}
         id={name}
         name={name}
         value={onChange ? effectiveValue : undefined}
@@ -80,6 +134,7 @@ function OptionField({ label, name, value, options, onChange, disabled = false }
         onChange={(event) => onChange?.(event.target.value)}
         className={selectClass}
         disabled={disabled}
+        aria-invalid={error ? "true" : undefined}
       >
         <option value="">Not assigned</option>
         {[...groups.entries()].map(([group, values]) =>
@@ -92,6 +147,7 @@ function OptionField({ label, name, value, options, onChange, disabled = false }
           )
         )}
       </select>
+      {error && <p className="text-destructive text-xs">{error}</p>}
     </div>
   );
 }
@@ -104,12 +160,25 @@ function normalizeOptionValue(value: string, options: ReferenceOption[]) {
 
 export function ItemCreator({ referenceData }: { referenceData: ReferenceData }) {
   const [state, action] = useActionState(createInventoryItem, initial);
+  const values = state.values ?? {};
+  const fieldErrors = state.fieldErrors ?? {};
+  const formKey = state.formKey ?? "initial";
   const [category, setCategory] = useState("");
   const [brand, setBrand] = useState("");
   const [model, setModel] = useState("");
   const [storageLocation, setStorageLocation] = useState("");
   const [sizeSystem, setSizeSystem] = useState("");
   const [sizeValue, setSizeValue] = useState("");
+
+  useEffect(() => {
+    if (!state.values) return;
+    setCategory(state.values.category ?? "");
+    setBrand(state.values.brand ?? "");
+    setModel(state.values.model ?? "");
+    setStorageLocation(state.values.storageLocation ?? "");
+    setSizeSystem(state.values.sizeSystem ?? "");
+    setSizeValue(state.values.sizeValue ?? "");
+  }, [state.formKey, state.values]);
 
   const categories = referenceData.categories ?? [];
   const safeCategory = normalizeOptionValue(category, categories);
@@ -131,16 +200,25 @@ export function ItemCreator({ referenceData }: { referenceData: ReferenceData })
           <CardContent className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2 sm:col-span-2">
               <Label htmlFor="title">Title</Label>
-              <Input id="title" name="title" required placeholder="e.g. Super Mario 64, N64, complete in box" />
+              <Input
+                key={`title:${formKey}`}
+                id="title"
+                name="title"
+                required
+                placeholder="e.g. Super Mario 64, N64, complete in box"
+                defaultValue={values.title ?? ""}
+                aria-invalid={fieldErrors.title ? "true" : undefined}
+              />
+              {fieldErrors.title && <p className="text-destructive text-xs">{fieldErrors.title}</p>}
             </div>
-            <OptionField label="Category" name="category" value={category} options={categories} onChange={(value) => { setCategory(value); setBrand(""); setModel(""); }} />
-            <OptionField label="Brand" name="brand" value={brand} options={brands} onChange={(value) => { setBrand(value); setModel(""); }} />
-            <OptionField label="Model / product line" name="model" value={model} options={models} onChange={setModel} disabled={!safeBrand || models.length === 0} />
-            <OptionField label="Color" name="color" value="" options={referenceData.colors ?? []} />
-            <OptionField label="Condition" name="condition" value="" options={referenceData.conditions ?? []} />
-            <OptionField label="Storage location" name="storageLocation" value={storageLocation} options={referenceData.storageLocations ?? []} onChange={setStorageLocation} />
-            {showSizing && <OptionField label="Size system" name="sizeSystem" value={sizeSystem} options={referenceData.sizeSystems ?? []} onChange={(value) => { setSizeSystem(value); setSizeValue(""); }} />}
-            {showSizing && <OptionField label="Size" name="sizeValue" value={sizeValue} options={sizes} onChange={setSizeValue} disabled={!sizeSystem} />}
+            <OptionField label="Category" name="category" value={category} options={categories} onChange={(value) => { setCategory(value); setBrand(""); setModel(""); }} error={fieldErrors.category} />
+            <OptionField label="Brand" name="brand" value={brand} options={brands} onChange={(value) => { setBrand(value); setModel(""); }} error={fieldErrors.brand} />
+            <OptionField label="Model / product line" name="model" value={model} options={models} onChange={setModel} disabled={!safeBrand || models.length === 0} error={fieldErrors.model} />
+            <OptionField label="Color" name="color" value={values.color ?? ""} options={referenceData.colors ?? []} error={fieldErrors.color} formKey={formKey} />
+            <OptionField label="Condition" name="condition" value={values.condition ?? ""} options={referenceData.conditions ?? []} error={fieldErrors.condition} formKey={formKey} />
+            <OptionField label="Storage location" name="storageLocation" value={storageLocation} options={referenceData.storageLocations ?? []} onChange={setStorageLocation} error={fieldErrors.storageLocation} />
+            {showSizing && <OptionField label="Size system" name="sizeSystem" value={sizeSystem} options={referenceData.sizeSystems ?? []} onChange={(value) => { setSizeSystem(value); setSizeValue(""); }} error={fieldErrors.sizeSystem} />}
+            {showSizing && <OptionField label="Size" name="sizeValue" value={sizeValue} options={sizes} onChange={setSizeValue} disabled={!sizeSystem} error={fieldErrors.sizeValue} />}
           </CardContent>
         </Card>
 
@@ -150,8 +228,8 @@ export function ItemCreator({ referenceData }: { referenceData: ReferenceData })
             <CardDescription>Ownership and functional state drive consignment, repair, and listing routing.</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-2">
-            <EnumField label="Ownership" name="ownershipType" options={ownershipOptions} />
-            <EnumField label="Functional status" name="functionalStatus" options={functionalOptions} />
+            <EnumField label="Ownership" name="ownershipType" options={ownershipOptions} defaultValue={values.ownershipType} error={fieldErrors.ownershipType} formKey={formKey} />
+            <EnumField label="Functional status" name="functionalStatus" options={functionalOptions} defaultValue={values.functionalStatus} error={fieldErrors.functionalStatus} formKey={formKey} />
           </CardContent>
         </Card>
 
@@ -161,9 +239,9 @@ export function ItemCreator({ referenceData }: { referenceData: ReferenceData })
             <CardDescription>Single-item purchase cost becomes this item&rsquo;s cost basis for profit reporting.</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-3">
-            <Field label="Purchase price" name="purchasePrice" type="number" step="0.01" min="0" />
-            <Field label="Seller asking price" name="sellerAskingPrice" type="number" step="0.01" min="0" />
-            <Field label="Estimated sale price" name="estimatedSalePrice" type="number" step="0.01" min="0" />
+            <Field label="Purchase price" name="purchasePrice" type="number" step="0.01" min="0" defaultValue={values.purchasePrice} error={fieldErrors.purchasePrice} formKey={formKey} />
+            <Field label="Seller asking price" name="sellerAskingPrice" type="number" step="0.01" min="0" defaultValue={values.sellerAskingPrice} error={fieldErrors.sellerAskingPrice} formKey={formKey} />
+            <Field label="Estimated sale price" name="estimatedSalePrice" type="number" step="0.01" min="0" defaultValue={values.estimatedSalePrice} error={fieldErrors.estimatedSalePrice} formKey={formKey} />
           </CardContent>
         </Card>
 
@@ -172,15 +250,15 @@ export function ItemCreator({ referenceData }: { referenceData: ReferenceData })
             <CardTitle className="text-lg">Details and notes</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-2">
-            <Field label="Barcode / UPC" name="barcode" />
-            <Field label="Serial number" name="serialNumber" />
+            <Field label="Barcode / UPC" name="barcode" defaultValue={values.barcode} error={fieldErrors.barcode} formKey={formKey} />
+            <Field label="Serial number" name="serialNumber" defaultValue={values.serialNumber} error={fieldErrors.serialNumber} formKey={formKey} />
             <div className="space-y-2 sm:col-span-2">
               <Label htmlFor="description">Description</Label>
-              <Textarea id="description" name="description" rows={3} placeholder="Condition detail, provenance, measurements…" />
+              <Textarea key={`description:${formKey}`} id="description" name="description" rows={3} placeholder="Condition detail, provenance, measurements…" defaultValue={values.description ?? ""} />
             </div>
             <div className="space-y-2 sm:col-span-2">
               <Label htmlFor="notes">Internal notes</Label>
-              <Textarea id="notes" name="notes" rows={2} placeholder="Where/how acquired, follow-up work…" />
+              <Textarea key={`notes:${formKey}`} id="notes" name="notes" rows={2} placeholder="Where/how acquired, follow-up work…" defaultValue={values.notes ?? ""} />
             </div>
           </CardContent>
         </Card>

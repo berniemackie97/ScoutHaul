@@ -8,6 +8,7 @@ import {
   getApiBaseUrl,
   getApiClient,
 } from "@/lib/api";
+import { failedFormState, type FailedFormState, type FieldErrors } from "@/lib/form-state";
 
 type UpsertInventoryItemRequest = components["schemas"]["UpsertInventoryItemRequest"];
 type OwnershipType = components["schemas"]["InventoryOwnershipType"];
@@ -21,6 +22,12 @@ type WeightUnit = components["schemas"]["WeightUnit"];
 export type InventoryActionResult = {
   ok: boolean;
   message: string;
+} & FailedFormState;
+
+type NumberOptions = {
+  min?: number;
+  max?: number;
+  integer?: boolean;
 };
 
 const initialFailure = (message: string): InventoryActionResult => ({ ok: false, message });
@@ -32,11 +39,33 @@ function textValue(formData: FormData, name: string): string | null {
   return normalized.length > 0 ? normalized : null;
 }
 
-function numberValue(formData: FormData, name: string): number | null {
+function numberValue(
+  formData: FormData,
+  name: string,
+  label: string,
+  fieldErrors: FieldErrors,
+  options: NumberOptions = {},
+): number | null {
   const value = textValue(formData, name);
   if (value === null) return null;
   const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : null;
+  if (!Number.isFinite(parsed)) {
+    fieldErrors[name] = `${label} must be a valid number.`;
+    return null;
+  }
+  if (options.integer && !Number.isInteger(parsed)) {
+    fieldErrors[name] = `${label} must be a whole number.`;
+    return null;
+  }
+  if (options.min !== undefined && parsed < options.min) {
+    fieldErrors[name] = `${label} cannot be less than ${options.min}.`;
+    return null;
+  }
+  if (options.max !== undefined && parsed > options.max) {
+    fieldErrors[name] = `${label} cannot be greater than ${options.max}.`;
+    return null;
+  }
+  return parsed;
 }
 
 function errorMessage(error: unknown, fallback: string): string {
@@ -56,12 +85,25 @@ export async function updateInventoryItem(
   formData: FormData,
 ): Promise<InventoryActionResult> {
   const title = textValue(formData, "title");
-  if (!title) return initialFailure("Title is required.");
+  const fieldErrors: FieldErrors = {};
+  if (!title) fieldErrors.title = "Title is required.";
+
+  const sellerAskingPrice = numberValue(formData, "sellerAskingPrice", "Seller asking price", fieldErrors, { min: 0 });
+  const purchasePrice = numberValue(formData, "purchasePrice", "Acquisition cost", fieldErrors, { min: 0 });
+  const estimatedSalePrice = numberValue(formData, "estimatedSalePrice", "Estimated sale price", fieldErrors, { min: 0 });
+  const manufactureYear = numberValue(formData, "manufactureYear", "Manufacture year", fieldErrors, { min: 1800, max: 2200, integer: true });
+  const length = numberValue(formData, "length", "Length", fieldErrors, { min: 0 });
+  const width = numberValue(formData, "width", "Width", fieldErrors, { min: 0 });
+  const height = numberValue(formData, "height", "Height", fieldErrors, { min: 0 });
+  const weight = numberValue(formData, "weight", "Weight", fieldErrors, { min: 0 });
+  if (Object.keys(fieldErrors).length > 0) {
+    return failedFormState("Fix the highlighted fields.", formData, fieldErrors);
+  }
 
   const api = await getApiClient();
   const current = await api.GET("/api/inventory/{id}", { params: { path: { id } } });
   if (!current.data) {
-    return initialFailure(errorMessage(current.error, "Inventory item could not be loaded."));
+    return failedFormState(errorMessage(current.error, "Inventory item could not be loaded."), formData);
   }
 
   const body: UpsertInventoryItemRequest = {
@@ -86,9 +128,9 @@ export async function updateInventoryItem(
     testingNotes: textValue(formData, "testingNotes"),
     cleaningNotes: textValue(formData, "cleaningNotes"),
     listingNotes: textValue(formData, "listingNotes"),
-    sellerAskingPrice: numberValue(formData, "sellerAskingPrice"),
-    purchasePrice: numberValue(formData, "purchasePrice"),
-    estimatedSalePrice: numberValue(formData, "estimatedSalePrice"),
+    sellerAskingPrice,
+    purchasePrice,
+    estimatedSalePrice,
     barcode: textValue(formData, "barcode"),
     notes: textValue(formData, "notes"),
     ownershipType: textValue(formData, "ownershipType") as OwnershipType,
@@ -99,12 +141,12 @@ export async function updateInventoryItem(
     manufacturerPartNumber: textValue(formData, "manufacturerPartNumber"),
     serialNumber: textValue(formData, "serialNumber"),
     countryOfOrigin: textValue(formData, "countryOfOrigin"),
-    manufactureYear: numberValue(formData, "manufactureYear"),
-    length: numberValue(formData, "length"),
-    width: numberValue(formData, "width"),
-    height: numberValue(formData, "height"),
+    manufactureYear,
+    length,
+    width,
+    height,
     dimensionUnit: textValue(formData, "dimensionUnit") as DimensionUnit,
-    weight: numberValue(formData, "weight"),
+    weight,
     weightUnit: textValue(formData, "weightUnit") as WeightUnit,
   };
 
@@ -113,7 +155,7 @@ export async function updateInventoryItem(
     body,
   });
   if (!result.data) {
-    return initialFailure(errorMessage(result.error, "Inventory changes could not be saved."));
+    return failedFormState(errorMessage(result.error, "Inventory changes could not be saved."), formData);
   }
 
   revalidatePath("/inventory");

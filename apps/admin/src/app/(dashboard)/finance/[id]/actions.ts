@@ -3,12 +3,18 @@
 import { revalidatePath } from "next/cache";
 import type { components } from "@overhaul/api-client";
 import { getApiClient } from "@/lib/api";
+import { failedFormState, type FailedFormState, type FieldErrors } from "@/lib/form-state";
 
 type UpdateSaleRequest = components["schemas"]["UpdateSaleRequest"];
 type SaleStatusTransitionRequest = components["schemas"]["SaleStatusTransitionRequest"];
 type SaleStatus = components["schemas"]["SaleStatus"];
 
-export type SaleActionResult = { ok: boolean; message: string };
+export type SaleActionResult = { ok: boolean; message: string } & FailedFormState;
+
+type NumberOptions = {
+  required?: boolean;
+  positive?: boolean;
+};
 
 function textValue(formData: FormData, name: string): string | null {
   const value = formData.get(name);
@@ -17,11 +23,37 @@ function textValue(formData: FormData, name: string): string | null {
   return normalized.length > 0 ? normalized : null;
 }
 
-function numberValue(formData: FormData, name: string): number | null {
+function failure(message: string, formData: FormData, fieldErrors: FieldErrors = {}): SaleActionResult {
+  const result = failedFormState(message, formData, fieldErrors);
+  return {
+    ...result,
+    values: {
+      ...(result.values ?? {}),
+      taxRemittedByPlatform: formData.get("taxRemittedByPlatform") === "on" ? "on" : "off",
+    },
+  };
+}
+
+function numberValue(formData: FormData, name: string, label: string, fieldErrors: FieldErrors, options: NumberOptions = {}): number | null {
   const value = textValue(formData, name);
-  if (value === null) return 0;
+  if (value === null) {
+    if (options.required) fieldErrors[name] = `${label} is required.`;
+    return options.required ? null : 0;
+  }
   const parsed = Number(value);
-  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+  if (!Number.isFinite(parsed)) {
+    fieldErrors[name] = `${label} must be a valid amount.`;
+    return null;
+  }
+  if (parsed < 0) {
+    fieldErrors[name] = `${label} cannot be negative.`;
+    return null;
+  }
+  if (options.positive && parsed <= 0) {
+    fieldErrors[name] = `${label} must be greater than zero.`;
+    return null;
+  }
+  return parsed;
 }
 
 function errorMessage(error: unknown, fallback: string): string {
@@ -39,35 +71,34 @@ const money = (value: number | null | undefined) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value ?? 0);
 
 export async function updateSale(id: string, _previous: SaleActionResult, formData: FormData): Promise<SaleActionResult> {
+  const fieldErrors: FieldErrors = {};
   const reason = textValue(formData, "reason");
-  if (!reason) return { ok: false, message: "A reason is required to correct a sale." };
+  if (!reason) fieldErrors.reason = "A reason is required to correct a sale.";
 
   const platform = textValue(formData, "platform");
-  if (!platform) return { ok: false, message: "Channel / platform is required." };
+  if (!platform) fieldErrors.platform = "Channel / platform is required.";
 
-  const soldPrice = numberValue(formData, "soldPrice");
-  if (soldPrice === null || soldPrice <= 0) return { ok: false, message: "Sold price must be greater than zero." };
-
-  const platformFees = numberValue(formData, "platformFees");
-  const paymentFees = numberValue(formData, "paymentFees");
-  const shippingCost = numberValue(formData, "shippingCost");
-  const suppliesCost = numberValue(formData, "suppliesCost");
-  const otherCosts = numberValue(formData, "otherCosts");
-  const salesTaxCollected = numberValue(formData, "salesTaxCollected");
-  if ([platformFees, paymentFees, shippingCost, suppliesCost, otherCosts, salesTaxCollected].some((value) => value === null)) {
-    return { ok: false, message: "Fees, costs, and tax must be valid non-negative amounts." };
-  }
+  const soldPrice = numberValue(formData, "soldPrice", "Sold price", fieldErrors, { required: true, positive: true });
+  const platformFees = numberValue(formData, "platformFees", "Platform fees", fieldErrors);
+  const paymentFees = numberValue(formData, "paymentFees", "Payment fees", fieldErrors);
+  const shippingCost = numberValue(formData, "shippingCost", "Shipping cost", fieldErrors);
+  const suppliesCost = numberValue(formData, "suppliesCost", "Supplies cost", fieldErrors);
+  const otherCosts = numberValue(formData, "otherCosts", "Other costs", fieldErrors);
+  const salesTaxCollected = numberValue(formData, "salesTaxCollected", "Sales tax collected", fieldErrors);
 
   const soldAtRaw = textValue(formData, "soldAt");
   const soldAtDate = soldAtRaw ? new Date(`${soldAtRaw}T12:00:00Z`) : new Date();
   if (Number.isNaN(soldAtDate.getTime()) || (soldAtRaw !== null && soldAtRaw > new Date().toISOString().slice(0, 10))) {
-    return { ok: false, message: "Enter a valid sale date that is not in the future." };
+    fieldErrors.soldAt = "Enter a valid sale date that is not in the future.";
+  }
+  if (Object.keys(fieldErrors).length > 0) {
+    return failure("Fix the highlighted fields.", formData, fieldErrors);
   }
   const soldAt = soldAtDate.toISOString();
 
   const body: UpdateSaleRequest = {
-    platform,
-    soldPrice,
+    platform: platform!,
+    soldPrice: soldPrice!,
     platformFees: platformFees!,
     paymentFees: paymentFees!,
     shippingCost: shippingCost!,
@@ -77,13 +108,13 @@ export async function updateSale(id: string, _previous: SaleActionResult, formDa
     taxRemittedByPlatform: formData.get("taxRemittedByPlatform") === "on",
     soldAt,
     notes: textValue(formData, "notes"),
-    reason,
+    reason: reason!,
   };
 
   const api = await getApiClient();
   const result = await api.PUT("/api/sales/{id}", { params: { path: { id } }, body });
   if (!result.data) {
-    return { ok: false, message: errorMessage(result.error, "Could not save the correction.") };
+    return failure(errorMessage(result.error, "Could not save the correction."), formData);
   }
 
   revalidatePath("/finance");
