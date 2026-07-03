@@ -5606,7 +5606,7 @@ export interface components {
             lastError?: string | null;
         };
         /** @enum {string} */
-        ChannelListingStatus: "NotListed" | "Draft" | "Active" | "Sold" | "Delisted" | "Error";
+        ChannelListingStatus: "NotListed" | "Draft" | "Active" | "Sold" | "PendingDelist" | "Delisted" | "Error";
         CompleteSourcingStopRequest: {
             force?: boolean;
         };

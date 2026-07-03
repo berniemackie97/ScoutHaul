@@ -7343,6 +7343,7 @@
           "Draft",
           "Active",
           "Sold",
+          "PendingDelist",
           "Delisted",
           "Error"
         ],

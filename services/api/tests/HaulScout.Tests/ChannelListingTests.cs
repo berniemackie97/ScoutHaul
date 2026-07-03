@@ -74,4 +74,22 @@ public class ChannelListingTests
         Assert.IsType<NoContentResult>(await controller.Delete(item, created.Id, default));
         Assert.Equal(0, await db.ChannelListings.CountAsync());
     }
+
+    [Fact]
+    public async Task Selling_on_one_channel_flags_the_others_for_delist()
+    {
+        var (db, controller, org, item, ebay) = Setup();
+        var posh = new ChannelAccount { OrganizationId = org, Channel = "Poshmark", DisplayName = "Closet" };
+        db.ChannelAccounts.Add(posh);
+        await db.SaveChangesAsync();
+
+        await controller.Upsert(item, Req(ebay, ChannelListingStatus.Active), default);
+        await controller.Upsert(item, Req(posh.Id, ChannelListingStatus.Active), default);
+
+        // Sold on eBay → Poshmark's still-live listing must be flagged to come down.
+        await controller.Upsert(item, Req(ebay, ChannelListingStatus.Sold), default);
+
+        var poshListing = await db.ChannelListings.SingleAsync(listing => listing.ChannelAccountId == posh.Id);
+        Assert.Equal(ChannelListingStatus.PendingDelist, poshListing.Status);
+    }
 }

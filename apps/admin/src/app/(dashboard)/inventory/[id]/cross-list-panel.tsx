@@ -10,7 +10,7 @@ import { upsertChannelListing, removeChannelListing, type ListingActionResult } 
 type Account = components["schemas"]["ChannelAccountDto"];
 type Listing = components["schemas"]["ChannelListingDto"];
 
-const STATUSES = ["NotListed", "Draft", "Active", "Sold", "Delisted", "Error"] as const;
+const STATUSES = ["NotListed", "Draft", "Active", "Sold", "PendingDelist", "Delisted", "Error"] as const;
 const selectClass = "h-9 rounded-lg border border-input bg-background px-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring";
 const money = (value: number | null | undefined) =>
   typeof value === "number" ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value) : "";
@@ -19,6 +19,7 @@ const statusVariant = (status: string | undefined) => {
   if (status === "Active") return "success" as const;
   if (status === "Sold") return "info" as const;
   if (status === "Error") return "destructive" as const;
+  if (status === "PendingDelist") return "warning" as const;
   if (status === "Delisted") return "outline" as const;
   return "secondary" as const;
 };
