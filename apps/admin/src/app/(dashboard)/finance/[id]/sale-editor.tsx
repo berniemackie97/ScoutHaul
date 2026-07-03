@@ -20,11 +20,33 @@ function SaveButton() {
   );
 }
 
-function Money({ label, name, defaultValue }: { label: string; name: string; defaultValue: number }) {
+function Money({
+  label,
+  name,
+  defaultValue,
+  error,
+  formKey,
+}: {
+  label: string;
+  name: string;
+  defaultValue: string | number;
+  error?: string;
+  formKey?: string;
+}) {
   return (
     <div className="space-y-2">
       <Label htmlFor={name}>{label}</Label>
-      <Input id={name} name={name} type="number" step="0.01" min="0" defaultValue={defaultValue} />
+      <Input
+        key={`${name}:${formKey ?? "initial"}`}
+        id={name}
+        name={name}
+        type="number"
+        step="0.01"
+        min="0"
+        defaultValue={defaultValue}
+        aria-invalid={error ? "true" : undefined}
+      />
+      {error && <p className="text-destructive text-xs">{error}</p>}
     </div>
   );
 }
@@ -33,6 +55,11 @@ export function SaleEditor({ sale, channels }: { sale: SaleDto; channels: Channe
   const action = updateSale.bind(null, sale.id!);
   const [state, formAction] = useActionState(action, initialState);
   const soldDate = sale.soldAt ? new Date(sale.soldAt).toISOString().slice(0, 10) : "";
+  const values = state.values ?? {};
+  const fieldErrors = state.fieldErrors ?? {};
+  const formKey = state.formKey ?? "initial";
+  const valueFor = (name: string, fallback?: string | number | null) => values[name] ?? fallback ?? "";
+  const taxRemitted = state.values ? values.taxRemittedByPlatform !== "off" : sale.taxRemittedByPlatform ?? true;
 
   return (
     <Card>
@@ -49,11 +76,13 @@ export function SaleEditor({ sale, channels }: { sale: SaleDto; channels: Channe
             <div className="space-y-2">
               <Label htmlFor="platform">Channel / platform</Label>
               <select
+                key={`platform:${formKey}`}
                 id="platform"
                 name="platform"
-                defaultValue={sale.platform ?? ""}
+                defaultValue={valueFor("platform", sale.platform)}
                 required
                 className="border-input bg-background h-10 w-full rounded-lg border px-3 text-sm"
+                aria-invalid={fieldErrors.platform ? "true" : undefined}
               >
                 {channels.flatMap((channel) =>
                   channel.value
@@ -65,29 +94,39 @@ export function SaleEditor({ sale, channels }: { sale: SaleDto; channels: Channe
                     : []
                 )}
               </select>
+              {fieldErrors.platform && <p className="text-destructive text-xs">{fieldErrors.platform}</p>}
             </div>
             <div className="space-y-2">
               <Label htmlFor="soldAt">Sold date</Label>
-              <Input id="soldAt" name="soldAt" type="date" defaultValue={soldDate} />
+              <Input
+                key={`soldAt:${formKey}`}
+                id="soldAt"
+                name="soldAt"
+                type="date"
+                defaultValue={valueFor("soldAt", soldDate)}
+                aria-invalid={fieldErrors.soldAt ? "true" : undefined}
+              />
+              {fieldErrors.soldAt && <p className="text-destructive text-xs">{fieldErrors.soldAt}</p>}
             </div>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-3">
-            <Money label="Sold price" name="soldPrice" defaultValue={sale.soldPrice ?? 0} />
-            <Money label="Platform fees" name="platformFees" defaultValue={sale.platformFees ?? 0} />
-            <Money label="Payment fees" name="paymentFees" defaultValue={sale.paymentFees ?? 0} />
-            <Money label="Shipping cost" name="shippingCost" defaultValue={sale.shippingCost ?? 0} />
-            <Money label="Supplies cost" name="suppliesCost" defaultValue={sale.suppliesCost ?? 0} />
-            <Money label="Other costs" name="otherCosts" defaultValue={sale.otherCosts ?? 0} />
+            <Money label="Sold price" name="soldPrice" defaultValue={valueFor("soldPrice", sale.soldPrice ?? 0)} error={fieldErrors.soldPrice} formKey={formKey} />
+            <Money label="Platform fees" name="platformFees" defaultValue={valueFor("platformFees", sale.platformFees ?? 0)} error={fieldErrors.platformFees} formKey={formKey} />
+            <Money label="Payment fees" name="paymentFees" defaultValue={valueFor("paymentFees", sale.paymentFees ?? 0)} error={fieldErrors.paymentFees} formKey={formKey} />
+            <Money label="Shipping cost" name="shippingCost" defaultValue={valueFor("shippingCost", sale.shippingCost ?? 0)} error={fieldErrors.shippingCost} formKey={formKey} />
+            <Money label="Supplies cost" name="suppliesCost" defaultValue={valueFor("suppliesCost", sale.suppliesCost ?? 0)} error={fieldErrors.suppliesCost} formKey={formKey} />
+            <Money label="Other costs" name="otherCosts" defaultValue={valueFor("otherCosts", sale.otherCosts ?? 0)} error={fieldErrors.otherCosts} formKey={formKey} />
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <Money label="Sales tax collected" name="salesTaxCollected" defaultValue={sale.salesTaxCollected ?? 0} />
+            <Money label="Sales tax collected" name="salesTaxCollected" defaultValue={valueFor("salesTaxCollected", sale.salesTaxCollected ?? 0)} error={fieldErrors.salesTaxCollected} formKey={formKey} />
             <label className="flex items-start gap-3 rounded-lg border p-3 text-sm">
               <input
+                key={`taxRemittedByPlatform:${formKey}`}
                 type="checkbox"
                 name="taxRemittedByPlatform"
-                defaultChecked={sale.taxRemittedByPlatform ?? true}
+                defaultChecked={taxRemitted}
                 className="mt-0.5 h-4 w-4"
               />
               <span>
@@ -101,14 +140,23 @@ export function SaleEditor({ sale, channels }: { sale: SaleDto; channels: Channe
 
           <div className="space-y-2">
             <Label htmlFor="notes">Notes</Label>
-            <Textarea id="notes" name="notes" defaultValue={sale.notes ?? ""} rows={2} />
+            <Textarea key={`notes:${formKey}`} id="notes" name="notes" defaultValue={valueFor("notes", sale.notes)} rows={2} />
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="reason">
               Reason for this correction <span className="text-destructive">*</span>
             </Label>
-            <Input id="reason" name="reason" required placeholder="e.g. Actual eBay fee differed from the estimate" />
+            <Input
+              key={`reason:${formKey}`}
+              id="reason"
+              name="reason"
+              required
+              placeholder="e.g. Actual eBay fee differed from the estimate"
+              defaultValue={values.reason ?? ""}
+              aria-invalid={fieldErrors.reason ? "true" : undefined}
+            />
+            {fieldErrors.reason && <p className="text-destructive text-xs">{fieldErrors.reason}</p>}
           </div>
 
           <div className="flex items-center justify-between gap-4 border-t pt-4">

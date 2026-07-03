@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useMemo, useState } from "react";
+import { useActionState, useEffect, useMemo, useState } from "react";
 import { useFormStatus } from "react-dom";
 import type { components } from "@overhaul/api-client";
 import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Label, Textarea } from "@overhaul/ui";
@@ -42,17 +42,42 @@ function SaveButton() {
   );
 }
 
-function MoneyField({ label, name, value, onChange }: { label: string; name: string; value: string; onChange: (value: string) => void }) {
+function MoneyField({
+  label,
+  name,
+  value,
+  onChange,
+  error,
+}: {
+  label: string;
+  name: string;
+  value: string;
+  onChange: (value: string) => void;
+  error?: string;
+}) {
   return (
     <div className="space-y-2">
       <Label htmlFor={name}>{label}</Label>
-      <Input id={name} name={name} type="number" step="0.01" min="0" value={value} onChange={(event) => onChange(event.target.value)} />
+      <Input
+        id={name}
+        name={name}
+        type="number"
+        step="0.01"
+        min="0"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        aria-invalid={error ? "true" : undefined}
+      />
+      {error && <p className="text-destructive text-xs">{error}</p>}
     </div>
   );
 }
 
 export function SaleCreator({ candidates, channels }: { candidates: Candidate[]; channels: Channel[] }) {
   const [state, action] = useActionState(createSale, initial);
+  const values = state.values ?? {};
+  const fieldErrors = state.fieldErrors ?? {};
+  const formKey = state.formKey ?? "initial";
   const [candidateId, setCandidateId] = useState("");
   const [channel, setChannel] = useState("");
   const [feeProfileId, setFeeProfileId] = useState("");
@@ -64,6 +89,26 @@ export function SaleCreator({ candidates, channels }: { candidates: Candidate[];
   const [shippingCost, setShippingCost] = useState("");
   const [suppliesCost, setSuppliesCost] = useState("");
   const [otherCosts, setOtherCosts] = useState("");
+
+  useEffect(() => {
+    if (!state.values) return;
+
+    setCandidateId(state.values.inventoryItemId ?? "");
+    setChannel(state.values.platform ?? "");
+    setSoldPrice(state.values.soldPrice ?? "");
+    setSalesTax(state.values.salesTaxCollected ?? "");
+    setTaxRemitted(state.values.taxRemittedByPlatform !== "off");
+    setPlatformFees(state.values.platformFees ?? "");
+    setPaymentFees(state.values.paymentFees ?? "");
+    setShippingCost(state.values.shippingCost ?? "");
+    setSuppliesCost(state.values.suppliesCost ?? "");
+    setOtherCosts(state.values.otherCosts ?? "");
+
+    const nextChannel = channels.find((option) => option.value === state.values?.platform);
+    const defaultProfile = nextChannel?.feeProfiles?.find((profile: FeeProfile) => profile.isDefault) ?? nextChannel?.feeProfiles?.[0];
+    setFeeProfileId(defaultProfile?.id ?? "");
+  }, [channels, state.formKey, state.values]);
+
   const selected = candidates.find((candidate) => candidate.inventoryItemId === candidateId);
   const totalCosts = [platformFees, paymentFees, shippingCost, suppliesCost, otherCosts].reduce(
     (sum, value) => sum + (Number(value) || 0),
@@ -140,6 +185,7 @@ export function SaleCreator({ candidates, channels }: { candidates: Candidate[];
                 onChange={(event) => chooseCandidate(event.target.value)}
                 className={selectClass}
                 required
+                aria-invalid={fieldErrors.inventoryItemId ? "true" : undefined}
               >
                 <option value="">Select an eligible item…</option>
                 {candidates.map((candidate) => (
@@ -148,6 +194,7 @@ export function SaleCreator({ candidates, channels }: { candidates: Candidate[];
                   </option>
                 ))}
               </select>
+              {fieldErrors.inventoryItemId && <p className="text-destructive text-xs">{fieldErrors.inventoryItemId}</p>}
             </div>
             <div className="space-y-2">
               <Label htmlFor="platform">Sales channel</Label>
@@ -158,6 +205,7 @@ export function SaleCreator({ candidates, channels }: { candidates: Candidate[];
                 onChange={(event) => chooseChannel(event.target.value)}
                 className={selectClass}
                 required
+                aria-invalid={fieldErrors.platform ? "true" : undefined}
               >
                 <option value="">Select channel…</option>
                 {[...groups.entries()].map(([group, options]) => (
@@ -174,6 +222,7 @@ export function SaleCreator({ candidates, channels }: { candidates: Candidate[];
                   </optgroup>
                 ))}
               </select>
+              {fieldErrors.platform && <p className="text-destructive text-xs">{fieldErrors.platform}</p>}
             </div>
             <div className="space-y-2">
               <Label htmlFor="feeProfile">Fee profile</Label>
@@ -192,10 +241,19 @@ export function SaleCreator({ candidates, channels }: { candidates: Candidate[];
             </div>
             <div className="space-y-2">
               <Label htmlFor="soldAt">Sold date</Label>
-              <Input id="soldAt" name="soldAt" type="date" defaultValue={localDateValue()} required />
+              <Input
+                key={`soldAt:${formKey}`}
+                id="soldAt"
+                name="soldAt"
+                type="date"
+                defaultValue={values.soldAt ?? localDateValue()}
+                required
+                aria-invalid={fieldErrors.soldAt ? "true" : undefined}
+              />
+              {fieldErrors.soldAt && <p className="text-destructive text-xs">{fieldErrors.soldAt}</p>}
             </div>
-            <MoneyField label="Sold price" name="soldPrice" value={soldPrice} onChange={setSoldPrice} />
-            <MoneyField label="Sales tax collected" name="salesTaxCollected" value={salesTax} onChange={setSalesTax} />
+            <MoneyField label="Sold price" name="soldPrice" value={soldPrice} onChange={setSoldPrice} error={fieldErrors.soldPrice} />
+            <MoneyField label="Sales tax collected" name="salesTaxCollected" value={salesTax} onChange={setSalesTax} error={fieldErrors.salesTaxCollected} />
             <label className="flex items-center gap-2 rounded-lg border p-3 text-sm sm:col-span-2">
               <input
                 type="checkbox"
@@ -234,11 +292,11 @@ export function SaleCreator({ candidates, channels }: { candidates: Candidate[];
                 <span className="text-brand-600 shrink-0 font-medium">Apply</span>
               </button>
             )}
-            <MoneyField label="Platform fees" name="platformFees" value={platformFees} onChange={setPlatformFees} />
-            <MoneyField label="Payment fees" name="paymentFees" value={paymentFees} onChange={setPaymentFees} />
-            <MoneyField label="Shipping cost" name="shippingCost" value={shippingCost} onChange={setShippingCost} />
-            <MoneyField label="Packing supplies" name="suppliesCost" value={suppliesCost} onChange={setSuppliesCost} />
-            <MoneyField label="Other costs" name="otherCosts" value={otherCosts} onChange={setOtherCosts} />
+            <MoneyField label="Platform fees" name="platformFees" value={platformFees} onChange={setPlatformFees} error={fieldErrors.platformFees} />
+            <MoneyField label="Payment fees" name="paymentFees" value={paymentFees} onChange={setPaymentFees} error={fieldErrors.paymentFees} />
+            <MoneyField label="Shipping cost" name="shippingCost" value={shippingCost} onChange={setShippingCost} error={fieldErrors.shippingCost} />
+            <MoneyField label="Packing supplies" name="suppliesCost" value={suppliesCost} onChange={setSuppliesCost} error={fieldErrors.suppliesCost} />
+            <MoneyField label="Other costs" name="otherCosts" value={otherCosts} onChange={setOtherCosts} error={fieldErrors.otherCosts} />
           </CardContent>
         </Card>
         <Card>
@@ -246,7 +304,7 @@ export function SaleCreator({ candidates, channels }: { candidates: Candidate[];
             <CardTitle className="text-lg">Internal notes</CardTitle>
           </CardHeader>
           <CardContent>
-            <Textarea name="notes" rows={4} placeholder="Order number, buyer context, payout notes, exceptions…" />
+            <Textarea key={`notes:${formKey}`} name="notes" rows={4} placeholder="Order number, buyer context, payout notes, exceptions…" defaultValue={values.notes ?? ""} />
           </CardContent>
         </Card>
       </div>

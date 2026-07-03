@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useMemo, useState } from "react";
+import { useActionState, useEffect, useMemo, useState } from "react";
 import { useFormStatus } from "react-dom";
 import type { components } from "@overhaul/api-client";
 import {
@@ -55,7 +55,7 @@ function SubmitButton() {
   return <Button type="submit" disabled={pending}>{pending ? "Saving…" : "Save inventory record"}</Button>;
 }
 
-function Field({ label, name, defaultValue, type = "text", placeholder, min, max, step }: {
+function Field({ label, name, defaultValue, type = "text", placeholder, min, max, step, error, formKey }: {
   label: string;
   name: string;
   defaultValue?: string | number | null;
@@ -64,26 +64,56 @@ function Field({ label, name, defaultValue, type = "text", placeholder, min, max
   min?: number;
   max?: number;
   step?: string;
+  error?: string;
+  formKey?: string;
 }) {
   return (
     <div className="space-y-2">
       <Label htmlFor={name}>{label}</Label>
-      <Input id={name} name={name} type={type} step={step ?? (type === "number" ? "0.01" : undefined)} min={min ?? (type === "number" ? 0 : undefined)} max={max} defaultValue={defaultValue ?? ""} placeholder={placeholder} />
+      <Input
+        key={`${name}:${formKey ?? "initial"}`}
+        id={name}
+        name={name}
+        type={type}
+        step={step ?? (type === "number" ? "0.01" : undefined)}
+        min={min ?? (type === "number" ? 0 : undefined)}
+        max={max}
+        defaultValue={defaultValue ?? ""}
+        placeholder={placeholder}
+        aria-invalid={error ? "true" : undefined}
+      />
+      {error && <p className="text-destructive text-xs">{error}</p>}
     </div>
   );
 }
 
-function NotesField({ label, name, defaultValue, placeholder, rows = 3 }: {
+function NotesField({ label, name, defaultValue, placeholder, rows = 3, error, formKey }: {
   label: string;
   name: string;
   defaultValue?: string | null;
   placeholder?: string;
   rows?: number;
+  error?: string;
+  formKey?: string;
 }) {
-  return <div className="space-y-2"><Label htmlFor={name}>{label}</Label><Textarea id={name} name={name} defaultValue={defaultValue ?? ""} placeholder={placeholder} rows={rows} /></div>;
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={name}>{label}</Label>
+      <Textarea
+        key={`${name}:${formKey ?? "initial"}`}
+        id={name}
+        name={name}
+        defaultValue={defaultValue ?? ""}
+        placeholder={placeholder}
+        rows={rows}
+        aria-invalid={error ? "true" : undefined}
+      />
+      {error && <p className="text-destructive text-xs">{error}</p>}
+    </div>
+  );
 }
 
-function OptionField({ label, name, value, options, onChange, emptyLabel = "Not assigned", disabled = false }: {
+function OptionField({ label, name, value, options, onChange, emptyLabel = "Not assigned", disabled = false, error, formKey }: {
   label: string;
   name: string;
   value: string;
@@ -91,6 +121,8 @@ function OptionField({ label, name, value, options, onChange, emptyLabel = "Not 
   onChange?: (value: string) => void;
   emptyLabel?: string;
   disabled?: boolean;
+  error?: string;
+  formKey?: string;
 }) {
   const approvedOptions = useMemo(() => options.filter((option) => !option.isLegacy && option.value && option.label), [options]);
   const effectiveValue = normalizeOptionValue(value, approvedOptions);
@@ -108,6 +140,7 @@ function OptionField({ label, name, value, options, onChange, emptyLabel = "Not 
     <div className="space-y-2">
       <Label htmlFor={name}>{label}</Label>
       <select
+        key={`${name}:${onChange ? "controlled" : formKey ?? "initial"}`}
         id={name}
         name={name}
         value={onChange ? effectiveValue : undefined}
@@ -115,18 +148,35 @@ function OptionField({ label, name, value, options, onChange, emptyLabel = "Not 
         onChange={event => onChange?.(event.target.value)}
         className={selectClass}
         disabled={disabled}
+        aria-invalid={error ? "true" : undefined}
       >
         <option value="">{disabled ? "No approved options configured" : emptyLabel}</option>
         {[...groups.entries()].map(([group, values]) => hasNamedGroups ? (
           <optgroup key={group} label={group}>{values.map(option => <option key={`${option.parentValue ?? ""}:${option.value}`} value={option.value!}>{option.label}</option>)}</optgroup>
         ) : values.map(option => <option key={`${option.parentValue ?? ""}:${option.value}`} value={option.value!}>{option.label}</option>))}
       </select>
+      {error && <p className="text-destructive text-xs">{error}</p>}
     </div>
   );
 }
 
-function EnumField({ label, name, value, options }: { label: string; name: string; value: string; options: ReadonlyArray<readonly [string, string]> }) {
-  return <div className="space-y-2"><Label htmlFor={name}>{label}</Label><select id={name} name={name} defaultValue={value} className={selectClass}>{options.map(([optionValue, optionLabel]) => <option key={optionValue} value={optionValue}>{optionLabel}</option>)}</select></div>;
+function EnumField({ label, name, value, options, error, formKey }: { label: string; name: string; value: string; options: ReadonlyArray<readonly [string, string]>; error?: string; formKey?: string }) {
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={name}>{label}</Label>
+      <select
+        key={`${name}:${formKey ?? "initial"}`}
+        id={name}
+        name={name}
+        defaultValue={value}
+        className={selectClass}
+        aria-invalid={error ? "true" : undefined}
+      >
+        {options.map(([optionValue, optionLabel]) => <option key={optionValue} value={optionValue}>{optionLabel}</option>)}
+      </select>
+      {error && <p className="text-destructive text-xs">{error}</p>}
+    </div>
+  );
 }
 
 function normalizeOptionValue(value: string, options: ReferenceOption[]) {
@@ -138,12 +188,30 @@ function normalizeOptionValue(value: string, options: ReferenceOption[]) {
 export function InventoryEditor({ item, referenceData }: { item: InventoryItem; referenceData: ReferenceData }) {
   const action = updateInventoryItem.bind(null, item.id!);
   const [state, formAction] = useActionState(action, initialState);
+  const values = state.values ?? {};
+  const fieldErrors = state.fieldErrors ?? {};
+  const formKey = state.formKey ?? "initial";
+  function valueFor(name: string, fallback?: string | null): string;
+  function valueFor(name: string, fallback?: number | null): string | number;
+  function valueFor(name: string, fallback?: string | number | null) {
+    return values[name] ?? fallback ?? "";
+  }
   const [category, setCategory] = useState(item.category ?? "");
   const [brand, setBrand] = useState(item.brand ?? "");
   const [model, setModel] = useState(item.model ?? "");
   const [sizeSystem, setSizeSystem] = useState(item.sizeSystem ?? "");
   const [sizeValue, setSizeValue] = useState(item.sizeValue ?? "");
   const [storageLocation, setStorageLocation] = useState(item.storageLocation ?? "");
+
+  useEffect(() => {
+    if (!state.values) return;
+    setCategory(state.values.category ?? "");
+    setBrand(state.values.brand ?? "");
+    setModel(state.values.model ?? "");
+    setSizeSystem(state.values.sizeSystem ?? "");
+    setSizeValue(state.values.sizeValue ?? "");
+    setStorageLocation(state.values.storageLocation ?? "");
+  }, [state.formKey, state.values]);
 
   const categories = referenceData.categories ?? [];
   const safeCategory = normalizeOptionValue(category, categories);
@@ -164,15 +232,15 @@ export function InventoryEditor({ item, referenceData }: { item: InventoryItem; 
       <Card>
         <CardHeader><CardTitle className="text-lg">Identity and classification</CardTitle><CardDescription>Canonical values used by inventory search, storefront merchandising, mobile workflows, reporting, and channel integrations.</CardDescription></CardHeader>
         <CardContent className="space-y-5">
-          <Field label="Title" name="title" defaultValue={item.title} />
-          <NotesField label="Description" name="description" defaultValue={item.description} rows={5} />
+          <Field label="Title" name="title" defaultValue={valueFor("title", item.title)} error={fieldErrors.title} formKey={formKey} />
+          <NotesField label="Description" name="description" defaultValue={valueFor("description", item.description)} rows={5} error={fieldErrors.description} formKey={formKey} />
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <OptionField label="Category" name="category" value={category} options={categories} onChange={value => { setCategory(value); setBrand(""); setModel(""); }} />
-            <OptionField label="Brand" name="brand" value={brand} options={brands} onChange={value => { setBrand(value); setModel(""); }} />
-            <OptionField label="Model / product line" name="model" value={model} options={models} onChange={setModel} disabled={!safeBrand || models.length === 0} />
-            <OptionField label="Color" name="color" value={item.color ?? ""} options={referenceData.colors ?? []} />
-            <OptionField label="Cosmetic condition" name="condition" value={item.condition ?? ""} options={referenceData.conditions ?? []} emptyLabel="Select condition" />
-            <EnumField label="Ownership" name="ownershipType" value={item.ownershipType ?? "Owned"} options={ownershipOptions} />
+            <OptionField label="Category" name="category" value={category} options={categories} onChange={value => { setCategory(value); setBrand(""); setModel(""); }} error={fieldErrors.category} />
+            <OptionField label="Brand" name="brand" value={brand} options={brands} onChange={value => { setBrand(value); setModel(""); }} error={fieldErrors.brand} />
+            <OptionField label="Model / product line" name="model" value={model} options={models} onChange={setModel} disabled={!safeBrand || models.length === 0} error={fieldErrors.model} />
+            <OptionField label="Color" name="color" value={valueFor("color", item.color)} options={referenceData.colors ?? []} error={fieldErrors.color} formKey={formKey} />
+            <OptionField label="Cosmetic condition" name="condition" value={valueFor("condition", item.condition)} options={referenceData.conditions ?? []} emptyLabel="Select condition" error={fieldErrors.condition} formKey={formKey} />
+            <EnumField label="Ownership" name="ownershipType" value={valueFor("ownershipType", item.ownershipType ?? "Owned")} options={ownershipOptions} error={fieldErrors.ownershipType} formKey={formKey} />
           </div>
         </CardContent>
       </Card>
@@ -180,10 +248,10 @@ export function InventoryEditor({ item, referenceData }: { item: InventoryItem; 
       <Card>
         <CardHeader><CardTitle className="text-lg">Condition controls</CardTitle><CardDescription>Separate condition dimensions prevent ambiguous listings and support category-specific readiness rules.</CardDescription></CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <EnumField label="Functional status" name="functionalStatus" value={item.functionalStatus ?? "Unknown"} options={functionalOptions} />
-          <EnumField label="Completeness" name="completenessStatus" value={item.completenessStatus ?? "Unknown"} options={completenessOptions} />
-          <EnumField label="Authenticity" name="authenticityStatus" value={item.authenticityStatus ?? "NotAssessed"} options={authenticityOptions} />
-          <EnumField label="Packaging" name="packagingStatus" value={item.packagingStatus ?? "NotApplicable"} options={packagingOptions} />
+          <EnumField label="Functional status" name="functionalStatus" value={valueFor("functionalStatus", item.functionalStatus ?? "Unknown")} options={functionalOptions} error={fieldErrors.functionalStatus} formKey={formKey} />
+          <EnumField label="Completeness" name="completenessStatus" value={valueFor("completenessStatus", item.completenessStatus ?? "Unknown")} options={completenessOptions} error={fieldErrors.completenessStatus} formKey={formKey} />
+          <EnumField label="Authenticity" name="authenticityStatus" value={valueFor("authenticityStatus", item.authenticityStatus ?? "NotAssessed")} options={authenticityOptions} error={fieldErrors.authenticityStatus} formKey={formKey} />
+          <EnumField label="Packaging" name="packagingStatus" value={valueFor("packagingStatus", item.packagingStatus ?? "NotApplicable")} options={packagingOptions} error={fieldErrors.packagingStatus} formKey={formKey} />
         </CardContent>
       </Card>
 
@@ -191,21 +259,21 @@ export function InventoryEditor({ item, referenceData }: { item: InventoryItem; 
         <CardHeader><CardTitle className="text-lg">Identifiers and physical data</CardTitle><CardDescription>Identifiers stay unique text values; standardized systems, countries, measurements, and units remain controlled.</CardDescription></CardHeader>
         <CardContent className="space-y-5">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <Field label="Barcode / GTIN" name="barcode" defaultValue={item.barcode} placeholder="UPC, EAN, ISBN" />
-            <Field label="Manufacturer part number" name="manufacturerPartNumber" defaultValue={item.manufacturerPartNumber} />
-            <Field label="Serial number" name="serialNumber" defaultValue={item.serialNumber} />
-            <Field label="Manufacture year" name="manufactureYear" type="number" min={1800} max={2200} step="1" defaultValue={item.manufactureYear} />
-            <OptionField label="Country of origin" name="countryOfOrigin" value={item.countryOfOrigin ?? ""} options={referenceData.countries ?? []} />
-            <OptionField label="Storage location" name="storageLocation" value={storageLocation} options={referenceData.storageLocations ?? []} onChange={setStorageLocation} />
-            {showSizing && <OptionField label="Size system" name="sizeSystem" value={sizeSystem} options={referenceData.sizeSystems ?? []} onChange={value => { setSizeSystem(value); setSizeValue(""); }} />}
-            {showSizing && <OptionField label="Size" name="sizeValue" value={sizeValue} options={sizes} onChange={setSizeValue} disabled={!sizeSystem || sizes.length === 0} />}
+            <Field label="Barcode / GTIN" name="barcode" defaultValue={valueFor("barcode", item.barcode)} placeholder="UPC, EAN, ISBN" error={fieldErrors.barcode} formKey={formKey} />
+            <Field label="Manufacturer part number" name="manufacturerPartNumber" defaultValue={valueFor("manufacturerPartNumber", item.manufacturerPartNumber)} error={fieldErrors.manufacturerPartNumber} formKey={formKey} />
+            <Field label="Serial number" name="serialNumber" defaultValue={valueFor("serialNumber", item.serialNumber)} error={fieldErrors.serialNumber} formKey={formKey} />
+            <Field label="Manufacture year" name="manufactureYear" type="number" min={1800} max={2200} step="1" defaultValue={valueFor("manufactureYear", item.manufactureYear)} error={fieldErrors.manufactureYear} formKey={formKey} />
+            <OptionField label="Country of origin" name="countryOfOrigin" value={valueFor("countryOfOrigin", item.countryOfOrigin)} options={referenceData.countries ?? []} error={fieldErrors.countryOfOrigin} formKey={formKey} />
+            <OptionField label="Storage location" name="storageLocation" value={storageLocation} options={referenceData.storageLocations ?? []} onChange={setStorageLocation} error={fieldErrors.storageLocation} />
+            {showSizing && <OptionField label="Size system" name="sizeSystem" value={sizeSystem} options={referenceData.sizeSystems ?? []} onChange={value => { setSizeSystem(value); setSizeValue(""); }} error={fieldErrors.sizeSystem} />}
+            {showSizing && <OptionField label="Size" name="sizeValue" value={sizeValue} options={sizes} onChange={setSizeValue} disabled={!sizeSystem || sizes.length === 0} error={fieldErrors.sizeValue} />}
           </div>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-            <Field label="Length" name="length" type="number" defaultValue={item.length} />
-            <Field label="Width" name="width" type="number" defaultValue={item.width} />
-            <Field label="Height" name="height" type="number" defaultValue={item.height} />
-            <EnumField label="Dimension unit" name="dimensionUnit" value={item.dimensionUnit ?? "Inches"} options={[["Inches", "Inches"], ["Centimeters", "Centimeters"]]} />
-            <div className="grid grid-cols-[1fr_130px] gap-2"><Field label="Weight" name="weight" type="number" defaultValue={item.weight} /><EnumField label="Unit" name="weightUnit" value={item.weightUnit ?? "Ounces"} options={[["Ounces", "Ounces"], ["Pounds", "Pounds"], ["Grams", "Grams"], ["Kilograms", "Kilograms"]]} /></div>
+            <Field label="Length" name="length" type="number" defaultValue={valueFor("length", item.length)} error={fieldErrors.length} formKey={formKey} />
+            <Field label="Width" name="width" type="number" defaultValue={valueFor("width", item.width)} error={fieldErrors.width} formKey={formKey} />
+            <Field label="Height" name="height" type="number" defaultValue={valueFor("height", item.height)} error={fieldErrors.height} formKey={formKey} />
+            <EnumField label="Dimension unit" name="dimensionUnit" value={valueFor("dimensionUnit", item.dimensionUnit ?? "Inches")} options={[["Inches", "Inches"], ["Centimeters", "Centimeters"]]} error={fieldErrors.dimensionUnit} formKey={formKey} />
+            <div className="grid grid-cols-[1fr_130px] gap-2"><Field label="Weight" name="weight" type="number" defaultValue={valueFor("weight", item.weight)} error={fieldErrors.weight} formKey={formKey} /><EnumField label="Unit" name="weightUnit" value={valueFor("weightUnit", item.weightUnit ?? "Ounces")} options={[["Ounces", "Ounces"], ["Pounds", "Pounds"], ["Grams", "Grams"], ["Kilograms", "Kilograms"]]} error={fieldErrors.weightUnit} formKey={formKey} /></div>
           </div>
         </CardContent>
       </Card>
@@ -220,21 +288,21 @@ export function InventoryEditor({ item, referenceData }: { item: InventoryItem; 
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-3">
-          <Field label="Seller asking price" name="sellerAskingPrice" type="number" defaultValue={item.sellerAskingPrice} />
-          <Field label={item.acquisitionLotId ? "Acquisition cost (allocated)" : "Acquisition cost"} name="purchasePrice" type="number" defaultValue={item.purchasePrice} />
-          <Field label="Estimated sale price" name="estimatedSalePrice" type="number" defaultValue={item.estimatedSalePrice} />
+          <Field label="Seller asking price" name="sellerAskingPrice" type="number" defaultValue={valueFor("sellerAskingPrice", item.sellerAskingPrice)} error={fieldErrors.sellerAskingPrice} formKey={formKey} />
+          <Field label={item.acquisitionLotId ? "Acquisition cost (allocated)" : "Acquisition cost"} name="purchasePrice" type="number" defaultValue={valueFor("purchasePrice", item.purchasePrice)} error={fieldErrors.purchasePrice} formKey={formKey} />
+          <Field label="Estimated sale price" name="estimatedSalePrice" type="number" defaultValue={valueFor("estimatedSalePrice", item.estimatedSalePrice)} error={fieldErrors.estimatedSalePrice} formKey={formKey} />
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader><CardTitle className="text-lg">Preparation and listing</CardTitle><CardDescription>Open-ended operational evidence and disclosures that must travel with the item.</CardDescription></CardHeader>
         <CardContent className="grid gap-5 lg:grid-cols-2">
-          <NotesField label="Accessories included" name="accessories" defaultValue={item.accessories} />
-          <NotesField label="Missing parts / disclosed defects" name="missingParts" defaultValue={item.missingParts} />
-          <NotesField label="Testing notes" name="testingNotes" defaultValue={item.testingNotes} />
-          <NotesField label="Cleaning notes" name="cleaningNotes" defaultValue={item.cleaningNotes} />
-          <NotesField label="Listing notes" name="listingNotes" defaultValue={item.listingNotes} />
-          <NotesField label="Internal notes" name="notes" defaultValue={item.notes} />
+          <NotesField label="Accessories included" name="accessories" defaultValue={valueFor("accessories", item.accessories)} error={fieldErrors.accessories} formKey={formKey} />
+          <NotesField label="Missing parts / disclosed defects" name="missingParts" defaultValue={valueFor("missingParts", item.missingParts)} error={fieldErrors.missingParts} formKey={formKey} />
+          <NotesField label="Testing notes" name="testingNotes" defaultValue={valueFor("testingNotes", item.testingNotes)} error={fieldErrors.testingNotes} formKey={formKey} />
+          <NotesField label="Cleaning notes" name="cleaningNotes" defaultValue={valueFor("cleaningNotes", item.cleaningNotes)} error={fieldErrors.cleaningNotes} formKey={formKey} />
+          <NotesField label="Listing notes" name="listingNotes" defaultValue={valueFor("listingNotes", item.listingNotes)} error={fieldErrors.listingNotes} formKey={formKey} />
+          <NotesField label="Internal notes" name="notes" defaultValue={valueFor("notes", item.notes)} error={fieldErrors.notes} formKey={formKey} />
         </CardContent>
       </Card>
 
