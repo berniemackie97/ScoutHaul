@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Badge, Card, CardContent, CardDescription, CardHeader, CardTitle } from "@overhaul/ui";
 import { Bell, CreditCard, LockKeyhole, ReceiptText, Settings2, Truck } from "lucide-react";
 import { getApiClient } from "@/lib/api";
@@ -10,7 +11,6 @@ const plannedModules = [
   { title: "Shipping and fulfillment", description: "Warehouses, carriers, service levels, packaging, label defaults, local pickup, and return routing.", icon: Truck },
   { title: "Tax and accounting", description: "Tax registrations, calculation provider, reporting basis, fiscal periods, account mappings, and exports.", icon: ReceiptText },
   { title: "Notifications", description: "Customer and operator templates, delivery channels, event routing, escalation, and quiet hours.", icon: Bell },
-  { title: "Access and governance", description: "Staff, roles, permissions, approvals, sessions, audit retention, integrations, and API credentials.", icon: LockKeyhole },
 ];
 
 export default async function SettingsPage() {
@@ -32,6 +32,19 @@ export default async function SettingsPage() {
           isLive: store?.isLive ?? false,
         }}
       />
+
+      <Link href="/settings/team" className="block">
+        <Card className="transition hover:border-brand-300 hover:bg-muted/30">
+          <CardHeader>
+            <div className="mb-2 flex items-center justify-between">
+              <div className="bg-brand-100 flex h-9 w-9 items-center justify-center rounded-lg"><LockKeyhole className="text-brand-700 h-4 w-4" /></div>
+              <Badge variant="success">Live</Badge>
+            </div>
+            <CardTitle className="text-lg">Team &amp; access</CardTitle>
+            <CardDescription>Invite staff, assign roles and permissions, and manage invite codes.</CardDescription>
+          </CardHeader>
+        </Card>
+      </Link>
 
       <div>
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">More modules</h2>
