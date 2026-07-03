@@ -75,6 +75,19 @@ public sealed class ChannelListingsController(HaulScoutDbContext db, ICurrentUse
         if (request.Status == ChannelListingStatus.Sold)
         {
             listing.SoldAt ??= DateTimeOffset.UtcNow;
+            // Sold here → every other channel still live needs to come down. Flag them so the
+            // extension surfaces one-click delists; the operator (not a bot) actually removes them.
+            var siblings = await db.ChannelListings
+                .Where(item => item.InventoryItemId == itemId
+                    && item.OrganizationId == currentUser.OrganizationId
+                    && item.ChannelAccountId != request.ChannelAccountId
+                    && item.Status == ChannelListingStatus.Active)
+                .ToListAsync(cancellationToken);
+            foreach (var sibling in siblings)
+            {
+                sibling.Status = ChannelListingStatus.PendingDelist;
+                sibling.LastSyncedAt = DateTimeOffset.UtcNow;
+            }
         }
 
         await db.SaveChangesAsync(cancellationToken);

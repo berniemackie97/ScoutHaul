@@ -284,6 +284,8 @@ public enum ChannelListingStatus
     Draft,
     Active,
     Sold,
+    /// <summary>Sold on another channel — needs to be taken down here. The extension surfaces these to delist.</summary>
+    PendingDelist,
     Delisted,
     Error
 }
