@@ -112,9 +112,32 @@ public sealed class ChannelListingsController(HaulScoutDbContext db, ICurrentUse
         return NoContent();
     }
 
+    /// <summary>Org-wide listing worklist across all items — used for the delist queue (status=PendingDelist).</summary>
+    [HttpGet("~/api/channel-listings")]
+    public async Task<ActionResult<IReadOnlyList<ChannelListingDto>>> Worklist([FromQuery] string? status, CancellationToken cancellationToken)
+    {
+        var query = db.ChannelListings
+            .Include(item => item.ChannelAccount)
+            .Include(item => item.InventoryItem)
+            .Where(item => item.OrganizationId == currentUser.OrganizationId);
+
+        if (!string.IsNullOrWhiteSpace(status) && Enum.TryParse<ChannelListingStatus>(status, ignoreCase: true, out var parsed))
+        {
+            query = query.Where(item => item.Status == parsed);
+        }
+
+        var listings = await query
+            .OrderByDescending(item => item.LastSyncedAt)
+            .Take(500)
+            .ToListAsync(cancellationToken);
+
+        return listings.Select(item => item.ToDto()).ToList();
+    }
+
     private IQueryable<ChannelListing> Query(Guid itemId) =>
         db.ChannelListings
             .Include(item => item.ChannelAccount)
+            .Include(item => item.InventoryItem)
             .Where(item => item.InventoryItemId == itemId && item.OrganizationId == currentUser.OrganizationId);
 
     private Task<bool> ItemExists(Guid itemId, CancellationToken cancellationToken) =>

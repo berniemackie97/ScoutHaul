@@ -1,5 +1,6 @@
+import Link from "next/link";
 import { Card } from "@overhaul/ui";
-import { Radio, Store, Globe } from "lucide-react";
+import { Radio, Store, Globe, AlertTriangle, ExternalLink } from "lucide-react";
 import { getApiClient } from "@/lib/api";
 import { ChannelManager } from "./channel-manager";
 
@@ -7,12 +8,14 @@ export const dynamic = "force-dynamic";
 
 export default async function ChannelsPage() {
   const api = await getApiClient();
-  const [{ data: accounts }, { data: reference }] = await Promise.all([
+  const [{ data: accounts }, { data: reference }, { data: delist }] = await Promise.all([
     api.GET("/api/channel-accounts", {}),
     api.GET("/api/sales/reference-data", {}),
+    api.GET("/api/channel-listings", { params: { query: { status: "PendingDelist" } } }),
   ]);
 
   const list = accounts ?? [];
+  const pendingDelist = delist ?? [];
   const nativeCount = list.filter((account) => account.isNativelySynced && account.isActive).length;
   const externalCount = list.filter((account) => !account.isNativelySynced && account.isActive).length;
 
@@ -45,6 +48,32 @@ export default async function ChannelsPage() {
           </Card>
         ))}
       </div>
+
+      {pendingDelist.length > 0 && (
+        <Card className="border-amber-300 p-5">
+          <div className="flex items-center gap-2 text-sm font-semibold text-amber-700">
+            <AlertTriangle className="h-4 w-4" /> Needs delist ({pendingDelist.length})
+          </div>
+          <p className="text-muted-foreground mt-1 text-xs">Sold on another channel — take these down where they&rsquo;re still live.</p>
+          <div className="mt-3 divide-y">
+            {pendingDelist.map((listing) => (
+              <div key={listing.id} className="flex items-center justify-between gap-3 py-2 text-sm">
+                <Link href={`/inventory/${listing.inventoryItemId}`} className="font-medium hover:underline">
+                  {listing.inventoryItemTitle}
+                </Link>
+                <div className="flex items-center gap-2">
+                  <span className="text-muted-foreground text-xs">{listing.channelAccountName}</span>
+                  {listing.externalUrl && (
+                    <a href={listing.externalUrl} target="_blank" rel="noreferrer" className="text-brand-700" title="Open listing">
+                      <ExternalLink className="h-4 w-4" />
+                    </a>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
 
       <ChannelManager accounts={list} channels={reference?.channels ?? []} />
     </div>

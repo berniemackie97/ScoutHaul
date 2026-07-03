@@ -943,6 +943,7 @@ public sealed record UpsertChannelAccountRequest(
 public sealed record ChannelListingDto(
     Guid Id,
     Guid InventoryItemId,
+    string InventoryItemTitle,
     Guid ChannelAccountId,
     string ChannelAccountName,
     string Channel,

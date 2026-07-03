@@ -91,5 +91,11 @@ public class ChannelListingTests
 
         var poshListing = await db.ChannelListings.SingleAsync(listing => listing.ChannelAccountId == posh.Id);
         Assert.Equal(ChannelListingStatus.PendingDelist, poshListing.Status);
+
+        // The org-wide worklist surfaces it (with the item title) for the delist queue.
+        var worklist = (await controller.Worklist("PendingDelist", default)).Value!;
+        var flagged = Assert.Single(worklist);
+        Assert.Equal(posh.Id, flagged.ChannelAccountId);
+        Assert.Equal("Camera", flagged.InventoryItemTitle);
     }
 }
