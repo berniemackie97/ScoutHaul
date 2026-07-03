@@ -35,4 +35,5 @@ export const api = {
   listingsForItem: (itemId) => apiFetch(`/api/inventory/${itemId}/channel-listings`),
   upsertListing: (itemId, body) =>
     apiFetch(`/api/inventory/${itemId}/channel-listings`, { method: "PUT", body }),
+  worklist: (status) => apiFetch(`/api/channel-listings${status ? `?status=${encodeURIComponent(status)}` : ""}`),
 };

@@ -504,6 +504,7 @@ public static class DtoMapping
     public static ChannelListingDto ToDto(this ChannelListing item) => new(
         item.Id,
         item.InventoryItemId,
+        item.InventoryItem?.Title ?? string.Empty,
         item.ChannelAccountId,
         item.ChannelAccount?.DisplayName ?? string.Empty,
         item.ChannelAccount?.Channel ?? string.Empty,

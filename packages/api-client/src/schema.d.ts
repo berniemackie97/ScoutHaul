@@ -687,6 +687,45 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/channel-listings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    status?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ChannelListingDto"][];
+                        "application/json": components["schemas"]["ChannelListingDto"][];
+                        "text/json": components["schemas"]["ChannelListingDto"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/customers": {
         parameters: {
             query?: never;
@@ -5585,6 +5624,7 @@ export interface components {
             id?: string;
             /** Format: uuid */
             inventoryItemId?: string;
+            inventoryItemTitle?: string | null;
             /** Format: uuid */
             channelAccountId?: string;
             channelAccountName?: string | null;
