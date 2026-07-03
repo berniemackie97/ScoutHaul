@@ -1,0 +1,117 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import { useActionState } from "react";
+import { useFormStatus } from "react-dom";
+import { CircleDollarSign } from "lucide-react";
+import type { components } from "@overhaul/api-client";
+import { Button, Card, CardContent, CardHeader, CardTitle, Input, Label } from "@overhaul/ui";
+import { recordSaleForItem, type SellResult } from "./sell-actions";
+
+type Channel = components["schemas"]["SaleChannelOptionDto"];
+
+const initial: SellResult = { ok: false, message: "" };
+const selectClass = "h-10 w-full rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring";
+const currency = (value: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value);
+const today = () => new Date(Date.now() - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
+
+function SaveButton() {
+  const { pending } = useFormStatus();
+  return <Button type="submit" disabled={pending} className="w-full">{pending ? "Recording…" : "Record sale"}</Button>;
+}
+
+function Money({ label, name, value, onChange }: { label: string; name: string; value: string; onChange: (value: string) => void }) {
+  return (
+    <div className="space-y-1">
+      <Label htmlFor={name} className="text-xs">{label}</Label>
+      <Input id={name} name={name} type="number" step="0.01" min="0" value={value} onChange={(event) => onChange(event.target.value)} className="h-9" />
+    </div>
+  );
+}
+
+export function RecordSaleCard({ itemId, cost, channels }: { itemId: string; cost: number; channels: Channel[] }) {
+  const [state, action] = useActionState(recordSaleForItem.bind(null, itemId), initial);
+  const [open, setOpen] = useState(false);
+  const [soldPrice, setSoldPrice] = useState("");
+  const [platformFees, setPlatformFees] = useState("");
+  const [paymentFees, setPaymentFees] = useState("");
+  const [shipping, setShipping] = useState("");
+  const [tax, setTax] = useState("");
+  const [taxRemitted, setTaxRemitted] = useState(true);
+
+  const groups = useMemo(() => {
+    const map = new Map<string, Channel[]>();
+    for (const option of channels) {
+      if (!option.value) continue;
+      map.set(option.group ?? "Channels", [...(map.get(option.group ?? "Channels") ?? []), option]);
+    }
+    return map;
+  }, [channels]);
+
+  const net = (Number(soldPrice) || 0) - cost - [platformFees, paymentFees, shipping].reduce((sum, value) => sum + (Number(value) || 0), 0);
+
+  if (!open) {
+    return (
+      <Card>
+        <CardContent className="p-4">
+          <button type="button" onClick={() => setOpen(true)} className="text-brand-700 flex w-full items-center justify-center gap-2 text-sm font-medium">
+            <CircleDollarSign className="h-4 w-4" /> Record a sale for this item
+          </button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-lg">
+          <CircleDollarSign className="h-4 w-4" /> Record sale
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <form action={action} className="space-y-3">
+          <div className="space-y-1">
+            <Label htmlFor="platform" className="text-xs">Channel</Label>
+            <select id="platform" name="platform" required className={selectClass} defaultValue="">
+              <option value="">Select channel…</option>
+              {[...groups.entries()].map(([group, options]) => (
+                <optgroup key={group} label={group}>
+                  {options.map((option) => <option key={option.value} value={option.value ?? ""}>{option.label}</option>)}
+                </optgroup>
+              ))}
+            </select>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <Money label="Sold price" name="soldPrice" value={soldPrice} onChange={setSoldPrice} />
+            <div className="space-y-1">
+              <Label htmlFor="soldAt" className="text-xs">Sold date</Label>
+              <Input id="soldAt" name="soldAt" type="date" defaultValue={today()} className="h-9" />
+            </div>
+            <Money label="Platform fees" name="platformFees" value={platformFees} onChange={setPlatformFees} />
+            <Money label="Payment fees" name="paymentFees" value={paymentFees} onChange={setPaymentFees} />
+            <Money label="Shipping" name="shippingCost" value={shipping} onChange={setShipping} />
+            <Money label="Sales tax" name="salesTaxCollected" value={tax} onChange={setTax} />
+          </div>
+          <input type="hidden" name="suppliesCost" value="0" />
+          <input type="hidden" name="otherCosts" value="0" />
+          <label className="flex items-center gap-2 text-xs">
+            <input type="checkbox" name="taxRemittedByPlatform" checked={taxRemitted} onChange={(event) => setTaxRemitted(event.target.checked)} />
+            Marketplace remits the sales tax (pass-through)
+          </label>
+
+          <div className="flex justify-between border-t pt-2 text-sm">
+            <span className="text-muted-foreground">True net (after COGS {currency(cost)})</span>
+            <span className={`font-semibold tabular-nums ${net < 0 ? "text-destructive" : ""}`}>{currency(net)}</span>
+          </div>
+
+          {state.message && <p className={`text-xs ${state.ok ? "text-green-700" : "text-destructive"}`}>{state.message}</p>}
+          <div className="flex gap-2">
+            <SaveButton />
+            <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+          </div>
+        </form>
+      </CardContent>
+    </Card>
+  );
+}
