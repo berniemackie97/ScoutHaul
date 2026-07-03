@@ -1,27 +1,59 @@
 "use client";
 
-import { useActionState, useMemo, useState } from "react";
+import { useActionState, useEffect, useMemo, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Label, Textarea } from "@overhaul/ui";
-import { inventoryStatusLabel, type InventoryItem } from "@/features/inventory/inventory-operations";
+import { inventoryStatusLabel, type InventoryItem, type InventoryStatus } from "@/features/inventory/inventory-operations";
+import { readinessBlockers } from "@/features/inventory/lifecycle-readiness";
+import { ReadinessChecklist } from "@/features/inventory/readiness-checklist";
 import { createBundle, type BundleActionResult } from "./actions";
 
 const initial: BundleActionResult = { ok: false, message: "" };
 const money = (value: number | null | undefined) =>
   typeof value === "number" ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value) : "—";
 
-function SubmitButton() {
+function SubmitButton({ disabledReason }: { disabledReason?: string }) {
   const { pending } = useFormStatus();
-  return <Button type="submit" disabled={pending}>{pending ? "Creating bundle…" : "Create bundle"}</Button>;
+  return <Button type="submit" disabled={pending || Boolean(disabledReason)}>{pending ? "Creating bundle…" : "Create bundle"}</Button>;
 }
 
 export function BundleCreator({ candidates }: { candidates: InventoryItem[] }) {
   const [state, action] = useActionState(createBundle, initial);
+  const values = state.values ?? {};
+  const fieldErrors = state.fieldErrors ?? {};
+  const formKey = state.formKey ?? "initial";
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [title, setTitle] = useState("");
+  const [category, setCategory] = useState("");
+  const [status, setStatus] = useState<InventoryStatus>("ReadyToList");
+  const [estimatedSalePrice, setEstimatedSalePrice] = useState("");
+  const [description, setDescription] = useState("");
+  const [notes, setNotes] = useState("");
   const selectedItems = useMemo(() => candidates.filter((item) => item.id && selected.has(item.id)), [candidates, selected]);
   const cost = selectedItems.reduce((sum, item) => sum + (item.purchasePrice ?? 0), 0);
   const expected = selectedItems.reduce((sum, item) => sum + (item.estimatedSalePrice ?? 0), 0);
   const categories = [...new Set(candidates.map((item) => item.category).filter((value): value is string => Boolean(value)))].sort();
+  const readinessFacts = {
+    title,
+    description,
+    category,
+    estimatedSalePrice,
+    componentCount: selectedItems.length,
+    isBundle: true,
+  };
+  const blockers = readinessBlockers(status, readinessFacts);
+  const disabledReason = status === "ReadyToList" && blockers.length > 0 ? "Resolve readiness blockers before creating this bundle as Ready to list." : undefined;
+
+  useEffect(() => {
+    if (!state.values) return;
+    setTitle(state.values.title ?? "");
+    setCategory(state.values.category ?? "");
+    setStatus((state.values.status as InventoryStatus | undefined) ?? "ReadyToList");
+    setEstimatedSalePrice(state.values.estimatedSalePrice ?? "");
+    setDescription(state.values.description ?? "");
+    setNotes(state.values.notes ?? "");
+    setSelected(new Set((state.values.selectedComponentIds ?? "").split("|").filter(Boolean)));
+  }, [state.formKey, state.values]);
 
   function toggle(id: string) {
     setSelected((current) => {
@@ -43,30 +75,60 @@ export function BundleCreator({ candidates }: { candidates: InventoryItem[] }) {
           <CardContent className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2 sm:col-span-2">
               <Label htmlFor="title">Bundle title</Label>
-              <Input id="title" name="title" required placeholder="e.g. Pokémon GX binder lot, 12-card trainer bundle" />
+              <Input
+                key={`title:${formKey}`}
+                id="title"
+                name="title"
+                required
+                placeholder="e.g. Pokémon GX binder lot, 12-card trainer bundle"
+                value={title}
+                onChange={(event) => setTitle(event.target.value)}
+                aria-invalid={fieldErrors.title ? "true" : undefined}
+              />
+              {fieldErrors.title && <p className="text-destructive text-xs">{fieldErrors.title}</p>}
             </div>
             <div className="space-y-2">
               <Label htmlFor="category">Category</Label>
-              <select id="category" name="category" className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm">
+              <select id="category" name="category" value={category} onChange={(event) => setCategory(event.target.value)} className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm">
                 <option value="">Use dominant category</option>
                 {categories.map((category) => <option key={category} value={category}>{category}</option>)}
               </select>
+              {fieldErrors.category && <p className="text-destructive text-xs">{fieldErrors.category}</p>}
             </div>
             <div className="space-y-2">
               <Label htmlFor="status">Starting stage</Label>
-              <select id="status" name="status" defaultValue="ReadyToList" className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm">
+              <select id="status" name="status" value={status} onChange={(event) => setStatus(event.target.value as InventoryStatus)} className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm">
                 <option value="Draft">Draft</option>
                 <option value="NeedsPhotos">Needs photos</option>
                 <option value="ReadyToList">Ready to list</option>
               </select>
+              {fieldErrors.status && <p className="text-destructive text-xs">{fieldErrors.status}</p>}
             </div>
             <div className="space-y-2">
               <Label htmlFor="estimatedSalePrice">Expected bundle sale price</Label>
-              <Input id="estimatedSalePrice" name="estimatedSalePrice" type="number" min="0" step="0.01" placeholder={expected > 0 ? String(expected) : undefined} />
+              <Input
+                id="estimatedSalePrice"
+                name="estimatedSalePrice"
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder={expected > 0 ? String(expected) : undefined}
+                value={estimatedSalePrice}
+                onChange={(event) => setEstimatedSalePrice(event.target.value)}
+                aria-invalid={fieldErrors.estimatedSalePrice ? "true" : undefined}
+              />
+              {fieldErrors.estimatedSalePrice && <p className="text-destructive text-xs">{fieldErrors.estimatedSalePrice}</p>}
             </div>
             <div className="space-y-2 sm:col-span-2">
               <Label htmlFor="description">Bundle description</Label>
-              <Textarea id="description" name="description" rows={4} placeholder="Describe exactly what is included, condition spread, exclusions, and listing notes." />
+              <Textarea
+                id="description"
+                name="description"
+                rows={4}
+                placeholder="Describe exactly what is included, condition spread, exclusions, and listing notes."
+                value={description}
+                onChange={(event) => setDescription(event.target.value)}
+              />
             </div>
           </CardContent>
         </Card>
@@ -77,6 +139,7 @@ export function BundleCreator({ candidates }: { candidates: InventoryItem[] }) {
             <CardDescription>Select available unlisted inventory. Components will move to Bundled and stop appearing as individual sale candidates.</CardDescription>
           </CardHeader>
           <CardContent>
+            {fieldErrors.componentInventoryItemId && <p className="text-destructive mb-3 text-sm">{fieldErrors.componentInventoryItemId}</p>}
             {candidates.length === 0 ? (
               <p className="rounded-lg border border-dashed p-10 text-center text-sm text-muted-foreground">No available inventory candidates. Listed/sold/bundled items are intentionally excluded.</p>
             ) : (
@@ -120,7 +183,7 @@ export function BundleCreator({ candidates }: { candidates: InventoryItem[] }) {
 
         <Card>
           <CardHeader><CardTitle className="text-lg">Internal notes</CardTitle></CardHeader>
-          <CardContent><Textarea name="notes" rows={3} placeholder="Why these items were bundled, cross-listing notes, exceptions…" /></CardContent>
+          <CardContent><Textarea key={`notes:${formKey}`} name="notes" rows={3} placeholder="Why these items were bundled, cross-listing notes, exceptions…" value={notes} onChange={(event) => setNotes(event.target.value)} /></CardContent>
         </Card>
       </div>
 
@@ -134,8 +197,10 @@ export function BundleCreator({ candidates }: { candidates: InventoryItem[] }) {
             <div className="flex justify-between"><span className="text-muted-foreground">Projected spread</span><span>{expected > 0 ? money(expected - cost) : "—"}</span></div>
           </div>
         </Card>
+        <ReadinessChecklist targetStatus={status} facts={readinessFacts} compact />
+        {disabledReason && <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">{disabledReason}</div>}
         {state.message && <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{state.message}</div>}
-        <SubmitButton />
+        <SubmitButton disabledReason={disabledReason} />
       </aside>
     </form>
   );

@@ -14,6 +14,7 @@ type AuthenticityStatus = components["schemas"]["InventoryAuthenticityStatus"];
 type PackagingStatus = components["schemas"]["InventoryPackagingStatus"];
 type DimensionUnit = components["schemas"]["DimensionUnit"];
 type WeightUnit = components["schemas"]["WeightUnit"];
+type InventoryStatus = components["schemas"]["InventoryStatus"];
 
 export type NewInventoryResult = { ok: boolean; message: string } & FailedFormState;
 
@@ -22,6 +23,18 @@ type NumberOptions = {
   max?: number;
   integer?: boolean;
 };
+
+const createStatuses = new Set([
+  "Draft",
+  "Researching",
+  "Watchlist",
+  "Purchased",
+  "NeedsCleaning",
+  "NeedsTesting",
+  "NeedsRepair",
+  "NeedsPhotos",
+  "ReadyToList",
+]);
 
 function text(formData: FormData, name: string): string | null {
   const value = formData.get(name);
@@ -73,6 +86,8 @@ export async function createInventoryItem(_previous: NewInventoryResult, formDat
   const title = text(formData, "title");
   const fieldErrors: FieldErrors = {};
   if (!title) fieldErrors.title = "Title is required.";
+  const status = text(formData, "status") ?? "Draft";
+  if (!createStatuses.has(status)) fieldErrors.status = "Choose a valid pre-sale starting stage.";
 
   const purchasePrice = optionalNumber(formData, "purchasePrice", "Purchase price", fieldErrors, { min: 0 });
   const sellerAskingPrice = optionalNumber(formData, "sellerAskingPrice", "Seller asking price", fieldErrors, { min: 0 });
@@ -125,6 +140,7 @@ export async function createInventoryItem(_previous: NewInventoryResult, formDat
     dimensionUnit: (text(formData, "dimensionUnit") ?? "Inches") as DimensionUnit,
     weight,
     weightUnit: (text(formData, "weightUnit") ?? "Ounces") as WeightUnit,
+    status: status as InventoryStatus,
   };
 
   const api = await getApiClient();

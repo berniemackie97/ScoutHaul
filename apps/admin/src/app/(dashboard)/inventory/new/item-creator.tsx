@@ -1,10 +1,13 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useState } from "react";
+import { useActionState, useEffect, useMemo, useState, type ChangeEvent } from "react";
 import { useFormStatus } from "react-dom";
 import type { components } from "@overhaul/api-client";
 import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Label, Textarea } from "@overhaul/ui";
 import { Combobox } from "@/components/combobox";
+import type { InventoryStatus } from "@/features/inventory/inventory-operations";
+import { CREATE_STAGE_OPTIONS, readinessBlockers } from "@/features/inventory/lifecycle-readiness";
+import { ReadinessChecklist } from "@/features/inventory/readiness-checklist";
 import { createInventoryItem, type NewInventoryResult } from "./actions";
 
 function toCombo(options: ReferenceOption[]) {
@@ -34,10 +37,24 @@ const functionalOptions = [
   ["NonFunctional", "Non-functional"],
   ["PartsOnly", "Parts only"],
 ] as const;
+const completenessOptions = [
+  ["Unknown", "Unknown / not recorded"], ["Complete", "Complete"],
+  ["MissingAccessories", "Missing accessories"], ["MissingParts", "Missing parts"], ["Incomplete", "Incomplete set"],
+] as const;
+const authenticityOptions = [
+  ["NotAssessed", "Not assessed"], ["Authentic", "Authenticated"], ["LikelyAuthentic", "Likely authentic"],
+  ["NeedsVerification", "Needs verification"], ["Replica", "Replica (disclosed)"], ["Counterfeit", "Counterfeit — do not list"],
+] as const;
+const packagingOptions = [
+  ["NotApplicable", "Not applicable"], ["FactorySealed", "Factory sealed"],
+  ["OriginalExcellent", "Original packaging — excellent"], ["OriginalWorn", "Original packaging — worn"],
+  ["OriginalDamaged", "Original packaging — damaged"], ["ReplacementPackaging", "Replacement packaging"],
+  ["LooseNoPackaging", "Loose / no packaging"],
+] as const;
 
-function SubmitButton() {
+function SubmitButton({ disabledReason }: { disabledReason?: string }) {
   const { pending } = useFormStatus();
-  return <Button type="submit" disabled={pending}>{pending ? "Creating…" : "Create item"}</Button>;
+  return <Button type="submit" disabled={pending || Boolean(disabledReason)}>{pending ? "Creating…" : "Create item"}</Button>;
 }
 
 function Field({
@@ -50,6 +67,8 @@ function Field({
   defaultValue,
   error,
   formKey,
+  value,
+  onChange,
 }: {
   label: string;
   name: string;
@@ -60,7 +79,10 @@ function Field({
   defaultValue?: string | number | null;
   error?: string;
   formKey?: string;
+  value?: string;
+  onChange?: (value: string) => void;
 }) {
+  const controlProps = onChange ? { value: value ?? "", onChange: (event: ChangeEvent<HTMLInputElement>) => onChange(event.target.value) } : { defaultValue: defaultValue ?? "" };
   return (
     <div className="space-y-2">
       <Label htmlFor={name}>{label}</Label>
@@ -72,8 +94,8 @@ function Field({
         placeholder={placeholder}
         step={step}
         min={min}
-        defaultValue={defaultValue ?? ""}
         aria-invalid={error ? "true" : undefined}
+        {...controlProps}
       />
       {error && <p className="text-destructive text-xs">{error}</p>}
     </div>
@@ -87,6 +109,8 @@ function EnumField({
   defaultValue,
   error,
   formKey,
+  value,
+  onChange,
 }: {
   label: string;
   name: string;
@@ -94,7 +118,10 @@ function EnumField({
   defaultValue?: string;
   error?: string;
   formKey?: string;
+  value?: string;
+  onChange?: (value: string) => void;
 }) {
+  const controlProps = onChange ? { value: value ?? "", onChange: (event: ChangeEvent<HTMLSelectElement>) => onChange(event.target.value) } : { defaultValue: defaultValue ?? options[0]?.[0] };
   return (
     <div className="space-y-2">
       <Label htmlFor={name}>{label}</Label>
@@ -103,8 +130,8 @@ function EnumField({
         id={name}
         name={name}
         className={selectClass}
-        defaultValue={defaultValue ?? options[0]?.[0]}
         aria-invalid={error ? "true" : undefined}
+        {...controlProps}
       >
         {options.map(([value, text]) => <option key={value} value={value}>{text}</option>)}
       </select>
@@ -168,21 +195,39 @@ export function ItemCreator({ referenceData }: { referenceData: ReferenceData })
   const values = state.values ?? {};
   const fieldErrors = state.fieldErrors ?? {};
   const formKey = state.formKey ?? "initial";
+  const [title, setTitle] = useState("");
+  const [status, setStatus] = useState<InventoryStatus>("Draft");
   const [category, setCategory] = useState("");
   const [brand, setBrand] = useState("");
   const [model, setModel] = useState("");
+  const [condition, setCondition] = useState("");
   const [storageLocation, setStorageLocation] = useState("");
   const [sizeSystem, setSizeSystem] = useState("");
   const [sizeValue, setSizeValue] = useState("");
+  const [functionalStatus, setFunctionalStatus] = useState("Unknown");
+  const [completenessStatus, setCompletenessStatus] = useState("Unknown");
+  const [authenticityStatus, setAuthenticityStatus] = useState("NotAssessed");
+  const [packagingStatus, setPackagingStatus] = useState("NotApplicable");
+  const [testingNotes, setTestingNotes] = useState("");
+  const [estimatedSalePrice, setEstimatedSalePrice] = useState("");
 
   useEffect(() => {
     if (!state.values) return;
+    setTitle(state.values.title ?? "");
+    setStatus((state.values.status as InventoryStatus | undefined) ?? "Draft");
     setCategory(state.values.category ?? "");
     setBrand(state.values.brand ?? "");
     setModel(state.values.model ?? "");
+    setCondition(state.values.condition ?? "");
     setStorageLocation(state.values.storageLocation ?? "");
     setSizeSystem(state.values.sizeSystem ?? "");
     setSizeValue(state.values.sizeValue ?? "");
+    setFunctionalStatus(state.values.functionalStatus ?? "Unknown");
+    setCompletenessStatus(state.values.completenessStatus ?? "Unknown");
+    setAuthenticityStatus(state.values.authenticityStatus ?? "NotAssessed");
+    setPackagingStatus(state.values.packagingStatus ?? "NotApplicable");
+    setTestingNotes(state.values.testingNotes ?? "");
+    setEstimatedSalePrice(state.values.estimatedSalePrice ?? "");
   }, [state.formKey, state.values]);
 
   const categories = referenceData.categories ?? [];
@@ -193,6 +238,20 @@ export function ItemCreator({ referenceData }: { referenceData: ReferenceData })
   const safeSizeSystem = normalizeOptionValue(sizeSystem, referenceData.sizeSystems ?? []);
   const sizes = (referenceData.sizes ?? []).filter((option) => !option.isLegacy && (!option.parentValue || option.parentValue === safeSizeSystem));
   const showSizing = category === "" || sizedCategories.has(category);
+  const readinessFacts = {
+    title,
+    category,
+    condition,
+    functionalStatus,
+    completenessStatus,
+    authenticityStatus,
+    packagingStatus,
+    testingNotes,
+    estimatedSalePrice,
+    photoCount: null,
+  };
+  const blockers = readinessBlockers(status, readinessFacts);
+  const disabledReason = status === "ReadyToList" && blockers.length > 0 ? "Resolve readiness blockers before creating directly as Ready to list." : undefined;
 
   return (
     <form action={action} className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
@@ -211,7 +270,8 @@ export function ItemCreator({ referenceData }: { referenceData: ReferenceData })
                 name="title"
                 required
                 placeholder="e.g. Super Mario 64, N64, complete in box"
-                defaultValue={values.title ?? ""}
+                value={title}
+                onChange={(event) => setTitle(event.target.value)}
                 aria-invalid={fieldErrors.title ? "true" : undefined}
               />
               {fieldErrors.title && <p className="text-destructive text-xs">{fieldErrors.title}</p>}
@@ -224,7 +284,7 @@ export function ItemCreator({ referenceData }: { referenceData: ReferenceData })
             </div>
             <OptionField label="Model / product line" name="model" value={model} options={models} onChange={setModel} disabled={!safeBrand || models.length === 0} error={fieldErrors.model} />
             <OptionField label="Color" name="color" value={values.color ?? ""} options={referenceData.colors ?? []} error={fieldErrors.color} formKey={formKey} />
-            <OptionField label="Condition" name="condition" value={values.condition ?? ""} options={referenceData.conditions ?? []} error={fieldErrors.condition} formKey={formKey} />
+            <OptionField label="Condition" name="condition" value={condition} options={referenceData.conditions ?? []} onChange={setCondition} error={fieldErrors.condition} formKey={formKey} />
             <OptionField label="Storage location" name="storageLocation" value={storageLocation} options={referenceData.storageLocations ?? []} onChange={setStorageLocation} error={fieldErrors.storageLocation} />
             {showSizing && <OptionField label="Size system" name="sizeSystem" value={sizeSystem} options={referenceData.sizeSystems ?? []} onChange={(value) => { setSizeSystem(value); setSizeValue(""); }} error={fieldErrors.sizeSystem} />}
             {showSizing && <OptionField label="Size" name="sizeValue" value={sizeValue} options={sizes} onChange={setSizeValue} disabled={!sizeSystem} error={fieldErrors.sizeValue} />}
@@ -238,7 +298,24 @@ export function ItemCreator({ referenceData }: { referenceData: ReferenceData })
           </CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-2">
             <EnumField label="Ownership" name="ownershipType" options={ownershipOptions} defaultValue={values.ownershipType} error={fieldErrors.ownershipType} formKey={formKey} />
-            <EnumField label="Functional status" name="functionalStatus" options={functionalOptions} defaultValue={values.functionalStatus} error={fieldErrors.functionalStatus} formKey={formKey} />
+            <EnumField label="Starting stage" name="status" options={CREATE_STAGE_OPTIONS.map((option) => [option.value, option.label] as const)} value={status} onChange={(value) => setStatus(value as InventoryStatus)} error={fieldErrors.status} />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Condition and readiness</CardTitle>
+            <CardDescription>Capture the category-specific facts that determine whether this item can move through intake, testing, photos, and listing.</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <EnumField label="Functional / tested state" name="functionalStatus" options={functionalOptions} value={functionalStatus} onChange={setFunctionalStatus} error={fieldErrors.functionalStatus} />
+            <EnumField label="Completeness" name="completenessStatus" options={completenessOptions} value={completenessStatus} onChange={setCompletenessStatus} error={fieldErrors.completenessStatus} />
+            <EnumField label="Authenticity" name="authenticityStatus" options={authenticityOptions} value={authenticityStatus} onChange={setAuthenticityStatus} error={fieldErrors.authenticityStatus} />
+            <EnumField label="Packaging / CIB state" name="packagingStatus" options={packagingOptions} value={packagingStatus} onChange={setPackagingStatus} error={fieldErrors.packagingStatus} />
+            <div className="space-y-2 sm:col-span-2 lg:col-span-4">
+              <Label htmlFor="testingNotes">Testing / inspection notes</Label>
+              <Textarea id="testingNotes" name="testingNotes" rows={3} value={testingNotes} onChange={(event) => setTestingNotes(event.target.value)} placeholder="For games/electronics: tested console, disc/cart read, controller ports, battery, defects, or parts-only disclosure." />
+            </div>
           </CardContent>
         </Card>
 
@@ -250,7 +327,7 @@ export function ItemCreator({ referenceData }: { referenceData: ReferenceData })
           <CardContent className="grid gap-4 sm:grid-cols-3">
             <Field label="Purchase price" name="purchasePrice" type="number" step="0.01" min="0" defaultValue={values.purchasePrice} error={fieldErrors.purchasePrice} formKey={formKey} />
             <Field label="Seller asking price" name="sellerAskingPrice" type="number" step="0.01" min="0" defaultValue={values.sellerAskingPrice} error={fieldErrors.sellerAskingPrice} formKey={formKey} />
-            <Field label="Estimated sale price" name="estimatedSalePrice" type="number" step="0.01" min="0" defaultValue={values.estimatedSalePrice} error={fieldErrors.estimatedSalePrice} formKey={formKey} />
+            <Field label="Estimated sale price" name="estimatedSalePrice" type="number" step="0.01" min="0" value={estimatedSalePrice} onChange={setEstimatedSalePrice} error={fieldErrors.estimatedSalePrice} formKey={formKey} />
           </CardContent>
         </Card>
 
@@ -276,12 +353,14 @@ export function ItemCreator({ referenceData }: { referenceData: ReferenceData })
       <aside className="space-y-4 xl:sticky xl:top-6 xl:self-start">
         <Card className="p-6 text-sm">
           <p className="font-medium">Add a single item</p>
-          <p className="text-muted-foreground mt-2">After creating, you land on the item to add photos, generate a listing, cross-list, and set its stage.</p>
+          <p className="text-muted-foreground mt-2">Choose the starting stage now. The record opens next so photos, listing generation, cross-listing, and sale workflow stay attached to the same canonical item.</p>
         </Card>
+        <ReadinessChecklist targetStatus={status} facts={readinessFacts} compact />
+        {disabledReason && <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">{disabledReason}</div>}
         {state.message && (
           <div className="border-destructive/30 bg-destructive/5 text-destructive rounded-lg border p-3 text-sm">{state.message}</div>
         )}
-        <SubmitButton />
+        <SubmitButton disabledReason={disabledReason} />
       </aside>
     </form>
   );

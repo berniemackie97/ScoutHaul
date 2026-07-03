@@ -76,7 +76,7 @@ export default async function InventoryDetailPage({ params }: { params: Promise<
         <aside className="space-y-6">
           <PhotoManager id={inventoryItem.id} photos={photos} />
           <ListingGenerator item={inventoryItem} />
-          <StatusControl id={inventoryItem.id} status={inventoryItem.status} />
+          <StatusControl item={inventoryItem} />
           {!inventoryItem.isSold && (
             <RecordSaleCard itemId={inventoryItem.id} cost={cost ?? 0} channels={salesReference?.channels ?? []} />
           )}

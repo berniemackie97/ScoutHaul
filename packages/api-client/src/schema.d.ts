@@ -7284,6 +7284,7 @@ export interface components {
             /** Format: double */
             weight?: number | null;
             weightUnit?: components["schemas"]["WeightUnit"];
+            status?: components["schemas"]["InventoryStatus"];
         };
         UpsertMarketObservationRequest: {
             /** Format: uuid */

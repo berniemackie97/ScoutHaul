@@ -116,7 +116,8 @@ public sealed record UpsertInventoryItemRequest(
     decimal? Height = null,
     DimensionUnit? DimensionUnit = null,
     decimal? Weight = null,
-    WeightUnit? WeightUnit = null);
+    WeightUnit? WeightUnit = null,
+    InventoryStatus? Status = null);
 
 public sealed record ChangeInventoryStatusRequest(InventoryStatus Status);
 

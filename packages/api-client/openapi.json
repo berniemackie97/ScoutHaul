@@ -12186,6 +12186,9 @@
           },
           "weightUnit": {
             "$ref": "#/components/schemas/WeightUnit"
+          },
+          "status": {
+            "$ref": "#/components/schemas/InventoryStatus"
           }
         },
         "additionalProperties": false
