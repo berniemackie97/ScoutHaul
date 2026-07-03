@@ -131,6 +131,14 @@ public static class InventoryReferenceCatalog
         B(brands, "Pet Supplies", "Kong", "PetSafe", "Furbo", "Chewy", "Blue Buffalo", "Ruffwear", "Kurgo", "Petmate", "Fluval");
         B(brands, "Automotive", "Bosch", "ACDelco", "Mobil 1", "K&N", "WeatherTech", "Garmin", "Michelin", "Goodyear", "Meguiar's", "Chemical Guys", "NOCO");
         B(brands, "Industrial", "3M", "Honeywell", "Fluke", "Grainger", "Klein Tools", "Milwaukee", "DeWalt", "Makita");
+        B(brands, "Home", "OXO", "Pyrex", "Corelle", "Lodge", "Le Creuset", "Rubbermaid", "Tupperware", "Anchor Hocking", "Yeti", "Stanley", "Corningware", "Farberware");
+        B(brands, "Furniture", "IKEA", "Ashley", "Herman Miller", "La-Z-Boy", "West Elm", "Pottery Barn", "Steelcase", "Wayfair", "Crate & Barrel");
+        B(brands, "Decor", "Yankee Candle", "Bath & Body Works", "Threshold", "Hearth & Hand", "Anthropologie");
+        B(brands, "Health & Beauty", "Dyson", "Olaplex", "CeraVe", "The Ordinary", "Drunk Elephant", "Philips", "Oral-B", "Braun", "Conair", "Revlon", "L'Oréal", "Estée Lauder");
+        B(brands, "Garden", "Scotts", "Miracle-Gro", "Greenworks", "EGO", "Weber", "Traeger", "Sun Joe");
+        B(brands, "Office", "HP", "Canon", "Brother", "Epson", "Logitech", "Herman Miller", "Fellowes", "Brother");
+        B(brands, "Crafts", "Cricut", "Singer", "Brother", "Bernina", "Silhouette", "Sizzix");
+        B(brands, "Books", "Scholastic", "Penguin Random House", "Marvel", "DC Comics", "LEGO");
         foreach (string category in Categories.Select(category => category.Value))
         {
             B(brands, category, "Other");
