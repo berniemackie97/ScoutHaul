@@ -22,6 +22,7 @@ type ReferenceOption = components["schemas"]["InventoryReferenceOptionDto"];
 
 const initialState: InventoryActionResult = { ok: false, message: "" };
 const selectClass = "h-10 w-full rounded-lg border border-input bg-background px-3 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50";
+const otherValue = "Other";
 
 const ownershipOptions = [
   ["Owned", "Owned inventory"],
@@ -91,16 +92,17 @@ function OptionField({ label, name, value, options, onChange, emptyLabel = "Not 
   emptyLabel?: string;
   disabled?: boolean;
 }) {
+  const approvedOptions = useMemo(() => options.filter((option) => !option.isLegacy && option.value && option.label), [options]);
+  const effectiveValue = normalizeOptionValue(value, approvedOptions);
   const groups = useMemo(() => {
     const result = new Map<string, ReferenceOption[]>();
-    for (const option of options) {
-      if (!option.value || !option.label) continue;
-      const group = option.group ?? "Options";
+    for (const option of approvedOptions) {
+      const group = option.group ?? "";
       result.set(group, [...(result.get(group) ?? []), option]);
     }
     return result;
-  }, [options]);
-  const hasNamedGroups = [...groups.keys()].some(group => group !== "Options");
+  }, [approvedOptions]);
+  const hasNamedGroups = [...groups.keys()].some(group => group.length > 0);
 
   return (
     <div className="space-y-2">
@@ -108,8 +110,8 @@ function OptionField({ label, name, value, options, onChange, emptyLabel = "Not 
       <select
         id={name}
         name={name}
-        value={onChange ? value : undefined}
-        defaultValue={onChange ? undefined : value}
+        value={onChange ? effectiveValue : undefined}
+        defaultValue={onChange ? undefined : effectiveValue}
         onChange={event => onChange?.(event.target.value)}
         className={selectClass}
         disabled={disabled}
@@ -127,6 +129,12 @@ function EnumField({ label, name, value, options }: { label: string; name: strin
   return <div className="space-y-2"><Label htmlFor={name}>{label}</Label><select id={name} name={name} defaultValue={value} className={selectClass}>{options.map(([optionValue, optionLabel]) => <option key={optionValue} value={optionValue}>{optionLabel}</option>)}</select></div>;
 }
 
+function normalizeOptionValue(value: string, options: ReferenceOption[]) {
+  if (!value) return "";
+  if (options.some((option) => option.value?.toLowerCase() === value.toLowerCase())) return value;
+  return options.some((option) => option.value === otherValue) ? otherValue : "";
+}
+
 export function InventoryEditor({ item, referenceData }: { item: InventoryItem; referenceData: ReferenceData }) {
   const action = updateInventoryItem.bind(null, item.id!);
   const [state, formAction] = useActionState(action, initialState);
@@ -135,11 +143,15 @@ export function InventoryEditor({ item, referenceData }: { item: InventoryItem; 
   const [model, setModel] = useState(item.model ?? "");
   const [sizeSystem, setSizeSystem] = useState(item.sizeSystem ?? "");
   const [sizeValue, setSizeValue] = useState(item.sizeValue ?? "");
+  const [storageLocation, setStorageLocation] = useState(item.storageLocation ?? "");
 
-  // Brands scoped to the chosen category (universal/legacy brands with no parent always show).
-  const brands = (referenceData.brands ?? []).filter(option => !option.parentValue || !category || option.parentValue === category);
-  const models = (referenceData.models ?? []).filter(option => !option.parentValue || !brand || option.parentValue === brand);
-  const sizes = (referenceData.sizes ?? []).filter(option => !option.parentValue || option.parentValue === sizeSystem);
+  const categories = referenceData.categories ?? [];
+  const safeCategory = normalizeOptionValue(category, categories);
+  const brands = (referenceData.brands ?? []).filter(option => !option.isLegacy && (!option.parentValue || !safeCategory || option.parentValue === safeCategory));
+  const safeBrand = normalizeOptionValue(brand, brands);
+  const models = (referenceData.models ?? []).filter(option => !option.isLegacy && (!option.parentValue || !safeBrand || option.parentValue === safeBrand));
+  const safeSizeSystem = normalizeOptionValue(sizeSystem, referenceData.sizeSystems ?? []);
+  const sizes = (referenceData.sizes ?? []).filter(option => !option.isLegacy && (!option.parentValue || option.parentValue === safeSizeSystem));
   // Sizing only applies to worn/carried goods; hide it elsewhere to declutter.
   const sizedCategories = new Set(["Clothing", "Shoes", "Handbags", "Baby"]);
   const showSizing = category === "" || sizedCategories.has(category);
@@ -155,9 +167,9 @@ export function InventoryEditor({ item, referenceData }: { item: InventoryItem; 
           <Field label="Title" name="title" defaultValue={item.title} />
           <NotesField label="Description" name="description" defaultValue={item.description} rows={5} />
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <OptionField label="Category" name="category" value={category} options={referenceData.categories ?? []} onChange={value => { setCategory(value); setBrand(""); setModel(""); }} />
-            <OptionField label="Brand" name="brand" value={brand} options={brands} onChange={value => { setBrand(value); setModel(""); }} disabled={brands.length === 0} />
-            <OptionField label="Model" name="model" value={model} options={models} onChange={setModel} disabled={models.length === 0} />
+            <OptionField label="Category" name="category" value={category} options={categories} onChange={value => { setCategory(value); setBrand(""); setModel(""); }} />
+            <OptionField label="Brand" name="brand" value={brand} options={brands} onChange={value => { setBrand(value); setModel(""); }} />
+            <OptionField label="Model / product line" name="model" value={model} options={models} onChange={setModel} disabled={!safeBrand || models.length === 0} />
             <OptionField label="Color" name="color" value={item.color ?? ""} options={referenceData.colors ?? []} />
             <OptionField label="Cosmetic condition" name="condition" value={item.condition ?? ""} options={referenceData.conditions ?? []} emptyLabel="Select condition" />
             <EnumField label="Ownership" name="ownershipType" value={item.ownershipType ?? "Owned"} options={ownershipOptions} />
@@ -184,7 +196,7 @@ export function InventoryEditor({ item, referenceData }: { item: InventoryItem; 
             <Field label="Serial number" name="serialNumber" defaultValue={item.serialNumber} />
             <Field label="Manufacture year" name="manufactureYear" type="number" min={1800} max={2200} step="1" defaultValue={item.manufactureYear} />
             <OptionField label="Country of origin" name="countryOfOrigin" value={item.countryOfOrigin ?? ""} options={referenceData.countries ?? []} />
-            <OptionField label="Storage location" name="storageLocation" value={item.storageLocation ?? ""} options={referenceData.storageLocations ?? []} disabled={(referenceData.storageLocations ?? []).length === 0} />
+            <OptionField label="Storage location" name="storageLocation" value={storageLocation} options={referenceData.storageLocations ?? []} onChange={setStorageLocation} />
             {showSizing && <OptionField label="Size system" name="sizeSystem" value={sizeSystem} options={referenceData.sizeSystems ?? []} onChange={value => { setSizeSystem(value); setSizeValue(""); }} />}
             {showSizing && <OptionField label="Size" name="sizeValue" value={sizeValue} options={sizes} onChange={setSizeValue} disabled={!sizeSystem || sizes.length === 0} />}
           </div>

@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
+import type { components } from "@overhaul/api-client";
 import { Badge, Card, CardContent, CardHeader, CardTitle } from "@overhaul/ui";
 import { getApiClient } from "@/lib/api";
 import { OrderStatusControl } from "./order-status-control";
+import { OrderTrackingCard } from "./order-tracking-card";
 
 export const dynamic = "force-dynamic";
 
@@ -22,11 +24,20 @@ const orderStatusVariant = (status: string | undefined) => {
 
 type OrderStatus = "Pending" | "Paid" | "Fulfilling" | "Shipped" | "Delivered" | "Cancelled" | "Refunded";
 
+type OrderWithTracking = components["schemas"]["OrderDetailDto"] & {
+  shippingCarrier?: string | null;
+  trackingNumber?: string | null;
+  trackingUrl?: string | null;
+  shippedAt?: string | null;
+  deliveredAt?: string | null;
+};
+
 export default async function OrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const api = await getApiClient();
   const { data: order } = await api.GET("/api/orders/{id}", { params: { path: { id } } });
   if (!order) notFound();
+  const trackedOrder = order as OrderWithTracking;
 
   const lines = order.lines ?? [];
   const shipTo = [order.shipToLine1, order.shipToLine2, [order.shipToCity, order.shipToRegion, order.shipToPostalCode].filter(Boolean).join(", "), order.shipToCountry]
@@ -104,6 +115,18 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
               <OrderStatusControl id={order.id!} status={(order.status ?? "Pending") as OrderStatus} />
             </CardContent>
           </Card>
+
+          <OrderTrackingCard
+            order={{
+              id: order.id!,
+              isLocalPickup: order.isLocalPickup,
+              shippingCarrier: trackedOrder.shippingCarrier,
+              trackingNumber: trackedOrder.trackingNumber,
+              trackingUrl: trackedOrder.trackingUrl,
+              shippedAt: trackedOrder.shippedAt,
+              deliveredAt: trackedOrder.deliveredAt,
+            }}
+          />
         </div>
 
         <aside className="space-y-4">
@@ -149,6 +172,22 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
             )}
             {order.customerNote && <p className="text-muted-foreground mt-3 border-t pt-3 italic">“{order.customerNote}”</p>}
           </Card>
+
+          {(trackedOrder.trackingNumber || trackedOrder.shippedAt || trackedOrder.deliveredAt) && (
+            <Card className="p-5 text-sm">
+              <p className="text-muted-foreground text-xs uppercase tracking-wide">Tracking</p>
+              <p className="mt-1 font-medium">{[trackedOrder.shippingCarrier, trackedOrder.trackingNumber].filter(Boolean).join(" · ") || "Tracking recorded"}</p>
+              {trackedOrder.trackingUrl && (
+                <Link href={trackedOrder.trackingUrl} target="_blank" rel="noreferrer" className="text-brand-700 mt-2 inline-block hover:underline">
+                  Open carrier tracking
+                </Link>
+              )}
+              <div className="text-muted-foreground mt-3 space-y-1 border-t pt-3">
+                <p>Shipped: {dateTime(trackedOrder.shippedAt)}</p>
+                <p>Delivered: {dateTime(trackedOrder.deliveredAt)}</p>
+              </div>
+            </Card>
+          )}
         </aside>
       </div>
     </div>

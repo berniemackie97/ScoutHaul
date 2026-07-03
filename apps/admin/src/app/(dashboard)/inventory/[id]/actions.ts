@@ -207,3 +207,37 @@ export async function deleteInventoryPhoto(
   revalidatePath(`/inventory/${id}`);
   return { ok: true, message: "Photo deleted." };
 }
+
+export type InventoryDeleteResult = InventoryActionResult & {
+  deleted?: boolean;
+};
+
+export async function deleteInventoryItem(
+  id: string,
+  hard: boolean,
+): Promise<InventoryDeleteResult> {
+  const token = await getApiAccessToken();
+  if (!token) return { ok: false, message: "Your session expired. Sign in again." };
+
+  const response = await fetch(`${getApiBaseUrl()}/api/inventory/${id}?hard=${hard ? "true" : "false"}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    const body = await response.text();
+    return {
+      ok: false,
+      message: body || (hard ? "Inventory item could not be permanently deleted." : "Inventory item could not be archived."),
+    };
+  }
+
+  revalidatePath("/inventory");
+  revalidatePath(`/inventory/${id}`);
+  return {
+    ok: true,
+    deleted: hard,
+    message: hard ? "Inventory item permanently deleted." : "Inventory item archived.",
+  };
+}

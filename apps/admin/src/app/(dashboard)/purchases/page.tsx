@@ -32,7 +32,7 @@ export default async function PurchasesPage() {
           <p className="text-sm text-muted-foreground">Operations</p>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight">Purchases &amp; acquisition lots</h1>
           <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-            Record a receipt, pallet, haul, auction pickup, or loose lot once, then allocate landed cost to each inventory record for accurate COGS and historical profit.
+            Record a single-item purchase or a multi-item receipt, pallet, haul, auction pickup, or loose lot, then allocate landed cost into inventory for accurate COGS and historical profit.
           </p>
         </div>
         <Link href="/inventory" className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border px-4 text-sm font-medium hover:bg-muted">
@@ -41,7 +41,7 @@ export default async function PurchasesPage() {
       </header>
 
       <div className="grid gap-4 sm:grid-cols-3">
-        <Card className="p-5"><div className="flex items-center justify-between text-sm text-muted-foreground"><span>Total lot spend</span><ReceiptText className="h-4 w-4" /></div><p className="mt-3 text-3xl font-semibold tabular-nums">{money(totalSpend)}</p></Card>
+        <Card className="p-5"><div className="flex items-center justify-between text-sm text-muted-foreground"><span>Total purchase spend</span><ReceiptText className="h-4 w-4" /></div><p className="mt-3 text-3xl font-semibold tabular-nums">{money(totalSpend)}</p></Card>
         <Card className="p-5"><p className="text-sm text-muted-foreground">Allocated COGS</p><p className="mt-3 text-3xl font-semibold tabular-nums">{money(allocated)}</p></Card>
         <Card className="p-5"><p className="text-sm text-muted-foreground">Open candidates</p><p className="mt-3 text-3xl font-semibold tabular-nums">{candidates.length}</p></Card>
       </div>
@@ -50,17 +50,17 @@ export default async function PurchasesPage() {
 
       <section className="space-y-3">
         <div>
-          <h2 className="text-lg font-semibold">Recorded acquisition lots</h2>
-          <p className="text-sm text-muted-foreground">Each lot creates one purchase expense and allocated item-level cost basis.</p>
+          <h2 className="text-lg font-semibold">Recorded purchase records</h2>
+          <p className="text-sm text-muted-foreground">Each record creates one purchase expense and allocated item-level cost basis.</p>
         </div>
         {acquisitionLots.length === 0 ? (
-          <p className="rounded-xl border border-dashed bg-muted/20 p-10 text-center text-sm text-muted-foreground">No acquisition lots recorded yet.</p>
+          <p className="rounded-xl border border-dashed bg-muted/20 p-10 text-center text-sm text-muted-foreground">No purchase records recorded yet.</p>
         ) : (
           <div className="overflow-x-auto rounded-xl border bg-card">
             <table className="w-full text-sm">
               <thead className="border-b bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
                 <tr>
-                  <th className="px-4 py-3 font-medium">Lot</th>
+                  <th className="px-4 py-3 font-medium">Purchase record</th>
                   <th className="px-4 py-3 font-medium">Purchased</th>
                   <th className="px-4 py-3 font-medium">Allocation</th>
                   <th className="px-4 py-3 text-right font-medium">Items</th>
@@ -72,7 +72,7 @@ export default async function PurchasesPage() {
                 {acquisitionLots.map((lot) => (
                   <tr key={lot.id} className="hover:bg-muted/30">
                     <td className="px-4 py-3">
-                      <Link href={`/purchases/${lot.id}`} className="font-medium hover:underline">{lot.name || "Untitled lot"}</Link>
+                      <Link href={`/purchases/${lot.id}`} className="font-medium hover:underline">{lot.name || "Untitled purchase"}</Link>
                       <p className="text-xs text-muted-foreground">{[lot.supplierName, lot.externalReference].filter(Boolean).join(" · ") || "No supplier/reference"}</p>
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">{date(lot.purchasedAt)}</td>

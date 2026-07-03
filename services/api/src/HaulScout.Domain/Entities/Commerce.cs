@@ -156,8 +156,13 @@ public sealed class Order : EntityBase, IOrganizationScoped
     public string? ShipToCountry { get; set; }
     public bool IsLocalPickup { get; set; }
     public string? CustomerNote { get; set; }
+    public string? ShippingCarrier { get; set; }
+    public string? TrackingNumber { get; set; }
+    public string? TrackingUrl { get; set; }
 
     public DateTimeOffset? PaidAt { get; set; }
+    public DateTimeOffset? ShippedAt { get; set; }
+    public DateTimeOffset? DeliveredAt { get; set; }
     public DateTimeOffset? CancelledAt { get; set; }
 
     public ICollection<OrderLine> Lines { get; set; } = [];

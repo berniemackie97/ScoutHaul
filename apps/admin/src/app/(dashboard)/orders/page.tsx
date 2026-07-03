@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { PackageCheck, ShoppingBag, Truck } from "lucide-react";
+import type { components } from "@overhaul/api-client";
 import { Badge, Card } from "@overhaul/ui";
 import { getApiClient } from "@/lib/api";
 
@@ -20,6 +21,13 @@ const orderStatusVariant = (status: string | undefined) => {
 
 const FILTERS = ["All", "Pending", "Paid", "Fulfilling", "Shipped", "Delivered", "Cancelled", "Refunded"] as const;
 
+type OrderSummaryWithTracking = components["schemas"]["OrderSummaryDto"] & {
+  shippingCarrier?: string | null;
+  trackingNumber?: string | null;
+  shippedAt?: string | null;
+  deliveredAt?: string | null;
+};
+
 export default async function OrdersPage({ searchParams }: { searchParams: Promise<{ status?: string }> }) {
   const { status } = await searchParams;
   const active = FILTERS.includes((status ?? "All") as (typeof FILTERS)[number]) ? status ?? "All" : "All";
@@ -28,7 +36,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
   const { data } = await api.GET("/api/orders", {
     params: { query: active === "All" ? {} : { status: active } },
   });
-  const orders = data ?? [];
+  const orders = (data ?? []) as OrderSummaryWithTracking[];
 
   const openOrders = orders.filter((order) => !["Delivered", "Cancelled", "Refunded"].includes(order.status ?? ""));
   const revenue = orders
@@ -95,6 +103,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
                 <th className="px-4 py-3 font-medium">Placed</th>
                 <th className="px-4 py-3 text-right font-medium">Items</th>
                 <th className="px-4 py-3 text-right font-medium">Total</th>
+                <th className="px-4 py-3 font-medium">Tracking</th>
                 <th className="px-4 py-3 font-medium">Payment</th>
                 <th className="px-4 py-3 font-medium">Status</th>
               </tr>
@@ -112,6 +121,20 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
                   <td className="text-muted-foreground px-4 py-3">{date(order.createdAt)}</td>
                   <td className="px-4 py-3 text-right tabular-nums">{order.itemCount}</td>
                   <td className="px-4 py-3 text-right font-medium tabular-nums">{money(order.grandTotal)}</td>
+                  <td className="text-muted-foreground px-4 py-3">
+                    {order.isLocalPickup ? (
+                      "Pickup"
+                    ) : order.trackingNumber ? (
+                      <span>
+                        <span className="text-foreground font-medium">{order.shippingCarrier ?? "Carrier"}</span>
+                        <span className="block max-w-[180px] truncate text-xs">{order.trackingNumber}</span>
+                      </span>
+                    ) : order.shippedAt ? (
+                      <span>Shipped {date(order.shippedAt)}</span>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
                   <td className="px-4 py-3">
                     <Badge variant={order.paymentStatus === "Paid" ? "success" : order.paymentStatus === "Refunded" ? "destructive" : "secondary"}>
                       {order.paymentStatus}

@@ -405,7 +405,11 @@ public static class DtoMapping
         item.Lines.Sum(line => line.Quantity),
         item.IsLocalPickup,
         item.CreatedAt,
-        item.PaidAt);
+        item.PaidAt,
+        item.ShippingCarrier,
+        item.TrackingNumber,
+        item.ShippedAt,
+        item.DeliveredAt);
 
     public static OrderDetailDto ToDetailDto(this Order item)
     {
@@ -436,9 +440,14 @@ public static class DtoMapping
             item.ShipToCountry,
             item.IsLocalPickup,
             item.CustomerNote,
+            item.ShippingCarrier,
+            item.TrackingNumber,
+            item.TrackingUrl,
             item.StripePaymentIntentId,
             item.CreatedAt,
             item.PaidAt,
+            item.ShippedAt,
+            item.DeliveredAt,
             item.CancelledAt,
             item.Lines.OrderBy(line => line.TitleSnapshot).Select(line => line.ToDto()).ToList());
     }

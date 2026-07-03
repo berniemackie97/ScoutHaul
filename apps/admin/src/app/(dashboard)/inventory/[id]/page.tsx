@@ -15,6 +15,7 @@ import { StatusControl } from "./status-control";
 import { ListingGenerator } from "./listing-generator";
 import { CrossListPanel } from "./cross-list-panel";
 import { RecordSaleCard } from "./record-sale-card";
+import { DeleteInventoryCard } from "./delete-inventory-card";
 
 export const dynamic = "force-dynamic";
 
@@ -142,6 +143,8 @@ export default async function InventoryDetailPage({ params }: { params: Promise<
               <div className="flex items-start gap-2"><CalendarDays className="mt-0.5 h-4 w-4 text-muted-foreground" /><div><p className="text-xs text-muted-foreground">Created</p><p>{date(inventoryItem.createdAt)}</p></div></div>
             </CardContent>
           </Card>
+
+          <DeleteInventoryCard id={inventoryItem.id} title={inventoryItem.title ?? ""} />
         </aside>
       </div>
     </div>

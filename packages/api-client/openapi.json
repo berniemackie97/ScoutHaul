@@ -1212,6 +1212,14 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "hard",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
           }
         ],
         "responses": {
@@ -2644,6 +2652,65 @@
             "application/*+json": {
               "schema": {
                 "$ref": "#/components/schemas/UpdateOrderStatusRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderDetailDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderDetailDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderDetailDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/orders/{id}/tracking": {
+      "patch": {
+        "tags": [
+          "Orders"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateOrderTrackingRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateOrderTrackingRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateOrderTrackingRequest"
               }
             }
           }
@@ -9288,6 +9355,18 @@
             "type": "string",
             "nullable": true
           },
+          "shippingCarrier": {
+            "type": "string",
+            "nullable": true
+          },
+          "trackingNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "trackingUrl": {
+            "type": "string",
+            "nullable": true
+          },
           "stripePaymentIntentId": {
             "type": "string",
             "nullable": true
@@ -9297,6 +9376,16 @@
             "format": "date-time"
           },
           "paidAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "shippedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "deliveredAt": {
             "type": "string",
             "format": "date-time",
             "nullable": true
@@ -9420,6 +9509,24 @@
             "format": "date-time"
           },
           "paidAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "shippingCarrier": {
+            "type": "string",
+            "nullable": true
+          },
+          "trackingNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "shippedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "deliveredAt": {
             "type": "string",
             "format": "date-time",
             "nullable": true
@@ -11495,6 +11602,40 @@
         "properties": {
           "status": {
             "$ref": "#/components/schemas/OrderStatus"
+          }
+        },
+        "additionalProperties": false
+      },
+      "UpdateOrderTrackingRequest": {
+        "type": "object",
+        "properties": {
+          "shippingCarrier": {
+            "type": "string",
+            "nullable": true
+          },
+          "trackingNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "trackingUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "shippedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "deliveredAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "markShipped": {
+            "type": "boolean"
+          },
+          "markDelivered": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false
