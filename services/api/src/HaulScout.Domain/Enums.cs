@@ -276,3 +276,14 @@ public enum ReviewStatus
     Approved,
     Rejected
 }
+
+/// <summary>State of an inventory item on a single channel account (the cross-listing sync ledger).</summary>
+public enum ChannelListingStatus
+{
+    NotListed,
+    Draft,
+    Active,
+    Sold,
+    Delisted,
+    Error
+}

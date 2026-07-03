@@ -57,6 +57,8 @@ public sealed class HaulScoutDbContext(DbContextOptions<HaulScoutDbContext> opti
     public DbSet<OrderLine> OrderLines => Set<OrderLine>();
     public DbSet<WishlistItem> WishlistItems => Set<WishlistItem>();
     public DbSet<Review> Reviews => Set<Review>();
+    public DbSet<ChannelAccount> ChannelAccounts => Set<ChannelAccount>();
+    public DbSet<ChannelListing> ChannelListings => Set<ChannelListing>();
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
@@ -640,6 +642,34 @@ public sealed class HaulScoutDbContext(DbContextOptions<HaulScoutDbContext> opti
             entity.HasIndex(item => new { item.OrganizationId, item.Status });
             entity.HasOne(item => item.Customer).WithMany(item => item.Reviews).HasForeignKey(item => item.CustomerId).OnDelete(DeleteBehavior.Cascade);
             entity.HasOne(item => item.StoreListing).WithMany(item => item.Reviews).HasForeignKey(item => item.StoreListingId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ChannelAccount>(entity =>
+        {
+            entity.ToTable("ChannelAccounts");
+            entity.Property(item => item.Channel).HasMaxLength(60).IsRequired();
+            entity.Property(item => item.DisplayName).HasMaxLength(160).IsRequired();
+            entity.Property(item => item.ExternalAccountId).HasMaxLength(200);
+            entity.Property(item => item.DefaultFeeProfileId).HasMaxLength(80);
+            entity.Property(item => item.Notes).HasMaxLength(2000);
+            entity.HasIndex(item => new { item.OrganizationId, item.Channel });
+            entity.HasIndex(item => new { item.OrganizationId, item.DisplayName }).IsUnique();
+        });
+
+        modelBuilder.Entity<ChannelListing>(entity =>
+        {
+            entity.ToTable("ChannelListings");
+            entity.Property(item => item.Status).HasConversion<string>().HasMaxLength(24);
+            entity.Property(item => item.ExternalListingId).HasMaxLength(200);
+            entity.Property(item => item.ExternalUrl).HasMaxLength(1000);
+            entity.Property(item => item.ImageHash).HasMaxLength(128);
+            entity.Property(item => item.LastError).HasMaxLength(2000);
+            ConfigureMoney(entity.Property(item => item.ListedPrice));
+            // One listing row per item per channel account.
+            entity.HasIndex(item => new { item.OrganizationId, item.InventoryItemId, item.ChannelAccountId }).IsUnique();
+            entity.HasIndex(item => new { item.OrganizationId, item.Status });
+            entity.HasOne(item => item.InventoryItem).WithMany(item => item.ChannelListings).HasForeignKey(item => item.InventoryItemId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(item => item.ChannelAccount).WithMany(item => item.Listings).HasForeignKey(item => item.ChannelAccountId).OnDelete(DeleteBehavior.Cascade);
         });
 
         ApplyOrganizationQueryFilters(modelBuilder);
