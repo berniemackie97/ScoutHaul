@@ -64,14 +64,9 @@ export default async function InventoryPage({
           <h1 className="mt-1 text-2xl font-semibold tracking-tight">Inventory control</h1>
           <p className="mt-1 text-sm text-muted-foreground">The authoritative record for every item across intake, preparation, listing, sale, and fulfillment.</p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Link href="/inventory/new" className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-brand-600 px-4 text-sm font-medium text-white hover:bg-brand-700">
-            <Plus className="h-4 w-4" /> Add item
-          </Link>
-          <Link href="/inventory/bundles/new" className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border px-4 text-sm font-medium hover:bg-muted">
-            <Plus className="h-4 w-4" /> Build bundle
-          </Link>
-        </div>
+        <Link href="/inventory/add" className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-brand-600 px-4 text-sm font-medium text-white hover:bg-brand-700">
+          <Plus className="h-4 w-4" /> Add inventory
+        </Link>
       </header>
 
       <div className="grid gap-4 sm:grid-cols-3">
