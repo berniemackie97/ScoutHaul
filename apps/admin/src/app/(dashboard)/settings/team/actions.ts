@@ -3,10 +3,13 @@
 import { revalidatePath } from "next/cache";
 import type { components } from "@overhaul/api-client";
 import { getApiClient } from "@/lib/api";
+import { failedFormState, type FailedFormState, type FieldErrors } from "@/lib/form-state";
 
 type OrganizationRole = components["schemas"]["OrganizationRole"];
 
-export type TeamResult = { ok: boolean; message: string; code?: string };
+export type TeamResult = { ok: boolean; message: string; code?: string } & FailedFormState;
+
+const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function text(formData: FormData, name: string): string | null {
   const value = formData.get(name);
@@ -24,6 +27,21 @@ function errorMessage(error: unknown, fallback: string): string {
   return fallback;
 }
 
+function selectedPermissions(formData: FormData) {
+  return formData.getAll("permissions").filter((value): value is string => typeof value === "string" && value.length > 0);
+}
+
+function failure(message: string, formData: FormData, fieldErrors: FieldErrors = {}): TeamResult {
+  const result = failedFormState(message, formData, fieldErrors);
+  return {
+    ...result,
+    values: {
+      ...(result.values ?? {}),
+      selectedPermissions: selectedPermissions(formData).join("|"),
+    },
+  };
+}
+
 function revalidate() {
   revalidatePath("/settings/team");
 }
@@ -31,19 +49,25 @@ function revalidate() {
 export async function inviteMember(orgId: string, _prev: TeamResult, formData: FormData): Promise<TeamResult> {
   const email = text(formData, "email");
   const displayName = text(formData, "displayName");
-  if (!email || !displayName) return { ok: false, message: "Name and email are required." };
+  const fieldErrors: FieldErrors = {};
+  if (!displayName) fieldErrors.displayName = "Name is required.";
+  if (!email) fieldErrors.email = "Email is required.";
+  else if (!emailPattern.test(email)) fieldErrors.email = "Enter a valid email address.";
+  if (Object.keys(fieldErrors).length > 0) {
+    return failure("Fix the highlighted fields.", formData, fieldErrors);
+  }
 
   const api = await getApiClient();
   const result = await api.POST("/api/organizations/{id}/members", {
     params: { path: { id: orgId } },
     body: {
-      email,
-      displayName,
+      email: email!,
+      displayName: displayName!,
       role: (text(formData, "role") ?? "Member") as OrganizationRole,
       roleId: text(formData, "roleId"),
     },
   });
-  if (!result.data) return { ok: false, message: errorMessage(result.error, "The member could not be invited.") };
+  if (!result.data) return failure(errorMessage(result.error, "The member could not be invited."), formData);
   revalidate();
   return { ok: true, message: `Invited ${displayName}.` };
 }
@@ -81,37 +105,57 @@ export async function removeMember(orgId: string, memberId: string): Promise<Tea
 
 export async function createRole(orgId: string, _prev: TeamResult, formData: FormData): Promise<TeamResult> {
   const name = text(formData, "name");
-  if (!name) return { ok: false, message: "Role name is required." };
-  const permissions = formData.getAll("permissions").filter((value): value is string => typeof value === "string");
+  const permissions = selectedPermissions(formData);
+  const fieldErrors: FieldErrors = {};
+  if (!name) fieldErrors.name = "Role name is required.";
+  if (permissions.length === 0) fieldErrors.permissions = "Select at least one permission for a custom role.";
+  if (formData.get("grantsOwnerAccess") === "on") {
+    fieldErrors.permissions = "Owner access is system-governed and cannot be granted by a custom role from this screen.";
+  }
+  if (Object.keys(fieldErrors).length > 0) {
+    return failure("Fix the highlighted fields.", formData, fieldErrors);
+  }
 
   const api = await getApiClient();
   const result = await api.POST("/api/organizations/{id}/roles", {
     params: { path: { id: orgId } },
-    body: { name, description: text(formData, "description"), permissions, grantsOwnerAccess: formData.get("grantsOwnerAccess") === "on" },
+    body: { name: name!, description: text(formData, "description"), permissions, grantsOwnerAccess: false },
   });
-  if (!result.data) return { ok: false, message: errorMessage(result.error, "The role could not be created.") };
+  if (!result.data) return failure(errorMessage(result.error, "The role could not be created."), formData);
   revalidate();
   return { ok: true, message: `Role “${name}” created.` };
 }
 
 export async function createInviteCode(orgId: string, _prev: TeamResult, formData: FormData): Promise<TeamResult> {
   const name = text(formData, "name");
-  if (!name) return { ok: false, message: "Give the invite a label." };
+  const fieldErrors: FieldErrors = {};
+  if (!name) fieldErrors.name = "Give the invite a label.";
   const maxUsesRaw = text(formData, "maxUses");
-  const maxUses = maxUsesRaw ? Number(maxUsesRaw) : null;
+  let maxUses: number | null = null;
+  if (maxUsesRaw) {
+    const parsedMaxUses = Number(maxUsesRaw);
+    if (!Number.isInteger(parsedMaxUses) || parsedMaxUses <= 0) {
+      fieldErrors.maxUses = "Max uses must be a positive whole number.";
+    } else {
+      maxUses = parsedMaxUses;
+    }
+  }
+  if (Object.keys(fieldErrors).length > 0) {
+    return failure("Fix the highlighted fields.", formData, fieldErrors);
+  }
 
   const api = await getApiClient();
   const result = await api.POST("/api/organizations/{id}/invite-codes", {
     params: { path: { id: orgId } },
     body: {
-      name,
+      name: name!,
       teamId: null,
       roleId: text(formData, "roleId"),
       expiresAt: null,
-      maxUses: maxUses && Number.isFinite(maxUses) && maxUses > 0 ? maxUses : null,
+      maxUses,
     },
   });
-  if (!result.data?.code) return { ok: false, message: errorMessage(result.error, "The invite code could not be created.") };
+  if (!result.data?.code) return failure(errorMessage(result.error, "The invite code could not be created."), formData);
   revalidate();
   return { ok: true, message: "Invite code created — copy it now, it won't be shown again.", code: result.data.code };
 }

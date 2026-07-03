@@ -24,6 +24,10 @@ function Submit({ label }: { label: string }) {
   return <Button type="submit" disabled={pending}>{pending ? "Working…" : label}</Button>;
 }
 
+function FieldError({ message }: { message?: string }) {
+  return message ? <p className="text-destructive text-xs">{message}</p> : null;
+}
+
 export function TeamAccess({ orgId, members, roles, permissions, codes }: { orgId: string; members: Member[]; roles: Role[]; permissions: string[]; codes: InviteCode[] }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -32,6 +36,16 @@ export function TeamAccess({ orgId, members, roles, permissions, codes }: { orgI
   const [inviteState, inviteAction] = useActionState(inviteMember.bind(null, orgId), initial);
   const [roleState, roleAction] = useActionState(createRole.bind(null, orgId), initial);
   const [codeState, codeAction] = useActionState(createInviteCode.bind(null, orgId), initial);
+  const inviteValues = inviteState.values ?? {};
+  const inviteErrors = inviteState.fieldErrors ?? {};
+  const inviteKey = inviteState.formKey ?? "initial";
+  const roleValues = roleState.values ?? {};
+  const roleErrors = roleState.fieldErrors ?? {};
+  const roleKey = roleState.formKey ?? "initial";
+  const selectedPermissions = new Set((roleValues.selectedPermissions ?? "").split("|").filter(Boolean));
+  const codeValues = codeState.values ?? {};
+  const codeErrors = codeState.fieldErrors ?? {};
+  const codeKey = codeState.formKey ?? "initial";
 
   function run(fn: () => Promise<TeamResult>) {
     startTransition(async () => {
@@ -97,13 +111,39 @@ export function TeamAccess({ orgId, members, roles, permissions, codes }: { orgI
           </div>
 
           <form action={inviteAction} className="grid gap-2 rounded-lg border bg-muted/20 p-3 sm:grid-cols-[1fr_1fr_160px_auto]">
-            <Input name="displayName" placeholder="Full name" required className="h-9" />
-            <Input name="email" type="email" placeholder="email@example.com" required className="h-9" />
-            <select name="roleId" className={selectClass} defaultValue="">
-              <option value="">Member (base)</option>
-              {roles.filter((role) => !role.isOwnerRole).map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}
-            </select>
-            <Submit label="Invite" />
+            <div className="space-y-1">
+              <Input
+                key={`displayName:${inviteKey}`}
+                name="displayName"
+                placeholder="Full name"
+                required
+                className="h-9"
+                defaultValue={inviteValues.displayName ?? ""}
+                aria-invalid={inviteErrors.displayName ? "true" : undefined}
+              />
+              <FieldError message={inviteErrors.displayName} />
+            </div>
+            <div className="space-y-1">
+              <Input
+                key={`email:${inviteKey}`}
+                name="email"
+                type="email"
+                placeholder="email@example.com"
+                required
+                className="h-9"
+                defaultValue={inviteValues.email ?? ""}
+                aria-invalid={inviteErrors.email ? "true" : undefined}
+              />
+              <FieldError message={inviteErrors.email} />
+            </div>
+            <div className="space-y-1">
+              <select key={`roleId:${inviteKey}`} name="roleId" className={selectClass} defaultValue={inviteValues.roleId ?? ""}>
+                <option value="">Member (base)</option>
+                {roles.filter((role) => !role.isOwnerRole).map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}
+              </select>
+              <FieldError message={inviteErrors.roleId} />
+            </div>
+            <div className="self-start"><Submit label="Invite" /></div>
             {inviteState.message && <p className={`text-xs sm:col-span-4 ${inviteState.ok ? "text-green-700" : "text-destructive"}`}>{inviteState.message}</p>}
           </form>
         </CardContent>
@@ -125,22 +165,54 @@ export function TeamAccess({ orgId, members, roles, permissions, codes }: { orgI
             ))}
           </div>
 
-          <details className="rounded-lg border bg-muted/20 p-3">
+          <details className="rounded-lg border bg-muted/20 p-3" open={Boolean(roleState.message && !roleState.ok)}>
             <summary className="cursor-pointer text-sm font-medium">Create a role</summary>
             <form action={roleAction} className="mt-3 space-y-3">
               <div className="grid gap-2 sm:grid-cols-2">
-                <div className="space-y-1"><Label htmlFor="name" className="text-xs">Role name</Label><Input id="name" name="name" required className="h-9" placeholder="Lister" /></div>
-                <div className="space-y-1"><Label htmlFor="description" className="text-xs">Description</Label><Input id="description" name="description" className="h-9" /></div>
+                <div className="space-y-1">
+                  <Label htmlFor="name" className="text-xs">Role name</Label>
+                  <Input
+                    key={`role-name:${roleKey}`}
+                    id="name"
+                    name="name"
+                    required
+                    className="h-9"
+                    placeholder="Lister"
+                    defaultValue={roleValues.name ?? ""}
+                    aria-invalid={roleErrors.name ? "true" : undefined}
+                  />
+                  <FieldError message={roleErrors.name} />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="description" className="text-xs">Description</Label>
+                  <Input
+                    key={`role-description:${roleKey}`}
+                    id="description"
+                    name="description"
+                    className="h-9"
+                    defaultValue={roleValues.description ?? ""}
+                  />
+                </div>
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">Permissions</Label>
                 <div className="grid gap-1 sm:grid-cols-2 md:grid-cols-3">
                   {permissions.map((permission) => (
-                    <label key={permission} className="flex items-center gap-2 text-xs"><input type="checkbox" name="permissions" value={permission} /> {permission}</label>
+                    <label key={permission} className="flex items-center gap-2 text-xs">
+                      <input
+                        key={`${permission}:${roleKey}`}
+                        type="checkbox"
+                        name="permissions"
+                        value={permission}
+                        defaultChecked={selectedPermissions.has(permission)}
+                      />{" "}
+                      {permission}
+                    </label>
                   ))}
                 </div>
+                <FieldError message={roleErrors.permissions} />
               </div>
-              <label className="flex items-center gap-2 text-xs"><input type="checkbox" name="grantsOwnerAccess" /> Grants full owner access</label>
+              <p className="text-muted-foreground text-xs">Owner-level access stays system-governed. Custom roles must grant explicit permissions.</p>
               <div className="flex items-center gap-3"><Submit label="Create role" />{roleState.message && <span className={`text-xs ${roleState.ok ? "text-green-700" : "text-destructive"}`}>{roleState.message}</span>}</div>
             </form>
           </details>
@@ -173,10 +245,40 @@ export function TeamAccess({ orgId, members, roles, permissions, codes }: { orgI
             </div>
           )}
           <form action={codeAction} className="grid gap-2 rounded-lg border bg-muted/20 p-3 sm:grid-cols-[1fr_160px_120px_auto]">
-            <Input name="name" placeholder="Label (e.g. Warehouse crew)" required className="h-9" />
-            <select name="roleId" className={selectClass} defaultValue=""><option value="">Member (base)</option>{roles.filter((role) => !role.isOwnerRole).map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}</select>
-            <Input name="maxUses" type="number" min="1" placeholder="Max uses" className="h-9" />
-            <Submit label="Create code" />
+            <div className="space-y-1">
+              <Input
+                key={`code-name:${codeKey}`}
+                name="name"
+                placeholder="Label (e.g. Warehouse crew)"
+                required
+                className="h-9"
+                defaultValue={codeValues.name ?? ""}
+                aria-invalid={codeErrors.name ? "true" : undefined}
+              />
+              <FieldError message={codeErrors.name} />
+            </div>
+            <div className="space-y-1">
+              <select key={`code-role:${codeKey}`} name="roleId" className={selectClass} defaultValue={codeValues.roleId ?? ""}>
+                <option value="">Member (base)</option>
+                {roles.filter((role) => !role.isOwnerRole).map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}
+              </select>
+              <FieldError message={codeErrors.roleId} />
+            </div>
+            <div className="space-y-1">
+              <Input
+                key={`code-maxUses:${codeKey}`}
+                name="maxUses"
+                type="number"
+                min="1"
+                step="1"
+                placeholder="Max uses"
+                className="h-9"
+                defaultValue={codeValues.maxUses ?? ""}
+                aria-invalid={codeErrors.maxUses ? "true" : undefined}
+              />
+              <FieldError message={codeErrors.maxUses} />
+            </div>
+            <div className="self-start"><Submit label="Create code" /></div>
             {codeState.message && !codeState.code && <p className={`text-xs sm:col-span-4 ${codeState.ok ? "text-green-700" : "text-destructive"}`}>{codeState.message}</p>}
           </form>
         </CardContent>
