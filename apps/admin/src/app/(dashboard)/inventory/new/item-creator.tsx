@@ -1,13 +1,17 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useMemo, useState } from "react";
 import { useFormStatus } from "react-dom";
+import type { components } from "@overhaul/api-client";
 import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Label, Textarea } from "@overhaul/ui";
 import { createInventoryItem, type NewInventoryResult } from "./actions";
 
+type ReferenceData = components["schemas"]["InventoryReferenceDataDto"];
+type ReferenceOption = components["schemas"]["InventoryReferenceOptionDto"];
+
 const initial: NewInventoryResult = { ok: false, message: "" };
-const selectClass =
-  "h-10 w-full rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring";
+const selectClass = "h-10 w-full rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50";
+const sizedCategories = new Set(["Clothing", "Shoes", "Handbags", "Baby"]);
 
 const ownershipOptions = [
   ["Owned", "Owned inventory"],
@@ -39,23 +43,68 @@ function Field({ label, name, type = "text", placeholder, step, min }: { label: 
   );
 }
 
-function SelectField({ label, name, options }: { label: string; name: string; options: readonly (readonly [string, string])[] }) {
+function EnumField({ label, name, options }: { label: string; name: string; options: readonly (readonly [string, string])[] }) {
   return (
     <div className="space-y-2">
       <Label htmlFor={name}>{label}</Label>
       <select id={name} name={name} className={selectClass} defaultValue={options[0]?.[0]}>
-        {options.map(([value, text]) => (
-          <option key={value} value={value}>
-            {text}
-          </option>
-        ))}
+        {options.map(([value, text]) => <option key={value} value={value}>{text}</option>)}
       </select>
     </div>
   );
 }
 
-export function ItemCreator() {
+function OptionField({ label, name, value, options, onChange, disabled = false }: {
+  label: string; name: string; value: string; options: ReferenceOption[]; onChange?: (value: string) => void; disabled?: boolean;
+}) {
+  const groups = useMemo(() => {
+    const map = new Map<string, ReferenceOption[]>();
+    for (const option of options) {
+      if (!option.value || !option.label) continue;
+      map.set(option.group ?? "Options", [...(map.get(option.group ?? "Options") ?? []), option]);
+    }
+    return map;
+  }, [options]);
+  const named = [...groups.keys()].some((group) => group !== "Options");
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={name}>{label}</Label>
+      <select
+        id={name}
+        name={name}
+        value={onChange ? value : undefined}
+        defaultValue={onChange ? undefined : value}
+        onChange={(event) => onChange?.(event.target.value)}
+        className={selectClass}
+        disabled={disabled}
+      >
+        <option value="">Not assigned</option>
+        {[...groups.entries()].map(([group, values]) =>
+          named ? (
+            <optgroup key={group} label={group}>
+              {values.map((option) => <option key={`${option.parentValue ?? ""}:${option.value}`} value={option.value!}>{option.label}</option>)}
+            </optgroup>
+          ) : (
+            values.map((option) => <option key={`${option.parentValue ?? ""}:${option.value}`} value={option.value!}>{option.label}</option>)
+          )
+        )}
+      </select>
+    </div>
+  );
+}
+
+export function ItemCreator({ referenceData }: { referenceData: ReferenceData }) {
   const [state, action] = useActionState(createInventoryItem, initial);
+  const [category, setCategory] = useState("");
+  const [brand, setBrand] = useState("");
+  const [model, setModel] = useState("");
+  const [sizeSystem, setSizeSystem] = useState("");
+  const [sizeValue, setSizeValue] = useState("");
+
+  const brands = (referenceData.brands ?? []).filter((option) => !option.parentValue || !category || option.parentValue === category);
+  const models = (referenceData.models ?? []).filter((option) => !option.parentValue || !brand || option.parentValue === brand);
+  const sizes = (referenceData.sizes ?? []).filter((option) => !option.parentValue || option.parentValue === sizeSystem);
+  const showSizing = category === "" || sizedCategories.has(category);
 
   return (
     <form action={action} className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
@@ -63,19 +112,21 @@ export function ItemCreator() {
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">Item identity</CardTitle>
-            <CardDescription>What the item is. Only a title is required — everything else can be refined after it exists.</CardDescription>
+            <CardDescription>Only a title is required. Pick a category first — the brand list narrows to that category.</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2 sm:col-span-2">
               <Label htmlFor="title">Title</Label>
-              <Input id="title" name="title" required placeholder="e.g. Vintage Pyrex mixing bowl, spring blossom" />
+              <Input id="title" name="title" required placeholder="e.g. Super Mario 64, N64, complete in box" />
             </div>
-            <Field label="Category" name="category" placeholder="Kitchenware" />
-            <Field label="Brand" name="brand" placeholder="Pyrex" />
-            <Field label="Model" name="model" />
-            <Field label="Color" name="color" />
-            <Field label="Condition" name="condition" placeholder="Good, light wear" />
+            <OptionField label="Category" name="category" value={category} options={referenceData.categories ?? []} onChange={(value) => { setCategory(value); setBrand(""); setModel(""); }} />
+            <OptionField label="Brand" name="brand" value={brand} options={brands} onChange={(value) => { setBrand(value); setModel(""); }} />
+            <OptionField label="Model" name="model" value={model} options={models} onChange={setModel} disabled={models.length === 0} />
+            <OptionField label="Color" name="color" value="" options={referenceData.colors ?? []} />
+            <OptionField label="Condition" name="condition" value="" options={referenceData.conditions ?? []} />
             <Field label="Storage location" name="storageLocation" placeholder="Bin A3" />
+            {showSizing && <OptionField label="Size system" name="sizeSystem" value={sizeSystem} options={referenceData.sizeSystems ?? []} onChange={(value) => { setSizeSystem(value); setSizeValue(""); }} />}
+            {showSizing && <OptionField label="Size" name="sizeValue" value={sizeValue} options={sizes} onChange={setSizeValue} disabled={!sizeSystem} />}
           </CardContent>
         </Card>
 
@@ -85,8 +136,8 @@ export function ItemCreator() {
             <CardDescription>Ownership and functional state drive consignment, repair, and listing routing.</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-2">
-            <SelectField label="Ownership" name="ownershipType" options={ownershipOptions} />
-            <SelectField label="Functional status" name="functionalStatus" options={functionalOptions} />
+            <EnumField label="Ownership" name="ownershipType" options={ownershipOptions} />
+            <EnumField label="Functional status" name="functionalStatus" options={functionalOptions} />
           </CardContent>
         </Card>
 
@@ -124,11 +175,7 @@ export function ItemCreator() {
       <aside className="space-y-4 xl:sticky xl:top-6 xl:self-start">
         <Card className="p-6 text-sm">
           <p className="font-medium">Add a single item</p>
-          <p className="text-muted-foreground mt-2">
-            Use this for a one-off buy. For a receipt/pallet/haul with many pieces, record a{" "}
-            <a href="/purchases" className="text-brand-700 hover:underline">purchase lot</a> and itemize it instead.
-          </p>
-          <p className="text-muted-foreground mt-3">After creating, you&rsquo;ll land on the item to add photos, generate a listing, and set its stage.</p>
+          <p className="text-muted-foreground mt-2">After creating, you land on the item to add photos, generate a listing, cross-list, and set its stage.</p>
         </Card>
         {state.message && (
           <div className="border-destructive/30 bg-destructive/5 text-destructive rounded-lg border p-3 text-sm">{state.message}</div>
