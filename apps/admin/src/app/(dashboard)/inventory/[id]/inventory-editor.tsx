@@ -14,6 +14,7 @@ import {
   Label,
   Textarea,
 } from "@overhaul/ui";
+import { Combobox } from "@/components/combobox";
 import type { InventoryItem } from "@/features/inventory/inventory-operations";
 import { updateInventoryItem, type InventoryActionResult } from "./actions";
 
@@ -236,7 +237,11 @@ export function InventoryEditor({ item, referenceData }: { item: InventoryItem; 
           <NotesField label="Description" name="description" defaultValue={valueFor("description", item.description)} rows={5} error={fieldErrors.description} formKey={formKey} />
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <OptionField label="Category" name="category" value={category} options={categories} onChange={value => { setCategory(value); setBrand(""); setModel(""); }} error={fieldErrors.category} />
-            <OptionField label="Brand" name="brand" value={brand} options={brands} onChange={value => { setBrand(value); setModel(""); }} error={fieldErrors.brand} />
+            <div className="space-y-2">
+              <Label htmlFor="brand">Brand</Label>
+              <Combobox name="brand" value={brand} onChange={value => { setBrand(value); setModel(""); }} options={brands.filter(o => o.value).map(o => ({ value: o.value!, label: o.label ?? o.value!, group: o.group }))} placeholder={safeCategory ? `Search ${safeCategory} brands…` : "Search brands…"} />
+              {fieldErrors.brand && <p className="text-destructive text-xs">{fieldErrors.brand}</p>}
+            </div>
             <OptionField label="Model / product line" name="model" value={model} options={models} onChange={setModel} disabled={!safeBrand || models.length === 0} error={fieldErrors.model} />
             <OptionField label="Color" name="color" value={valueFor("color", item.color)} options={referenceData.colors ?? []} error={fieldErrors.color} formKey={formKey} />
             <OptionField label="Cosmetic condition" name="condition" value={valueFor("condition", item.condition)} options={referenceData.conditions ?? []} emptyLabel="Select condition" error={fieldErrors.condition} formKey={formKey} />

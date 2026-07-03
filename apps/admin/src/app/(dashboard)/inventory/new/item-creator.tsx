@@ -4,7 +4,12 @@ import { useActionState, useEffect, useMemo, useState } from "react";
 import { useFormStatus } from "react-dom";
 import type { components } from "@overhaul/api-client";
 import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Label, Textarea } from "@overhaul/ui";
+import { Combobox } from "@/components/combobox";
 import { createInventoryItem, type NewInventoryResult } from "./actions";
+
+function toCombo(options: ReferenceOption[]) {
+  return options.filter((option) => option.value).map((option) => ({ value: option.value!, label: option.label ?? option.value!, group: option.group }));
+}
 
 type ReferenceData = components["schemas"]["InventoryReferenceDataDto"];
 type ReferenceOption = components["schemas"]["InventoryReferenceOptionDto"];
@@ -212,7 +217,11 @@ export function ItemCreator({ referenceData }: { referenceData: ReferenceData })
               {fieldErrors.title && <p className="text-destructive text-xs">{fieldErrors.title}</p>}
             </div>
             <OptionField label="Category" name="category" value={category} options={categories} onChange={(value) => { setCategory(value); setBrand(""); setModel(""); }} error={fieldErrors.category} />
-            <OptionField label="Brand" name="brand" value={brand} options={brands} onChange={(value) => { setBrand(value); setModel(""); }} error={fieldErrors.brand} />
+            <div className="space-y-2">
+              <Label htmlFor="brand">Brand</Label>
+              <Combobox name="brand" value={brand} onChange={(value) => { setBrand(value); setModel(""); }} options={toCombo(brands)} placeholder={safeCategory ? `Search ${safeCategory} brands…` : "Search brands…"} />
+              {fieldErrors.brand && <p className="text-destructive text-xs">{fieldErrors.brand}</p>}
+            </div>
             <OptionField label="Model / product line" name="model" value={model} options={models} onChange={setModel} disabled={!safeBrand || models.length === 0} error={fieldErrors.model} />
             <OptionField label="Color" name="color" value={values.color ?? ""} options={referenceData.colors ?? []} error={fieldErrors.color} formKey={formKey} />
             <OptionField label="Condition" name="condition" value={values.condition ?? ""} options={referenceData.conditions ?? []} error={fieldErrors.condition} formKey={formKey} />
