@@ -25,6 +25,8 @@ export type Specimen = {
   blurb: string;
   /** Absolute URL of the item's hero photo (served by the API), if any. */
   image?: string;
+  /** All photos for the gallery, hero first. */
+  images?: string[];
 };
 
 // Storefront data access — the live API only. No sample/fallback data: the store shows
@@ -83,6 +85,7 @@ export async function getListing(slug: string): Promise<Specimen | null> {
       compareAt: data.compareAtPrice ?? undefined,
       blurb: data.description ?? data.subtitle ?? "",
       image: data.imageUrl ? STORE.apiBaseUrl + data.imageUrl : undefined,
+      images: (data.imageUrls ?? []).map((url) => STORE.apiBaseUrl + url),
     };
   } catch {
     return null;

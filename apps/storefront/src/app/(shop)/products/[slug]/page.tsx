@@ -99,17 +99,22 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
               <span aria-hidden className="absolute bottom-4 right-4 h-6 w-6 border-b-2 border-r-2 border-copper/60" />
             </div>
           </div>
-          <div className="mt-3 grid grid-cols-4 gap-3">
-            {[0, 1, 2, 3].map((i) => (
-              <button
-                key={i}
-                aria-label={`View image ${i + 1}`}
-                className="flex aspect-square items-center justify-center bg-surface ring-1 ring-rule transition-all hover:ring-ink/30"
-              >
-                <span className="font-heading text-2xl text-ink/[0.06]">OT</span>
-              </button>
-            ))}
-          </div>
+          {(item.images?.length ?? 0) > 1 ? (
+            <div className="mt-3 grid grid-cols-4 gap-3">
+              {item.images!.map((src, i) => (
+                <a
+                  key={src}
+                  href={src}
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label={`View image ${i + 1}`}
+                  className="relative aspect-square overflow-hidden bg-surface ring-1 ring-rule transition-all hover:ring-ink/30"
+                >
+                  <Image src={src} alt={`${item.title} — image ${i + 1}`} fill sizes="120px" className="object-cover" />
+                </a>
+              ))}
+            </div>
+          ) : null}
         </div>
 
         {/* Dossier */}

@@ -129,7 +129,9 @@ public sealed record StorefrontListingDetailDto(
     decimal? Height,
     DimensionUnit DimensionUnit,
     decimal? Weight,
-    WeightUnit WeightUnit);
+    WeightUnit WeightUnit,
+    // All photos for the gallery, hero first (relative /api/storefront/photos/{id} URLs). Empty when none.
+    IReadOnlyList<string> ImageUrls = default!);
 
 public sealed record StorefrontPageDto<T>(
     IReadOnlyList<T> Items,

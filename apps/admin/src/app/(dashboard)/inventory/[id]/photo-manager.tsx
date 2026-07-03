@@ -3,11 +3,7 @@
 import { useRef, useState, useTransition } from "react";
 import { ImageIcon, Star, Trash2, Upload } from "lucide-react";
 import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle } from "@overhaul/ui";
-import {
-  deleteInventoryPhoto,
-  setInventoryHeroPhoto,
-  uploadInventoryPhoto,
-} from "./actions";
+import { deleteInventoryPhoto, setInventoryHeroPhoto, uploadInventoryPhoto } from "./actions";
 
 export type ManagedPhoto = {
   id: string;
@@ -16,16 +12,36 @@ export type ManagedPhoto = {
   isHero: boolean;
 };
 
+const ACCEPTED = ["image/jpeg", "image/png", "image/webp"];
+
 export function PhotoManager({ id, photos }: { id: string; photos: ManagedPhoto[] }) {
-  const formRef = useRef<HTMLFormElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const [message, setMessage] = useState("");
+  const [dragging, setDragging] = useState(false);
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  function upload(formData: FormData) {
+  function uploadFiles(fileList: FileList | File[]) {
+    const files = Array.from(fileList).filter((file) => ACCEPTED.includes(file.type) && file.size > 0 && file.size <= 10_000_000);
+    if (files.length === 0) {
+      setMessage("Choose JPEG, PNG, or WebP images under 10 MB.");
+      return;
+    }
     startTransition(async () => {
-      const result = await uploadInventoryPhoto(id, formData);
-      setMessage(result.message);
-      if (result.ok) formRef.current?.reset();
+      let done = 0;
+      let failed = 0;
+      setProgress({ done: 0, total: files.length });
+      // Upload sequentially so the first image reliably becomes the hero and the server isn't hammered.
+      for (const file of files) {
+        const formData = new FormData();
+        formData.set("file", file);
+        const result = await uploadInventoryPhoto(id, formData);
+        if (!result.ok) failed += 1;
+        done += 1;
+        setProgress({ done, total: files.length });
+      }
+      setProgress(null);
+      setMessage(failed === 0 ? `Uploaded ${files.length} photo${files.length === 1 ? "" : "s"}.` : `Uploaded ${files.length - failed} of ${files.length}; ${failed} failed.`);
     });
   }
 
@@ -48,20 +64,13 @@ export function PhotoManager({ id, photos }: { id: string; photos: ManagedPhoto[
     <Card>
       <CardHeader>
         <CardTitle className="text-lg">Photos</CardTitle>
-        <CardDescription>Manage item photography and choose the image used as the primary storefront visual.</CardDescription>
+        <CardDescription>Drag & drop or select multiple images. The first becomes the hero; reorder by setting a new hero.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {photos.length === 0 ? (
-          <div className="flex min-h-36 flex-col items-center justify-center rounded-lg border border-dashed bg-muted/20 text-center">
-            <ImageIcon className="mb-2 h-6 w-6 text-muted-foreground" />
-            <p className="text-sm font-medium">No photos uploaded</p>
-            <p className="text-xs text-muted-foreground">The first photo becomes the hero automatically.</p>
-          </div>
-        ) : (
+        {photos.length > 0 && (
           <div className="grid grid-cols-2 gap-3">
             {photos.map((photo) => (
               <div key={photo.id} className="group relative overflow-hidden rounded-lg border bg-muted">
-                {/* The API serves authenticated inventory images from stable, unguessable URLs. */}
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={photo.imageUrl} alt="Inventory item" className="aspect-square h-full w-full object-cover" />
                 {photo.isHero && (
@@ -84,23 +93,37 @@ export function PhotoManager({ id, photos }: { id: string; photos: ManagedPhoto[
           </div>
         )}
 
-        <form ref={formRef} action={upload} className="space-y-3 rounded-lg border bg-muted/20 p-3">
+        <div
+          onDragOver={(event) => { event.preventDefault(); setDragging(true); }}
+          onDragLeave={() => setDragging(false)}
+          onDrop={(event) => { event.preventDefault(); setDragging(false); uploadFiles(event.dataTransfer.files); }}
+          onClick={() => inputRef.current?.click()}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") inputRef.current?.click(); }}
+          className={`flex min-h-32 cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed p-6 text-center transition ${
+            dragging ? "border-brand-500 bg-brand-50/50" : "bg-muted/20 hover:bg-muted/40"
+          }`}
+        >
+          <Upload className="text-muted-foreground mb-2 h-6 w-6" />
+          <p className="text-sm font-medium">{isPending && progress ? `Uploading ${progress.done}/${progress.total}…` : "Drag & drop photos, or click to browse"}</p>
+          <p className="text-muted-foreground text-xs">JPEG, PNG, or WebP · up to 10 MB each · multiple at once</p>
           <input
-            name="file"
+            ref={inputRef}
             type="file"
-            accept="image/jpeg,image/png,image/webp"
-            required
-            className="block w-full text-xs file:mr-3 file:rounded-md file:border-0 file:bg-secondary file:px-3 file:py-2 file:text-xs file:font-medium"
+            accept={ACCEPTED.join(",")}
+            multiple
+            className="hidden"
+            onChange={(event) => { if (event.target.files) uploadFiles(event.target.files); event.target.value = ""; }}
           />
-          <label className="flex items-center gap-2 text-xs text-muted-foreground">
-            <input name="isHero" type="checkbox" className="h-4 w-4 rounded border-input" />
-            Make this the hero image
-          </label>
-          <Button type="submit" variant="outline" className="w-full" disabled={isPending}>
-            <Upload className="h-4 w-4" /> {isPending ? "Working…" : "Upload photo"}
-          </Button>
-        </form>
-        {message && <p className="text-sm text-muted-foreground" aria-live="polite">{message}</p>}
+        </div>
+
+        {photos.length === 0 && !isPending && (
+          <div className="text-muted-foreground flex items-center gap-2 text-xs">
+            <ImageIcon className="h-4 w-4" /> No photos yet — the first one you add becomes the hero.
+          </div>
+        )}
+        {message && <p className="text-muted-foreground text-sm" aria-live="polite">{message}</p>}
       </CardContent>
     </Card>
   );
