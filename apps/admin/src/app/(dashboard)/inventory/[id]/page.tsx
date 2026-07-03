@@ -14,6 +14,7 @@ import { PhotoManager, type ManagedPhoto } from "./photo-manager";
 import { StatusControl } from "./status-control";
 import { ListingGenerator } from "./listing-generator";
 import { CrossListPanel } from "./cross-list-panel";
+import { RecordSaleCard } from "./record-sale-card";
 
 export const dynamic = "force-dynamic";
 
@@ -28,11 +29,12 @@ const date = (value: string | null | undefined) =>
 export default async function InventoryDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const api = await getApiClient();
-  const [{ data: item }, { data: referenceData }, { data: channelAccounts }, { data: channelListings }] = await Promise.all([
+  const [{ data: item }, { data: referenceData }, { data: channelAccounts }, { data: channelListings }, { data: salesReference }] = await Promise.all([
     api.GET("/api/inventory/{id}", { params: { path: { id } } }),
     api.GET("/api/inventory/reference-data"),
     api.GET("/api/channel-accounts", {}),
     api.GET("/api/inventory/{itemId}/channel-listings", { params: { path: { itemId: id } } }),
+    api.GET("/api/sales/reference-data", {}),
   ]);
   const inventoryItem = item as InventoryItem | undefined;
   if (!inventoryItem?.id || !inventoryItem.status) notFound();
@@ -74,6 +76,9 @@ export default async function InventoryDetailPage({ params }: { params: Promise<
           <PhotoManager id={inventoryItem.id} photos={photos} />
           <ListingGenerator item={inventoryItem} />
           <StatusControl id={inventoryItem.id} status={inventoryItem.status} />
+          {!inventoryItem.isSold && (
+            <RecordSaleCard itemId={inventoryItem.id} cost={cost ?? 0} channels={salesReference?.channels ?? []} />
+          )}
           <CrossListPanel
             itemId={inventoryItem.id}
             accounts={(channelAccounts ?? []).filter((account) => account.isActive)}
