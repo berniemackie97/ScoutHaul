@@ -130,14 +130,19 @@ function EnumField({ label, name, value, options }: { label: string; name: strin
 export function InventoryEditor({ item, referenceData }: { item: InventoryItem; referenceData: ReferenceData }) {
   const action = updateInventoryItem.bind(null, item.id!);
   const [state, formAction] = useActionState(action, initialState);
+  const [category, setCategory] = useState(item.category ?? "");
   const [brand, setBrand] = useState(item.brand ?? "");
   const [model, setModel] = useState(item.model ?? "");
   const [sizeSystem, setSizeSystem] = useState(item.sizeSystem ?? "");
   const [sizeValue, setSizeValue] = useState(item.sizeValue ?? "");
 
-  const brands = referenceData.brands ?? [];
+  // Brands scoped to the chosen category (universal/legacy brands with no parent always show).
+  const brands = (referenceData.brands ?? []).filter(option => !option.parentValue || !category || option.parentValue === category);
   const models = (referenceData.models ?? []).filter(option => !option.parentValue || !brand || option.parentValue === brand);
   const sizes = (referenceData.sizes ?? []).filter(option => !option.parentValue || option.parentValue === sizeSystem);
+  // Sizing only applies to worn/carried goods; hide it elsewhere to declutter.
+  const sizedCategories = new Set(["Clothing", "Shoes", "Handbags", "Baby"]);
+  const showSizing = category === "" || sizedCategories.has(category);
 
   return (
     <form action={formAction} className="space-y-6">
@@ -150,7 +155,7 @@ export function InventoryEditor({ item, referenceData }: { item: InventoryItem; 
           <Field label="Title" name="title" defaultValue={item.title} />
           <NotesField label="Description" name="description" defaultValue={item.description} rows={5} />
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <OptionField label="Category" name="category" value={item.category ?? ""} options={referenceData.categories ?? []} />
+            <OptionField label="Category" name="category" value={category} options={referenceData.categories ?? []} onChange={value => { setCategory(value); setBrand(""); setModel(""); }} />
             <OptionField label="Brand" name="brand" value={brand} options={brands} onChange={value => { setBrand(value); setModel(""); }} disabled={brands.length === 0} />
             <OptionField label="Model" name="model" value={model} options={models} onChange={setModel} disabled={models.length === 0} />
             <OptionField label="Color" name="color" value={item.color ?? ""} options={referenceData.colors ?? []} />
@@ -180,8 +185,8 @@ export function InventoryEditor({ item, referenceData }: { item: InventoryItem; 
             <Field label="Manufacture year" name="manufactureYear" type="number" min={1800} max={2200} step="1" defaultValue={item.manufactureYear} />
             <OptionField label="Country of origin" name="countryOfOrigin" value={item.countryOfOrigin ?? ""} options={referenceData.countries ?? []} />
             <OptionField label="Storage location" name="storageLocation" value={item.storageLocation ?? ""} options={referenceData.storageLocations ?? []} disabled={(referenceData.storageLocations ?? []).length === 0} />
-            <OptionField label="Size system" name="sizeSystem" value={sizeSystem} options={referenceData.sizeSystems ?? []} onChange={value => { setSizeSystem(value); setSizeValue(""); }} />
-            <OptionField label="Size" name="sizeValue" value={sizeValue} options={sizes} onChange={setSizeValue} disabled={!sizeSystem || sizes.length === 0} />
+            {showSizing && <OptionField label="Size system" name="sizeSystem" value={sizeSystem} options={referenceData.sizeSystems ?? []} onChange={value => { setSizeSystem(value); setSizeValue(""); }} />}
+            {showSizing && <OptionField label="Size" name="sizeValue" value={sizeValue} options={sizes} onChange={setSizeValue} disabled={!sizeSystem || sizes.length === 0} />}
           </div>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
             <Field label="Length" name="length" type="number" defaultValue={item.length} />

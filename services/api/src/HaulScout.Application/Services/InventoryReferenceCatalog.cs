@@ -86,6 +86,43 @@ public static class InventoryReferenceCatalog
 
     public static readonly InventoryReferenceOptionDto[] Sizes = BuildSizes();
 
+    // Curated brands tagged by category (ParentValue = category). The reference service also folds in any
+    // brands already typed into inventory as universal options, so this list guides without limiting.
+    public static readonly InventoryReferenceOptionDto[] Brands = BuildBrands();
+
+    private static InventoryReferenceOptionDto[] BuildBrands()
+    {
+        var brands = new List<InventoryReferenceOptionDto>();
+        B(brands, "Video Games", "Nintendo", "Sony", "Microsoft", "Sega", "Atari", "SNK", "Bandai Namco", "Capcom", "Square Enix", "Ubisoft", "Electronic Arts", "Activision", "Rockstar Games", "Konami", "Valve", "2K");
+        B(brands, "Clothing", "Nike", "Adidas", "Lululemon", "The North Face", "Patagonia", "Levi's", "Carhartt", "Ralph Lauren", "Polo Ralph Lauren", "Tommy Hilfiger", "Champion", "Under Armour", "Columbia", "Gap", "Old Navy", "Zara", "H&M", "Supreme", "Gymshark", "Vineyard Vines", "Free People", "Anthropologie", "Gucci", "Louis Vuitton", "Burberry");
+        B(brands, "Shoes", "Nike", "Jordan", "Adidas", "New Balance", "Vans", "Converse", "Dr. Martens", "Timberland", "Reebok", "Puma", "ASICS", "Birkenstock", "UGG", "Crocs", "Salomon", "Hoka", "On", "Clarks", "Sperry");
+        B(brands, "Handbags", "Coach", "Michael Kors", "Kate Spade", "Fossil", "Tory Burch", "Louis Vuitton", "Gucci", "Prada", "Chanel", "Dooney & Bourke", "Longchamp");
+        B(brands, "Watches", "Seiko", "Casio", "Citizen", "Fossil", "Timex", "Bulova", "Invicta", "Garmin", "Apple", "Rolex", "Omega", "Tag Heuer", "Movado");
+        B(brands, "Jewelry", "Pandora", "Tiffany & Co.", "Swarovski", "David Yurman", "Kay", "James Avery", "Alex and Ani");
+        B(brands, "Tech", "Apple", "Dell", "HP", "Lenovo", "ASUS", "Acer", "Microsoft", "Razer", "MSI", "Logitech", "Samsung", "LG", "Intel", "AMD", "NVIDIA");
+        B(brands, "Phones", "Apple", "Samsung", "Google", "Motorola", "OnePlus", "LG", "Nokia", "OtterBox", "Spigen");
+        B(brands, "Cameras", "Canon", "Nikon", "Sony", "Fujifilm", "Panasonic", "Olympus", "Leica", "GoPro", "DJI", "Polaroid");
+        B(brands, "Audio", "Bose", "Sony", "JBL", "Beats", "Sennheiser", "Sonos", "Apple", "Audio-Technica", "Marshall", "Ultimate Ears", "Anker");
+        B(brands, "TV", "Samsung", "LG", "Sony", "Vizio", "TCL", "Hisense", "Roku", "Panasonic");
+        B(brands, "Electronics", "Apple", "Samsung", "Sony", "LG", "Anker", "Logitech", "Belkin", "Amazon");
+        B(brands, "Appliances", "KitchenAid", "Dyson", "Ninja", "Instant Pot", "Cuisinart", "Breville", "Vitamix", "Keurig", "Nespresso", "Shark", "Hamilton Beach", "Crock-Pot");
+        B(brands, "Toys", "LEGO", "Hasbro", "Mattel", "Funko", "Fisher-Price", "Playmobil", "Hot Wheels", "Nerf", "Barbie", "Bandai", "Melissa & Doug", "Squishmallows");
+        B(brands, "Collectibles", "Pokémon", "Panini", "Topps", "Upper Deck", "Wizards of the Coast", "Konami", "Funko", "Hallmark", "Bowman");
+        B(brands, "Musical Instruments", "Fender", "Gibson", "Yamaha", "Roland", "Korg", "Ibanez", "Shure", "Epiphone", "Casio", "Boss");
+        B(brands, "Tools", "DeWalt", "Milwaukee", "Makita", "Bosch", "Ryobi", "Craftsman", "Stanley", "Snap-on", "RIDGID", "Black+Decker", "Kobalt");
+        B(brands, "Sporting Goods", "Wilson", "Spalding", "Titleist", "Callaway", "TaylorMade", "Yeti", "Coleman", "Shimano", "Nike", "Adidas");
+        B(brands, "Fitness", "Bowflex", "NordicTrack", "Peloton", "Rogue", "Theragun", "Fitbit", "Garmin");
+        B(brands, "Baby", "Graco", "Chicco", "Fisher-Price", "Britax", "Evenflo", "Medela", "Baby Brezza");
+        B(brands, "Pet Supplies", "Kong", "PetSafe", "Furbo", "Chewy", "Blue Buffalo");
+        B(brands, "Automotive", "Bosch", "ACDelco", "Mobil 1", "K&N", "WeatherTech", "Garmin");
+        return brands
+            .DistinctBy(brand => $"{brand.ParentValue}{brand.Value}")
+            .ToArray();
+    }
+
+    private static void B(List<InventoryReferenceOptionDto> target, string category, params string[] names) =>
+        target.AddRange(names.Select(name => new InventoryReferenceOptionDto(name, name, category, category)));
+
     public static readonly InventoryReferenceOptionDto[] Countries = CultureInfo
         .GetCultures(CultureTypes.SpecificCultures)
         .Select(culture => new RegionInfo(culture.Name))
