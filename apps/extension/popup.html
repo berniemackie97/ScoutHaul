@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>HaulScout Cross-Lister</title>
+    <style>
+      :root { color-scheme: light dark; }
+      body { width: 380px; margin: 0; font: 13px/1.4 system-ui, sans-serif; padding: 12px; }
+      h1 { font-size: 14px; margin: 0 0 2px; }
+      .muted { color: #6b7280; font-size: 12px; }
+      .row { display: flex; gap: 6px; align-items: center; }
+      .col { display: flex; flex-direction: column; gap: 6px; }
+      input, select, button { font: inherit; padding: 6px 8px; border: 1px solid #d1d5db; border-radius: 8px; background: transparent; color: inherit; }
+      button { cursor: pointer; }
+      button.primary { background: #4f46e5; color: #fff; border-color: #4f46e5; }
+      .card { border: 1px solid #e5e7eb; border-radius: 10px; padding: 10px; margin-top: 8px; }
+      .badge { font-size: 11px; padding: 1px 6px; border-radius: 999px; border: 1px solid #d1d5db; }
+      .badge.active { background: #dcfce7; border-color: #86efac; }
+      .badge.sold { background: #dbeafe; border-color: #93c5fd; }
+      details summary { cursor: pointer; }
+      .list { max-height: 260px; overflow: auto; }
+      .item { padding: 6px 0; border-bottom: 1px solid #f3f4f6; }
+      .err { color: #b91c1c; }
+      .ok { color: #15803d; }
+      .hidden { display: none; }
+    </style>
+  </head>
+  <body>
+    <h1>HaulScout Cross-Lister</h1>
+    <p class="muted">Human-led. It prefills your listings — you review and submit.</p>
+
+    <details id="settings">
+      <summary class="muted">Settings / connection</summary>
+      <div class="col card">
+        <label class="col">API base <input id="apiBase" placeholder="https://scouthaul-production.up.railway.app" /></label>
+        <label class="col">API token <input id="token" type="password" placeholder="Paste your HaulScout session token" /></label>
+        <button id="save" class="primary">Save & connect</button>
+        <span id="settingsMsg" class="muted"></span>
+      </div>
+    </details>
+
+    <div id="ebayCard" class="card hidden">
+      <div class="row" style="justify-content: space-between;">
+        <strong>Active eBay tab</strong>
+        <button id="readTab">Read listing</button>
+      </div>
+      <div id="ebayRead" class="muted">Open an eBay listing or sell page, then Read.</div>
+      <div id="ebayMatch" class="col hidden" style="margin-top: 8px;">
+        <select id="matchItem"></select>
+        <select id="matchAccount"></select>
+        <button id="saveListed" class="primary">Save as listed on eBay</button>
+        <span id="ebayMsg" class="muted"></span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="row" style="justify-content: space-between;">
+        <strong>Inventory</strong>
+        <button id="refresh">Refresh</button>
+      </div>
+      <div id="status" class="muted">Not connected.</div>
+      <div id="list" class="list"></div>
+    </div>
+
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>
