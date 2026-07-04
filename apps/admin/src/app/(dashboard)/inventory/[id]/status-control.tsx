@@ -7,15 +7,23 @@ import {
   COMMERCE_MANAGED_STATUSES,
   MANUAL_INVENTORY_STATUSES,
   TERMINAL_STATUSES,
+  type InventoryItem,
   type InventoryStatus,
 } from "@/features/inventory/inventory-operations";
+import { factsFromInventoryItem, readinessBlockers } from "@/features/inventory/lifecycle-readiness";
+import { ReadinessChecklist } from "@/features/inventory/readiness-checklist";
 import { changeInventoryStatus } from "./actions";
 
-export function StatusControl({ id, status }: { id: string; status: InventoryStatus }) {
+export function StatusControl({ item }: { item: InventoryItem }) {
+  const id = item.id!;
+  const status = item.status!;
   const [nextStatus, setNextStatus] = useState<InventoryStatus>(status);
   const [message, setMessage] = useState("");
   const [isPending, startTransition] = useTransition();
   const isCommerceManaged = COMMERCE_MANAGED_STATUSES.includes(status) && status !== "Returned";
+  const readinessFacts = factsFromInventoryItem(item);
+  const blockers = readinessBlockers(nextStatus, readinessFacts);
+  const blockedReadyToList = nextStatus === "ReadyToList" && blockers.length > 0;
 
   function submit() {
     if (nextStatus === status) return;
@@ -63,7 +71,13 @@ export function StatusControl({ id, status }: { id: string; status: InventorySta
                 </option>
               ))}
             </select>
-            <Button className="w-full" onClick={submit} disabled={isPending || nextStatus === status}>
+            <ReadinessChecklist targetStatus={nextStatus} facts={readinessFacts} compact />
+            {blockedReadyToList && (
+              <p className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
+                Resolve the blocker{blockers.length === 1 ? "" : "s"} before moving this item to Ready to list.
+              </p>
+            )}
+            <Button className="w-full" onClick={submit} disabled={isPending || nextStatus === status || blockedReadyToList}>
               {isPending ? "Updating…" : "Update stage"}
             </Button>
             {message && (

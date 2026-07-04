@@ -51,12 +51,18 @@ public sealed class InventoryController(
             return BadRequest(controlledError);
         }
 
+        InventoryStatus startingStatus = request.Status ?? (request.PurchasePrice.HasValue ? InventoryStatus.Purchased : InventoryStatus.Draft);
+        if (!CanCreateInStatus(startingStatus))
+        {
+            return BadRequest("A new inventory item must start in a pre-sale intake, prep, or ready-to-list stage.");
+        }
+
         var item = new InventoryItem
         {
             OrganizationId = currentUser.OrganizationId,
             Title = request.Title.Trim(),
-            Status = request.PurchasePrice.HasValue ? InventoryStatus.Purchased : InventoryStatus.Draft,
-            PurchasedAt = request.PurchasePrice.HasValue ? DateTimeOffset.UtcNow : null
+            Status = startingStatus,
+            PurchasedAt = startingStatus == InventoryStatus.Purchased || request.PurchasePrice.HasValue ? DateTimeOffset.UtcNow : null
         };
 
         Apply(request, controlledValues!, item);
@@ -939,6 +945,17 @@ public sealed class InventoryController(
 
         return null;
     }
+
+    private static bool CanCreateInStatus(InventoryStatus status) =>
+        status is InventoryStatus.Draft
+            or InventoryStatus.Researching
+            or InventoryStatus.Watchlist
+            or InventoryStatus.Purchased
+            or InventoryStatus.NeedsCleaning
+            or InventoryStatus.NeedsTesting
+            or InventoryStatus.NeedsRepair
+            or InventoryStatus.NeedsPhotos
+            or InventoryStatus.ReadyToList;
 
     private static string? ValidateBundle(CreateInventoryBundleRequest request)
     {
