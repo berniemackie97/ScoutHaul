@@ -44,8 +44,8 @@ public sealed class InventoryReferenceDataService(HaulScoutDbContext db, ICurren
     {
         InventoryReferenceDataDto data = await GetAsync(cancellationToken);
         string? category = ResolveOrOther(data.Categories, request.Category);
-        string? brand = ResolveDependentOrOther(data.Brands, request.Brand, category);
-        string? model = ResolveDependentOrOther(data.Models, request.Model, brand);
+        string? brand = ResolveDependent(data.Brands, request.Brand, category) ?? CleanOperatorValue(request.Brand);
+        string? model = ResolveDependent(data.Models, request.Model, brand) ?? CleanOperatorValue(request.Model);
         string? color = ResolveOrOther(data.Colors, request.Color);
         string? condition = ResolveOrOther(data.Conditions, request.Condition);
         string? sizeSystem = ResolveOrOther(data.SizeSystems, request.SizeSystem);
@@ -119,6 +119,9 @@ public sealed class InventoryReferenceDataService(HaulScoutDbContext db, ICurren
         return options.FirstOrDefault(option => string.Equals(option.Value, value, StringComparison.OrdinalIgnoreCase))?.Value
             ?? NormalizeOperatorValue(value);
     }
+
+    private static string? CleanOperatorValue(string? supplied) =>
+        string.IsNullOrWhiteSpace(supplied) ? null : NormalizeOperatorValue(supplied.Trim());
 
     private static string NormalizeOperatorValue(string value) =>
         string.Join(' ', value.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));

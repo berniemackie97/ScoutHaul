@@ -114,7 +114,7 @@ function NotesField({ label, name, defaultValue, placeholder, rows = 3, error, f
   );
 }
 
-function OptionField({ label, name, value, options, onChange, emptyLabel = "Not assigned", disabled = false, error, formKey }: {
+function OptionField({ label, name, value, options, onChange, emptyLabel = "Not assigned", disabled = false, error, formKey, allowCustom = false, placeholder = "Search options…" }: {
   label: string;
   name: string;
   value: string;
@@ -124,38 +124,32 @@ function OptionField({ label, name, value, options, onChange, emptyLabel = "Not 
   disabled?: boolean;
   error?: string;
   formKey?: string;
+  allowCustom?: boolean;
+  placeholder?: string;
 }) {
   const approvedOptions = useMemo(() => options.filter((option) => !option.isLegacy && option.value && option.label), [options]);
-  const effectiveValue = normalizeOptionValue(value, approvedOptions);
-  const groups = useMemo(() => {
-    const result = new Map<string, ReferenceOption[]>();
-    for (const option of approvedOptions) {
-      const group = option.group ?? "";
-      result.set(group, [...(result.get(group) ?? []), option]);
-    }
-    return result;
-  }, [approvedOptions]);
-  const hasNamedGroups = [...groups.keys()].some(group => group.length > 0);
+  const effectiveValue = normalizeOptionValue(value, approvedOptions, allowCustom);
+  const [internalValue, setInternalValue] = useState(effectiveValue);
+  useEffect(() => {
+    if (!onChange) setInternalValue(effectiveValue);
+  }, [effectiveValue, formKey, onChange]);
+  const currentValue = onChange ? effectiveValue : internalValue;
+  const updateValue = onChange ?? setInternalValue;
 
   return (
     <div className="space-y-2">
       <Label htmlFor={name}>{label}</Label>
-      <select
-        key={`${name}:${onChange ? "controlled" : formKey ?? "initial"}`}
-        id={name}
+      <Combobox
+        key={`${name}:${formKey ?? "initial"}`}
         name={name}
-        value={onChange ? effectiveValue : undefined}
-        defaultValue={onChange ? undefined : effectiveValue}
-        onChange={event => onChange?.(event.target.value)}
-        className={selectClass}
+        value={currentValue}
+        onChange={updateValue}
+        options={approvedOptions.map(option => ({ value: option.value!, label: option.label ?? option.value!, group: option.group }))}
+        placeholder={disabled ? "No approved options configured" : placeholder || emptyLabel}
         disabled={disabled}
-        aria-invalid={error ? "true" : undefined}
-      >
-        <option value="">{disabled ? "No approved options configured" : emptyLabel}</option>
-        {[...groups.entries()].map(([group, values]) => hasNamedGroups ? (
-          <optgroup key={group} label={group}>{values.map(option => <option key={`${option.parentValue ?? ""}:${option.value}`} value={option.value!}>{option.label}</option>)}</optgroup>
-        ) : values.map(option => <option key={`${option.parentValue ?? ""}:${option.value}`} value={option.value!}>{option.label}</option>))}
-      </select>
+        allowCustom={allowCustom}
+        emptyLabel={emptyLabel}
+      />
       {error && <p className="text-destructive text-xs">{error}</p>}
     </div>
   );
@@ -180,10 +174,17 @@ function EnumField({ label, name, value, options, error, formKey }: { label: str
   );
 }
 
-function normalizeOptionValue(value: string, options: ReferenceOption[]) {
+function normalizeOptionValue(value: string, options: ReferenceOption[], preserveCustom = false) {
   if (!value) return "";
-  if (options.some((option) => option.value?.toLowerCase() === value.toLowerCase())) return value;
+  const match = options.find((option) => option.value?.toLowerCase() === value.toLowerCase());
+  if (match?.value) return match.value;
+  if (preserveCustom) return value.trim();
   return options.some((option) => option.value === otherValue) ? otherValue : "";
+}
+
+function exactOptionValue(value: string, options: ReferenceOption[]) {
+  if (!value) return "";
+  return options.find((option) => option.value?.toLowerCase() === value.toLowerCase())?.value ?? "";
 }
 
 export function InventoryEditor({ item, referenceData }: { item: InventoryItem; referenceData: ReferenceData }) {
@@ -217,8 +218,9 @@ export function InventoryEditor({ item, referenceData }: { item: InventoryItem; 
   const categories = referenceData.categories ?? [];
   const safeCategory = normalizeOptionValue(category, categories);
   const brands = (referenceData.brands ?? []).filter(option => !option.isLegacy && (!option.parentValue || !safeCategory || option.parentValue === safeCategory));
-  const safeBrand = normalizeOptionValue(brand, brands);
-  const models = (referenceData.models ?? []).filter(option => !option.isLegacy && (!option.parentValue || !safeBrand || option.parentValue === safeBrand));
+  const canonicalBrand = exactOptionValue(brand, brands);
+  const canEnterModel = brand.trim().length > 0;
+  const models = (referenceData.models ?? []).filter(option => !option.isLegacy && (!option.parentValue || !canonicalBrand || option.parentValue === canonicalBrand));
   const safeSizeSystem = normalizeOptionValue(sizeSystem, referenceData.sizeSystems ?? []);
   const sizes = (referenceData.sizes ?? []).filter(option => !option.isLegacy && (!option.parentValue || option.parentValue === safeSizeSystem));
   // Sizing only applies to worn/carried goods; hide it elsewhere to declutter.
@@ -236,15 +238,15 @@ export function InventoryEditor({ item, referenceData }: { item: InventoryItem; 
           <Field label="Title" name="title" defaultValue={valueFor("title", item.title)} error={fieldErrors.title} formKey={formKey} />
           <NotesField label="Description" name="description" defaultValue={valueFor("description", item.description)} rows={5} error={fieldErrors.description} formKey={formKey} />
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <OptionField label="Category" name="category" value={category} options={categories} onChange={value => { setCategory(value); setBrand(""); setModel(""); }} error={fieldErrors.category} />
+            <OptionField label="Category" name="category" value={category} options={categories} onChange={value => { setCategory(value); setBrand(""); setModel(""); }} error={fieldErrors.category} placeholder="Search categories…" />
             <div className="space-y-2">
               <Label htmlFor="brand">Brand</Label>
               <Combobox name="brand" value={brand} onChange={value => { setBrand(value); setModel(""); }} options={brands.filter(o => o.value).map(o => ({ value: o.value!, label: o.label ?? o.value!, group: o.group }))} placeholder={safeCategory ? `Search ${safeCategory} brands…` : "Search brands…"} />
               {fieldErrors.brand && <p className="text-destructive text-xs">{fieldErrors.brand}</p>}
             </div>
-            <OptionField label="Model / product line" name="model" value={model} options={models} onChange={setModel} disabled={!safeBrand || models.length === 0} error={fieldErrors.model} />
-            <OptionField label="Color" name="color" value={valueFor("color", item.color)} options={referenceData.colors ?? []} error={fieldErrors.color} formKey={formKey} />
-            <OptionField label="Cosmetic condition" name="condition" value={valueFor("condition", item.condition)} options={referenceData.conditions ?? []} emptyLabel="Select condition" error={fieldErrors.condition} formKey={formKey} />
+            <OptionField label="Model / product line" name="model" value={model} options={models} onChange={setModel} disabled={!canEnterModel} allowCustom error={fieldErrors.model} placeholder="Search or enter model…" />
+            <OptionField label="Color" name="color" value={valueFor("color", item.color)} options={referenceData.colors ?? []} error={fieldErrors.color} formKey={formKey} placeholder="Search colors…" />
+            <OptionField label="Cosmetic condition" name="condition" value={valueFor("condition", item.condition)} options={referenceData.conditions ?? []} emptyLabel="Select condition" error={fieldErrors.condition} formKey={formKey} placeholder="Search conditions…" />
             <EnumField label="Ownership" name="ownershipType" value={valueFor("ownershipType", item.ownershipType ?? "Owned")} options={ownershipOptions} error={fieldErrors.ownershipType} formKey={formKey} />
           </div>
         </CardContent>
@@ -268,10 +270,10 @@ export function InventoryEditor({ item, referenceData }: { item: InventoryItem; 
             <Field label="Manufacturer part number" name="manufacturerPartNumber" defaultValue={valueFor("manufacturerPartNumber", item.manufacturerPartNumber)} error={fieldErrors.manufacturerPartNumber} formKey={formKey} />
             <Field label="Serial number" name="serialNumber" defaultValue={valueFor("serialNumber", item.serialNumber)} error={fieldErrors.serialNumber} formKey={formKey} />
             <Field label="Manufacture year" name="manufactureYear" type="number" min={1800} max={2200} step="1" defaultValue={valueFor("manufactureYear", item.manufactureYear)} error={fieldErrors.manufactureYear} formKey={formKey} />
-            <OptionField label="Country of origin" name="countryOfOrigin" value={valueFor("countryOfOrigin", item.countryOfOrigin)} options={referenceData.countries ?? []} error={fieldErrors.countryOfOrigin} formKey={formKey} />
-            <OptionField label="Storage location" name="storageLocation" value={storageLocation} options={referenceData.storageLocations ?? []} onChange={setStorageLocation} error={fieldErrors.storageLocation} />
-            {showSizing && <OptionField label="Size system" name="sizeSystem" value={sizeSystem} options={referenceData.sizeSystems ?? []} onChange={value => { setSizeSystem(value); setSizeValue(""); }} error={fieldErrors.sizeSystem} />}
-            {showSizing && <OptionField label="Size" name="sizeValue" value={sizeValue} options={sizes} onChange={setSizeValue} disabled={!sizeSystem || sizes.length === 0} error={fieldErrors.sizeValue} />}
+            <OptionField label="Country of origin" name="countryOfOrigin" value={valueFor("countryOfOrigin", item.countryOfOrigin)} options={referenceData.countries ?? []} error={fieldErrors.countryOfOrigin} formKey={formKey} placeholder="Search countries…" />
+            <OptionField label="Storage location" name="storageLocation" value={storageLocation} options={referenceData.storageLocations ?? []} onChange={setStorageLocation} allowCustom error={fieldErrors.storageLocation} placeholder="Search or enter location…" />
+            {showSizing && <OptionField label="Size system" name="sizeSystem" value={sizeSystem} options={referenceData.sizeSystems ?? []} onChange={value => { setSizeSystem(value); setSizeValue(""); }} error={fieldErrors.sizeSystem} placeholder="Search size systems…" />}
+            {showSizing && <OptionField label="Size" name="sizeValue" value={sizeValue} options={sizes} onChange={setSizeValue} disabled={!sizeSystem || sizes.length === 0} error={fieldErrors.sizeValue} placeholder="Search sizes…" />}
           </div>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
             <Field label="Length" name="length" type="number" defaultValue={valueFor("length", item.length)} error={fieldErrors.length} formKey={formKey} />

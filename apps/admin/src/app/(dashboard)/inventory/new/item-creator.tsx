@@ -140,54 +140,46 @@ function EnumField({
   );
 }
 
-function OptionField({ label, name, value, options, onChange, disabled = false, error, formKey }: {
-  label: string; name: string; value: string; options: ReferenceOption[]; onChange?: (value: string) => void; disabled?: boolean; error?: string; formKey?: string;
+function OptionField({ label, name, value, options, onChange, disabled = false, error, formKey, allowCustom = false, placeholder = "Search options…" }: {
+  label: string; name: string; value: string; options: ReferenceOption[]; onChange?: (value: string) => void; disabled?: boolean; error?: string; formKey?: string; allowCustom?: boolean; placeholder?: string;
 }) {
   const approvedOptions = useMemo(() => options.filter((option) => !option.isLegacy && option.value && option.label), [options]);
-  const effectiveValue = normalizeOptionValue(value, approvedOptions);
-  const groups = useMemo(() => {
-    const map = new Map<string, ReferenceOption[]>();
-    for (const option of approvedOptions) {
-      const group = option.group ?? "";
-      map.set(group, [...(map.get(group) ?? []), option]);
-    }
-    return map;
-  }, [approvedOptions]);
-  const named = [...groups.keys()].some((group) => group.length > 0);
+  const effectiveValue = normalizeOptionValue(value, approvedOptions, allowCustom);
+  const [internalValue, setInternalValue] = useState(effectiveValue);
+  useEffect(() => {
+    if (!onChange) setInternalValue(effectiveValue);
+  }, [effectiveValue, formKey, onChange]);
+  const currentValue = onChange ? effectiveValue : internalValue;
+  const updateValue = onChange ?? setInternalValue;
   return (
     <div className="space-y-2">
       <Label htmlFor={name}>{label}</Label>
-      <select
-        key={`${name}:${onChange ? "controlled" : formKey ?? "initial"}`}
-        id={name}
+      <Combobox
+        key={`${name}:${formKey ?? "initial"}`}
         name={name}
-        value={onChange ? effectiveValue : undefined}
-        defaultValue={onChange ? undefined : effectiveValue}
-        onChange={(event) => onChange?.(event.target.value)}
-        className={selectClass}
+        value={currentValue}
+        onChange={updateValue}
+        options={toCombo(approvedOptions)}
+        placeholder={disabled ? "No approved options configured" : placeholder}
         disabled={disabled}
-        aria-invalid={error ? "true" : undefined}
-      >
-        <option value="">Not assigned</option>
-        {[...groups.entries()].map(([group, values]) =>
-          named ? (
-            <optgroup key={group} label={group}>
-              {values.map((option) => <option key={`${option.parentValue ?? ""}:${option.value}`} value={option.value!}>{option.label}</option>)}
-            </optgroup>
-          ) : (
-            values.map((option) => <option key={`${option.parentValue ?? ""}:${option.value}`} value={option.value!}>{option.label}</option>)
-          )
-        )}
-      </select>
+        allowCustom={allowCustom}
+      />
       {error && <p className="text-destructive text-xs">{error}</p>}
     </div>
   );
 }
 
-function normalizeOptionValue(value: string, options: ReferenceOption[]) {
+function normalizeOptionValue(value: string, options: ReferenceOption[], preserveCustom = false) {
   if (!value) return "";
-  if (options.some((option) => option.value?.toLowerCase() === value.toLowerCase())) return value;
+  const match = options.find((option) => option.value?.toLowerCase() === value.toLowerCase());
+  if (match?.value) return match.value;
+  if (preserveCustom) return value.trim();
   return options.some((option) => option.value === otherValue) ? otherValue : "";
+}
+
+function exactOptionValue(value: string, options: ReferenceOption[]) {
+  if (!value) return "";
+  return options.find((option) => option.value?.toLowerCase() === value.toLowerCase())?.value ?? "";
 }
 
 export function ItemCreator({ referenceData }: { referenceData: ReferenceData }) {
@@ -233,8 +225,9 @@ export function ItemCreator({ referenceData }: { referenceData: ReferenceData })
   const categories = referenceData.categories ?? [];
   const safeCategory = normalizeOptionValue(category, categories);
   const brands = (referenceData.brands ?? []).filter((option) => !option.isLegacy && (!option.parentValue || !safeCategory || option.parentValue === safeCategory));
-  const safeBrand = normalizeOptionValue(brand, brands);
-  const models = (referenceData.models ?? []).filter((option) => !option.isLegacy && (!option.parentValue || !safeBrand || option.parentValue === safeBrand));
+  const canonicalBrand = exactOptionValue(brand, brands);
+  const canEnterModel = brand.trim().length > 0;
+  const models = (referenceData.models ?? []).filter((option) => !option.isLegacy && (!option.parentValue || !canonicalBrand || option.parentValue === canonicalBrand));
   const safeSizeSystem = normalizeOptionValue(sizeSystem, referenceData.sizeSystems ?? []);
   const sizes = (referenceData.sizes ?? []).filter((option) => !option.isLegacy && (!option.parentValue || option.parentValue === safeSizeSystem));
   const showSizing = category === "" || sizedCategories.has(category);
@@ -282,12 +275,12 @@ export function ItemCreator({ referenceData }: { referenceData: ReferenceData })
               <Combobox name="brand" value={brand} onChange={(value) => { setBrand(value); setModel(""); }} options={toCombo(brands)} placeholder={safeCategory ? `Search ${safeCategory} brands…` : "Search brands…"} />
               {fieldErrors.brand && <p className="text-destructive text-xs">{fieldErrors.brand}</p>}
             </div>
-            <OptionField label="Model / product line" name="model" value={model} options={models} onChange={setModel} disabled={!safeBrand || models.length === 0} error={fieldErrors.model} />
-            <OptionField label="Color" name="color" value={values.color ?? ""} options={referenceData.colors ?? []} error={fieldErrors.color} formKey={formKey} />
-            <OptionField label="Condition" name="condition" value={condition} options={referenceData.conditions ?? []} onChange={setCondition} error={fieldErrors.condition} formKey={formKey} />
-            <OptionField label="Storage location" name="storageLocation" value={storageLocation} options={referenceData.storageLocations ?? []} onChange={setStorageLocation} error={fieldErrors.storageLocation} />
-            {showSizing && <OptionField label="Size system" name="sizeSystem" value={sizeSystem} options={referenceData.sizeSystems ?? []} onChange={(value) => { setSizeSystem(value); setSizeValue(""); }} error={fieldErrors.sizeSystem} />}
-            {showSizing && <OptionField label="Size" name="sizeValue" value={sizeValue} options={sizes} onChange={setSizeValue} disabled={!sizeSystem} error={fieldErrors.sizeValue} />}
+            <OptionField label="Model / product line" name="model" value={model} options={models} onChange={setModel} disabled={!canEnterModel} allowCustom error={fieldErrors.model} placeholder="Search or enter model…" />
+            <OptionField label="Color" name="color" value={values.color ?? ""} options={referenceData.colors ?? []} error={fieldErrors.color} formKey={formKey} placeholder="Search colors…" />
+            <OptionField label="Condition" name="condition" value={condition} options={referenceData.conditions ?? []} onChange={setCondition} error={fieldErrors.condition} formKey={formKey} placeholder="Search conditions…" />
+            <OptionField label="Storage location" name="storageLocation" value={storageLocation} options={referenceData.storageLocations ?? []} onChange={setStorageLocation} allowCustom error={fieldErrors.storageLocation} placeholder="Search or enter location…" />
+            {showSizing && <OptionField label="Size system" name="sizeSystem" value={sizeSystem} options={referenceData.sizeSystems ?? []} onChange={(value) => { setSizeSystem(value); setSizeValue(""); }} error={fieldErrors.sizeSystem} placeholder="Search size systems…" />}
+            {showSizing && <OptionField label="Size" name="sizeValue" value={sizeValue} options={sizes} onChange={setSizeValue} disabled={!sizeSystem} error={fieldErrors.sizeValue} placeholder="Search sizes…" />}
           </CardContent>
         </Card>
 

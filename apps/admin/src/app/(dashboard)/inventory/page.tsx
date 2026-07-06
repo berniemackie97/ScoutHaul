@@ -1,12 +1,10 @@
 import Link from "next/link";
-import { Boxes, DollarSign, ImageIcon, PackageCheck, Plus, Search } from "lucide-react";
-import { Badge, Card, Input } from "@overhaul/ui";
+import { Boxes, DollarSign, PackageCheck, Plus, Search } from "lucide-react";
+import { Card, Input } from "@overhaul/ui";
 import {
   INVENTORY_STATUSES,
   LIFECYCLE_FILTERS,
   LIFECYCLE_GROUP_VALUES,
-  getInventoryCost,
-  getProjectedMetrics,
   inventoryStatusLabel,
   matchesInventorySearch,
   type InventoryItem,
@@ -14,6 +12,7 @@ import {
   type InventoryStatus,
 } from "@/features/inventory/inventory-operations";
 import { getApiAssetUrl, getApiClient } from "@/lib/api";
+import { InventoryTable, type InventoryTableRow } from "./inventory-table";
 
 export const dynamic = "force-dynamic";
 
@@ -21,13 +20,6 @@ const money = (value: number | null | undefined) =>
   typeof value === "number"
     ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value)
     : "—";
-
-const badgeVariant = (status: string | undefined) => {
-  if (["Listed", "Delivered"].includes(status ?? "")) return "success" as const;
-  if (["NeedsCleaning", "NeedsTesting", "NeedsRepair", "NeedsPhotos"].includes(status ?? "")) return "warning" as const;
-  if (["Sold", "Packed", "Shipped"].includes(status ?? "")) return "info" as const;
-  return "secondary" as const;
-};
 
 export default async function InventoryPage({
   searchParams,
@@ -51,6 +43,10 @@ export default async function InventoryPage({
   const items = search
     ? allItems.filter((item) => matchesInventorySearch(item, search))
     : allItems;
+  const rows: InventoryTableRow[] = items.map((item) => ({
+    ...item,
+    thumbnailUrl: getApiAssetUrl(item.heroPhotoThumbnailUrl),
+  }));
 
   const activeItems = allItems.filter((item) => !["Sold", "Delivered", "Donated", "Disposed"].includes(item.status ?? "")).length;
   const readyItems = allItems.filter((item) => ["ReadyToList", "Listed"].includes(item.status ?? "")).length;
@@ -99,56 +95,7 @@ export default async function InventoryPage({
       {items.length === 0 ? (
         <p className="rounded-xl border border-dashed bg-muted/20 p-12 text-center text-sm text-muted-foreground">No inventory matches these filters.</p>
       ) : (
-        <div className="overflow-x-auto rounded-xl border bg-card">
-          <table className="w-full text-sm">
-            <thead className="border-b bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
-              <tr>
-                <th className="px-4 py-3 font-medium">Item</th>
-                <th className="px-4 py-3 font-medium">Stage</th>
-                <th className="px-4 py-3 font-medium">Location</th>
-                <th className="px-4 py-3 text-right font-medium">Cost</th>
-                <th className="px-4 py-3 text-right font-medium">Expected</th>
-                <th className="px-4 py-3 text-right font-medium">Projected profit</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              {items.map((item) => {
-                const thumbnail = getApiAssetUrl(item.heroPhotoThumbnailUrl);
-                const cost = getInventoryCost(item);
-                const { profit: projectedProfit } = getProjectedMetrics(item);
-                const subtitle = [
-                  item.brand,
-                  item.model,
-                  item.category,
-                  item.isBundle ? `${item.bundleComponentCount ?? 0} components` : null,
-                ].filter(Boolean).join(" · ") || "Uncategorized";
-                return (
-                  <tr key={item.id} className="transition-colors hover:bg-muted/30">
-                    <td className="p-0">
-                      <Link href={`/inventory/${item.id}`} className="flex min-w-72 items-center gap-3 px-4 py-3">
-                        <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-muted">
-                          {thumbnail ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={thumbnail} alt="" className="h-full w-full object-cover" />
-                          ) : <ImageIcon className="h-5 w-5 text-muted-foreground" />}
-                        </div>
-                        <div className="min-w-0">
-                          <p className="truncate font-medium text-foreground">{item.title}</p>
-                          <p className="truncate text-xs text-muted-foreground">{subtitle}</p>
-                        </div>
-                      </Link>
-                    </td>
-                    <td className="px-4 py-3"><Badge variant={badgeVariant(item.status)}>{inventoryStatusLabel(item.status)}</Badge></td>
-                    <td className="px-4 py-3 text-muted-foreground">{item.storageLocation ?? "—"}</td>
-                    <td className="px-4 py-3 text-right tabular-nums">{money(cost)}</td>
-                    <td className="px-4 py-3 text-right tabular-nums">{money(item.estimatedSalePrice)}</td>
-                    <td className={`px-4 py-3 text-right font-medium tabular-nums ${projectedProfit != null && projectedProfit < 0 ? "text-destructive" : ""}`}>{money(projectedProfit)}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        <InventoryTable items={rows} />
       )}
     </div>
   );

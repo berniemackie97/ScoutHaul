@@ -48,10 +48,10 @@ public sealed class InventoryReferenceDataServiceTests
     }
 
     [Fact]
-    public async Task Resolution_canonicalizes_case_and_maps_unapproved_values_to_other()
+    public async Task Resolution_canonicalizes_case_and_preserves_custom_brand_and_model_values()
     {
         Guid organizationId = Guid.NewGuid();
-        await using HaulScoutDbContext db = NewContext(organizationId, nameof(Resolution_canonicalizes_case_and_maps_unapproved_values_to_other));
+        await using HaulScoutDbContext db = NewContext(organizationId, nameof(Resolution_canonicalizes_case_and_preserves_custom_brand_and_model_values));
         db.ProductIdentities.Add(new ProductIdentity { Title = "Console", Brand = "Nintendo", Model = "Switch OLED" });
         await db.SaveChangesAsync();
 
@@ -65,8 +65,8 @@ public sealed class InventoryReferenceDataServiceTests
         Assert.Equal("Switch OLED", accepted.Values.Model);
         Assert.Null(corrected.Error);
         Assert.Equal("Other", corrected.Values!.Category);
-        Assert.Equal("Other", corrected.Values.Brand);
-        Assert.Equal("Other", corrected.Values.Model);
+        Assert.Equal("Nintenndo", corrected.Values.Brand);
+        Assert.Equal("Switch-ish", corrected.Values.Model);
     }
 
     private static HaulScoutDbContext NewContext(Guid organizationId, string databaseName)
