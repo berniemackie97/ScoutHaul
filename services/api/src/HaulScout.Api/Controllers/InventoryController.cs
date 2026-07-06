@@ -666,6 +666,12 @@ public sealed class InventoryController(
             return NotFound();
         }
 
+        string? deleteBlockReason = await ValidateDeleteOrArchive(item, cancellationToken);
+        if (deleteBlockReason is not null)
+        {
+            return Conflict(deleteBlockReason);
+        }
+
         if (hard)
         {
             string? blockReason = await ValidateHardDelete(item, cancellationToken);
@@ -697,6 +703,66 @@ public sealed class InventoryController(
 
         await db.SaveChangesAsync(cancellationToken);
         return NoContent();
+    }
+
+    private async Task<string?> ValidateDeleteOrArchive(InventoryItem item, CancellationToken cancellationToken)
+    {
+        if (item.Status == InventoryStatus.Listed)
+        {
+            return "This inventory item is marked Listed. Delist it from every channel and move it out of the Listed stage before deleting or archiving it.";
+        }
+
+        bool hasActiveSale = await db.Sales.AnyAsync(
+            sale => sale.InventoryItemId == item.Id
+                && sale.OrganizationId == currentUser.OrganizationId
+                && sale.Status != SaleStatus.Returned
+                && sale.Status != SaleStatus.Refunded
+                && sale.Status != SaleStatus.Cancelled,
+            cancellationToken);
+        if (hasActiveSale)
+        {
+            return "This inventory item has an active sale. Complete, cancel, refund, or return the sale workflow before deleting or archiving it.";
+        }
+
+        bool isBundleComponent = await db.InventoryBundleComponents.AnyAsync(
+            component => component.ComponentInventoryItemId == item.Id && component.OrganizationId == currentUser.OrganizationId,
+            cancellationToken);
+        if (isBundleComponent)
+        {
+            return "This item is inside a bundle. Delete or edit the bundle before deleting or archiving the component item.";
+        }
+
+        bool hasLiveChannelListing = await db.ChannelListings.AnyAsync(
+            listing => listing.InventoryItemId == item.Id
+                && listing.OrganizationId == currentUser.OrganizationId
+                && (listing.Status == ChannelListingStatus.Active || listing.Status == ChannelListingStatus.PendingDelist),
+            cancellationToken);
+        if (hasLiveChannelListing)
+        {
+            return "This inventory item still has live or pending-delist channel listings. Delist every channel before deleting or archiving it.";
+        }
+
+        bool hasActiveListing = await db.Listings.AnyAsync(
+            listing => listing.InventoryItemId == item.Id
+                && listing.OrganizationId == currentUser.OrganizationId
+                && listing.Status == ListingStatus.Active,
+            cancellationToken);
+        if (hasActiveListing)
+        {
+            return "This inventory item still has an active marketplace listing. End or delist the listing before deleting or archiving it.";
+        }
+
+        bool hasActiveStorefrontListing = await db.StoreListings.AnyAsync(
+            listing => listing.InventoryItemId == item.Id
+                && listing.OrganizationId == currentUser.OrganizationId
+                && (listing.Status == StoreListingStatus.Active || listing.Status == StoreListingStatus.Reserved),
+            cancellationToken);
+        if (hasActiveStorefrontListing)
+        {
+            return "This inventory item is still active or reserved on the storefront. Archive the storefront listing before deleting or archiving the item.";
+        }
+
+        return null;
     }
 
     private async Task<string?> ValidateHardDelete(InventoryItem item, CancellationToken cancellationToken)

@@ -74,7 +74,16 @@ public static class InventoryReferenceCatalog
     public static readonly InventoryReferenceOptionDto[] SizeSystems =
     [
         Option("US letter", "US Letter (S/M/L/XL)"),
-        Option("US numeric", "US Numeric"),
+        Option("US numeric", "US Numeric (general)"),
+        Option("US women's numeric", "US Women's Numeric"),
+        Option("US juniors numeric", "US Juniors Numeric"),
+        Option("US women's plus", "US Women's Plus"),
+        Option("US men's numeric", "US Men's Numeric / Chest"),
+        Option("EU numeric", "EU Numeric"),
+        Option("UK numeric", "UK Numeric"),
+        Option("AU numeric", "AU Numeric"),
+        Option("IT numeric", "Italian Numeric"),
+        Option("FR numeric", "French Numeric"),
         Option("Waist/Inseam", "Waist × Inseam"),
         Option("Shoe US M", "Shoe US Men's"),
         Option("Shoe US W", "Shoe US Women's"),
@@ -209,8 +218,17 @@ public static class InventoryReferenceCatalog
     private static InventoryReferenceOptionDto[] BuildSizes()
     {
         var sizes = new List<InventoryReferenceOptionDto>();
-        Add(sizes, "US letter", ["XXS", "XS", "S", "M", "L", "XL", "2XL", "3XL", "4XL", "5XL"]);
-        Add(sizes, "US numeric", Enumerable.Range(0, 21).Select(number => number.ToString()).ToArray());
+        Add(sizes, "US letter", ["XXS", "XS", "S", "M", "L", "XL", "2XL", "3XL", "4XL", "5XL", "6XL", "7XL", "8XL"]);
+        Add(sizes, "US numeric", ["000", "00", .. Enumerable.Range(0, 61).Select(number => number.ToString())]);
+        Add(sizes, "US women's numeric", ["000", "00", .. EvenNumbers(0, 40)]);
+        Add(sizes, "US juniors numeric", ["0", .. OddNumbers(1, 31)]);
+        Add(sizes, "US women's plus", [.. EvenNumbers(12, 44).Select(number => $"{number}W"), "1X", "2X", "3X", "4X", "5X", "6X"]);
+        Add(sizes, "US men's numeric", Enumerable.Range(28, 43).Select(number => number.ToString()).ToArray());
+        Add(sizes, "EU numeric", Enumerable.Range(28, 37).Select(number => number.ToString()).ToArray());
+        Add(sizes, "UK numeric", Enumerable.Range(2, 39).Select(number => number.ToString()).ToArray());
+        Add(sizes, "AU numeric", Enumerable.Range(2, 39).Select(number => number.ToString()).ToArray());
+        Add(sizes, "IT numeric", Enumerable.Range(34, 33).Select(number => number.ToString()).ToArray());
+        Add(sizes, "FR numeric", Enumerable.Range(30, 33).Select(number => number.ToString()).ToArray());
         Add(sizes, "Shoe US M", HalfSteps(4, 18));
         Add(sizes, "Shoe US W", HalfSteps(4, 16));
         Add(sizes, "Shoe US Youth", HalfSteps(1, 7));
@@ -220,8 +238,8 @@ public static class InventoryReferenceCatalog
         Add(sizes, "One size", ["One size"]);
         Add(sizes, "Other", ["Other"]);
 
-        string[] waists = ["26", "28", "30", "31", "32", "33", "34", "36", "38", "40", "42", "44", "46", "48"];
-        string[] inseams = ["28", "30", "32", "34", "36"];
+        string[] waists = Enumerable.Range(20, 51).Select(number => number.ToString()).ToArray();
+        string[] inseams = Enumerable.Range(24, 17).Select(number => number.ToString()).ToArray();
         Add(sizes, "Waist/Inseam", waists.SelectMany(waist => inseams.Select(inseam => $"{waist}×{inseam}")).ToArray());
         foreach (string parent in SizeSystems.Select(system => system.Value).Where(value => value != "Other"))
         {
@@ -234,6 +252,16 @@ public static class InventoryReferenceCatalog
         Enumerable.Range(from * 2, (through - from) * 2 + 1)
             .Select(value => value % 2 == 0 ? (value / 2).ToString() : $"{value / 2}.5")
             .ToArray();
+
+    private static IEnumerable<string> EvenNumbers(int from, int through) =>
+        Enumerable.Range(from, through - from + 1)
+            .Where(number => number % 2 == 0)
+            .Select(number => number.ToString());
+
+    private static IEnumerable<string> OddNumbers(int from, int through) =>
+        Enumerable.Range(from, through - from + 1)
+            .Where(number => number % 2 != 0)
+            .Select(number => number.ToString());
 
     private static void Add(List<InventoryReferenceOptionDto> target, string parent, IEnumerable<string> values) =>
         target.AddRange(values.Select(value => new InventoryReferenceOptionDto(value, value, ParentValue: parent)));
