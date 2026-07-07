@@ -59,6 +59,7 @@ public sealed class HaulScoutDbContext(DbContextOptions<HaulScoutDbContext> opti
     public DbSet<Review> Reviews => Set<Review>();
     public DbSet<ChannelAccount> ChannelAccounts => Set<ChannelAccount>();
     public DbSet<ChannelListing> ChannelListings => Set<ChannelListing>();
+    public DbSet<OrgReferenceOverride> OrgReferenceOverrides => Set<OrgReferenceOverride>();
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
@@ -673,6 +674,17 @@ public sealed class HaulScoutDbContext(DbContextOptions<HaulScoutDbContext> opti
             entity.HasIndex(item => new { item.OrganizationId, item.Status });
             entity.HasOne(item => item.InventoryItem).WithMany(item => item.ChannelListings).HasForeignKey(item => item.InventoryItemId).OnDelete(DeleteBehavior.Cascade);
             entity.HasOne(item => item.ChannelAccount).WithMany(item => item.Listings).HasForeignKey(item => item.ChannelAccountId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<OrgReferenceOverride>(entity =>
+        {
+            entity.ToTable("OrgReferenceOverrides");
+            entity.Property(item => item.Kind).HasMaxLength(40).IsRequired();
+            entity.Property(item => item.Value).HasMaxLength(200).IsRequired();
+            entity.Property(item => item.ParentValue).HasMaxLength(200);
+            entity.Property(item => item.Label).HasMaxLength(200);
+            entity.HasIndex(item => new { item.OrganizationId, item.Kind, item.Value, item.ParentValue }).IsUnique();
+            entity.HasIndex(item => new { item.OrganizationId, item.Kind });
         });
 
         ApplyOrganizationQueryFilters(modelBuilder);

@@ -46,6 +46,19 @@ export default async function SettingsPage() {
         </Card>
       </Link>
 
+      <Link href="/settings/menus" className="block">
+        <Card className="transition hover:border-brand-300 hover:bg-muted/30">
+          <CardHeader>
+            <div className="mb-2 flex items-center justify-between">
+              <div className="bg-brand-100 flex h-9 w-9 items-center justify-center rounded-lg"><Settings2 className="text-brand-700 h-4 w-4" /></div>
+              <Badge variant="success">Live</Badge>
+            </div>
+            <CardTitle className="text-lg">Menus &amp; controlled values</CardTitle>
+            <CardDescription>Add your own storage locations, categories, colors, and more — or hide options you don&rsquo;t use.</CardDescription>
+          </CardHeader>
+        </Card>
+      </Link>
+
       <div>
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">More modules</h2>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">

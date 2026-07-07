@@ -1,0 +1,53 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { getApiClient } from "@/lib/api";
+
+export type MenuResult = { ok: boolean; message: string };
+
+function errorMessage(error: unknown, fallback: string): string {
+  if (typeof error === "string" && error.trim()) return error;
+  if (error && typeof error === "object") {
+    for (const key of ["detail", "title", "message"] as const) {
+      const value = (error as Record<string, unknown>)[key];
+      if (typeof value === "string" && value.trim()) return value;
+    }
+  }
+  return fallback;
+}
+
+function revalidate() {
+  revalidatePath("/settings/menus");
+  // Menus change everywhere items are edited/added.
+  revalidatePath("/inventory", "layout");
+}
+
+export async function addMenuValue(kind: string, value: string): Promise<MenuResult> {
+  const trimmed = value.trim();
+  if (!trimmed) return { ok: false, message: "Enter a value." };
+  const api = await getApiClient();
+  const result = await api.POST("/api/reference-overrides", {
+    body: { kind, value: trimmed, parentValue: null, label: null, isCustom: true, isDisabled: false },
+  });
+  if (!result.data) return { ok: false, message: errorMessage(result.error, "Could not add the value.") };
+  revalidate();
+  return { ok: true, message: `Added “${trimmed}”.` };
+}
+
+export async function disableMenuValue(kind: string, value: string): Promise<MenuResult> {
+  const api = await getApiClient();
+  const result = await api.POST("/api/reference-overrides", {
+    body: { kind, value, parentValue: null, label: null, isCustom: false, isDisabled: true },
+  });
+  if (!result.data) return { ok: false, message: errorMessage(result.error, "Could not disable the value.") };
+  revalidate();
+  return { ok: true, message: `Hid “${value}” from menus.` };
+}
+
+export async function removeMenuOverride(id: string): Promise<MenuResult> {
+  const api = await getApiClient();
+  const result = (await api.DELETE("/api/reference-overrides/{id}", { params: { path: { id } } })) as { error?: unknown };
+  if (result.error) return { ok: false, message: errorMessage(result.error, "Could not update the menu.") };
+  revalidate();
+  return { ok: true, message: "Menu updated." };
+}

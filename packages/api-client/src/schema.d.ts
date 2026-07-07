@@ -3258,6 +3258,105 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/reference-overrides": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["OrgReferenceOverrideDto"][];
+                        "application/json": components["schemas"]["OrgReferenceOverrideDto"][];
+                        "text/json": components["schemas"]["OrgReferenceOverrideDto"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["UpsertReferenceOverrideRequest"];
+                    "text/json": components["schemas"]["UpsertReferenceOverrideRequest"];
+                    "application/*+json": components["schemas"]["UpsertReferenceOverrideRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["OrgReferenceOverrideDto"];
+                        "application/json": components["schemas"]["OrgReferenceOverrideDto"];
+                        "text/json": components["schemas"]["OrgReferenceOverrideDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/reference-overrides/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/reports/overview": {
         parameters: {
             query?: never;
@@ -6357,6 +6456,16 @@ export interface components {
             /** Format: date-time */
             deliveredAt?: string | null;
         };
+        OrgReferenceOverrideDto: {
+            /** Format: uuid */
+            id?: string;
+            kind?: string | null;
+            value?: string | null;
+            parentValue?: string | null;
+            label?: string | null;
+            isCustom?: boolean;
+            isDisabled?: boolean;
+        };
         OrganizationDto: {
             /** Format: uuid */
             id?: string;
@@ -7328,6 +7437,14 @@ export interface components {
             sku?: string | null;
             searchQuery?: string | null;
             notes?: string | null;
+        };
+        UpsertReferenceOverrideRequest: {
+            kind?: string | null;
+            value?: string | null;
+            parentValue?: string | null;
+            label?: string | null;
+            isCustom?: boolean;
+            isDisabled?: boolean;
         };
         UpsertSourcingTripStopRequest: {
             name?: string | null;

@@ -1490,6 +1490,9 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                         .HasMaxLength(120)
                         .HasColumnType("character varying(120)");
 
+                    b.Property<DateTimeOffset?>("ShippedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("ShippingCarrier")
                         .HasMaxLength(80)
                         .HasColumnType("character varying(80)");
@@ -1497,9 +1500,6 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                     b.Property<decimal>("ShippingTotal")
                         .HasPrecision(12, 2)
                         .HasColumnType("numeric(12,2)");
-
-                    b.Property<DateTimeOffset?>("ShippedAt")
-                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -1604,6 +1604,58 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                     b.HasIndex("OrganizationId", "OrderId");
 
                     b.ToTable("OrderLines", (string)null);
+                });
+
+            modelBuilder.Entity("HaulScout.Domain.Entities.OrgReferenceOverride", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsCustom")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsDisabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<string>("Label")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ParentValue")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrganizationId", "Kind");
+
+                    b.HasIndex("OrganizationId", "Kind", "Value", "ParentValue")
+                        .IsUnique();
+
+                    b.ToTable("OrgReferenceOverrides", (string)null);
                 });
 
             modelBuilder.Entity("HaulScout.Domain.Entities.Organization", b =>
@@ -3016,6 +3068,17 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                     b.Navigation("InventoryItem");
 
                     b.Navigation("Order");
+                });
+
+            modelBuilder.Entity("HaulScout.Domain.Entities.OrgReferenceOverride", b =>
+                {
+                    b.HasOne("HaulScout.Domain.Entities.Organization", "Organization")
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Organization");
                 });
 
             modelBuilder.Entity("HaulScout.Domain.Entities.OrganizationInviteCode", b =>
