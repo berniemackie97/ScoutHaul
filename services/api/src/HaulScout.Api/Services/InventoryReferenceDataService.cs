@@ -25,17 +25,49 @@ public sealed class InventoryReferenceDataService(HaulScoutDbContext db, ICurren
             .Where(item => item.OrganizationId == organizationId);
 
         List<string?> storageValues = await inventoryQuery.Select(item => item.StorageLocation).Distinct().ToListAsync(cancellationToken);
+        List<HaulScout.Domain.Entities.OrgReferenceOverride> overrides = await db.OrgReferenceOverrides
+            .AsNoTracking()
+            .Where(item => item.OrganizationId == organizationId)
+            .ToListAsync(cancellationToken);
 
         return new InventoryReferenceDataDto(
-            InventoryReferenceCatalog.Categories,
-            InventoryReferenceCatalog.Brands,
-            InventoryReferenceCatalog.Models,
-            InventoryReferenceCatalog.Conditions,
-            InventoryReferenceCatalog.Colors,
-            InventoryReferenceCatalog.SizeSystems,
-            InventoryReferenceCatalog.Sizes,
-            DynamicWithOther(storageValues),
-            InventoryReferenceCatalog.Countries);
+            ApplyOverrides("Category", InventoryReferenceCatalog.Categories, overrides),
+            ApplyOverrides("Brand", InventoryReferenceCatalog.Brands, overrides),
+            ApplyOverrides("Model", InventoryReferenceCatalog.Models, overrides),
+            ApplyOverrides("Condition", InventoryReferenceCatalog.Conditions, overrides),
+            ApplyOverrides("Color", InventoryReferenceCatalog.Colors, overrides),
+            ApplyOverrides("SizeSystem", InventoryReferenceCatalog.SizeSystems, overrides),
+            ApplyOverrides("Size", InventoryReferenceCatalog.Sizes, overrides),
+            ApplyOverrides("StorageLocation", DynamicWithOther(storageValues), overrides),
+            ApplyOverrides("Country", InventoryReferenceCatalog.Countries, overrides));
+    }
+
+    private static string OverrideKey(string? value, string? parent) =>
+        $"{parent?.ToLowerInvariant()}{value?.ToLowerInvariant()}";
+
+    // Adds an org's custom values for a kind and removes the ones it has disabled. Never mutates the catalog.
+    private static InventoryReferenceOptionDto[] ApplyOverrides(
+        string kind,
+        IReadOnlyList<InventoryReferenceOptionDto> options,
+        List<HaulScout.Domain.Entities.OrgReferenceOverride> overrides)
+    {
+        var forKind = overrides.Where(item => string.Equals(item.Kind, kind, StringComparison.OrdinalIgnoreCase)).ToList();
+        if (forKind.Count == 0)
+        {
+            return options as InventoryReferenceOptionDto[] ?? options.ToArray();
+        }
+
+        var disabled = forKind.Where(item => item.IsDisabled).Select(item => OverrideKey(item.Value, item.ParentValue)).ToHashSet();
+        var result = options.Where(option => !disabled.Contains(OverrideKey(option.Value, option.ParentValue))).ToList();
+        foreach (var addition in forKind.Where(item => item.IsCustom && !item.IsDisabled))
+        {
+            if (result.All(option => OverrideKey(option.Value, option.ParentValue) != OverrideKey(addition.Value, addition.ParentValue)))
+            {
+                result.Add(new InventoryReferenceOptionDto(addition.Value, addition.Label ?? addition.Value, addition.ParentValue, addition.ParentValue));
+            }
+        }
+
+        return result.ToArray();
     }
 
     public async Task<(ControlledValues? Values, string? Error)> ResolveAsync(
