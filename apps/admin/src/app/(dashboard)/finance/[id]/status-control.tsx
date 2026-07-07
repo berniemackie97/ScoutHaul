@@ -7,6 +7,8 @@ import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Inpu
 import { transitionSale, type SaleActionResult } from "./actions";
 
 type SaleDto = components["schemas"]["SaleDto"];
+type Shipment = components["schemas"]["SaleShipmentDto"];
+const CARRIERS = ["USPS", "UPS", "FedEx", "DHL", "eBay Labels", "Other"];
 const initial: SaleActionResult = { ok: false, message: "" };
 const labels: Record<string, string> = {
   Recorded: "Recorded / sold",
@@ -28,8 +30,9 @@ function Submit() {
   );
 }
 
-export function SaleStatusControl({ sale }: { sale: SaleDto }) {
+export function SaleStatusControl({ sale, shipment }: { sale: SaleDto; shipment?: Shipment | null }) {
   const [state, action] = useActionState(transitionSale.bind(null, sale.id!), initial);
+  const hasCarrier = Boolean(shipment?.carrier && CARRIERS.includes(shipment.carrier));
   const transitions = sale.allowedTransitions ?? [];
   const [selected, setSelected] = useState(transitions[0] ?? "");
   const reasonRequired =
@@ -79,15 +82,29 @@ export function SaleStatusControl({ sale }: { sale: SaleDto }) {
             />
           </div>
           {selected === "Shipped" && (
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="carrier">Carrier</Label>
-                <Input id="carrier" name="carrier" placeholder="USPS, UPS, FedEx…" />
+            <div className="space-y-2 rounded-lg border bg-muted/20 p-3">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="carrier">Carrier</Label>
+                  <select
+                    id="carrier"
+                    name="carrier"
+                    defaultValue={hasCarrier ? shipment!.carrier! : "USPS"}
+                    className="border-input bg-background h-10 w-full rounded-lg border px-3 text-sm"
+                  >
+                    {CARRIERS.map((carrier) => (
+                      <option key={carrier} value={carrier}>{carrier}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="trackingNumber">Tracking number</Label>
+                  <Input id="trackingNumber" name="trackingNumber" defaultValue={shipment?.trackingNumber ?? ""} placeholder="Paste tracking…" />
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="trackingNumber">Tracking number</Label>
-                <Input id="trackingNumber" name="trackingNumber" />
-              </div>
+              {shipment?.trackingNumber && (
+                <p className="text-muted-foreground text-xs">On file from the shipping step — pre-filled. Only change it if the shipment changed.</p>
+              )}
             </div>
           )}
           <div className="space-y-2">
