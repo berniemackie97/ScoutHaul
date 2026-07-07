@@ -64,7 +64,7 @@ export default async function SaleDetailPage({ params }: { params: Promise<{ id:
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
         <div className="space-y-6">
-          <SaleStatusControl sale={sale} />
+          <SaleStatusControl sale={sale} shipment={shipment} />
           <SaleEditor sale={sale} channels={reference?.channels ?? []} />
         </div>
 
