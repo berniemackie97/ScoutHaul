@@ -3923,6 +3923,240 @@
         }
       }
     },
+    "/api/platform-orders": {
+      "get": {
+        "tags": [
+          "PlatformOrders"
+        ],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/PlatformOrderStatus"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PlatformOrderDto"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PlatformOrderDto"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PlatformOrderDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/platform-orders/{id}": {
+      "get": {
+        "tags": [
+          "PlatformOrders"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformOrderDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformOrderDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformOrderDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/platform-orders/ingest": {
+      "post": {
+        "tags": [
+          "PlatformOrders"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IngestPlatformOrdersRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IngestPlatformOrdersRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/IngestPlatformOrdersRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/IngestPlatformOrdersResultDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IngestPlatformOrdersResultDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IngestPlatformOrdersResultDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/platform-orders/{id}/reconcile": {
+      "post": {
+        "tags": [
+          "PlatformOrders"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReconcilePlatformOrderRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReconcilePlatformOrderRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReconcilePlatformOrderRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformOrderReconcileResultDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformOrderReconcileResultDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformOrderReconcileResultDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/platform-orders/{id}/ignore": {
+      "post": {
+        "tags": [
+          "PlatformOrders"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformOrderDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformOrderDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformOrderDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/product-identities": {
       "post": {
         "tags": [
@@ -8327,6 +8561,156 @@
         },
         "additionalProperties": false
       },
+      "IngestPlatformOrderInput": {
+        "type": "object",
+        "properties": {
+          "externalOrderId": {
+            "type": "string",
+            "nullable": true
+          },
+          "orderedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "itemsSubtotal": {
+            "type": "number",
+            "format": "double"
+          },
+          "shippingCharged": {
+            "type": "number",
+            "format": "double"
+          },
+          "taxCollected": {
+            "type": "number",
+            "format": "double"
+          },
+          "feeTotal": {
+            "type": "number",
+            "format": "double"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IngestPlatformOrderLineInput"
+            },
+            "nullable": true
+          },
+          "platform": {
+            "type": "string",
+            "nullable": true
+          },
+          "payoutAmount": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "currency": {
+            "type": "string",
+            "nullable": true
+          },
+          "taxRemittedByPlatform": {
+            "type": "boolean"
+          },
+          "buyerName": {
+            "type": "string",
+            "nullable": true
+          },
+          "buyerReference": {
+            "type": "string",
+            "nullable": true
+          },
+          "carrier": {
+            "type": "string",
+            "nullable": true
+          },
+          "trackingNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "feeBreakdownJson": {
+            "type": "string",
+            "nullable": true
+          },
+          "rawJson": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "IngestPlatformOrderLineInput": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "unitPrice": {
+            "type": "number",
+            "format": "double"
+          },
+          "quantity": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "externalItemId": {
+            "type": "string",
+            "nullable": true
+          },
+          "sku": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "IngestPlatformOrdersRequest": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string",
+            "nullable": true
+          },
+          "orders": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IngestPlatformOrderInput"
+            },
+            "nullable": true
+          },
+          "channelAccountId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "IngestPlatformOrdersResultDto": {
+        "type": "object",
+        "properties": {
+          "created": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "updated": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "skipped": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "orders": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlatformOrderDto"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "InventoryAuthenticityStatus": {
         "enum": [
           "NotAssessed",
@@ -10046,6 +10430,189 @@
         },
         "additionalProperties": false
       },
+      "PlatformOrderDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "platform": {
+            "type": "string",
+            "nullable": true
+          },
+          "externalOrderId": {
+            "type": "string",
+            "nullable": true
+          },
+          "buyerName": {
+            "type": "string",
+            "nullable": true
+          },
+          "buyerReference": {
+            "type": "string",
+            "nullable": true
+          },
+          "orderedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "itemsSubtotal": {
+            "type": "number",
+            "format": "double"
+          },
+          "shippingCharged": {
+            "type": "number",
+            "format": "double"
+          },
+          "taxCollected": {
+            "type": "number",
+            "format": "double"
+          },
+          "feeTotal": {
+            "type": "number",
+            "format": "double"
+          },
+          "payoutAmount": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "expectedPayout": {
+            "type": "number",
+            "format": "double"
+          },
+          "payoutVariance": {
+            "type": "number",
+            "format": "double"
+          },
+          "currency": {
+            "type": "string",
+            "nullable": true
+          },
+          "taxRemittedByPlatform": {
+            "type": "boolean"
+          },
+          "feeBreakdownJson": {
+            "type": "string",
+            "nullable": true
+          },
+          "carrier": {
+            "type": "string",
+            "nullable": true
+          },
+          "trackingNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "$ref": "#/components/schemas/PlatformOrderStatus"
+          },
+          "reconciledSaleGroupId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "reconciledAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "orderedAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "scrapedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlatformOrderLineDto"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "PlatformOrderLineDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "unitPrice": {
+            "type": "number",
+            "format": "double"
+          },
+          "quantity": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "externalItemId": {
+            "type": "string",
+            "nullable": true
+          },
+          "sku": {
+            "type": "string",
+            "nullable": true
+          },
+          "inventoryItemId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "inventoryItemTitle": {
+            "type": "string",
+            "nullable": true
+          },
+          "suggestedInventoryItemId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "suggestedInventoryItemTitle": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "PlatformOrderReconcileResultDto": {
+        "type": "object",
+        "properties": {
+          "platformOrderId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "saleGroupId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sales": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SaleDto"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "PlatformOrderStatus": {
+        "enum": [
+          "Imported",
+          "Reconciled",
+          "Ignored"
+        ],
+        "type": "string"
+      },
       "PricingBasisType": {
         "enum": [
           "LiveValidated",
@@ -10324,6 +10891,37 @@
           "Unavailable"
         ],
         "type": "string"
+      },
+      "ReconcilePlatformOrderLineMap": {
+        "type": "object",
+        "properties": {
+          "platformOrderLineId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "inventoryItemId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ReconcilePlatformOrderRequest": {
+        "type": "object",
+        "properties": {
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReconcilePlatformOrderLineMap"
+            },
+            "nullable": true
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
       },
       "RecordBundledSaleRequest": {
         "type": "object",
@@ -12901,6 +13499,9 @@
     },
     {
       "name": "Organizations"
+    },
+    {
+      "name": "PlatformOrders"
     },
     {
       "name": "ProductIdentities"

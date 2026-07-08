@@ -3105,6 +3105,211 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/platform-orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    status?: components["schemas"]["PlatformOrderStatus"];
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["PlatformOrderDto"][];
+                        "application/json": components["schemas"]["PlatformOrderDto"][];
+                        "text/json": components["schemas"]["PlatformOrderDto"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/platform-orders/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["PlatformOrderDto"];
+                        "application/json": components["schemas"]["PlatformOrderDto"];
+                        "text/json": components["schemas"]["PlatformOrderDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/platform-orders/ingest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["IngestPlatformOrdersRequest"];
+                    "text/json": components["schemas"]["IngestPlatformOrdersRequest"];
+                    "application/*+json": components["schemas"]["IngestPlatformOrdersRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["IngestPlatformOrdersResultDto"];
+                        "application/json": components["schemas"]["IngestPlatformOrdersResultDto"];
+                        "text/json": components["schemas"]["IngestPlatformOrdersResultDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/platform-orders/{id}/reconcile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["ReconcilePlatformOrderRequest"];
+                    "text/json": components["schemas"]["ReconcilePlatformOrderRequest"];
+                    "application/*+json": components["schemas"]["ReconcilePlatformOrderRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["PlatformOrderReconcileResultDto"];
+                        "application/json": components["schemas"]["PlatformOrderReconcileResultDto"];
+                        "text/json": components["schemas"]["PlatformOrderReconcileResultDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/platform-orders/{id}/ignore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["PlatformOrderDto"];
+                        "application/json": components["schemas"]["PlatformOrderDto"];
+                        "text/json": components["schemas"]["PlatformOrderDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/product-identities": {
         parameters: {
             query?: never;
@@ -6072,6 +6277,55 @@ export interface components {
             priceRationale?: string | null;
             comps?: components["schemas"]["ResaleComp"][] | null;
         };
+        IngestPlatformOrderInput: {
+            externalOrderId?: string | null;
+            /** Format: date-time */
+            orderedAt?: string;
+            /** Format: double */
+            itemsSubtotal?: number;
+            /** Format: double */
+            shippingCharged?: number;
+            /** Format: double */
+            taxCollected?: number;
+            /** Format: double */
+            feeTotal?: number;
+            lines?: components["schemas"]["IngestPlatformOrderLineInput"][] | null;
+            platform?: string | null;
+            /** Format: double */
+            payoutAmount?: number | null;
+            currency?: string | null;
+            taxRemittedByPlatform?: boolean;
+            buyerName?: string | null;
+            buyerReference?: string | null;
+            carrier?: string | null;
+            trackingNumber?: string | null;
+            feeBreakdownJson?: string | null;
+            rawJson?: string | null;
+        };
+        IngestPlatformOrderLineInput: {
+            title?: string | null;
+            /** Format: double */
+            unitPrice?: number;
+            /** Format: int32 */
+            quantity?: number;
+            externalItemId?: string | null;
+            sku?: string | null;
+        };
+        IngestPlatformOrdersRequest: {
+            platform?: string | null;
+            orders?: components["schemas"]["IngestPlatformOrderInput"][] | null;
+            /** Format: uuid */
+            channelAccountId?: string | null;
+        };
+        IngestPlatformOrdersResultDto: {
+            /** Format: int32 */
+            created?: number;
+            /** Format: int32 */
+            updated?: number;
+            /** Format: int32 */
+            skipped?: number;
+            orders?: components["schemas"]["PlatformOrderDto"][] | null;
+        };
         /** @enum {string} */
         InventoryAuthenticityStatus: "NotAssessed" | "Authentic" | "LikelyAuthentic" | "NeedsVerification" | "Replica" | "Counterfeit";
         InventoryBundleComponentDto: {
@@ -6623,6 +6877,71 @@ export interface components {
         PermissionCatalogDto: {
             permissions?: string[] | null;
         };
+        PlatformOrderDto: {
+            /** Format: uuid */
+            id?: string;
+            platform?: string | null;
+            externalOrderId?: string | null;
+            buyerName?: string | null;
+            buyerReference?: string | null;
+            /** Format: date-time */
+            orderedAt?: string;
+            /** Format: double */
+            itemsSubtotal?: number;
+            /** Format: double */
+            shippingCharged?: number;
+            /** Format: double */
+            taxCollected?: number;
+            /** Format: double */
+            feeTotal?: number;
+            /** Format: double */
+            payoutAmount?: number | null;
+            /** Format: double */
+            expectedPayout?: number;
+            /** Format: double */
+            payoutVariance?: number;
+            currency?: string | null;
+            taxRemittedByPlatform?: boolean;
+            feeBreakdownJson?: string | null;
+            carrier?: string | null;
+            trackingNumber?: string | null;
+            status?: components["schemas"]["PlatformOrderStatus"];
+            /** Format: uuid */
+            reconciledSaleGroupId?: string | null;
+            /** Format: date-time */
+            reconciledAt?: string | null;
+            /** Format: date-time */
+            orderedAtUtc?: string;
+            /** Format: date-time */
+            scrapedAt?: string;
+            lines?: components["schemas"]["PlatformOrderLineDto"][] | null;
+        };
+        PlatformOrderLineDto: {
+            /** Format: uuid */
+            id?: string;
+            title?: string | null;
+            /** Format: double */
+            unitPrice?: number;
+            /** Format: int32 */
+            quantity?: number;
+            externalItemId?: string | null;
+            sku?: string | null;
+            /** Format: uuid */
+            inventoryItemId?: string | null;
+            inventoryItemTitle?: string | null;
+            /** Format: uuid */
+            suggestedInventoryItemId?: string | null;
+            suggestedInventoryItemTitle?: string | null;
+        };
+        PlatformOrderReconcileResultDto: {
+            /** Format: uuid */
+            platformOrderId?: string;
+            /** Format: uuid */
+            saleGroupId?: string;
+            sales?: components["schemas"]["SaleDto"][] | null;
+        };
+        /** @enum {string} */
+        PlatformOrderStatus: "Imported" | "Reconciled" | "Ignored";
         /** @enum {string} */
         PricingBasisType: "LiveValidated" | "CachedRecent" | "CachedStale" | "ManualEstimate" | "InternalHistory" | "Unavailable";
         ProductIdentification: {
@@ -6710,6 +7029,16 @@ export interface components {
         };
         /** @enum {string} */
         RecommendationDecisionType: "Buy" | "Negotiate" | "Pass" | "ResearchRequired" | "Unavailable";
+        ReconcilePlatformOrderLineMap: {
+            /** Format: uuid */
+            platformOrderLineId?: string;
+            /** Format: uuid */
+            inventoryItemId?: string;
+        };
+        ReconcilePlatformOrderRequest: {
+            lines?: components["schemas"]["ReconcilePlatformOrderLineMap"][] | null;
+            notes?: string | null;
+        };
         RecordBundledSaleRequest: {
             items?: components["schemas"]["BundledSaleItemInput"][] | null;
             platform?: string | null;

@@ -152,6 +152,17 @@ public enum WorkTaskStatus
     Cancelled
 }
 
+/// <summary>State of a scraped marketplace order captured by the extension.</summary>
+public enum PlatformOrderStatus
+{
+    /// <summary>Imported from the platform, not yet turned into sales.</summary>
+    Imported,
+    /// <summary>Reconciled into ScoutHaul sales (linked via PlatformOrder.ReconciledSaleGroupId).</summary>
+    Reconciled,
+    /// <summary>Deliberately excluded (e.g. a test order or a non-inventory sale).</summary>
+    Ignored
+}
+
 public enum SourcingRouteStatus
 {
     Draft,
