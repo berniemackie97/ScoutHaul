@@ -60,12 +60,20 @@ export default async function FinancePage() {
             Every recorded sale with its true net after fees and tax. Open a sale to correct it — every change is audited.
           </p>
         </div>
-        <Link
-          href="/finance/new"
-          className="bg-brand-600 hover:bg-brand-700 inline-flex h-10 items-center justify-center gap-2 rounded-lg px-4 text-sm font-medium text-white"
-        >
-          <Plus className="h-4 w-4" /> Record sale
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href="/finance/new"
+            className="bg-brand-600 hover:bg-brand-700 inline-flex h-10 items-center justify-center gap-2 rounded-lg px-4 text-sm font-medium text-white"
+          >
+            <Plus className="h-4 w-4" /> Record sale
+          </Link>
+          <Link
+            href="/finance/bundled"
+            className="hover:bg-muted inline-flex h-10 items-center justify-center gap-2 rounded-lg border px-4 text-sm font-medium"
+          >
+            <Plus className="h-4 w-4" /> Bundled sale
+          </Link>
+        </div>
       </header>
 
       <div className="grid gap-4 sm:grid-cols-3">
