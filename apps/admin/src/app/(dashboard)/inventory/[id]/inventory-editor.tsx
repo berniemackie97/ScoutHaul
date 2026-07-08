@@ -298,6 +298,11 @@ export function InventoryEditor({ item, referenceData }: { item: InventoryItem; 
           <Field label="Seller asking price" name="sellerAskingPrice" type="number" defaultValue={valueFor("sellerAskingPrice", item.sellerAskingPrice)} error={fieldErrors.sellerAskingPrice} formKey={formKey} />
           <Field label={item.acquisitionLotId ? "Acquisition cost (allocated)" : "Acquisition cost"} name="purchasePrice" type="number" defaultValue={valueFor("purchasePrice", item.purchasePrice)} error={fieldErrors.purchasePrice} formKey={formKey} />
           <Field label="Estimated sale price" name="estimatedSalePrice" type="number" defaultValue={valueFor("estimatedSalePrice", item.estimatedSalePrice)} error={fieldErrors.estimatedSalePrice} formKey={formKey} />
+          {item.isSold && (
+            <p className="text-muted-foreground sm:col-span-3 text-xs">
+              This item is sold — fixing its acquisition cost re-corrects the recorded sale&rsquo;s COGS and true net, with an audit entry on the sale.
+            </p>
+          )}
         </CardContent>
       </Card>
 
