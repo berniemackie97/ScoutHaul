@@ -4,6 +4,7 @@ namespace HaulScout.Domain;
 public sealed record AllocatedSaleLine(
     Guid InventoryItemId,
     decimal Price,
+    decimal ShippingCharged,
     decimal PlatformFees,
     decimal PaymentFees,
     decimal ShippingCost,
@@ -24,6 +25,7 @@ public static class BundledSaleAllocator
     public static IReadOnlyList<AllocatedSaleLine> Allocate(
         IReadOnlyList<BundledSaleItemAllocation> items,
         decimal totalSoldPrice,
+        decimal shippingCharged,
         decimal platformFees,
         decimal paymentFees,
         decimal shippingCost,
@@ -63,7 +65,7 @@ public static class BundledSaleAllocator
 
         // Apportion every shared cost in proportion to price; last line absorbs rounding.
         var lines = new List<AllocatedSaleLine>();
-        var running = new decimal[6];
+        var running = new decimal[7];
         for (int index = 0; index < items.Count; index++)
         {
             Guid id = items[index].InventoryItemId;
@@ -78,12 +80,13 @@ public static class BundledSaleAllocator
             lines.Add(new AllocatedSaleLine(
                 id,
                 price,
-                Share(platformFees, 0),
-                Share(paymentFees, 1),
-                Share(shippingCost, 2),
-                Share(suppliesCost, 3),
-                Share(otherCosts, 4),
-                Share(salesTaxCollected, 5)));
+                Share(shippingCharged, 0),
+                Share(platformFees, 1),
+                Share(paymentFees, 2),
+                Share(shippingCost, 3),
+                Share(suppliesCost, 4),
+                Share(otherCosts, 5),
+                Share(salesTaxCollected, 6)));
         }
 
         return lines;

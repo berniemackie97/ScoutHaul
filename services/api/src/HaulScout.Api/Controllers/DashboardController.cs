@@ -47,7 +47,7 @@ public sealed class DashboardController(HaulScoutDbContext db, ICurrentUserConte
         decimal estimatedInventoryValue = await currentInventoryQuery.SumAsync(item => (decimal?)(item.EstimatedSalePrice ?? 0) ?? 0, cancellationToken);
         var realizedSalesQuery = db.Sales.Where(item =>
             item.OrganizationId == organizationId && !ExcludedRevenueStatuses.Contains(item.Status));
-        decimal grossSales = await realizedSalesQuery.SumAsync(item => (decimal?)item.SoldPrice ?? 0, cancellationToken);
+        decimal grossSales = await realizedSalesQuery.SumAsync(item => (decimal?)(item.SoldPrice + item.ShippingCharged) ?? 0, cancellationToken);
         decimal netProfit = await realizedSalesQuery.SumAsync(item => (decimal?)item.NetProfit ?? 0, cancellationToken);
         decimal cashDeployed = await currentInventoryQuery.SumAsync(item => (decimal?)(item.PurchasePrice ?? item.SellerAskingPrice ?? 0) ?? 0, cancellationToken);
         int unlistedCount = await currentInventoryQuery.CountAsync(item => unlistedStatuses.Contains(item.Status), cancellationToken);

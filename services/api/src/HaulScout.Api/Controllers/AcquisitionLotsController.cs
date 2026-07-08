@@ -343,6 +343,7 @@ public sealed class AcquisitionLotsController(HaulScoutDbContext db, ICurrentUse
             sale.CostOfGoods = correctedCost;
             RealizedSaleFinancials financials = ResaleFinancialCalculator.CalculateRealizedSale(
                 sale.SoldPrice,
+                sale.ShippingCharged,
                 sale.CostOfGoods,
                 sale.PlatformFees,
                 sale.PaymentFees,
@@ -396,6 +397,7 @@ public sealed class AcquisitionLotsController(HaulScoutDbContext db, ICurrentUse
     {
         sale.Platform,
         sale.SoldPrice,
+        sale.ShippingCharged,
         sale.CostOfGoods,
         sale.PlatformFees,
         sale.PaymentFees,

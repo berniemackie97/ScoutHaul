@@ -9,6 +9,7 @@ public sealed record ReportSaleInput(
     string InventoryItemTitle,
     string Platform,
     decimal SoldPrice,
+    decimal ShippingCharged,
     decimal PurchasePrice,
     decimal PlatformFees,
     decimal PaymentFees,
@@ -71,7 +72,7 @@ public static class BusinessReportCalculator
             series.Add(new ReportSeriesPointDto(
                 cursor,
                 BucketLabel(cursor, granularity),
-                sales.Sum(item => item.SoldPrice),
+                sales.Sum(SaleRevenue),
                 sales.Sum(item => item.NetProfit),
                 expenses.Where(item => item.Category != ExpenseCategory.InventoryPurchase).Sum(item => item.Amount),
                 expenses.Where(item => item.Category == ExpenseCategory.InventoryPurchase).Sum(item => item.Amount),
@@ -81,7 +82,7 @@ public static class BusinessReportCalculator
         ReportDimensionDto[] platforms = currentSales
             .Where(sale => SaleWorkflow.IsRealized(sale.Status))
             .GroupBy(sale => string.IsNullOrWhiteSpace(sale.Platform) ? "Unspecified" : sale.Platform.Trim())
-            .Select(group => new ReportDimensionDto(group.Key, group.Count(), group.Sum(item => item.SoldPrice), group.Sum(item => item.NetProfit)))
+            .Select(group => new ReportDimensionDto(group.Key, group.Count(), group.Sum(SaleRevenue), group.Sum(item => item.NetProfit)))
             .OrderByDescending(item => item.Amount)
             .ToArray();
 
@@ -159,7 +160,7 @@ public static class BusinessReportCalculator
     private static ReportKpiDto CalculateKpis(IReadOnlyList<ReportSaleInput> sales, IReadOnlyList<ReportExpenseInput> expenses)
     {
         ReportSaleInput[] realized = sales.Where(sale => SaleWorkflow.IsRealized(sale.Status)).ToArray();
-        decimal grossSales = realized.Sum(item => item.SoldPrice);
+        decimal grossSales = realized.Sum(SaleRevenue);
         decimal costOfGoods = realized.Sum(item => item.PurchasePrice);
         decimal saleCosts = realized.Sum(item => item.PlatformFees + item.PaymentFees + item.ShippingCost + item.SuppliesCost + item.OtherCosts);
         decimal netProfit = realized.Sum(item => item.NetProfit);
@@ -188,9 +189,12 @@ public static class BusinessReportCalculator
 
     private static ReportSaleRowDto ToSaleRow(ReportSaleInput sale)
     {
-        decimal margin = sale.SoldPrice == 0 ? 0 : sale.NetProfit / sale.SoldPrice * 100;
+        decimal revenue = SaleRevenue(sale);
+        decimal margin = revenue == 0 ? 0 : sale.NetProfit / revenue * 100;
         return new ReportSaleRowDto(sale.Id, sale.InventoryItemId, sale.InventoryItemTitle, sale.Platform, sale.SoldPrice, sale.PurchasePrice, sale.NetProfit, margin, sale.SoldAt);
     }
+
+    private static decimal SaleRevenue(ReportSaleInput sale) => sale.SoldPrice + sale.ShippingCharged;
 
     private static ReportAgingBucketDto Aging(string label, IReadOnlyList<ReportInventoryInput> inventory, DateTimeOffset now, int minDays, int maxDays)
     {

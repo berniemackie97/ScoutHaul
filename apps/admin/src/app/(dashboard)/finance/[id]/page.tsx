@@ -37,13 +37,15 @@ export default async function SaleDetailPage({ params }: { params: Promise<{ id:
 
   const lines = [
     { label: "Sold price", value: sale.soldPrice, strong: true },
-    { label: "Cost of goods", value: -(sale.costOfGoods ?? 0) },
+    { label: "Buyer shipping charged", value: sale.shippingCharged ?? 0, strong: true },
     { label: "Platform fees", value: -(sale.platformFees ?? 0) },
     { label: "Payment fees", value: -(sale.paymentFees ?? 0) },
-    { label: "Shipping", value: -(sale.shippingCost ?? 0) },
+    { label: "Shipping label cost", value: -(sale.shippingCost ?? 0) },
     { label: "Supplies", value: -(sale.suppliesCost ?? 0) },
     { label: "Other costs", value: -(sale.otherCosts ?? 0) },
   ];
+  const sellingCosts = (sale.platformFees ?? 0) + (sale.paymentFees ?? 0) + (sale.shippingCost ?? 0) + (sale.suppliesCost ?? 0) + (sale.otherCosts ?? 0);
+  const marketplaceNet = (sale.soldPrice ?? 0) + (sale.shippingCharged ?? 0) - sellingCosts;
 
   return (
     <div className="space-y-6">
@@ -107,6 +109,14 @@ export default async function SaleDetailPage({ params }: { params: Promise<{ id:
                   <span className={`tabular-nums ${line.strong ? "font-semibold" : ""}`}>{money(line.value)}</span>
                 </div>
               ))}
+              <div className="flex justify-between gap-4 border-t border-dashed pt-2">
+                <span className="text-muted-foreground">Marketplace net before COGS</span>
+                <span className="font-medium tabular-nums">{money(marketplaceNet)}</span>
+              </div>
+              <div className="flex justify-between gap-4">
+                <span className="text-muted-foreground">Cost of goods</span>
+                <span className="tabular-nums">-{money(sale.costOfGoods ?? 0)}</span>
+              </div>
               <div className="flex justify-between gap-4 border-t pt-2 text-base">
                 <span className="font-medium">True net profit</span>
                 <span className={`font-semibold tabular-nums ${(sale.netProfit ?? 0) < 0 ? "text-destructive" : ""}`}>

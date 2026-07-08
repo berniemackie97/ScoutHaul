@@ -82,6 +82,7 @@ export function SaleCreator({ candidates, channels }: { candidates: Candidate[];
   const [channel, setChannel] = useState("");
   const [feeProfileId, setFeeProfileId] = useState("");
   const [soldPrice, setSoldPrice] = useState("");
+  const [shippingCharged, setShippingCharged] = useState("");
   const [salesTax, setSalesTax] = useState("");
   const [taxRemitted, setTaxRemitted] = useState(true);
   const [platformFees, setPlatformFees] = useState("");
@@ -96,6 +97,7 @@ export function SaleCreator({ candidates, channels }: { candidates: Candidate[];
     setCandidateId(state.values.inventoryItemId ?? "");
     setChannel(state.values.platform ?? "");
     setSoldPrice(state.values.soldPrice ?? "");
+    setShippingCharged(state.values.shippingCharged ?? "");
     setSalesTax(state.values.salesTaxCollected ?? "");
     setTaxRemitted(state.values.taxRemittedByPlatform !== "off");
     setPlatformFees(state.values.platformFees ?? "");
@@ -114,14 +116,18 @@ export function SaleCreator({ candidates, channels }: { candidates: Candidate[];
     (sum, value) => sum + (Number(value) || 0),
     0
   );
-  const trueNet = (Number(soldPrice) || 0) - (selected?.costOfGoods ?? 0) - totalCosts;
+  const itemRevenue = Number(soldPrice) || 0;
+  const shippingRevenue = Number(shippingCharged) || 0;
+  const salesRevenue = itemRevenue + shippingRevenue;
+  const marketplaceNet = salesRevenue - totalCosts;
+  const trueNet = marketplaceNet - (selected?.costOfGoods ?? 0);
   // Tax we collected but the platform does NOT remit is a liability we owe the state — never part of net.
   const taxOwed = taxRemitted ? 0 : Number(salesTax) || 0;
 
   const selectedChannel = channels.find((option) => option.value === channel);
   const feeProfiles = selectedChannel?.feeProfiles ?? [];
   const selectedFeeProfile = feeProfiles.find((profile) => profile.id === feeProfileId) ?? feeProfiles.find((profile) => profile.isDefault) ?? feeProfiles[0];
-  const salePrice = Number(soldPrice) || 0;
+  const salePrice = salesRevenue;
   const round2 = (value: number) => Math.round(value * 100) / 100;
   function estimateRule(rule: FeeRule): number {
     const above = Math.max(0, rule.appliesAboveAmount ?? 0);
@@ -253,6 +259,7 @@ export function SaleCreator({ candidates, channels }: { candidates: Candidate[];
               {fieldErrors.soldAt && <p className="text-destructive text-xs">{fieldErrors.soldAt}</p>}
             </div>
             <MoneyField label="Sold price" name="soldPrice" value={soldPrice} onChange={setSoldPrice} error={fieldErrors.soldPrice} />
+            <MoneyField label="Buyer shipping charged" name="shippingCharged" value={shippingCharged} onChange={setShippingCharged} error={fieldErrors.shippingCharged} />
             <MoneyField label="Sales tax collected" name="salesTaxCollected" value={salesTax} onChange={setSalesTax} error={fieldErrors.salesTaxCollected} />
             <label className="flex items-center gap-2 rounded-lg border p-3 text-sm sm:col-span-2">
               <input
@@ -294,7 +301,7 @@ export function SaleCreator({ candidates, channels }: { candidates: Candidate[];
             )}
             <MoneyField label="Platform fees" name="platformFees" value={platformFees} onChange={setPlatformFees} error={fieldErrors.platformFees} />
             <MoneyField label="Payment fees" name="paymentFees" value={paymentFees} onChange={setPaymentFees} error={fieldErrors.paymentFees} />
-            <MoneyField label="Shipping cost" name="shippingCost" value={shippingCost} onChange={setShippingCost} error={fieldErrors.shippingCost} />
+            <MoneyField label="Shipping label cost" name="shippingCost" value={shippingCost} onChange={setShippingCost} error={fieldErrors.shippingCost} />
             <MoneyField label="Packing supplies" name="suppliesCost" value={suppliesCost} onChange={setSuppliesCost} error={fieldErrors.suppliesCost} />
             <MoneyField label="Other costs" name="otherCosts" value={otherCosts} onChange={setOtherCosts} error={fieldErrors.otherCosts} />
           </CardContent>
@@ -314,8 +321,16 @@ export function SaleCreator({ candidates, channels }: { candidates: Candidate[];
           <p className={`mt-2 text-4xl font-semibold tabular-nums ${trueNet < 0 ? "text-destructive" : ""}`}>{currency(trueNet)}</p>
           <div className="mt-5 space-y-2 border-t pt-4 text-sm">
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Revenue</span>
-              <span>{currency(Number(soldPrice) || 0)}</span>
+              <span className="text-muted-foreground">Item sales</span>
+              <span>{currency(itemRevenue)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Shipping charged</span>
+              <span>{currency(shippingRevenue)}</span>
+            </div>
+            <div className="flex justify-between border-t border-dashed pt-2">
+              <span className="text-muted-foreground">Marketplace net before COGS</span>
+              <span>{currency(marketplaceNet)}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">COGS</span>

@@ -73,9 +73,10 @@ export async function createSale(_previous: CreateSaleResult, formData: FormData
   if (!platform) fieldErrors.platform = "Select a sales channel.";
 
   const soldPrice = money(formData, "soldPrice", "Sold price", fieldErrors, { required: true, positive: true });
+  const shippingCharged = money(formData, "shippingCharged", "Buyer shipping charged", fieldErrors);
   const platformFees = money(formData, "platformFees", "Platform fees", fieldErrors);
   const paymentFees = money(formData, "paymentFees", "Payment fees", fieldErrors);
-  const shippingCost = money(formData, "shippingCost", "Shipping cost", fieldErrors);
+  const shippingCost = money(formData, "shippingCost", "Shipping label cost", fieldErrors);
   const suppliesCost = money(formData, "suppliesCost", "Packing supplies", fieldErrors);
   const otherCosts = money(formData, "otherCosts", "Other costs", fieldErrors);
   const salesTaxCollected = money(formData, "salesTaxCollected", "Sales tax collected", fieldErrors);
@@ -94,6 +95,7 @@ export async function createSale(_previous: CreateSaleResult, formData: FormData
     listingId: text(formData, "listingId"),
     platform: platform!,
     soldPrice: soldPrice!,
+    shippingCharged: shippingCharged!,
     platformFees: platformFees!,
     paymentFees: paymentFees!,
     shippingCost: shippingCost!,

@@ -2154,6 +2154,10 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                         .HasPrecision(12, 2)
                         .HasColumnType("numeric(12,2)");
 
+                    b.Property<decimal>("ShippingCharged")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
+
                     b.Property<decimal>("ShippingCost")
                         .HasPrecision(12, 2)
                         .HasColumnType("numeric(12,2)");

@@ -10272,11 +10272,27 @@
             "type": "number",
             "format": "double"
           },
+          "shippingCharged": {
+            "type": "number",
+            "format": "double"
+          },
+          "salesRevenue": {
+            "type": "number",
+            "format": "double"
+          },
           "purchaseCost": {
             "type": "number",
             "format": "double"
           },
+          "sellingCosts": {
+            "type": "number",
+            "format": "double"
+          },
           "totalFeesAndCosts": {
+            "type": "number",
+            "format": "double"
+          },
+          "marketplaceNetBeforeCogs": {
             "type": "number",
             "format": "double"
           },
@@ -10324,6 +10340,10 @@
             "nullable": true
           },
           "totalSoldPrice": {
+            "type": "number",
+            "format": "double"
+          },
+          "shippingCharged": {
             "type": "number",
             "format": "double"
           },
@@ -10425,6 +10445,10 @@
           },
           "taxRemittedByPlatform": {
             "type": "boolean"
+          },
+          "shippingCharged": {
+            "type": "number",
+            "format": "double"
           }
         },
         "additionalProperties": false
@@ -10924,6 +10948,10 @@
             "nullable": true
           },
           "soldPrice": {
+            "type": "number",
+            "format": "double"
+          },
+          "shippingCharged": {
             "type": "number",
             "format": "double"
           },
@@ -11970,6 +11998,10 @@
             "nullable": true
           },
           "soldPrice": {
+            "type": "number",
+            "format": "double"
+          },
+          "shippingCharged": {
             "type": "number",
             "format": "double"
           },

@@ -36,11 +36,11 @@ export async function recordSaleForItem(itemId: string, _previous: SellResult, f
   if (!platform) return { ok: false, message: "Select a sales channel." };
   if (soldPrice === null || soldPrice <= 0) return { ok: false, message: "Sold price must be greater than zero." };
 
-  const amounts = ["platformFees", "paymentFees", "shippingCost", "suppliesCost", "otherCosts", "salesTaxCollected"].map((field) => money(formData, field));
+  const amounts = ["shippingCharged", "platformFees", "paymentFees", "shippingCost", "suppliesCost", "otherCosts", "salesTaxCollected"].map((field) => money(formData, field));
   if (amounts.some((value) => value === null)) {
-    return { ok: false, message: "Fees, costs, and tax must be valid non-negative amounts." };
+    return { ok: false, message: "Revenue, fees, costs, and tax must be valid non-negative amounts." };
   }
-  const [platformFees, paymentFees, shippingCost, suppliesCost, otherCosts, salesTaxCollected] = amounts as number[];
+  const [shippingCharged, platformFees, paymentFees, shippingCost, suppliesCost, otherCosts, salesTaxCollected] = amounts as number[];
 
   const soldDate = text(formData, "soldAt");
   if (soldDate && soldDate > new Date().toISOString().slice(0, 10)) {
@@ -53,6 +53,7 @@ export async function recordSaleForItem(itemId: string, _previous: SellResult, f
     listingId: null,
     platform,
     soldPrice,
+    shippingCharged,
     platformFees,
     paymentFees,
     shippingCost,

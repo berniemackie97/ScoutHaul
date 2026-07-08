@@ -33,6 +33,7 @@ export function RecordSaleCard({ itemId, cost, channels }: { itemId: string; cos
   const [state, action] = useActionState(recordSaleForItem.bind(null, itemId), initial);
   const [open, setOpen] = useState(false);
   const [soldPrice, setSoldPrice] = useState("");
+  const [shippingCharged, setShippingCharged] = useState("");
   const [platformFees, setPlatformFees] = useState("");
   const [paymentFees, setPaymentFees] = useState("");
   const [shipping, setShipping] = useState("");
@@ -48,7 +49,7 @@ export function RecordSaleCard({ itemId, cost, channels }: { itemId: string; cos
     return map;
   }, [channels]);
 
-  const net = (Number(soldPrice) || 0) - cost - [platformFees, paymentFees, shipping].reduce((sum, value) => sum + (Number(value) || 0), 0);
+  const net = (Number(soldPrice) || 0) + (Number(shippingCharged) || 0) - cost - [platformFees, paymentFees, shipping].reduce((sum, value) => sum + (Number(value) || 0), 0);
 
   if (!open) {
     return (
@@ -84,13 +85,14 @@ export function RecordSaleCard({ itemId, cost, channels }: { itemId: string; cos
           </div>
           <div className="grid grid-cols-2 gap-2">
             <Money label="Sold price" name="soldPrice" value={soldPrice} onChange={setSoldPrice} />
+            <Money label="Buyer shipping charged" name="shippingCharged" value={shippingCharged} onChange={setShippingCharged} />
             <div className="space-y-1">
               <Label htmlFor="soldAt" className="text-xs">Sold date</Label>
               <Input id="soldAt" name="soldAt" type="date" defaultValue={today()} className="h-9" />
             </div>
             <Money label="Platform fees" name="platformFees" value={platformFees} onChange={setPlatformFees} />
             <Money label="Payment fees" name="paymentFees" value={paymentFees} onChange={setPaymentFees} />
-            <Money label="Shipping" name="shippingCost" value={shipping} onChange={setShipping} />
+            <Money label="Shipping label cost" name="shippingCost" value={shipping} onChange={setShipping} />
             <Money label="Sales tax" name="salesTaxCollected" value={tax} onChange={setTax} />
           </div>
           <input type="hidden" name="suppliesCost" value="0" />

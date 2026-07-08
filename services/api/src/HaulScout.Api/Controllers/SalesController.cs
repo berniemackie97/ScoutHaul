@@ -145,9 +145,9 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
             return BadRequest("Select a controlled sales channel and enter a positive sold price.");
         }
 
-        if (request.PlatformFees < 0 || request.PaymentFees < 0 || request.ShippingCost < 0 || request.SuppliesCost < 0 || request.OtherCosts < 0 || request.SalesTaxCollected < 0)
+        if (request.ShippingCharged < 0 || request.PlatformFees < 0 || request.PaymentFees < 0 || request.ShippingCost < 0 || request.SuppliesCost < 0 || request.OtherCosts < 0 || request.SalesTaxCollected < 0)
         {
-            return BadRequest("Costs, fees, and tax cannot be negative.");
+            return BadRequest("Revenue, costs, fees, and tax cannot be negative.");
         }
 
         if (request.SoldAt?.UtcDateTime.Date > DateTime.UtcNow.Date)
@@ -186,6 +186,7 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
 
         RealizedSaleFinancials financials = ResaleFinancialCalculator.CalculateRealizedSale(
             request.SoldPrice,
+            request.ShippingCharged,
             item.PurchasePrice ?? 0,
             request.PlatformFees,
             request.PaymentFees,
@@ -200,6 +201,7 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
             ListingId = request.ListingId,
             Platform = channel,
             SoldPrice = request.SoldPrice,
+            ShippingCharged = request.ShippingCharged,
             CostOfGoods = item.PurchasePrice ?? 0,
             PlatformFees = request.PlatformFees,
             PaymentFees = request.PaymentFees,
@@ -234,7 +236,7 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
             Source = "Internal",
             Title = item.Title,
             Price = request.SoldPrice,
-            TotalPrice = request.SoldPrice,
+            TotalPrice = request.SoldPrice + request.ShippingCharged,
             Condition = item.Condition,
             ObservedAt = sale.SoldAt,
             SoldAt = sale.SoldAt,
@@ -270,9 +272,9 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
             return BadRequest("Select a controlled sales channel and enter a positive order total.");
         }
 
-        if (new[] { request.PlatformFees, request.PaymentFees, request.ShippingCost, request.SuppliesCost, request.OtherCosts, request.SalesTaxCollected }.Any(value => value < 0))
+        if (new[] { request.ShippingCharged, request.PlatformFees, request.PaymentFees, request.ShippingCost, request.SuppliesCost, request.OtherCosts, request.SalesTaxCollected }.Any(value => value < 0))
         {
-            return BadRequest("Costs, fees, and tax cannot be negative.");
+            return BadRequest("Revenue, costs, fees, and tax cannot be negative.");
         }
 
         if (request.SoldAt?.UtcDateTime.Date > DateTime.UtcNow.Date)
@@ -305,7 +307,7 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
         IReadOnlyList<AllocatedSaleLine> lines;
         try
         {
-            lines = BundledSaleAllocator.Allocate(allocationInputs, request.TotalSoldPrice, request.PlatformFees, request.PaymentFees, request.ShippingCost, request.SuppliesCost, request.OtherCosts, request.SalesTaxCollected);
+            lines = BundledSaleAllocator.Allocate(allocationInputs, request.TotalSoldPrice, request.ShippingCharged, request.PlatformFees, request.PaymentFees, request.ShippingCost, request.SuppliesCost, request.OtherCosts, request.SalesTaxCollected);
         }
         catch (InvalidOperationException exception)
         {
@@ -322,7 +324,7 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
         {
             var item = byId[line.InventoryItemId];
             RealizedSaleFinancials financials = ResaleFinancialCalculator.CalculateRealizedSale(
-                line.Price, item.PurchasePrice ?? 0, line.PlatformFees, line.PaymentFees, line.ShippingCost, line.SuppliesCost, line.OtherCosts);
+                line.Price, line.ShippingCharged, item.PurchasePrice ?? 0, line.PlatformFees, line.PaymentFees, line.ShippingCost, line.SuppliesCost, line.OtherCosts);
 
             var sale = new Sale
             {
@@ -330,6 +332,7 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
                 InventoryItemId = item.Id,
                 Platform = channel,
                 SoldPrice = line.Price,
+                ShippingCharged = line.ShippingCharged,
                 CostOfGoods = item.PurchasePrice ?? 0,
                 PlatformFees = line.PlatformFees,
                 PaymentFees = line.PaymentFees,
@@ -379,6 +382,7 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
 
         RealizedSaleFinancials financials = ResaleFinancialCalculator.CalculateRealizedSale(
             sale.SoldPrice,
+            sale.ShippingCharged,
             sale.CostOfGoods,
             sale.PlatformFees,
             sale.PaymentFees,
@@ -389,8 +393,12 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
         return new RealizedProfitDto(
             sale.Id,
             financials.SoldPrice,
+            financials.ShippingCharged,
+            financials.SalesRevenue,
             financials.PurchaseCost,
+            financials.SellingCosts,
             financials.TotalFeesAndCosts,
+            financials.MarketplaceNetBeforeCogs,
             ResaleFinancialCalculator.SalesTaxOwed(sale.SalesTaxCollected, sale.TaxRemittedByPlatform),
             financials.NetProfit,
             financials.RoiPercent,
@@ -574,10 +582,10 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
             return BadRequest("Select a controlled sales channel and enter a positive sold price.");
         }
 
-        if (request.PlatformFees < 0 || request.PaymentFees < 0 || request.ShippingCost < 0
+        if (request.ShippingCharged < 0 || request.PlatformFees < 0 || request.PaymentFees < 0 || request.ShippingCost < 0
             || request.SuppliesCost < 0 || request.OtherCosts < 0 || request.SalesTaxCollected < 0)
         {
-            return BadRequest("Costs, fees, and tax cannot be negative.");
+            return BadRequest("Revenue, costs, fees, and tax cannot be negative.");
         }
 
         if (request.SoldAt.UtcDateTime.Date > DateTime.UtcNow.Date)
@@ -602,6 +610,7 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
 
         sale.Platform = channel;
         sale.SoldPrice = request.SoldPrice;
+        sale.ShippingCharged = request.ShippingCharged;
         sale.PlatformFees = request.PlatformFees;
         sale.PaymentFees = request.PaymentFees;
         sale.ShippingCost = request.ShippingCost;
@@ -631,14 +640,14 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
         if (observation is not null)
         {
             observation.Price = request.SoldPrice;
-            observation.TotalPrice = request.SoldPrice;
+            observation.TotalPrice = request.SoldPrice + request.ShippingCharged;
             observation.ObservedAt = request.SoldAt;
             observation.SoldAt = request.SoldAt;
         }
 
         // Net profit is always recomputed from the corrected inputs (tax excluded); never trust a stored figure.
         RealizedSaleFinancials financials = ResaleFinancialCalculator.CalculateRealizedSale(
-            sale.SoldPrice, sale.CostOfGoods, sale.PlatformFees, sale.PaymentFees,
+            sale.SoldPrice, sale.ShippingCharged, sale.CostOfGoods, sale.PlatformFees, sale.PaymentFees,
             sale.ShippingCost, sale.SuppliesCost, sale.OtherCosts);
         sale.NetProfit = financials.NetProfit;
 
@@ -672,6 +681,7 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
     {
         sale.Platform,
         sale.SoldPrice,
+        sale.ShippingCharged,
         sale.CostOfGoods,
         sale.PlatformFees,
         sale.PaymentFees,
