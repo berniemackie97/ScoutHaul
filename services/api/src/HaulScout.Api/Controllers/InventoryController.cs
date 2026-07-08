@@ -5,6 +5,7 @@ using HaulScout.Api.Authorization;
 using HaulScout.Api.Mapping;
 using HaulScout.Api.Services;
 using HaulScout.Application.Contracts;
+using HaulScout.Application.Services;
 using HaulScout.Domain;
 using HaulScout.Domain.Entities;
 using HaulScout.Infrastructure.Persistence;
@@ -103,10 +104,69 @@ public sealed class InventoryController(
         decimal? previousPurchasePrice = item.PurchasePrice;
         Apply(request, controlledValues!, item);
         await SyncInventoryPurchaseExpense(item, previousPurchasePrice, cancellationToken);
+        // Correcting cost on an already-sold (legacy) item flows through to its sale's COGS and true net, audited.
+        await SyncSaleCostBasis(item, previousPurchasePrice, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
 
         return item.ToDto();
     }
+
+    private async Task SyncSaleCostBasis(InventoryItem item, decimal? previousPurchasePrice, CancellationToken cancellationToken)
+    {
+        decimal newCost = item.PurchasePrice ?? 0;
+        if ((previousPurchasePrice ?? 0) == newCost)
+        {
+            return;
+        }
+
+        var sales = await db.Sales
+            .Where(sale => sale.InventoryItemId == item.Id && sale.OrganizationId == currentUser.OrganizationId)
+            .ToListAsync(cancellationToken);
+        foreach (var sale in sales)
+        {
+            if (sale.CostOfGoods == newCost)
+            {
+                continue;
+            }
+
+            string before = SnapshotSale(sale);
+            sale.CostOfGoods = newCost;
+            RealizedSaleFinancials financials = ResaleFinancialCalculator.CalculateRealizedSale(
+                sale.SoldPrice, sale.CostOfGoods, sale.PlatformFees, sale.PaymentFees, sale.ShippingCost, sale.SuppliesCost, sale.OtherCosts);
+            sale.NetProfit = financials.NetProfit;
+
+            int version = await db.SaleCorrections.CountAsync(
+                correction => correction.SaleId == sale.Id && correction.OrganizationId == currentUser.OrganizationId, cancellationToken) + 1;
+            db.SaleCorrections.Add(new SaleCorrection
+            {
+                OrganizationId = currentUser.OrganizationId,
+                SaleId = sale.Id,
+                CorrectedByUserId = currentUser.UserId,
+                Reason = "Acquisition cost corrected on the item.",
+                BeforeJson = before,
+                AfterJson = SnapshotSale(sale),
+                Version = version,
+            });
+        }
+    }
+
+    private static string SnapshotSale(Sale sale) => System.Text.Json.JsonSerializer.Serialize(new
+    {
+        sale.Platform,
+        sale.SoldPrice,
+        sale.CostOfGoods,
+        sale.PlatformFees,
+        sale.PaymentFees,
+        sale.ShippingCost,
+        sale.SuppliesCost,
+        sale.OtherCosts,
+        sale.SalesTaxCollected,
+        sale.TaxRemittedByPlatform,
+        sale.NetProfit,
+        sale.SoldAt,
+        Status = sale.Status.ToString(),
+        sale.Notes,
+    });
 
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<InventoryItemDto>> Get(Guid id, CancellationToken cancellationToken)
