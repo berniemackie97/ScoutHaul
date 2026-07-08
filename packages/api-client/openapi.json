@@ -4623,6 +4623,54 @@
         }
       }
     },
+    "/api/sales/bundled": {
+      "post": {
+        "tags": [
+          "Sales"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordBundledSaleRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordBundledSaleRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordBundledSaleRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/BundledSaleResultDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BundledSaleResultDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BundledSaleResultDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/sales/{id}/profit": {
       "get": {
         "tags": [
@@ -7235,6 +7283,50 @@
           "remainingAmount": {
             "type": "number",
             "format": "double"
+          }
+        },
+        "additionalProperties": false
+      },
+      "BundledSaleItemInput": {
+        "type": "object",
+        "properties": {
+          "inventoryItemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "manualPrice": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "BundledSaleResultDto": {
+        "type": "object",
+        "properties": {
+          "saleGroupId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "orderReference": {
+            "type": "string",
+            "nullable": true
+          },
+          "itemCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalNetProfit": {
+            "type": "number",
+            "format": "double"
+          },
+          "sales": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SaleDto"
+            },
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -10217,6 +10309,67 @@
         ],
         "type": "string"
       },
+      "RecordBundledSaleRequest": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BundledSaleItemInput"
+            },
+            "nullable": true
+          },
+          "platform": {
+            "type": "string",
+            "nullable": true
+          },
+          "totalSoldPrice": {
+            "type": "number",
+            "format": "double"
+          },
+          "platformFees": {
+            "type": "number",
+            "format": "double"
+          },
+          "paymentFees": {
+            "type": "number",
+            "format": "double"
+          },
+          "shippingCost": {
+            "type": "number",
+            "format": "double"
+          },
+          "suppliesCost": {
+            "type": "number",
+            "format": "double"
+          },
+          "otherCosts": {
+            "type": "number",
+            "format": "double"
+          },
+          "salesTaxCollected": {
+            "type": "number",
+            "format": "double"
+          },
+          "taxRemittedByPlatform": {
+            "type": "boolean"
+          },
+          "soldAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "orderReference": {
+            "type": "string",
+            "nullable": true
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "RecordSaleRequest": {
         "type": "object",
         "properties": {
@@ -10829,6 +10982,15 @@
             "items": {
               "$ref": "#/components/schemas/SaleStatus"
             },
+            "nullable": true
+          },
+          "saleGroupId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "groupOrderReference": {
+            "type": "string",
             "nullable": true
           }
         },

@@ -252,6 +252,119 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
         return CreatedAtAction(nameof(GetProfit), new { id = sale.Id }, sale.ToDto());
     }
 
+    /// <summary>Record one bundled order covering several items — one package, one tracking. Creates a linked
+    /// sale per item with the order's price and shared costs allocated across them, so each item keeps its own net.</summary>
+    [HttpPost("bundled")]
+    [RequireOrganizationPermission(HaulScoutPermissions.ManageFinance)]
+    public async Task<ActionResult<BundledSaleResultDto>> RecordBundled(RecordBundledSaleRequest request, CancellationToken cancellationToken)
+    {
+        Guid[] itemIds = (request.Items ?? []).Select(item => item.InventoryItemId).Distinct().ToArray();
+        if (itemIds.Length < 2)
+        {
+            return BadRequest("A bundled sale needs at least two distinct items. Use a normal sale for one item.");
+        }
+
+        string? channel = SalesChannelCatalog.CanonicalValue(request.Platform, await ExistingChannels(cancellationToken));
+        if (channel is null || request.TotalSoldPrice <= 0)
+        {
+            return BadRequest("Select a controlled sales channel and enter a positive order total.");
+        }
+
+        if (new[] { request.PlatformFees, request.PaymentFees, request.ShippingCost, request.SuppliesCost, request.OtherCosts, request.SalesTaxCollected }.Any(value => value < 0))
+        {
+            return BadRequest("Costs, fees, and tax cannot be negative.");
+        }
+
+        if (request.SoldAt?.UtcDateTime.Date > DateTime.UtcNow.Date)
+        {
+            return BadRequest("Sale date cannot be in the future.");
+        }
+
+        var items = await db.InventoryItems
+            .Include(inventoryItem => inventoryItem.BundleComponents).ThenInclude(component => component.ComponentInventoryItem)
+            .Where(inventoryItem => itemIds.Contains(inventoryItem.Id) && inventoryItem.OrganizationId == currentUser.OrganizationId)
+            .ToListAsync(cancellationToken);
+        if (items.Count != itemIds.Length)
+        {
+            return NotFound("One or more inventory items were not found.");
+        }
+
+        bool anySold = await db.Sales.AnyAsync(
+            sale => itemIds.Contains(sale.InventoryItemId) && sale.OrganizationId == currentUser.OrganizationId && !ReleasedInventoryStatuses.Contains(sale.Status),
+            cancellationToken);
+        if (anySold)
+        {
+            return Conflict("One or more of these items already has a recorded sale.");
+        }
+
+        var manualById = request.Items!.GroupBy(item => item.InventoryItemId).ToDictionary(group => group.Key, group => group.First().ManualPrice);
+        var allocationInputs = items
+            .Select(item => new BundledSaleItemAllocation(item.Id, manualById[item.Id], item.EstimatedSalePrice ?? item.SellerAskingPrice ?? item.PurchasePrice ?? 0))
+            .ToList();
+
+        IReadOnlyList<AllocatedSaleLine> lines;
+        try
+        {
+            lines = BundledSaleAllocator.Allocate(allocationInputs, request.TotalSoldPrice, request.PlatformFees, request.PaymentFees, request.ShippingCost, request.SuppliesCost, request.OtherCosts, request.SalesTaxCollected);
+        }
+        catch (InvalidOperationException exception)
+        {
+            return BadRequest(exception.Message);
+        }
+
+        Guid groupId = Guid.NewGuid();
+        string? orderReference = TrimToNull(request.OrderReference);
+        DateTimeOffset soldAt = request.SoldAt ?? DateTimeOffset.UtcNow;
+        var byId = items.ToDictionary(item => item.Id);
+        var created = new List<Sale>();
+
+        foreach (var line in lines)
+        {
+            var item = byId[line.InventoryItemId];
+            RealizedSaleFinancials financials = ResaleFinancialCalculator.CalculateRealizedSale(
+                line.Price, item.PurchasePrice ?? 0, line.PlatformFees, line.PaymentFees, line.ShippingCost, line.SuppliesCost, line.OtherCosts);
+
+            var sale = new Sale
+            {
+                OrganizationId = currentUser.OrganizationId,
+                InventoryItemId = item.Id,
+                Platform = channel,
+                SoldPrice = line.Price,
+                CostOfGoods = item.PurchasePrice ?? 0,
+                PlatformFees = line.PlatformFees,
+                PaymentFees = line.PaymentFees,
+                ShippingCost = line.ShippingCost,
+                SuppliesCost = line.SuppliesCost,
+                OtherCosts = line.OtherCosts,
+                SalesTaxCollected = line.SalesTaxCollected,
+                TaxRemittedByPlatform = request.TaxRemittedByPlatform,
+                NetProfit = financials.NetProfit,
+                SoldAt = soldAt,
+                Notes = TrimToNull(request.Notes),
+                SaleGroupId = groupId,
+                GroupOrderReference = orderReference,
+                InventoryItem = item,
+            };
+            db.Sales.Add(sale);
+            created.Add(sale);
+
+            item.Status = InventoryStatus.Sold;
+            item.SoldAt = soldAt;
+            ApplyBundleComponentInventoryStatus(item, InventoryStatus.Sold, soldAt);
+
+            var channelListings = await db.ChannelListings
+                .Include(listing => listing.ChannelAccount)
+                .Where(listing => listing.InventoryItemId == item.Id && listing.OrganizationId == currentUser.OrganizationId)
+                .ToListAsync(cancellationToken);
+            ChannelListingSync.ApplySale(channelListings, channel, DateTimeOffset.UtcNow);
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+
+        var dtos = created.Select(sale => sale.ToDto()).ToList();
+        return new BundledSaleResultDto(groupId, orderReference, dtos.Count, dtos.Sum(sale => sale.NetProfit), dtos);
+    }
+
     [HttpGet("{id:guid}/profit")]
     public async Task<ActionResult<RealizedProfitDto>> GetProfit(Guid id, CancellationToken cancellationToken)
     {

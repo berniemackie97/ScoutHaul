@@ -349,7 +349,9 @@ public static class DtoMapping
         item.Status,
         item.SoldAt,
         item.Notes,
-        SaleWorkflow.Next(item.Status));
+        SaleWorkflow.Next(item.Status),
+        item.SaleGroupId,
+        item.GroupOrderReference);
 
     public static SaleShipmentDto ToDto(this Shipment item) => new(
         item.Id,

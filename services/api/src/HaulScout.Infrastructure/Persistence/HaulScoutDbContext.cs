@@ -423,7 +423,9 @@ public sealed class HaulScoutDbContext(DbContextOptions<HaulScoutDbContext> opti
             ConfigureMoney(entity.Property(item => item.OtherCosts));
             ConfigureMoney(entity.Property(item => item.SalesTaxCollected));
             ConfigureMoney(entity.Property(item => item.NetProfit));
+            entity.Property(item => item.GroupOrderReference).HasMaxLength(120);
             entity.HasIndex(item => new { item.OrganizationId, item.SoldAt });
+            entity.HasIndex(item => new { item.OrganizationId, item.SaleGroupId });
             entity.HasOne(item => item.InventoryItem).WithMany(item => item.Sales).HasForeignKey(item => item.InventoryItemId);
             entity.HasOne(item => item.Listing).WithMany().HasForeignKey(item => item.ListingId).OnDelete(DeleteBehavior.SetNull);
         });

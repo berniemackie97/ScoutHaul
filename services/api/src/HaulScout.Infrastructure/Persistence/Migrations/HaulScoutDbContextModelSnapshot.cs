@@ -2110,6 +2110,10 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("GroupOrderReference")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
                     b.Property<Guid>("InventoryItemId")
                         .HasColumnType("uuid");
 
@@ -2142,6 +2146,9 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                     b.Property<decimal>("PlatformFees")
                         .HasPrecision(12, 2)
                         .HasColumnType("numeric(12,2)");
+
+                    b.Property<Guid?>("SaleGroupId")
+                        .HasColumnType("uuid");
 
                     b.Property<decimal>("SalesTaxCollected")
                         .HasPrecision(12, 2)
@@ -2178,6 +2185,8 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                     b.HasIndex("InventoryItemId");
 
                     b.HasIndex("ListingId");
+
+                    b.HasIndex("OrganizationId", "SaleGroupId");
 
                     b.HasIndex("OrganizationId", "SoldAt");
 

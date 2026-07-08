@@ -104,6 +104,14 @@ public sealed class Sale : EntityBase, IOrganizationScoped
     public SaleStatus Status { get; set; } = SaleStatus.Recorded;
     public DateTimeOffset SoldAt { get; set; } = DateTimeOffset.UtcNow;
     public string? Notes { get; set; }
+
+    /// <summary>Ties together the per-item sales of one multi-item ("bundled") order — one package, one tracking.
+    /// Null for a normal single-item sale. Each grouped sale still carries its own allocated price/fees/COGS/net.</summary>
+    public Guid? SaleGroupId { get; set; }
+
+    /// <summary>The marketplace order/reference number shared by a bundled order's items (e.g. the eBay order id).</summary>
+    public string? GroupOrderReference { get; set; }
+
     public ICollection<SaleCorrection> Corrections { get; set; } = [];
 }
 

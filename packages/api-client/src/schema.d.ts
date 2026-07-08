@@ -3684,6 +3684,49 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/sales/bundled": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["RecordBundledSaleRequest"];
+                    "text/json": components["schemas"]["RecordBundledSaleRequest"];
+                    "application/*+json": components["schemas"]["RecordBundledSaleRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["BundledSaleResultDto"];
+                        "application/json": components["schemas"]["BundledSaleResultDto"];
+                        "text/json": components["schemas"]["BundledSaleResultDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/sales/{id}/profit": {
         parameters: {
             query?: never;
@@ -5690,6 +5733,22 @@ export interface components {
             /** Format: double */
             remainingAmount?: number;
         };
+        BundledSaleItemInput: {
+            /** Format: uuid */
+            inventoryItemId?: string;
+            /** Format: double */
+            manualPrice?: number | null;
+        };
+        BundledSaleResultDto: {
+            /** Format: uuid */
+            saleGroupId?: string;
+            orderReference?: string | null;
+            /** Format: int32 */
+            itemCount?: number;
+            /** Format: double */
+            totalNetProfit?: number;
+            sales?: components["schemas"]["SaleDto"][] | null;
+        };
         BusinessReportDto: {
             /** Format: date-time */
             from?: string;
@@ -6643,6 +6702,29 @@ export interface components {
         };
         /** @enum {string} */
         RecommendationDecisionType: "Buy" | "Negotiate" | "Pass" | "ResearchRequired" | "Unavailable";
+        RecordBundledSaleRequest: {
+            items?: components["schemas"]["BundledSaleItemInput"][] | null;
+            platform?: string | null;
+            /** Format: double */
+            totalSoldPrice?: number;
+            /** Format: double */
+            platformFees?: number;
+            /** Format: double */
+            paymentFees?: number;
+            /** Format: double */
+            shippingCost?: number;
+            /** Format: double */
+            suppliesCost?: number;
+            /** Format: double */
+            otherCosts?: number;
+            /** Format: double */
+            salesTaxCollected?: number;
+            taxRemittedByPlatform?: boolean;
+            /** Format: date-time */
+            soldAt?: string | null;
+            orderReference?: string | null;
+            notes?: string | null;
+        };
         RecordSaleRequest: {
             /** Format: uuid */
             inventoryItemId?: string;
@@ -6886,6 +6968,9 @@ export interface components {
             soldAt?: string;
             notes?: string | null;
             allowedTransitions?: components["schemas"]["SaleStatus"][] | null;
+            /** Format: uuid */
+            saleGroupId?: string | null;
+            groupOrderReference?: string | null;
         };
         SaleShipmentDto: {
             /** Format: uuid */
