@@ -66,8 +66,8 @@ export function SaleEditor({ sale, channels }: { sale: SaleDto; channels: Channe
       <CardHeader>
         <CardTitle className="text-lg">Correct this sale</CardTitle>
         <CardDescription>
-          Every change is recorded with a reason and a before/after snapshot. Net profit is recomputed from these inputs; tax is never part
-          of net.
+          Every change is recorded with a reason and a before/after snapshot. Buyer shipping is revenue; shipping labels are costs; tax is
+          never part of net.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -112,9 +112,10 @@ export function SaleEditor({ sale, channels }: { sale: SaleDto; channels: Channe
 
           <div className="grid gap-4 sm:grid-cols-3">
             <Money label="Sold price" name="soldPrice" defaultValue={valueFor("soldPrice", sale.soldPrice ?? 0)} error={fieldErrors.soldPrice} formKey={formKey} />
+            <Money label="Buyer shipping charged" name="shippingCharged" defaultValue={valueFor("shippingCharged", sale.shippingCharged ?? 0)} error={fieldErrors.shippingCharged} formKey={formKey} />
             <Money label="Platform fees" name="platformFees" defaultValue={valueFor("platformFees", sale.platformFees ?? 0)} error={fieldErrors.platformFees} formKey={formKey} />
             <Money label="Payment fees" name="paymentFees" defaultValue={valueFor("paymentFees", sale.paymentFees ?? 0)} error={fieldErrors.paymentFees} formKey={formKey} />
-            <Money label="Shipping cost" name="shippingCost" defaultValue={valueFor("shippingCost", sale.shippingCost ?? 0)} error={fieldErrors.shippingCost} formKey={formKey} />
+            <Money label="Shipping label cost" name="shippingCost" defaultValue={valueFor("shippingCost", sale.shippingCost ?? 0)} error={fieldErrors.shippingCost} formKey={formKey} />
             <Money label="Supplies cost" name="suppliesCost" defaultValue={valueFor("suppliesCost", sale.suppliesCost ?? 0)} error={fieldErrors.suppliesCost} formKey={formKey} />
             <Money label="Other costs" name="otherCosts" defaultValue={valueFor("otherCosts", sale.otherCosts ?? 0)} error={fieldErrors.otherCosts} formKey={formKey} />
           </div>

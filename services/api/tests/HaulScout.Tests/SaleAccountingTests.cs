@@ -45,6 +45,7 @@ public class SaleAccountingTests
             InventoryItemId = item.Id,
             Platform = "eBay",
             SoldPrice = 120m,
+            ShippingCharged = 0m,
             CostOfGoods = 40m,
             PlatformFees = 15.60m,
             PaymentFees = 3.80m,
@@ -72,7 +73,7 @@ public class SaleAccountingTests
     [Fact]
     public void Net_profit_excludes_tax_entirely()
     {
-        var f = ResaleFinancialCalculator.CalculateRealizedSale(120m, 40m, 15.60m, 3.80m, 8m, 0m, 0m);
+        var f = ResaleFinancialCalculator.CalculateRealizedSale(120m, 0m, 40m, 15.60m, 3.80m, 8m, 0m, 0m);
         Assert.Equal(52.60m, f.NetProfit);
     }
 
@@ -86,7 +87,7 @@ public class SaleAccountingTests
 
         var backdated = DateTimeOffset.UtcNow.AddDays(-30);
         var result = await controller.Update(sale.Id, new UpdateSaleRequest(
-            Platform: "eBay", SoldPrice: 120m, PlatformFees: 20m, PaymentFees: 3.80m,
+            Platform: "eBay", SoldPrice: 120m, ShippingCharged: 0m, PlatformFees: 20m, PaymentFees: 3.80m,
             ShippingCost: 8m, SuppliesCost: 0m, OtherCosts: 0m, SalesTaxCollected: 9.90m,
             TaxRemittedByPlatform: false, SoldAt: backdated, Notes: null,
             Reason: "Actual eBay fee was higher than estimated"), CancellationToken.None);
@@ -112,7 +113,7 @@ public class SaleAccountingTests
         await using var _ = db;
         var sale = SeedSale(db, org);
         var controller = new SalesController(db, new StubCurrentUser(org, user));
-        UpdateSaleRequest Req(string reason) => new("eBay", 120m, 16m, 3.80m, 8m, 0m, 0m, 9.90m, true, sale.SoldAt, null, reason);
+        UpdateSaleRequest Req(string reason) => new("eBay", 120m, 0m, 16m, 3.80m, 8m, 0m, 0m, 9.90m, true, sale.SoldAt, null, reason);
 
         await controller.Update(sale.Id, Req("first fix"), CancellationToken.None);
         await controller.Update(sale.Id, Req("second fix"), CancellationToken.None);
@@ -131,7 +132,7 @@ public class SaleAccountingTests
         var controller = new SalesController(db, new StubCurrentUser(org, user));
 
         var result = await controller.Update(sale.Id, new UpdateSaleRequest(
-            "eBay", 120m, 16m, 3.80m, 8m, 0m, 0m, 9.90m, true, sale.SoldAt, null, "  "), CancellationToken.None);
+            "eBay", 120m, 0m, 16m, 3.80m, 8m, 0m, 0m, 9.90m, true, sale.SoldAt, null, "  "), CancellationToken.None);
 
         Assert.IsType<BadRequestObjectResult>(result.Result);
         Assert.Empty(await db.SaleCorrections.ToListAsync());

@@ -79,9 +79,10 @@ export async function updateSale(id: string, _previous: SaleActionResult, formDa
   if (!platform) fieldErrors.platform = "Channel / platform is required.";
 
   const soldPrice = numberValue(formData, "soldPrice", "Sold price", fieldErrors, { required: true, positive: true });
+  const shippingCharged = numberValue(formData, "shippingCharged", "Buyer shipping charged", fieldErrors);
   const platformFees = numberValue(formData, "platformFees", "Platform fees", fieldErrors);
   const paymentFees = numberValue(formData, "paymentFees", "Payment fees", fieldErrors);
-  const shippingCost = numberValue(formData, "shippingCost", "Shipping cost", fieldErrors);
+  const shippingCost = numberValue(formData, "shippingCost", "Shipping label cost", fieldErrors);
   const suppliesCost = numberValue(formData, "suppliesCost", "Supplies cost", fieldErrors);
   const otherCosts = numberValue(formData, "otherCosts", "Other costs", fieldErrors);
   const salesTaxCollected = numberValue(formData, "salesTaxCollected", "Sales tax collected", fieldErrors);
@@ -99,6 +100,7 @@ export async function updateSale(id: string, _previous: SaleActionResult, formDa
   const body: UpdateSaleRequest = {
     platform: platform!,
     soldPrice: soldPrice!,
+    shippingCharged: shippingCharged!,
     platformFees: platformFees!,
     paymentFees: paymentFees!,
     shippingCost: shippingCost!,

@@ -658,9 +658,9 @@ public sealed record ListingDto(
     DateTimeOffset? ListedAt,
     DateTimeOffset? EndedAt,
     string? Notes);
-public sealed record RecordSaleRequest(Guid InventoryItemId, Guid? ListingId, string Platform, decimal SoldPrice, decimal PlatformFees, decimal PaymentFees, decimal ShippingCost, decimal SuppliesCost, decimal OtherCosts, DateTimeOffset? SoldAt, string? Notes, decimal SalesTaxCollected = 0, bool TaxRemittedByPlatform = true);
+public sealed record RecordSaleRequest(Guid InventoryItemId, Guid? ListingId, string Platform, decimal SoldPrice, decimal PlatformFees, decimal PaymentFees, decimal ShippingCost, decimal SuppliesCost, decimal OtherCosts, DateTimeOffset? SoldAt, string? Notes, decimal SalesTaxCollected = 0, bool TaxRemittedByPlatform = true, decimal ShippingCharged = 0);
 /// <summary>Edits an existing sale. <c>Reason</c> is required and recorded with a before/after audit snapshot.</summary>
-public sealed record UpdateSaleRequest(string Platform, decimal SoldPrice, decimal PlatformFees, decimal PaymentFees, decimal ShippingCost, decimal SuppliesCost, decimal OtherCosts, decimal SalesTaxCollected, bool TaxRemittedByPlatform, DateTimeOffset SoldAt, string? Notes, string Reason);
+public sealed record UpdateSaleRequest(string Platform, decimal SoldPrice, decimal ShippingCharged, decimal PlatformFees, decimal PaymentFees, decimal ShippingCost, decimal SuppliesCost, decimal OtherCosts, decimal SalesTaxCollected, bool TaxRemittedByPlatform, DateTimeOffset SoldAt, string? Notes, string Reason);
 public sealed record SaleStatusTransitionRequest(SaleStatus Status, DateTimeOffset? OccurredAt, string? Reason, string? Carrier, string? TrackingNumber);
 public sealed record ChannelFeeRuleDto(
     string Name,
@@ -695,13 +695,14 @@ public sealed record SaleCandidateDto(Guid InventoryItemId, string Title, Invent
 public sealed record EstimateChannelFeesRequest(string Platform, string FeeProfileId, decimal SoldPrice);
 public sealed record ChannelFeeEstimateDto(string Platform, string FeeProfileId, string FeeProfileLabel, decimal SoldPrice, decimal EstimatedPlatformFees, decimal EstimatedPaymentFees, decimal EstimatedTotalFees, string? Notes);
 public sealed record SaleShipmentDto(Guid Id, Guid SaleId, string? Carrier, string? TrackingNumber, decimal? Cost, DateTimeOffset? PackedAt, DateTimeOffset? ShippedAt, DateTimeOffset? DeliveredAt);
-public sealed record SaleDto(Guid Id, Guid InventoryItemId, string InventoryItemTitle, Guid? ListingId, string Platform, decimal SoldPrice, decimal CostOfGoods, decimal PlatformFees, decimal PaymentFees, decimal ShippingCost, decimal SuppliesCost, decimal OtherCosts, decimal SalesTaxCollected, bool TaxRemittedByPlatform, decimal SalesTaxOwed, decimal NetProfit, SaleStatus Status, DateTimeOffset SoldAt, string? Notes, IReadOnlyList<SaleStatus> AllowedTransitions, Guid? SaleGroupId = null, string? GroupOrderReference = null);
+public sealed record SaleDto(Guid Id, Guid InventoryItemId, string InventoryItemTitle, Guid? ListingId, string Platform, decimal SoldPrice, decimal ShippingCharged, decimal CostOfGoods, decimal PlatformFees, decimal PaymentFees, decimal ShippingCost, decimal SuppliesCost, decimal OtherCosts, decimal SalesTaxCollected, bool TaxRemittedByPlatform, decimal SalesTaxOwed, decimal NetProfit, SaleStatus Status, DateTimeOffset SoldAt, string? Notes, IReadOnlyList<SaleStatus> AllowedTransitions, Guid? SaleGroupId = null, string? GroupOrderReference = null);
 
 public sealed record BundledSaleItemInput(Guid InventoryItemId, decimal? ManualPrice = null);
 public sealed record RecordBundledSaleRequest(
     IReadOnlyList<BundledSaleItemInput> Items,
     string Platform,
     decimal TotalSoldPrice,
+    decimal ShippingCharged,
     decimal PlatformFees,
     decimal PaymentFees,
     decimal ShippingCost,
@@ -714,7 +715,7 @@ public sealed record RecordBundledSaleRequest(
     string? Notes);
 public sealed record BundledSaleResultDto(Guid SaleGroupId, string? OrderReference, int ItemCount, decimal TotalNetProfit, IReadOnlyList<SaleDto> Sales);
 public sealed record SaleCorrectionDto(Guid Id, Guid SaleId, int Version, string Reason, string CorrectedBy, DateTimeOffset CorrectedAt, string BeforeJson, string AfterJson);
-public sealed record RealizedProfitDto(Guid SaleId, decimal SoldPrice, decimal PurchaseCost, decimal TotalFeesAndCosts, decimal SalesTaxOwed, decimal NetProfit, decimal RoiPercent, decimal MarginPercent);
+public sealed record RealizedProfitDto(Guid SaleId, decimal SoldPrice, decimal ShippingCharged, decimal SalesRevenue, decimal PurchaseCost, decimal SellingCosts, decimal TotalFeesAndCosts, decimal MarketplaceNetBeforeCogs, decimal SalesTaxOwed, decimal NetProfit, decimal RoiPercent, decimal MarginPercent);
 
 public sealed record CreateTaskRequest(Guid? InventoryItemId, Guid? AssignedToUserId, string Title, string? Description, DateTimeOffset? DueAt);
 public sealed record AssignTaskRequest(Guid? AssignedToUserId);

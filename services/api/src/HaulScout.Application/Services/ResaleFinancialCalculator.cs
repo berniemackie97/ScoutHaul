@@ -2,8 +2,12 @@ namespace HaulScout.Application.Services;
 
 public sealed record RealizedSaleFinancials(
     decimal SoldPrice,
+    decimal ShippingCharged,
+    decimal SalesRevenue,
     decimal PurchaseCost,
+    decimal SellingCosts,
     decimal TotalFeesAndCosts,
+    decimal MarketplaceNetBeforeCogs,
     decimal NetProfit,
     decimal RoiPercent,
     decimal MarginPercent);
@@ -12,6 +16,7 @@ public static class ResaleFinancialCalculator
 {
     public static RealizedSaleFinancials CalculateRealizedSale(
         decimal soldPrice,
+        decimal shippingCharged,
         decimal purchaseCost,
         decimal platformFees,
         decimal paymentFees,
@@ -20,21 +25,28 @@ public static class ResaleFinancialCalculator
         decimal otherCosts)
     {
         decimal normalizedSoldPrice = Math.Max(0, soldPrice);
+        decimal normalizedShippingCharged = Math.Max(0, shippingCharged);
+        decimal salesRevenue = normalizedSoldPrice + normalizedShippingCharged;
         decimal normalizedPurchaseCost = Math.Max(0, purchaseCost);
-        decimal feesAndCosts = Math.Max(0, platformFees)
+        decimal sellingCosts = Math.Max(0, platformFees)
                                + Math.Max(0, paymentFees)
                                + Math.Max(0, shippingCost)
                                + Math.Max(0, suppliesCost)
                                + Math.Max(0, otherCosts);
 
-        decimal netProfit = normalizedSoldPrice - normalizedPurchaseCost - feesAndCosts;
+        decimal marketplaceNetBeforeCogs = salesRevenue - sellingCosts;
+        decimal netProfit = marketplaceNetBeforeCogs - normalizedPurchaseCost;
         decimal roiPercent = normalizedPurchaseCost > 0 ? netProfit / normalizedPurchaseCost * 100 : 0;
-        decimal marginPercent = normalizedSoldPrice > 0 ? netProfit / normalizedSoldPrice * 100 : 0;
+        decimal marginPercent = salesRevenue > 0 ? netProfit / salesRevenue * 100 : 0;
 
         return new RealizedSaleFinancials(
             RoundMoney(normalizedSoldPrice),
+            RoundMoney(normalizedShippingCharged),
+            RoundMoney(salesRevenue),
             RoundMoney(normalizedPurchaseCost),
-            RoundMoney(normalizedPurchaseCost + feesAndCosts),
+            RoundMoney(sellingCosts),
+            RoundMoney(normalizedPurchaseCost + sellingCosts),
+            RoundMoney(marketplaceNetBeforeCogs),
             RoundMoney(netProfit),
             RoundPercent(roiPercent),
             RoundPercent(marginPercent));

@@ -34,6 +34,7 @@ export function BundledSaleCreator({ candidates, channels }: { candidates: Candi
   const [manual, setManual] = useState<Record<string, string>>({});
   const [channel, setChannel] = useState("");
   const [total, setTotal] = useState("");
+  const [shippingCharged, setShippingCharged] = useState("");
   const [platformFees, setPlatformFees] = useState("");
   const [paymentFees, setPaymentFees] = useState("");
   const [shippingCost, setShippingCost] = useState("");
@@ -49,7 +50,9 @@ export function BundledSaleCreator({ candidates, channels }: { candidates: Candi
   const chosen = candidates.filter((c) => c.inventoryItemId && selected.has(c.inventoryItemId));
   const cogs = chosen.reduce((sum, c) => sum + (c.costOfGoods ?? 0), 0);
   const feesTotal = [platformFees, paymentFees, shippingCost].reduce((sum, v) => sum + (Number(v) || 0), 0);
-  const groupNet = (Number(total) || 0) - cogs - feesTotal;
+  const revenue = (Number(total) || 0) + (Number(shippingCharged) || 0);
+  const marketplaceNet = revenue - feesTotal;
+  const groupNet = marketplaceNet - cogs;
 
   const itemsJson = JSON.stringify(
     chosen.map((c) => ({ inventoryItemId: c.inventoryItemId, manualPrice: manual[c.inventoryItemId!] ? Number(manual[c.inventoryItemId!]) : null }))
@@ -114,10 +117,11 @@ export function BundledSaleCreator({ candidates, channels }: { candidates: Candi
             </div>
             <div className="space-y-2"><Label htmlFor="orderReference">Order / tracking reference</Label><Input id="orderReference" name="orderReference" placeholder="eBay order #" /></div>
             <Money label="Order total (all items)" name="totalSoldPrice" value={total} onChange={setTotal} />
+            <Money label="Buyer shipping charged" name="shippingCharged" value={shippingCharged} onChange={setShippingCharged} />
             <div className="space-y-2"><Label htmlFor="soldAt">Sold date</Label><Input id="soldAt" name="soldAt" type="date" defaultValue={localDate()} /></div>
             <Money label="Platform fees" name="platformFees" value={platformFees} onChange={setPlatformFees} />
             <Money label="Payment fees" name="paymentFees" value={paymentFees} onChange={setPaymentFees} />
-            <Money label="Shipping" name="shippingCost" value={shippingCost} onChange={setShippingCost} />
+            <Money label="Shipping label cost" name="shippingCost" value={shippingCost} onChange={setShippingCost} />
             <Money label="Sales tax" name="salesTaxCollected" value={salesTax} onChange={setSalesTax} />
             <input type="hidden" name="suppliesCost" value="0" />
             <input type="hidden" name="otherCosts" value="0" />
@@ -134,6 +138,8 @@ export function BundledSaleCreator({ candidates, channels }: { candidates: Candi
           <div className="mt-5 space-y-2 border-t pt-4 text-sm">
             <div className="flex justify-between"><span className="text-muted-foreground">Items</span><span>{chosen.length}</span></div>
             <div className="flex justify-between"><span className="text-muted-foreground">Order total</span><span>{currency(Number(total) || 0)}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Shipping charged</span><span>{currency(Number(shippingCharged) || 0)}</span></div>
+            <div className="flex justify-between border-t border-dashed pt-2"><span className="text-muted-foreground">Marketplace net before COGS</span><span>{currency(marketplaceNet)}</span></div>
             <div className="flex justify-between"><span className="text-muted-foreground">COGS</span><span>-{currency(cogs)}</span></div>
             <div className="flex justify-between"><span className="text-muted-foreground">Fees</span><span>-{currency(feesTotal)}</span></div>
           </div>

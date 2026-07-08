@@ -111,6 +111,7 @@ public sealed class BusinessReportCalculatorTests
         SaleStatus status,
         DateTimeOffset soldAt,
         decimal salesTaxCollected = 0,
-        bool taxRemittedByPlatform = true) =>
-        new(Guid.NewGuid(), Guid.NewGuid(), title, platform, sold, purchase, platformFees, paymentFees, shipping, supplies, other, net, status, soldAt, salesTaxCollected, taxRemittedByPlatform);
+        bool taxRemittedByPlatform = true,
+        decimal shippingCharged = 0) =>
+        new(Guid.NewGuid(), Guid.NewGuid(), title, platform, sold, shippingCharged, purchase, platformFees, paymentFees, shipping, supplies, other, net, status, soldAt, salesTaxCollected, taxRemittedByPlatform);
 }

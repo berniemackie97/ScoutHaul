@@ -72,6 +72,7 @@ public sealed class ReportsController(HaulScoutDbContext db, ICurrentUserContext
                 item.InventoryItem == null ? "Unknown item" : item.InventoryItem.Title,
                 item.Platform,
                 item.SoldPrice,
+                item.ShippingCharged,
                 item.CostOfGoods,
                 item.PlatformFees,
                 item.PaymentFees,

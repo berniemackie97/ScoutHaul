@@ -35,8 +35,10 @@ function errorMessage(error: unknown): string {
 export async function recordBundledSale(_previous: BundledResult, formData: FormData): Promise<BundledResult> {
   const platform = text(formData, "platform");
   const totalSoldPrice = money(formData, "totalSoldPrice");
+  const shippingCharged = money(formData, "shippingCharged");
   if (!platform) return { ok: false, message: "Select a sales channel." };
   if (!Number.isFinite(totalSoldPrice) || totalSoldPrice <= 0) return { ok: false, message: "Enter a positive order total." };
+  if (!Number.isFinite(shippingCharged)) return { ok: false, message: "Buyer shipping charged must be a valid non-negative amount." };
 
   let items: { inventoryItemId: string; manualPrice: number | null }[] = [];
   try {
@@ -65,6 +67,7 @@ export async function recordBundledSale(_previous: BundledResult, formData: Form
     items,
     platform,
     totalSoldPrice,
+    shippingCharged,
     platformFees,
     paymentFees,
     shippingCost,

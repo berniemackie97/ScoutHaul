@@ -6688,9 +6688,17 @@ export interface components {
             /** Format: double */
             soldPrice?: number;
             /** Format: double */
+            shippingCharged?: number;
+            /** Format: double */
+            salesRevenue?: number;
+            /** Format: double */
             purchaseCost?: number;
             /** Format: double */
+            sellingCosts?: number;
+            /** Format: double */
             totalFeesAndCosts?: number;
+            /** Format: double */
+            marketplaceNetBeforeCogs?: number;
             /** Format: double */
             salesTaxOwed?: number;
             /** Format: double */
@@ -6707,6 +6715,8 @@ export interface components {
             platform?: string | null;
             /** Format: double */
             totalSoldPrice?: number;
+            /** Format: double */
+            shippingCharged?: number;
             /** Format: double */
             platformFees?: number;
             /** Format: double */
@@ -6749,6 +6759,8 @@ export interface components {
             /** Format: double */
             salesTaxCollected?: number;
             taxRemittedByPlatform?: boolean;
+            /** Format: double */
+            shippingCharged?: number;
         };
         RedeemOrganizationInviteCodeRequest: {
             code?: string | null;
@@ -6944,6 +6956,8 @@ export interface components {
             platform?: string | null;
             /** Format: double */
             soldPrice?: number;
+            /** Format: double */
+            shippingCharged?: number;
             /** Format: double */
             costOfGoods?: number;
             /** Format: double */
@@ -7305,6 +7319,8 @@ export interface components {
             platform?: string | null;
             /** Format: double */
             soldPrice?: number;
+            /** Format: double */
+            shippingCharged?: number;
             /** Format: double */
             platformFees?: number;
             /** Format: double */

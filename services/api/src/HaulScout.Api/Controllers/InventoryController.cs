@@ -132,7 +132,7 @@ public sealed class InventoryController(
             string before = SnapshotSale(sale);
             sale.CostOfGoods = newCost;
             RealizedSaleFinancials financials = ResaleFinancialCalculator.CalculateRealizedSale(
-                sale.SoldPrice, sale.CostOfGoods, sale.PlatformFees, sale.PaymentFees, sale.ShippingCost, sale.SuppliesCost, sale.OtherCosts);
+                sale.SoldPrice, sale.ShippingCharged, sale.CostOfGoods, sale.PlatformFees, sale.PaymentFees, sale.ShippingCost, sale.SuppliesCost, sale.OtherCosts);
             sale.NetProfit = financials.NetProfit;
 
             int version = await db.SaleCorrections.CountAsync(
@@ -154,6 +154,7 @@ public sealed class InventoryController(
     {
         sale.Platform,
         sale.SoldPrice,
+        sale.ShippingCharged,
         sale.CostOfGoods,
         sale.PlatformFees,
         sale.PaymentFees,
