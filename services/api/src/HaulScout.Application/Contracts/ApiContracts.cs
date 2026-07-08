@@ -738,6 +738,7 @@ public sealed record IngestPlatformOrderInput(
     decimal FeeTotal,
     IReadOnlyList<IngestPlatformOrderLineInput> Lines,
     string? Platform = null,
+    decimal? ShippingCost = null,
     decimal? PayoutAmount = null,
     string Currency = "USD",
     bool TaxRemittedByPlatform = true,
@@ -779,6 +780,7 @@ public sealed record PlatformOrderDto(
     decimal ShippingCharged,
     decimal TaxCollected,
     decimal FeeTotal,
+    decimal? SellerShippingCost,
     decimal? PayoutAmount,
     decimal ExpectedPayout,
     decimal PayoutVariance,
@@ -795,6 +797,10 @@ public sealed record PlatformOrderDto(
     IReadOnlyList<PlatformOrderLineDto> Lines);
 
 public sealed record IngestPlatformOrdersResultDto(int Created, int Updated, int Skipped, IReadOnlyList<PlatformOrderDto> Orders);
+
+/// <summary>Import a marketplace's own CSV export (e.g. eBay Seller Hub → Performance → Sales report) — the
+/// authoritative fee source. Parsed server-side into the same idempotent ingest as the extension push.</summary>
+public sealed record ImportPlatformOrdersCsvRequest(string Platform, string Csv);
 
 /// <summary>Maps one scraped order line to the ScoutHaul inventory item it represents, for reconciliation.</summary>
 public sealed record ReconcilePlatformOrderLineMap(Guid PlatformOrderLineId, Guid InventoryItemId);

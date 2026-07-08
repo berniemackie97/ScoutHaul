@@ -301,6 +301,87 @@ public class PlatformOrderIngestionTests
         Assert.Equal(15m, result.Value.Sales.Sum(sale => sale.PlatformFees)); // full fee allocated across both
     }
 
+    private const string EbayCsv = """
+"Report for Apr 9, 2026 to Jul 7, 2026"
+Listing title,eBay item ID,Store category L1,Store category L2,Quantity sold,Total sales (Includes taxes),Item sales,Taxes and government fees paid by buyer to you,Taxes and government fees paid by buyer to eBay,Shipping and handling paid by buyer to you,Total selling costs,Insertion fees,Optional listing upgrade fees,Final value fees,Promoted Listings - General fees,Promoted Listings - Priority fees,Ads Express fees,Promoted Offsite - Fees,International fees,Other eBay fees,Deposit processing fees,Fee credits,Shipping labels cost (Amount you paid to buy shipping labels on eBay),Net sales (Net of taxes and selling costs),Average Selling price,Quantity sold via promoted listing,Quantity sold via Best Offers,Quantity sold via Seller Initiated Offers,
+Brass Lamp,377251318593,-,-,1,$88.12,$77.28,$0.00,$7.15,$3.69,$18.05,$0.00,$0.00,$19.29,$0.00,$0.00,$0.00,$0.00,$0.00,$0.00,$0.00,$7.21,$5.97,$62.92,$88.12,0,1,0
+""";
+
+    [Fact]
+    public async Task Import_ebay_csv_ingests_then_reimports_idempotently()
+    {
+        var (db, org, user) = NewContext(nameof(Import_ebay_csv_ingests_then_reimports_idempotently));
+        await using var _ = db;
+        var controller = new PlatformOrdersController(db, new StubCurrentUser(org, user));
+
+        var first = await controller.ImportEbayCsv(new ImportPlatformOrdersCsvRequest("eBay", EbayCsv), CancellationToken.None);
+        Assert.Equal(1, first.Value!.Created);
+
+        var order = await db.PlatformOrders.Include(o => o.Lines).SingleAsync();
+        Assert.Equal("377251318593", order.ExternalOrderId);
+        Assert.Equal(12.08m, order.FeeTotal);            // exact eBay cut (18.05 − 5.97 label)
+        Assert.Equal(5.97m, order.SellerShippingCost);
+
+        var second = await controller.ImportEbayCsv(new ImportPlatformOrdersCsvRequest("eBay", EbayCsv), CancellationToken.None);
+        Assert.Equal(0, second.Value!.Created);
+        Assert.Equal(1, second.Value.Updated);
+        Assert.Single(await db.PlatformOrders.ToListAsync());
+    }
+
+    [Fact]
+    public async Task Reconcile_new_sale_from_csv_carries_the_shipping_label_cost()
+    {
+        var (db, org, user) = NewContext(nameof(Reconcile_new_sale_from_csv_carries_the_shipping_label_cost));
+        await using var _ = db;
+        var controller = new PlatformOrdersController(db, new StubCurrentUser(org, user));
+        var item = SeedItem(db, org, "Brass Lamp", 40m);
+
+        await controller.ImportEbayCsv(new ImportPlatformOrdersCsvRequest("eBay", EbayCsv), CancellationToken.None);
+        var order = await db.PlatformOrders.Include(o => o.Lines).SingleAsync();
+
+        var result = await controller.Reconcile(order.Id,
+            new ReconcilePlatformOrderRequest([new ReconcilePlatformOrderLineMap(order.Lines.First().Id, item.Id)]), CancellationToken.None);
+
+        var sale = Assert.Single(result.Value!.Sales);
+        Assert.Equal(77.28m, sale.SoldPrice);
+        Assert.Equal(12.08m, sale.PlatformFees);
+        Assert.Equal(5.97m, sale.ShippingCost);                         // seller label cost carried from the report
+        Assert.Equal(77.28m + 3.69m - 40m - 12.08m - 5.97m, sale.NetProfit); // label included in net
+    }
+
+    [Fact]
+    public async Task Reconcile_correction_preserves_the_recorded_sale_date()
+    {
+        var (db, org, user) = NewContext(nameof(Reconcile_correction_preserves_the_recorded_sale_date));
+        await using var _ = db;
+        var controller = new PlatformOrdersController(db, new StubCurrentUser(org, user));
+        var item = SeedItem(db, org, "Brass Lamp", 40m);
+        item.Status = InventoryStatus.Sold;
+        var recordedDate = new DateTimeOffset(2026, 5, 1, 12, 0, 0, TimeSpan.Zero);
+        db.Sales.Add(new Sale
+        {
+            OrganizationId = org,
+            InventoryItemId = item.Id,
+            Platform = "eBay",
+            SoldPrice = 70m,
+            CostOfGoods = 40m,
+            NetProfit = 30m,
+            Status = SaleStatus.Recorded,
+            SoldAt = recordedDate,
+        });
+        await db.SaveChangesAsync();
+
+        await controller.ImportEbayCsv(new ImportPlatformOrdersCsvRequest("eBay", EbayCsv), CancellationToken.None);
+        var order = await db.PlatformOrders.Include(o => o.Lines).SingleAsync();
+        await controller.Reconcile(order.Id,
+            new ReconcilePlatformOrderRequest([new ReconcilePlatformOrderLineMap(order.Lines.First().Id, item.Id)]), CancellationToken.None);
+
+        var sale = Assert.Single(await db.Sales.Where(s => s.InventoryItemId == item.Id).ToListAsync());
+        Assert.Equal(recordedDate, sale.SoldAt);          // the operator's real date is kept, not the report range
+        Assert.Equal(77.28m, sale.SoldPrice);             // money still corrected to eBay's exact figures
+        Assert.Equal(5.97m, sale.ShippingCost);
+    }
+
     [Fact]
     public async Task Ingest_rejects_negative_money()
     {

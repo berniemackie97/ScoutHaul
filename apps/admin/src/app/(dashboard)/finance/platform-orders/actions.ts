@@ -68,6 +68,30 @@ export async function ignorePlatformOrder(_previous: ActionResult, formData: For
 }
 
 /**
+ * Import eBay's own Sales report CSV (Seller Hub → Performance → Sales → Download) — the authoritative fee
+ * source. Parsed server-side; same idempotent ingest as the extension. This is the primary, zero-setup path.
+ */
+export async function importEbayCsv(_previous: ActionResult, formData: FormData): Promise<ActionResult> {
+  const file = formData.get("csvFile");
+  const pasted = (formData.get("csvText") as string)?.trim();
+  let csv = "";
+  if (file instanceof File && file.size > 0) {
+    csv = await file.text();
+  } else if (pasted) {
+    csv = pasted;
+  }
+  if (!csv) return { ok: false, message: "Choose the eBay report CSV file (or paste its contents)." };
+
+  const api = await getApiClient();
+  const result = await api.POST("/api/platform-orders/import/ebay-csv", { body: { platform: "eBay", csv } });
+  if (!result.data) return { ok: false, message: errorMessage(result.error, "The eBay report could not be imported.") };
+
+  revalidatePath("/finance/platform-orders");
+  const { created, updated, skipped } = result.data;
+  return { ok: true, message: `Imported ${created} new, updated ${updated}, skipped ${skipped}. Reconcile them below.` };
+}
+
+/**
  * Manual fallback for importing scraped orders when the browser extension is not yet connected: the operator
  * pastes the order JSON exactly as the extension would push it. Same idempotent ingest endpoint either way.
  */

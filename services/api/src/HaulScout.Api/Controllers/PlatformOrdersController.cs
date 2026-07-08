@@ -75,9 +75,6 @@ public sealed class PlatformOrdersController(HaulScoutDbContext db, ICurrentUser
             return BadRequest("No orders were supplied.");
         }
 
-        List<string> existingChannels = await ExistingChannels(cancellationToken);
-        string? defaultChannel = SalesChannelCatalog.CanonicalValue(request.Platform, existingChannels);
-
         Guid? channelAccountId = null;
         if (request.ChannelAccountId.HasValue)
         {
@@ -91,32 +88,64 @@ public sealed class PlatformOrdersController(HaulScoutDbContext db, ICurrentUser
             channelAccountId = request.ChannelAccountId;
         }
 
-        // Normalize + validate every order up front so a bad batch fails atomically rather than half-importing.
+        var (result, error) = await IngestOrders(request.Platform, request.Orders, channelAccountId, cancellationToken);
+        return error is not null ? BadRequest(error) : result!;
+    }
+
+    /// <summary>Import a marketplace's own CSV export (eBay Seller Hub → Performance → Sales report today) — the
+    /// authoritative fee source — parsed server-side into the same idempotent ingest as the extension push.</summary>
+    [HttpPost("import/ebay-csv")]
+    public async Task<ActionResult<IngestPlatformOrdersResultDto>> ImportEbayCsv(ImportPlatformOrdersCsvRequest request, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(request.Csv))
+        {
+            return BadRequest("Paste or upload the eBay report CSV.");
+        }
+
+        var parsed = EbayReportParser.ParseSalesReport(request.Csv);
+        if (parsed.Orders.Count == 0)
+        {
+            return BadRequest(parsed.Warning ?? "No sold-listing rows were found in the report.");
+        }
+
+        var (result, error) = await IngestOrders(string.IsNullOrWhiteSpace(request.Platform) ? "eBay" : request.Platform, parsed.Orders, null, cancellationToken);
+        return error is not null ? BadRequest(error) : result!;
+    }
+
+    // Shared idempotent upsert for both the extension push and CSV import. Validates the whole batch first so a
+    // bad row fails atomically rather than half-importing; Reconciled/Ignored orders are never overwritten.
+    private async Task<(IngestPlatformOrdersResultDto? Result, string? Error)> IngestOrders(
+        string? defaultPlatform, IReadOnlyList<IngestPlatformOrderInput> orders, Guid? channelAccountId, CancellationToken cancellationToken)
+    {
+        List<string> existingChannels = await ExistingChannels(cancellationToken);
+        string? defaultChannel = SalesChannelCatalog.CanonicalValue(defaultPlatform, existingChannels);
+
         var normalized = new List<(IngestPlatformOrderInput Input, string Channel, string ExternalOrderId)>();
-        foreach (var input in request.Orders)
+        foreach (var input in orders)
         {
             string externalOrderId = (input.ExternalOrderId ?? string.Empty).Trim();
             if (externalOrderId.Length == 0)
             {
-                return BadRequest("Every order needs an external order id.");
+                return (null, "Every order needs an external order id.");
             }
 
             string? channel = SalesChannelCatalog.CanonicalValue(input.Platform, existingChannels) ?? defaultChannel;
             if (channel is null)
             {
-                return BadRequest($"Order {externalOrderId} has no recognized sales channel.");
+                return (null, $"Order {externalOrderId} has no recognized sales channel.");
             }
 
             if (input.Lines is null || input.Lines.Count == 0)
             {
-                return BadRequest($"Order {externalOrderId} has no line items.");
+                return (null, $"Order {externalOrderId} has no line items.");
             }
 
             if (new[] { input.ItemsSubtotal, input.ShippingCharged, input.TaxCollected, input.FeeTotal }.Any(value => value < 0)
+                || (input.ShippingCost.HasValue && input.ShippingCost.Value < 0)
                 || (input.PayoutAmount.HasValue && input.PayoutAmount.Value < 0)
                 || input.Lines.Any(line => line.UnitPrice < 0 || line.Quantity <= 0))
             {
-                return BadRequest($"Order {externalOrderId} has negative money or a non-positive quantity.");
+                return (null, $"Order {externalOrderId} has negative money or a non-positive quantity.");
             }
 
             normalized.Add((input, channel, externalOrderId));
@@ -176,7 +205,7 @@ public sealed class PlatformOrdersController(HaulScoutDbContext db, ICurrentUser
             .ToListAsync(cancellationToken);
         var suggestions = await BuildSuggestions(refreshed, cancellationToken);
         var dtos = refreshed.Select(order => order.ToDto(suggestions)).ToList();
-        return new IngestPlatformOrdersResultDto(created, updated, skipped, dtos);
+        return (new IngestPlatformOrdersResultDto(created, updated, skipped, dtos), null);
     }
 
     /// <summary>Turn a scraped order into ScoutHaul sales. Each mapped line becomes a linked sale carrying the
@@ -243,7 +272,7 @@ public sealed class PlatformOrdersController(HaulScoutDbContext db, ICurrentUser
         {
             lines = BundledSaleAllocator.Allocate(
                 allocationInputs, totalSoldPrice, order.ShippingCharged, order.FeeTotal,
-                paymentFees: 0, shippingCost: 0, suppliesCost: 0, otherCosts: 0, order.TaxCollected);
+                paymentFees: 0, shippingCost: order.SellerShippingCost ?? 0, suppliesCost: 0, otherCosts: 0, order.TaxCollected);
         }
         catch (InvalidOperationException exception)
         {
@@ -266,9 +295,9 @@ public sealed class PlatformOrdersController(HaulScoutDbContext db, ICurrentUser
             if (saleByItem.TryGetValue(item.Id, out var existing))
             {
                 // Correct the recorded sale: overwrite ONLY what the platform reports (price, buyer shipping, tax,
-                // fee total); the seller's own label/supply/other costs are preserved. Net is recomputed; audited.
+                // fee total; and the shipping label when the platform gives it). The operator's real sale DATE and
+                // any supply/other costs are preserved. Net is recomputed; the change is audited.
                 string before = SnapshotSale(existing);
-                DateTimeOffset previousSoldAt = existing.SoldAt;
                 existing.Platform = order.Platform;
                 existing.SoldPrice = allocated.Price;
                 existing.ShippingCharged = allocated.ShippingCharged;
@@ -276,20 +305,19 @@ public sealed class PlatformOrdersController(HaulScoutDbContext db, ICurrentUser
                 existing.PaymentFees = allocated.PaymentFees;
                 existing.SalesTaxCollected = allocated.SalesTaxCollected;
                 existing.TaxRemittedByPlatform = order.TaxRemittedByPlatform;
+                if (order.SellerShippingCost.HasValue)
+                {
+                    existing.ShippingCost = allocated.ShippingCost;
+                }
                 existing.SaleGroupId = groupId;
                 existing.GroupOrderReference = order.ExternalOrderId;
-                existing.SoldAt = soldAt;
 
                 RealizedSaleFinancials corrected = ResaleFinancialCalculator.CalculateRealizedSale(
                     existing.SoldPrice, existing.ShippingCharged, existing.CostOfGoods, existing.PlatformFees,
                     existing.PaymentFees, existing.ShippingCost, existing.SuppliesCost, existing.OtherCosts);
                 existing.NetProfit = corrected.NetProfit;
-                if (existing.InventoryItem is not null)
-                {
-                    existing.InventoryItem.SoldAt = soldAt;
-                }
 
-                await UpdateInternalSaleObservation(item, previousSoldAt, allocated, soldAt, cancellationToken);
+                await UpdateInternalSaleObservation(item, existing.SoldAt, allocated, cancellationToken);
                 await AddCorrection(existing, before, $"Reconciled to {order.Platform} order {order.ExternalOrderId} — exact platform fees.", cancellationToken);
                 resultSales.Add(existing);
                 correctedCount++;
@@ -399,6 +427,7 @@ public sealed class PlatformOrdersController(HaulScoutDbContext db, ICurrentUser
         order.ShippingCharged = input.ShippingCharged;
         order.TaxCollected = input.TaxCollected;
         order.FeeTotal = input.FeeTotal;
+        order.SellerShippingCost = input.ShippingCost;
         order.PayoutAmount = input.PayoutAmount;
         order.Currency = string.IsNullOrWhiteSpace(input.Currency) ? "USD" : input.Currency.Trim().ToUpperInvariant();
         order.TaxRemittedByPlatform = input.TaxRemittedByPlatform;
@@ -536,14 +565,14 @@ public sealed class PlatformOrdersController(HaulScoutDbContext db, ICurrentUser
         });
     }
 
-    // Keeps the internal-sale comp for this item in step with the corrected figures (updates the prior one, or adds).
-    private async Task UpdateInternalSaleObservation(InventoryItem item, DateTimeOffset previousSoldAt, AllocatedSaleLine allocated, DateTimeOffset soldAt, CancellationToken cancellationToken)
+    // Keeps the internal-sale comp for this item in step with the corrected price (the recorded date is preserved).
+    private async Task UpdateInternalSaleObservation(InventoryItem item, DateTimeOffset soldAt, AllocatedSaleLine allocated, CancellationToken cancellationToken)
     {
         MarketObservation? observation = await db.MarketObservations
             .Where(obs => obs.InventoryItemId == item.Id
                 && obs.ObservationType == MarketObservationType.InternalSale
                 && obs.OrganizationId == currentUser.OrganizationId
-                && obs.SoldAt == previousSoldAt)
+                && obs.SoldAt == soldAt)
             .OrderByDescending(obs => obs.ObservedAt)
             .FirstOrDefaultAsync(cancellationToken);
         if (observation is null)
@@ -568,8 +597,6 @@ public sealed class PlatformOrdersController(HaulScoutDbContext db, ICurrentUser
 
         observation.Price = allocated.Price;
         observation.TotalPrice = allocated.Price + allocated.ShippingCharged;
-        observation.ObservedAt = soldAt;
-        observation.SoldAt = soldAt;
     }
 
     private async Task<List<string>> ExistingChannels(CancellationToken cancellationToken)
