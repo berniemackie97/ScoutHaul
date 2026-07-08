@@ -49,7 +49,10 @@ export async function reconcilePlatformOrder(_previous: ActionResult, formData: 
   revalidatePath("/finance/platform-orders");
   revalidatePath("/finance");
   revalidatePath("/inventory");
-  return { ok: true, message: `Reconciled into ${result.data.sales?.length ?? 0} sale(s).` };
+  const created = result.data.createdSaleCount ?? 0;
+  const corrected = result.data.correctedSaleCount ?? 0;
+  const parts = [created > 0 ? `${created} new sale${created === 1 ? "" : "s"}` : null, corrected > 0 ? `${corrected} corrected` : null].filter(Boolean);
+  return { ok: true, message: `Reconciled: ${parts.join(", ") || "done"}.` };
 }
 
 export async function ignorePlatformOrder(_previous: ActionResult, formData: FormData): Promise<ActionResult> {

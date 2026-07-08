@@ -765,7 +765,8 @@ public sealed record PlatformOrderLineDto(
     Guid? InventoryItemId,
     string? InventoryItemTitle,
     Guid? SuggestedInventoryItemId,
-    string? SuggestedInventoryItemTitle);
+    string? SuggestedInventoryItemTitle,
+    bool SuggestedInventoryItemAlreadySold);
 
 public sealed record PlatformOrderDto(
     Guid Id,
@@ -803,7 +804,7 @@ public sealed record ReconcilePlatformOrderRequest(
     IReadOnlyList<ReconcilePlatformOrderLineMap> Lines,
     string? Notes = null);
 
-public sealed record PlatformOrderReconcileResultDto(Guid PlatformOrderId, Guid SaleGroupId, IReadOnlyList<SaleDto> Sales);
+public sealed record PlatformOrderReconcileResultDto(Guid PlatformOrderId, Guid SaleGroupId, int CreatedSaleCount, int CorrectedSaleCount, IReadOnlyList<SaleDto> Sales);
 
 public sealed record CreateTaskRequest(Guid? InventoryItemId, Guid? AssignedToUserId, string Title, string? Description, DateTimeOffset? DueAt);
 public sealed record AssignTaskRequest(Guid? AssignedToUserId);

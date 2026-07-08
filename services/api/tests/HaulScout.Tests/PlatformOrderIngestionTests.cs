@@ -207,27 +207,98 @@ public class PlatformOrderIngestionTests
     }
 
     [Fact]
-    public async Task Reconcile_blocks_an_item_that_already_sold()
+    public async Task Reconcile_corrects_a_hand_recorded_sale_in_place_with_exact_fees()
     {
-        var (db, org, user) = NewContext(nameof(Reconcile_blocks_an_item_that_already_sold));
+        var (db, org, user) = NewContext(nameof(Reconcile_corrects_a_hand_recorded_sale_in_place_with_exact_fees));
         await using var _ = db;
         var controller = new PlatformOrdersController(db, new StubCurrentUser(org, user));
         var item = SeedItem(db, org, "Brass Lamp", 40m);
+        item.Status = InventoryStatus.Sold;
+        // A sale the operator hand-entered earlier with guessed fees + their own $8 shipping label cost.
         db.Sales.Add(new Sale
         {
-            OrganizationId = org, InventoryItemId = item.Id, Platform = "eBay",
-            SoldPrice = 100m, CostOfGoods = 40m, NetProfit = 60m, Status = SaleStatus.Recorded,
+            OrganizationId = org,
+            InventoryItemId = item.Id,
+            Platform = "eBay",
+            SoldPrice = 100m,
+            CostOfGoods = 40m,
+            PlatformFees = 12m,
+            ShippingCost = 8m,
+            NetProfit = 40m,
+            Status = SaleStatus.Recorded,
         });
         await db.SaveChangesAsync();
 
         var lines = new[] { new IngestPlatformOrderLineInput("Brass Lamp", 120m) };
-        await controller.Ingest(new IngestPlatformOrdersRequest("eBay", [Order("ORD-5", lines)]), CancellationToken.None);
+        await controller.Ingest(new IngestPlatformOrdersRequest("eBay", [Order("ORD-5", lines, shipping: 10m, tax: 9m, fee: 19.40m)]), CancellationToken.None);
         var order = await db.PlatformOrders.Include(o => o.Lines).SingleAsync();
 
         var result = await controller.Reconcile(order.Id,
             new ReconcilePlatformOrderRequest([new ReconcilePlatformOrderLineMap(order.Lines.First().Id, item.Id)]), CancellationToken.None);
 
-        Assert.IsType<ConflictObjectResult>(result.Result);
+        var reconcile = result.Value!;
+        Assert.Equal(0, reconcile.CreatedSaleCount);
+        Assert.Equal(1, reconcile.CorrectedSaleCount);
+
+        // Exactly one sale for the item — corrected, never duplicated.
+        var sale = Assert.Single(await db.Sales.Where(s => s.InventoryItemId == item.Id).ToListAsync());
+        Assert.Equal(120m, sale.SoldPrice);          // platform's exact figures overwrite the guesses
+        Assert.Equal(10m, sale.ShippingCharged);
+        Assert.Equal(19.40m, sale.PlatformFees);
+        Assert.Equal(9m, sale.SalesTaxCollected);
+        Assert.Equal(8m, sale.ShippingCost);         // seller's own label cost preserved
+        Assert.Equal(120m + 10m - 40m - 19.40m - 8m, sale.NetProfit);
+
+        var correction = Assert.Single(await db.SaleCorrections.Where(c => c.SaleId == sale.Id).ToListAsync());
+        Assert.Equal(1, correction.Version);
+        Assert.Contains("ORD-5", correction.Reason);
+        Assert.Contains("40", correction.BeforeJson);   // prior net preserved in the audit
+    }
+
+    [Fact]
+    public async Task Reconcile_mixes_a_new_sale_and_a_correction_in_one_order()
+    {
+        var (db, org, user) = NewContext(nameof(Reconcile_mixes_a_new_sale_and_a_correction_in_one_order));
+        await using var _ = db;
+        var controller = new PlatformOrdersController(db, new StubCurrentUser(org, user));
+        var fresh = SeedItem(db, org, "Fresh Item", 10m);
+        var recorded = SeedItem(db, org, "Recorded Item", 15m);
+        recorded.Status = InventoryStatus.Sold;
+        db.Sales.Add(new Sale
+        {
+            OrganizationId = org,
+            InventoryItemId = recorded.Id,
+            Platform = "eBay",
+            SoldPrice = 50m,
+            CostOfGoods = 15m,
+            NetProfit = 35m,
+            Status = SaleStatus.Recorded,
+        });
+        await db.SaveChangesAsync();
+
+        var lines = new[]
+        {
+            new IngestPlatformOrderLineInput("Fresh Item", 60m),
+            new IngestPlatformOrderLineInput("Recorded Item", 40m),
+        };
+        await controller.Ingest(new IngestPlatformOrdersRequest("eBay", [Order("ORD-10", lines, fee: 15m)]), CancellationToken.None);
+        var order = await db.PlatformOrders.Include(o => o.Lines).SingleAsync();
+        var freshLine = order.Lines.Single(line => line.Title == "Fresh Item");
+        var recordedLine = order.Lines.Single(line => line.Title == "Recorded Item");
+
+        var result = await controller.Reconcile(order.Id, new ReconcilePlatformOrderRequest(
+        [
+            new ReconcilePlatformOrderLineMap(freshLine.Id, fresh.Id),
+            new ReconcilePlatformOrderLineMap(recordedLine.Id, recorded.Id),
+        ]), CancellationToken.None);
+
+        Assert.Equal(1, result.Value!.CreatedSaleCount);
+        Assert.Equal(1, result.Value.CorrectedSaleCount);
+        // Still exactly one sale per item, all sharing the order's group.
+        Assert.Equal(1, await db.Sales.CountAsync(s => s.InventoryItemId == fresh.Id));
+        Assert.Equal(1, await db.Sales.CountAsync(s => s.InventoryItemId == recorded.Id));
+        Assert.All(result.Value.Sales, sale => Assert.Equal(result.Value.SaleGroupId, sale.SaleGroupId));
+        Assert.Equal(15m, result.Value.Sales.Sum(sale => sale.PlatformFees)); // full fee allocated across both
     }
 
     [Fact]
@@ -255,8 +326,11 @@ public class PlatformOrderIngestionTests
         db.ChannelAccounts.Add(account);
         db.ChannelListings.Add(new ChannelListing
         {
-            OrganizationId = org, InventoryItemId = item.Id, ChannelAccountId = account.Id,
-            Status = ChannelListingStatus.Active, ExternalListingId = "EBAY-ITEM-777",
+            OrganizationId = org,
+            InventoryItemId = item.Id,
+            ChannelAccountId = account.Id,
+            Status = ChannelListingStatus.Active,
+            ExternalListingId = "EBAY-ITEM-777",
         });
         await db.SaveChangesAsync();
 
@@ -268,6 +342,27 @@ public class PlatformOrderIngestionTests
         var line = Assert.Single(detail.Value!.Lines);
         Assert.Equal(item.Id, line.SuggestedInventoryItemId);
         Assert.Equal("Signed Poster", line.SuggestedInventoryItemTitle);
+    }
+
+    [Fact]
+    public async Task Get_suggests_a_match_by_title_when_there_is_no_link_and_flags_already_sold()
+    {
+        var (db, org, user) = NewContext(nameof(Get_suggests_a_match_by_title_when_there_is_no_link_and_flags_already_sold));
+        await using var _ = db;
+        var controller = new PlatformOrdersController(db, new StubCurrentUser(org, user));
+        // No ChannelListing link at all — matching must fall back to the title. Item is already sold.
+        var item = SeedItem(db, org, "Levi's 501 Denim Jacket", 20m);
+        item.Status = InventoryStatus.Sold;
+        await db.SaveChangesAsync();
+
+        var lines = new[] { new IngestPlatformOrderLineInput("Vintage Levi's 501 Denim Jacket Men's Medium USA", 65m) };
+        await controller.Ingest(new IngestPlatformOrdersRequest("eBay", [Order("ORD-11", lines)]), CancellationToken.None);
+        var order = await db.PlatformOrders.SingleAsync();
+
+        var detail = await controller.Get(order.Id, CancellationToken.None);
+        var line = Assert.Single(detail.Value!.Lines);
+        Assert.Equal(item.Id, line.SuggestedInventoryItemId);
+        Assert.True(line.SuggestedInventoryItemAlreadySold); // tells the UI it will correct, not create
     }
 
     [Fact]

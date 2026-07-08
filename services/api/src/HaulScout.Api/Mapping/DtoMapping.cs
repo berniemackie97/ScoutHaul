@@ -379,7 +379,7 @@ public static class DtoMapping
     public static decimal ExpectedPayout(this PlatformOrder order) =>
         order.ItemsSubtotal + order.ShippingCharged - order.FeeTotal + (order.TaxRemittedByPlatform ? 0 : order.TaxCollected);
 
-    public static PlatformOrderDto ToDto(this PlatformOrder order, IReadOnlyDictionary<Guid, (Guid Id, string Title)>? lineSuggestions = null)
+    public static PlatformOrderDto ToDto(this PlatformOrder order, IReadOnlyDictionary<Guid, (Guid Id, string Title, bool AlreadySold)>? lineSuggestions = null)
     {
         decimal expectedPayout = order.ExpectedPayout();
         return new PlatformOrderDto(
@@ -410,7 +410,7 @@ public static class DtoMapping
                 .OrderBy(line => line.CreatedAt)
                 .Select(line =>
                 {
-                    (Guid Id, string Title)? suggestion = lineSuggestions is not null && lineSuggestions.TryGetValue(line.Id, out var match) ? match : null;
+                    (Guid Id, string Title, bool AlreadySold)? suggestion = lineSuggestions is not null && lineSuggestions.TryGetValue(line.Id, out var match) ? match : null;
                     return new PlatformOrderLineDto(
                         line.Id,
                         line.Title,
@@ -421,7 +421,8 @@ public static class DtoMapping
                         line.InventoryItemId,
                         line.InventoryItem?.Title,
                         suggestion?.Id,
-                        suggestion?.Title);
+                        suggestion?.Title,
+                        suggestion?.AlreadySold ?? false);
                 })
                 .ToList());
     }

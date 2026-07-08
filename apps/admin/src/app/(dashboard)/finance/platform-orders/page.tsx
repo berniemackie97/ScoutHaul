@@ -14,17 +14,20 @@ const date = (value: string | null | undefined) =>
 
 export default async function PlatformOrdersPage() {
   const api = await getApiClient();
-  const [openResult, reconciledResult, candidatesResult, referenceResult] = await Promise.all([
+  const [openResult, reconciledResult, inventoryResult, referenceResult] = await Promise.all([
     api.GET("/api/platform-orders", { params: { query: { status: "Imported" } } }),
     api.GET("/api/platform-orders", { params: { query: { status: "Reconciled" } } }),
-    api.GET("/api/sales/candidates", {}),
+    api.GET("/api/inventory", { params: { query: { includeArchived: false } } }),
     api.GET("/api/sales/reference-data", {}),
   ]);
 
   const openOrders = openResult.data ?? [];
   const reconciled = reconciledResult.data ?? [];
-  const candidates = candidatesResult.data ?? [];
   const channels = referenceResult.data?.channels ?? [];
+  // Match against ALL inventory (sold + unsold): unsold → new sale, already-recorded → correct that sale.
+  const targets = (inventoryResult.data ?? [])
+    .filter((item) => item.id && (!item.isBundle || item.bundleComponentCount === 0))
+    .map((item) => ({ id: item.id as string, title: item.title ?? "Untitled item", isSold: item.isSold ?? false }));
 
   const flagged = openOrders.filter(
     (order) => typeof order.payoutAmount === "number" && Math.abs(order.payoutVariance ?? 0) >= 0.01
@@ -68,7 +71,7 @@ export default async function PlatformOrdersPage() {
 
       <section className="space-y-3">
         <h2 className="text-sm font-semibold">Reconcile queue</h2>
-        <PlatformOrderReconciler orders={openOrders} candidates={candidates} />
+        <PlatformOrderReconciler orders={openOrders} targets={targets} />
       </section>
 
       <ManualImporter channels={channels} />

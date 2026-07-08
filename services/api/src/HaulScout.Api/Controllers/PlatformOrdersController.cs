@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using HaulScout.Api.Authorization;
@@ -219,13 +220,17 @@ public sealed class PlatformOrdersController(HaulScoutDbContext db, ICurrentUser
             return NotFound("One or more matched inventory items were not found.");
         }
 
-        bool anySold = await db.Sales.AnyAsync(
-            sale => itemIds.Contains(sale.InventoryItemId) && sale.OrganizationId == currentUser.OrganizationId && !ReleasedInventoryStatuses.Contains(sale.Status),
-            cancellationToken);
-        if (anySold)
-        {
-            return Conflict("One or more matched items already has a recorded sale.");
-        }
+        // A matched item that already carries an active sale (e.g. hand-entered) is CORRECTED in place with the
+        // platform's exact figures rather than sold twice — so a recorded history and a fresh order both end up
+        // matching eBay. Released (returned/refunded/cancelled) sales don't block a new one.
+        var existingSales = await db.Sales
+            .Include(sale => sale.InventoryItem)
+            .Include(sale => sale.Listing)
+            .Where(sale => itemIds.Contains(sale.InventoryItemId) && sale.OrganizationId == currentUser.OrganizationId && !ReleasedInventoryStatuses.Contains(sale.Status))
+            .ToListAsync(cancellationToken);
+        var saleByItem = existingSales
+            .GroupBy(sale => sale.InventoryItemId)
+            .ToDictionary(group => group.Key, group => group.OrderByDescending(sale => sale.SoldAt).First());
 
         // Each line carries the platform's exact per-item price; the shared order costs are apportioned by price.
         var allocationInputs = order.Lines
@@ -249,61 +254,98 @@ public sealed class PlatformOrdersController(HaulScoutDbContext db, ICurrentUser
         DateTimeOffset soldAt = order.OrderedAt;
         var byId = items.ToDictionary(item => item.Id);
         var lineByItem = order.Lines.ToDictionary(line => mapByLine[line.Id], line => line);
-        var created = new List<Sale>();
+        var resultSales = new List<Sale>();
+        int createdCount = 0;
+        int correctedCount = 0;
 
         foreach (var allocated in lines)
         {
             var item = byId[allocated.InventoryItemId];
-            RealizedSaleFinancials financials = ResaleFinancialCalculator.CalculateRealizedSale(
-                allocated.Price, allocated.ShippingCharged, item.PurchasePrice ?? 0, allocated.PlatformFees,
-                allocated.PaymentFees, allocated.ShippingCost, allocated.SuppliesCost, allocated.OtherCosts);
-
-            var sale = new Sale
-            {
-                OrganizationId = currentUser.OrganizationId,
-                InventoryItemId = item.Id,
-                Platform = order.Platform,
-                SoldPrice = allocated.Price,
-                ShippingCharged = allocated.ShippingCharged,
-                CostOfGoods = item.PurchasePrice ?? 0,
-                PlatformFees = allocated.PlatformFees,
-                PaymentFees = allocated.PaymentFees,
-                ShippingCost = allocated.ShippingCost,
-                SuppliesCost = allocated.SuppliesCost,
-                OtherCosts = allocated.OtherCosts,
-                SalesTaxCollected = allocated.SalesTaxCollected,
-                TaxRemittedByPlatform = order.TaxRemittedByPlatform,
-                NetProfit = financials.NetProfit,
-                SoldAt = soldAt,
-                Notes = TrimToNull(request.Notes),
-                SaleGroupId = groupId,
-                GroupOrderReference = order.ExternalOrderId,
-                InventoryItem = item,
-            };
-            db.Sales.Add(sale);
-            created.Add(sale);
-
             lineByItem[item.Id].InventoryItemId = item.Id;
 
-            item.Status = InventoryStatus.Sold;
-            item.SoldAt = soldAt;
-            ApplyBundleComponentInventoryStatus(item, InventoryStatus.Sold, soldAt);
-
-            db.MarketObservations.Add(new MarketObservation
+            if (saleByItem.TryGetValue(item.Id, out var existing))
             {
-                OrganizationId = currentUser.OrganizationId,
-                ProductIdentityId = item.ProductIdentityId,
-                InventoryItemId = item.Id,
-                ObservationType = MarketObservationType.InternalSale,
-                Source = order.Platform,
-                Title = item.Title,
-                Price = allocated.Price,
-                TotalPrice = allocated.Price + allocated.ShippingCharged,
-                Condition = item.Condition,
-                ObservedAt = soldAt,
-                SoldAt = soldAt,
-                Notes = $"Reconciled from {order.Platform} order {order.ExternalOrderId}."
-            });
+                // Correct the recorded sale: overwrite ONLY what the platform reports (price, buyer shipping, tax,
+                // fee total); the seller's own label/supply/other costs are preserved. Net is recomputed; audited.
+                string before = SnapshotSale(existing);
+                DateTimeOffset previousSoldAt = existing.SoldAt;
+                existing.Platform = order.Platform;
+                existing.SoldPrice = allocated.Price;
+                existing.ShippingCharged = allocated.ShippingCharged;
+                existing.PlatformFees = allocated.PlatformFees;
+                existing.PaymentFees = allocated.PaymentFees;
+                existing.SalesTaxCollected = allocated.SalesTaxCollected;
+                existing.TaxRemittedByPlatform = order.TaxRemittedByPlatform;
+                existing.SaleGroupId = groupId;
+                existing.GroupOrderReference = order.ExternalOrderId;
+                existing.SoldAt = soldAt;
+
+                RealizedSaleFinancials corrected = ResaleFinancialCalculator.CalculateRealizedSale(
+                    existing.SoldPrice, existing.ShippingCharged, existing.CostOfGoods, existing.PlatformFees,
+                    existing.PaymentFees, existing.ShippingCost, existing.SuppliesCost, existing.OtherCosts);
+                existing.NetProfit = corrected.NetProfit;
+                if (existing.InventoryItem is not null)
+                {
+                    existing.InventoryItem.SoldAt = soldAt;
+                }
+
+                await UpdateInternalSaleObservation(item, previousSoldAt, allocated, soldAt, cancellationToken);
+                await AddCorrection(existing, before, $"Reconciled to {order.Platform} order {order.ExternalOrderId} — exact platform fees.", cancellationToken);
+                resultSales.Add(existing);
+                correctedCount++;
+            }
+            else
+            {
+                RealizedSaleFinancials financials = ResaleFinancialCalculator.CalculateRealizedSale(
+                    allocated.Price, allocated.ShippingCharged, item.PurchasePrice ?? 0, allocated.PlatformFees,
+                    allocated.PaymentFees, allocated.ShippingCost, allocated.SuppliesCost, allocated.OtherCosts);
+
+                var sale = new Sale
+                {
+                    OrganizationId = currentUser.OrganizationId,
+                    InventoryItemId = item.Id,
+                    Platform = order.Platform,
+                    SoldPrice = allocated.Price,
+                    ShippingCharged = allocated.ShippingCharged,
+                    CostOfGoods = item.PurchasePrice ?? 0,
+                    PlatformFees = allocated.PlatformFees,
+                    PaymentFees = allocated.PaymentFees,
+                    ShippingCost = allocated.ShippingCost,
+                    SuppliesCost = allocated.SuppliesCost,
+                    OtherCosts = allocated.OtherCosts,
+                    SalesTaxCollected = allocated.SalesTaxCollected,
+                    TaxRemittedByPlatform = order.TaxRemittedByPlatform,
+                    NetProfit = financials.NetProfit,
+                    SoldAt = soldAt,
+                    Notes = TrimToNull(request.Notes),
+                    SaleGroupId = groupId,
+                    GroupOrderReference = order.ExternalOrderId,
+                    InventoryItem = item,
+                };
+                db.Sales.Add(sale);
+                resultSales.Add(sale);
+                createdCount++;
+
+                item.Status = InventoryStatus.Sold;
+                item.SoldAt = soldAt;
+                ApplyBundleComponentInventoryStatus(item, InventoryStatus.Sold, soldAt);
+
+                db.MarketObservations.Add(new MarketObservation
+                {
+                    OrganizationId = currentUser.OrganizationId,
+                    ProductIdentityId = item.ProductIdentityId,
+                    InventoryItemId = item.Id,
+                    ObservationType = MarketObservationType.InternalSale,
+                    Source = order.Platform,
+                    Title = item.Title,
+                    Price = allocated.Price,
+                    TotalPrice = allocated.Price + allocated.ShippingCharged,
+                    Condition = item.Condition,
+                    ObservedAt = soldAt,
+                    SoldAt = soldAt,
+                    Notes = $"Reconciled from {order.Platform} order {order.ExternalOrderId}."
+                });
+            }
 
             var channelListings = await db.ChannelListings
                 .Include(listing => listing.ChannelAccount)
@@ -318,8 +360,8 @@ public sealed class PlatformOrdersController(HaulScoutDbContext db, ICurrentUser
 
         await db.SaveChangesAsync(cancellationToken);
 
-        var dtos = created.Select(sale => sale.ToDto()).ToList();
-        return new PlatformOrderReconcileResultDto(order.Id, groupId, dtos);
+        var dtos = resultSales.Select(sale => sale.ToDto()).ToList();
+        return new PlatformOrderReconcileResultDto(order.Id, groupId, createdCount, correctedCount, dtos);
     }
 
     [HttpPost("{id:guid}/ignore")]
@@ -386,34 +428,51 @@ public sealed class PlatformOrdersController(HaulScoutDbContext db, ICurrentUser
         }
     }
 
-    /// <summary>Best-effort auto-match of unreconciled order lines to inventory by the platform's own listing id
-    /// (via <see cref="ChannelListing.ExternalListingId"/>). Only surfaces suggestions; never posts them.</summary>
-    private async Task<Dictionary<Guid, (Guid Id, string Title)>> BuildSuggestions(IReadOnlyList<PlatformOrder> orders, CancellationToken cancellationToken)
+    /// <summary>Best-effort auto-match of unreconciled order lines to inventory — first by the platform's own listing
+    /// id (via <see cref="ChannelListing.ExternalListingId"/>), then by <see cref="TitleMatch"/> when there is no
+    /// link yet. Suggestions include whether the item is already sold (so a match points at the sale to correct).
+    /// Only surfaces suggestions; the operator always confirms — nothing is posted from here.</summary>
+    private async Task<Dictionary<Guid, (Guid Id, string Title, bool AlreadySold)>> BuildSuggestions(IReadOnlyList<PlatformOrder> orders, CancellationToken cancellationToken)
     {
-        var suggestions = new Dictionary<Guid, (Guid, string)>();
+        var suggestions = new Dictionary<Guid, (Guid, string, bool)>();
         var openLines = orders
             .Where(order => order.Status != PlatformOrderStatus.Reconciled)
-            .SelectMany(order => order.Lines.Where(line => line.InventoryItemId is null && line.ExternalItemId is not null))
+            .SelectMany(order => order.Lines.Where(line => line.InventoryItemId is null))
             .ToList();
         if (openLines.Count == 0)
         {
             return suggestions;
         }
 
-        var externalIds = openLines.Select(line => line.ExternalItemId!).Distinct().ToList();
-        var byExternalId = await db.ChannelListings
-            .Where(listing => listing.OrganizationId == currentUser.OrganizationId
-                && listing.ExternalListingId != null && externalIds.Contains(listing.ExternalListingId)
-                && listing.InventoryItem != null)
-            .Select(listing => new { listing.ExternalListingId, listing.InventoryItemId, Title = listing.InventoryItem!.Title })
+        // Inventory pool for title matching + sold-state lookup (bounded to the most recently touched items).
+        var inventory = await db.InventoryItems
+            .Where(item => item.OrganizationId == currentUser.OrganizationId && !item.IsArchived)
+            .OrderByDescending(item => item.UpdatedAt)
+            .Select(item => new { item.Id, item.Title, item.Status })
+            .Take(2000)
             .ToListAsync(cancellationToken);
+        var titleById = inventory.ToDictionary(item => item.Id, item => item.Title);
+        var soldById = inventory.ToDictionary(item => item.Id, item => InventoryLifecycle.IsSold(item.Status));
+        var titleCandidates = inventory.Select(item => (item.Id, item.Title)).ToList();
+
+        var externalIds = openLines.Where(line => line.ExternalItemId is not null).Select(line => line.ExternalItemId!).Distinct().ToList();
+        var byExternalId = externalIds.Count == 0
+            ? []
+            : await db.ChannelListings
+                .Where(listing => listing.OrganizationId == currentUser.OrganizationId
+                    && listing.ExternalListingId != null && externalIds.Contains(listing.ExternalListingId))
+                .Select(listing => new { listing.ExternalListingId, listing.InventoryItemId })
+                .ToListAsync(cancellationToken);
 
         foreach (var line in openLines)
         {
-            var match = byExternalId.FirstOrDefault(candidate => candidate.ExternalListingId == line.ExternalItemId);
-            if (match is not null)
+            Guid? matchId = line.ExternalItemId is null
+                ? null
+                : byExternalId.FirstOrDefault(candidate => candidate.ExternalListingId == line.ExternalItemId)?.InventoryItemId;
+            matchId ??= TitleMatch.Best(line.Title, titleCandidates);
+            if (matchId is Guid id && titleById.TryGetValue(id, out var title))
             {
-                suggestions[line.Id] = (match.InventoryItemId, match.Title);
+                suggestions[line.Id] = (id, title, soldById.GetValueOrDefault(id));
             }
         }
 
@@ -439,6 +498,78 @@ public sealed class PlatformOrdersController(HaulScoutDbContext db, ICurrentUser
                 ? soldAt
                 : null;
         }
+    }
+
+    // Serializes a sale's financial state for the immutable before/after correction snapshot (mirrors SalesController).
+    private static string SnapshotSale(Sale sale) => JsonSerializer.Serialize(new
+    {
+        sale.Platform,
+        sale.SoldPrice,
+        sale.ShippingCharged,
+        sale.CostOfGoods,
+        sale.PlatformFees,
+        sale.PaymentFees,
+        sale.ShippingCost,
+        sale.SuppliesCost,
+        sale.OtherCosts,
+        sale.SalesTaxCollected,
+        sale.TaxRemittedByPlatform,
+        sale.NetProfit,
+        sale.SoldAt,
+        Status = sale.Status.ToString(),
+        sale.Notes,
+    });
+
+    private async Task AddCorrection(Sale sale, string before, string reason, CancellationToken cancellationToken)
+    {
+        int nextVersion = await db.SaleCorrections
+            .CountAsync(item => item.SaleId == sale.Id && item.OrganizationId == currentUser.OrganizationId, cancellationToken) + 1;
+        db.SaleCorrections.Add(new SaleCorrection
+        {
+            OrganizationId = currentUser.OrganizationId,
+            SaleId = sale.Id,
+            CorrectedByUserId = currentUser.UserId,
+            Reason = reason,
+            BeforeJson = before,
+            AfterJson = SnapshotSale(sale),
+            Version = nextVersion,
+        });
+    }
+
+    // Keeps the internal-sale comp for this item in step with the corrected figures (updates the prior one, or adds).
+    private async Task UpdateInternalSaleObservation(InventoryItem item, DateTimeOffset previousSoldAt, AllocatedSaleLine allocated, DateTimeOffset soldAt, CancellationToken cancellationToken)
+    {
+        MarketObservation? observation = await db.MarketObservations
+            .Where(obs => obs.InventoryItemId == item.Id
+                && obs.ObservationType == MarketObservationType.InternalSale
+                && obs.OrganizationId == currentUser.OrganizationId
+                && obs.SoldAt == previousSoldAt)
+            .OrderByDescending(obs => obs.ObservedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (observation is null)
+        {
+            db.MarketObservations.Add(new MarketObservation
+            {
+                OrganizationId = currentUser.OrganizationId,
+                ProductIdentityId = item.ProductIdentityId,
+                InventoryItemId = item.Id,
+                ObservationType = MarketObservationType.InternalSale,
+                Source = "Internal",
+                Title = item.Title,
+                Price = allocated.Price,
+                TotalPrice = allocated.Price + allocated.ShippingCharged,
+                Condition = item.Condition,
+                ObservedAt = soldAt,
+                SoldAt = soldAt,
+                Notes = "Created from platform-order reconciliation.",
+            });
+            return;
+        }
+
+        observation.Price = allocated.Price;
+        observation.TotalPrice = allocated.Price + allocated.ShippingCharged;
+        observation.ObservedAt = soldAt;
+        observation.SoldAt = soldAt;
     }
 
     private async Task<List<string>> ExistingChannels(CancellationToken cancellationToken)

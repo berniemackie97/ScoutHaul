@@ -10580,6 +10580,9 @@
           "suggestedInventoryItemTitle": {
             "type": "string",
             "nullable": true
+          },
+          "suggestedInventoryItemAlreadySold": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false
@@ -10594,6 +10597,14 @@
           "saleGroupId": {
             "type": "string",
             "format": "uuid"
+          },
+          "createdSaleCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "correctedSaleCount": {
+            "type": "integer",
+            "format": "int32"
           },
           "sales": {
             "type": "array",

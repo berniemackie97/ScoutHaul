@@ -6932,12 +6932,17 @@ export interface components {
             /** Format: uuid */
             suggestedInventoryItemId?: string | null;
             suggestedInventoryItemTitle?: string | null;
+            suggestedInventoryItemAlreadySold?: boolean;
         };
         PlatformOrderReconcileResultDto: {
             /** Format: uuid */
             platformOrderId?: string;
             /** Format: uuid */
             saleGroupId?: string;
+            /** Format: int32 */
+            createdSaleCount?: number;
+            /** Format: int32 */
+            correctedSaleCount?: number;
             sales?: components["schemas"]["SaleDto"][] | null;
         };
         /** @enum {string} */

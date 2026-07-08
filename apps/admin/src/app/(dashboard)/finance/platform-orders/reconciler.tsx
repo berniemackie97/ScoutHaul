@@ -8,7 +8,8 @@ import { reconcilePlatformOrder, ignorePlatformOrder, type ActionResult } from "
 
 type PlatformOrder = components["schemas"]["PlatformOrderDto"];
 type PlatformOrderLine = components["schemas"]["PlatformOrderLineDto"];
-type Candidate = components["schemas"]["SaleCandidateDto"];
+
+export type MatchTarget = { id: string; title: string; isSold: boolean };
 
 const initial: ActionResult = { ok: false, message: "" };
 const selectClass =
@@ -18,11 +19,15 @@ const currency = (value: number | null | undefined) =>
 const date = (value: string | null | undefined) =>
   value ? new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(new Date(value)) : "—";
 
-function ReconcileButton({ disabled }: { disabled: boolean }) {
+function ReconcileButton({ disabled, willCreate, willCorrect }: { disabled: boolean; willCreate: number; willCorrect: number }) {
   const { pending } = useFormStatus();
+  const label =
+    willCreate + willCorrect === 0
+      ? "Match every line first"
+      : [willCreate > 0 ? `record ${willCreate}` : null, willCorrect > 0 ? `correct ${willCorrect}` : null].filter(Boolean).join(" · ");
   return (
     <Button type="submit" disabled={pending || disabled}>
-      {pending ? "Reconciling…" : "Reconcile into sales"}
+      {pending ? "Reconciling…" : `Reconcile (${label})`}
     </Button>
   );
 }
@@ -36,22 +41,28 @@ function IgnoreButton() {
   );
 }
 
-function lineDefault(line: PlatformOrderLine): string {
-  return line.inventoryItemId ?? line.suggestedInventoryItemId ?? "";
-}
-
-function OrderCard({ order, candidates }: { order: PlatformOrder; candidates: Candidate[] }) {
+function OrderCard({ order, targets }: { order: PlatformOrder; targets: MatchTarget[] }) {
   const [reconcileState, reconcileAction] = useActionState(reconcilePlatformOrder, initial);
   const [ignoreState, ignoreAction] = useActionState(ignorePlatformOrder, initial);
   const lines = order.lines ?? [];
+
+  const soldById = useMemo(() => new Map(targets.map((target) => [target.id, target.isSold])), [targets]);
+  // Unsold first (a new sale), then already-recorded (a correction); each alphabetical.
+  const sortedTargets = useMemo(
+    () => [...targets].sort((a, b) => Number(a.isSold) - Number(b.isSold) || a.title.localeCompare(b.title)),
+    [targets]
+  );
+
   const [map, setMap] = useState<Record<string, string>>(() =>
-    Object.fromEntries(lines.map((line) => [line.id ?? "", lineDefault(line)]))
+    Object.fromEntries(lines.map((line) => [line.id ?? "", line.inventoryItemId ?? line.suggestedInventoryItemId ?? ""]))
   );
 
   const chosen = Object.values(map).filter(Boolean);
   const allMatched = lines.length > 0 && lines.every((line) => map[line.id ?? ""]);
   const allDistinct = new Set(chosen).size === chosen.length;
   const canReconcile = allMatched && allDistinct;
+  const willCorrect = chosen.filter((id) => soldById.get(id)).length;
+  const willCreate = chosen.length - willCorrect;
 
   const mappingJson = useMemo(
     () =>
@@ -96,7 +107,7 @@ function OrderCard({ order, candidates }: { order: PlatformOrder; candidates: Ca
           </span>
           {hasPayout && (
             <span className="text-muted-foreground">
-              eBay payout <span className="text-foreground">{currency(order.payoutAmount)}</span>
+              {order.platform} payout <span className="text-foreground">{currency(order.payoutAmount)}</span>
             </span>
           )}
           {varianceOff && (
@@ -121,9 +132,10 @@ function OrderCard({ order, candidates }: { order: PlatformOrder; candidates: Ca
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {lines.map((line) => {
+                {lines.map((line: PlatformOrderLine) => {
                   const id = line.id ?? "";
-                  const suggested = line.suggestedInventoryItemId;
+                  const selected = map[id];
+                  const willCorrectLine = selected ? soldById.get(selected) : false;
                   return (
                     <tr key={id}>
                       <td className="px-3 py-2">
@@ -143,13 +155,19 @@ function OrderCard({ order, candidates }: { order: PlatformOrder; candidates: Ca
                           onChange={(event) => setMap((current) => ({ ...current, [id]: event.target.value }))}
                         >
                           <option value="">Select item…</option>
-                          {candidates.map((candidate) => (
-                            <option key={candidate.inventoryItemId} value={candidate.inventoryItemId ?? ""}>
-                              {candidate.title}
-                              {candidate.inventoryItemId === suggested ? "  (suggested)" : ""}
+                          {sortedTargets.map((target) => (
+                            <option key={target.id} value={target.id}>
+                              {target.title}
+                              {target.isSold ? " · recorded" : ""}
+                              {target.id === line.suggestedInventoryItemId ? " (suggested)" : ""}
                             </option>
                           ))}
                         </select>
+                        {selected && (
+                          <span className={`mt-1 block text-xs ${willCorrectLine ? "text-amber-700" : "text-emerald-700"}`}>
+                            {willCorrectLine ? "→ corrects the recorded sale (exact fees)" : "→ records a new sale"}
+                          </span>
+                        )}
                       </td>
                     </tr>
                   );
@@ -166,10 +184,10 @@ function OrderCard({ order, candidates }: { order: PlatformOrder; candidates: Ca
 
           <div className="flex items-center justify-between gap-3">
             <p className="text-muted-foreground text-xs">
-              Pushes eBay&apos;s exact price, shipping, tax, and fee total onto {lines.length} sale
-              {lines.length === 1 ? "" : "s"}.
+              Writes {order.platform}&apos;s exact price, shipping, tax, and fees. Items you already recorded are
+              corrected in place (audited); the rest become new sales.
             </p>
-            <ReconcileButton disabled={!canReconcile} />
+            <ReconcileButton disabled={!canReconcile} willCreate={willCreate} willCorrect={willCorrect} />
           </div>
 
           {reconcileState.message && (
@@ -184,15 +202,13 @@ function OrderCard({ order, candidates }: { order: PlatformOrder; candidates: Ca
             </div>
           )}
         </form>
-        {ignoreState.message && !ignoreState.ok && (
-          <p className="text-destructive text-xs">{ignoreState.message}</p>
-        )}
+        {ignoreState.message && !ignoreState.ok && <p className="text-destructive text-xs">{ignoreState.message}</p>}
       </CardContent>
     </Card>
   );
 }
 
-export function PlatformOrderReconciler({ orders, candidates }: { orders: PlatformOrder[]; candidates: Candidate[] }) {
+export function PlatformOrderReconciler({ orders, targets }: { orders: PlatformOrder[]; targets: MatchTarget[] }) {
   if (orders.length === 0) {
     return (
       <div className="bg-muted/20 text-muted-foreground rounded-xl border border-dashed p-12 text-center text-sm">
@@ -203,7 +219,7 @@ export function PlatformOrderReconciler({ orders, candidates }: { orders: Platfo
   return (
     <div className="space-y-4">
       {orders.map((order) => (
-        <OrderCard key={order.id} order={order} candidates={candidates} />
+        <OrderCard key={order.id} order={order} targets={targets} />
       ))}
     </div>
   );
