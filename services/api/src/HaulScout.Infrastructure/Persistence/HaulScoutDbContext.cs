@@ -709,6 +709,7 @@ public sealed class HaulScoutDbContext(DbContextOptions<HaulScoutDbContext> opti
             ConfigureMoney(entity.Property(item => item.ShippingCharged));
             ConfigureMoney(entity.Property(item => item.TaxCollected));
             ConfigureMoney(entity.Property(item => item.FeeTotal));
+            ConfigureMoney(entity.Property(item => item.SellerShippingCost));
             ConfigureMoney(entity.Property(item => item.PayoutAmount));
             entity.HasIndex(item => new { item.OrganizationId, item.Platform, item.ExternalOrderId }).IsUnique();
             entity.HasIndex(item => new { item.OrganizationId, item.Status });

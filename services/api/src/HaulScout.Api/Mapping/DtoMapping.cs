@@ -393,6 +393,7 @@ public static class DtoMapping
             order.ShippingCharged,
             order.TaxCollected,
             order.FeeTotal,
+            order.SellerShippingCost,
             order.PayoutAmount,
             expectedPayout,
             order.PayoutAmount.HasValue ? order.PayoutAmount.Value - expectedPayout : 0,

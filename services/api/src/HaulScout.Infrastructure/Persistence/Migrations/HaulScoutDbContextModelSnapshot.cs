@@ -2003,6 +2003,10 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("ScrapedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<decimal?>("SellerShippingCost")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
+
                     b.Property<decimal>("ShippingCharged")
                         .HasPrecision(12, 2)
                         .HasColumnType("numeric(12,2)");

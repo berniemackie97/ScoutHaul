@@ -3226,6 +3226,49 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/platform-orders/import/ebay-csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["ImportPlatformOrdersCsvRequest"];
+                    "text/json": components["schemas"]["ImportPlatformOrdersCsvRequest"];
+                    "application/*+json": components["schemas"]["ImportPlatformOrdersCsvRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["IngestPlatformOrdersResultDto"];
+                        "application/json": components["schemas"]["IngestPlatformOrdersResultDto"];
+                        "text/json": components["schemas"]["IngestPlatformOrdersResultDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/platform-orders/{id}/reconcile": {
         parameters: {
             query?: never;
@@ -6277,6 +6320,10 @@ export interface components {
             priceRationale?: string | null;
             comps?: components["schemas"]["ResaleComp"][] | null;
         };
+        ImportPlatformOrdersCsvRequest: {
+            platform?: string | null;
+            csv?: string | null;
+        };
         IngestPlatformOrderInput: {
             externalOrderId?: string | null;
             /** Format: date-time */
@@ -6291,6 +6338,8 @@ export interface components {
             feeTotal?: number;
             lines?: components["schemas"]["IngestPlatformOrderLineInput"][] | null;
             platform?: string | null;
+            /** Format: double */
+            shippingCost?: number | null;
             /** Format: double */
             payoutAmount?: number | null;
             currency?: string | null;
@@ -6894,6 +6943,8 @@ export interface components {
             taxCollected?: number;
             /** Format: double */
             feeTotal?: number;
+            /** Format: double */
+            sellerShippingCost?: number | null;
             /** Format: double */
             payoutAmount?: number | null;
             /** Format: double */

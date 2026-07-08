@@ -4058,6 +4058,54 @@
         }
       }
     },
+    "/api/platform-orders/import/ebay-csv": {
+      "post": {
+        "tags": [
+          "PlatformOrders"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportPlatformOrdersCsvRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportPlatformOrdersCsvRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportPlatformOrdersCsvRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/IngestPlatformOrdersResultDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IngestPlatformOrdersResultDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IngestPlatformOrdersResultDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/platform-orders/{id}/reconcile": {
       "post": {
         "tags": [
@@ -8561,6 +8609,20 @@
         },
         "additionalProperties": false
       },
+      "ImportPlatformOrdersCsvRequest": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string",
+            "nullable": true
+          },
+          "csv": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "IngestPlatformOrderInput": {
         "type": "object",
         "properties": {
@@ -8597,6 +8659,11 @@
           },
           "platform": {
             "type": "string",
+            "nullable": true
+          },
+          "shippingCost": {
+            "type": "number",
+            "format": "double",
             "nullable": true
           },
           "payoutAmount": {
@@ -10472,6 +10539,11 @@
           "feeTotal": {
             "type": "number",
             "format": "double"
+          },
+          "sellerShippingCost": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
           },
           "payoutAmount": {
             "type": "number",
