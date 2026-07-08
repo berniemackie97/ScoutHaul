@@ -374,6 +374,59 @@ public static class DtoMapping
         item.BeforeJson,
         item.AfterJson);
 
+    /// <summary>The payout a marketplace should deposit: item + buyer shipping − fees, plus any tax the seller
+    /// keeps (when the platform does not remit it). Compared to the scraped payout to surface scrape/fee drift.</summary>
+    public static decimal ExpectedPayout(this PlatformOrder order) =>
+        order.ItemsSubtotal + order.ShippingCharged - order.FeeTotal + (order.TaxRemittedByPlatform ? 0 : order.TaxCollected);
+
+    public static PlatformOrderDto ToDto(this PlatformOrder order, IReadOnlyDictionary<Guid, (Guid Id, string Title, bool AlreadySold)>? lineSuggestions = null)
+    {
+        decimal expectedPayout = order.ExpectedPayout();
+        return new PlatformOrderDto(
+            order.Id,
+            order.Platform,
+            order.ExternalOrderId,
+            order.BuyerName,
+            order.BuyerReference,
+            order.OrderedAt,
+            order.ItemsSubtotal,
+            order.ShippingCharged,
+            order.TaxCollected,
+            order.FeeTotal,
+            order.PayoutAmount,
+            expectedPayout,
+            order.PayoutAmount.HasValue ? order.PayoutAmount.Value - expectedPayout : 0,
+            order.Currency,
+            order.TaxRemittedByPlatform,
+            order.FeeBreakdownJson,
+            order.Carrier,
+            order.TrackingNumber,
+            order.Status,
+            order.ReconciledSaleGroupId,
+            order.ReconciledAt,
+            order.OrderedAt.ToUniversalTime(),
+            order.ScrapedAt,
+            order.Lines
+                .OrderBy(line => line.CreatedAt)
+                .Select(line =>
+                {
+                    (Guid Id, string Title, bool AlreadySold)? suggestion = lineSuggestions is not null && lineSuggestions.TryGetValue(line.Id, out var match) ? match : null;
+                    return new PlatformOrderLineDto(
+                        line.Id,
+                        line.Title,
+                        line.UnitPrice,
+                        line.Quantity,
+                        line.ExternalItemId,
+                        line.Sku,
+                        line.InventoryItemId,
+                        line.InventoryItem?.Title,
+                        suggestion?.Id,
+                        suggestion?.Title,
+                        suggestion?.AlreadySold ?? false);
+                })
+                .ToList());
+    }
+
     public static ResaleTaskDto ToDto(this ResaleTask item) => new(
         item.Id,
         item.InventoryItemId,

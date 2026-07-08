@@ -36,4 +36,10 @@ export const api = {
   upsertListing: (itemId, body) =>
     apiFetch(`/api/inventory/${itemId}/channel-listings`, { method: "PUT", body }),
   worklist: (status) => apiFetch(`/api/channel-listings${status ? `?status=${encodeURIComponent(status)}` : ""}`),
+  // Push scraped marketplace orders into the idempotent finance landing zone. `platform` is the channel these
+  // orders came from (e.g. "eBay"); re-pushing the same order id updates it in place, never duplicates.
+  ingestPlatformOrders: (platform, orders) =>
+    apiFetch("/api/platform-orders/ingest", { method: "POST", body: { platform, orders } }),
+  platformOrders: (status) =>
+    apiFetch(`/api/platform-orders${status ? `?status=${encodeURIComponent(status)}` : ""}`),
 };

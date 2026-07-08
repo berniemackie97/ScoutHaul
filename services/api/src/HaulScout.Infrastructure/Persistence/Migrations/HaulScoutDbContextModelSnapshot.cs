@@ -1931,6 +1931,163 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                     b.ToTable("OrganizationTeamMembers", (string)null);
                 });
 
+            modelBuilder.Entity("HaulScout.Domain.Entities.PlatformOrder", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("BuyerName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("BuyerReference")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Carrier")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
+                    b.Property<Guid?>("ChannelAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)");
+
+                    b.Property<string>("ExternalOrderId")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<string>("FeeBreakdownJson")
+                        .HasColumnType("jsonb");
+
+                    b.Property<decimal>("FeeTotal")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
+
+                    b.Property<decimal>("ItemsSubtotal")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
+
+                    b.Property<DateTimeOffset>("OrderedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal?>("PayoutAmount")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
+
+                    b.Property<string>("Platform")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
+                    b.Property<string>("RawJson")
+                        .HasColumnType("jsonb");
+
+                    b.Property<DateTimeOffset?>("ReconciledAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ReconciledSaleGroupId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("ScrapedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("ShippingCharged")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)");
+
+                    b.Property<decimal>("TaxCollected")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
+
+                    b.Property<bool>("TaxRemittedByPlatform")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("TrackingNumber")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ChannelAccountId");
+
+                    b.HasIndex("OrganizationId", "Status");
+
+                    b.HasIndex("OrganizationId", "Platform", "ExternalOrderId")
+                        .IsUnique();
+
+                    b.ToTable("PlatformOrders", (string)null);
+                });
+
+            modelBuilder.Entity("HaulScout.Domain.Entities.PlatformOrderLine", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ExternalItemId")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<Guid?>("InventoryItemId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("PlatformOrderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Sku")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(400)
+                        .HasColumnType("character varying(400)");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("InventoryItemId");
+
+                    b.HasIndex("PlatformOrderId");
+
+                    b.ToTable("PlatformOrderLines", (string)null);
+                });
+
             modelBuilder.Entity("HaulScout.Domain.Entities.ProductIdentity", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3211,6 +3368,41 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("HaulScout.Domain.Entities.PlatformOrder", b =>
+                {
+                    b.HasOne("HaulScout.Domain.Entities.ChannelAccount", "ChannelAccount")
+                        .WithMany()
+                        .HasForeignKey("ChannelAccountId");
+
+                    b.HasOne("HaulScout.Domain.Entities.Organization", "Organization")
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ChannelAccount");
+
+                    b.Navigation("Organization");
+                });
+
+            modelBuilder.Entity("HaulScout.Domain.Entities.PlatformOrderLine", b =>
+                {
+                    b.HasOne("HaulScout.Domain.Entities.InventoryItem", "InventoryItem")
+                        .WithMany()
+                        .HasForeignKey("InventoryItemId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("HaulScout.Domain.Entities.PlatformOrder", "PlatformOrder")
+                        .WithMany("Lines")
+                        .HasForeignKey("PlatformOrderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("InventoryItem");
+
+                    b.Navigation("PlatformOrder");
+                });
+
             modelBuilder.Entity("HaulScout.Domain.Entities.ProductIdentity", b =>
                 {
                     b.HasOne("HaulScout.Domain.Entities.Organization", "Organization")
@@ -3500,6 +3692,11 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("HaulScout.Domain.Entities.OrganizationTeam", b =>
                 {
                     b.Navigation("Members");
+                });
+
+            modelBuilder.Entity("HaulScout.Domain.Entities.PlatformOrder", b =>
+                {
+                    b.Navigation("Lines");
                 });
 
             modelBuilder.Entity("HaulScout.Domain.Entities.ProductIdentity", b =>

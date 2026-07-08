@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CircleDollarSign, Landmark, Plus, ReceiptText, Wallet } from "lucide-react";
+import { CircleDollarSign, Landmark, PlugZap, Plus, ReceiptText, Wallet } from "lucide-react";
 import { Badge, Card } from "@overhaul/ui";
 import { getApiClient } from "@/lib/api";
 
@@ -89,6 +89,12 @@ export default async function FinancePage() {
             className="hover:bg-muted inline-flex h-10 items-center justify-center gap-2 rounded-lg border px-4 text-sm font-medium"
           >
             <Plus className="h-4 w-4" /> Bundled sale
+          </Link>
+          <Link
+            href="/finance/platform-orders"
+            className="hover:bg-muted inline-flex h-10 items-center justify-center gap-2 rounded-lg border px-4 text-sm font-medium"
+          >
+            <PlugZap className="h-4 w-4" /> Reconcile platform orders
           </Link>
         </div>
       </header>

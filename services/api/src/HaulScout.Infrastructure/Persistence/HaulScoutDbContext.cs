@@ -60,6 +60,8 @@ public sealed class HaulScoutDbContext(DbContextOptions<HaulScoutDbContext> opti
     public DbSet<ChannelAccount> ChannelAccounts => Set<ChannelAccount>();
     public DbSet<ChannelListing> ChannelListings => Set<ChannelListing>();
     public DbSet<OrgReferenceOverride> OrgReferenceOverrides => Set<OrgReferenceOverride>();
+    public DbSet<PlatformOrder> PlatformOrders => Set<PlatformOrder>();
+    public DbSet<PlatformOrderLine> PlatformOrderLines => Set<PlatformOrderLine>();
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
@@ -688,6 +690,40 @@ public sealed class HaulScoutDbContext(DbContextOptions<HaulScoutDbContext> opti
             entity.Property(item => item.Label).HasMaxLength(200);
             entity.HasIndex(item => new { item.OrganizationId, item.Kind, item.Value, item.ParentValue }).IsUnique();
             entity.HasIndex(item => new { item.OrganizationId, item.Kind });
+        });
+
+        modelBuilder.Entity<PlatformOrder>(entity =>
+        {
+            entity.ToTable("PlatformOrders");
+            entity.Property(item => item.Platform).HasMaxLength(60).IsRequired();
+            entity.Property(item => item.ExternalOrderId).HasMaxLength(120).IsRequired();
+            entity.Property(item => item.BuyerName).HasMaxLength(200);
+            entity.Property(item => item.BuyerReference).HasMaxLength(200);
+            entity.Property(item => item.Currency).HasMaxLength(3);
+            entity.Property(item => item.Carrier).HasMaxLength(60);
+            entity.Property(item => item.TrackingNumber).HasMaxLength(120);
+            entity.Property(item => item.Status).HasConversion<string>().HasMaxLength(24);
+            entity.Property(item => item.FeeBreakdownJson).HasColumnType("jsonb");
+            entity.Property(item => item.RawJson).HasColumnType("jsonb");
+            ConfigureMoney(entity.Property(item => item.ItemsSubtotal));
+            ConfigureMoney(entity.Property(item => item.ShippingCharged));
+            ConfigureMoney(entity.Property(item => item.TaxCollected));
+            ConfigureMoney(entity.Property(item => item.FeeTotal));
+            ConfigureMoney(entity.Property(item => item.PayoutAmount));
+            entity.HasIndex(item => new { item.OrganizationId, item.Platform, item.ExternalOrderId }).IsUnique();
+            entity.HasIndex(item => new { item.OrganizationId, item.Status });
+        });
+
+        modelBuilder.Entity<PlatformOrderLine>(entity =>
+        {
+            entity.ToTable("PlatformOrderLines");
+            entity.Property(item => item.Title).HasMaxLength(400).IsRequired();
+            entity.Property(item => item.ExternalItemId).HasMaxLength(120);
+            entity.Property(item => item.Sku).HasMaxLength(120);
+            ConfigureMoney(entity.Property(item => item.UnitPrice));
+            entity.HasIndex(item => item.PlatformOrderId);
+            entity.HasOne(item => item.PlatformOrder).WithMany(item => item.Lines).HasForeignKey(item => item.PlatformOrderId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(item => item.InventoryItem).WithMany().HasForeignKey(item => item.InventoryItemId).OnDelete(DeleteBehavior.SetNull);
         });
 
         ApplyOrganizationQueryFilters(modelBuilder);

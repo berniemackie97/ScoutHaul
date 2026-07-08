@@ -1,0 +1,116 @@
+import Link from "next/link";
+import { ArrowLeft, PlugZap, ScanLine, Wallet } from "lucide-react";
+import { Badge, Card } from "@overhaul/ui";
+import { getApiClient } from "@/lib/api";
+import { PlatformOrderReconciler } from "./reconciler";
+import { ManualImporter } from "./importer";
+
+export const dynamic = "force-dynamic";
+
+const money = (value: number | null | undefined) =>
+  typeof value === "number" ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value) : "—";
+const date = (value: string | null | undefined) =>
+  value ? new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(new Date(value)) : "—";
+
+export default async function PlatformOrdersPage() {
+  const api = await getApiClient();
+  const [openResult, reconciledResult, inventoryResult, referenceResult] = await Promise.all([
+    api.GET("/api/platform-orders", { params: { query: { status: "Imported" } } }),
+    api.GET("/api/platform-orders", { params: { query: { status: "Reconciled" } } }),
+    api.GET("/api/inventory", { params: { query: { includeArchived: false } } }),
+    api.GET("/api/sales/reference-data", {}),
+  ]);
+
+  const openOrders = openResult.data ?? [];
+  const reconciled = reconciledResult.data ?? [];
+  const channels = referenceResult.data?.channels ?? [];
+  // Match against ALL inventory (sold + unsold): unsold → new sale, already-recorded → correct that sale.
+  const targets = (inventoryResult.data ?? [])
+    .filter((item) => item.id && (!item.isBundle || item.bundleComponentCount === 0))
+    .map((item) => ({ id: item.id as string, title: item.title ?? "Untitled item", isSold: item.isSold ?? false }));
+
+  const flagged = openOrders.filter(
+    (order) => typeof order.payoutAmount === "number" && Math.abs(order.payoutVariance ?? 0) >= 0.01
+  ).length;
+
+  const kpis = [
+    { label: "Waiting to reconcile", value: String(openOrders.length), detail: "Scraped orders not yet turned into sales", icon: ScanLine },
+    { label: "Payout variances", value: String(flagged), detail: "Where the deposit ≠ item + shipping − fees", icon: Wallet },
+    { label: "Reconciled", value: String(reconciled.length), detail: "Posted with the platform's exact figures", icon: PlugZap },
+  ];
+
+  return (
+    <div className="space-y-6">
+      <header className="space-y-3">
+        <Link href="/finance" className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-sm">
+          <ArrowLeft className="h-4 w-4" /> Finance
+        </Link>
+        <div>
+          <p className="text-muted-foreground text-sm">Finance</p>
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight">Platform orders &amp; reconciliation</h1>
+          <p className="text-muted-foreground mt-1 max-w-3xl text-sm">
+            Marketplace orders captured from your logged-in tabs by the browser extension. Reconciling one posts the
+            platform&apos;s own item price, buyer shipping, sales tax, and exact fee total onto ScoutHaul sales — so
+            your numbers match eBay&apos;s report instead of a hand-typed estimate.
+          </p>
+        </div>
+      </header>
+
+      <div className="grid gap-4 sm:grid-cols-3">
+        {kpis.map((kpi) => (
+          <Card key={kpi.label} className="p-5">
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground text-sm">{kpi.label}</span>
+              <kpi.icon className="text-muted-foreground h-4 w-4" aria-hidden />
+            </div>
+            <p className="mt-3 text-3xl font-semibold tabular-nums">{kpi.value}</p>
+            <p className="text-muted-foreground mt-1 text-xs">{kpi.detail}</p>
+          </Card>
+        ))}
+      </div>
+
+      <section className="space-y-3">
+        <h2 className="text-sm font-semibold">Reconcile queue</h2>
+        <PlatformOrderReconciler orders={openOrders} targets={targets} />
+      </section>
+
+      <ManualImporter channels={channels} />
+
+      {reconciled.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="text-sm font-semibold">Recently reconciled</h2>
+          <div className="bg-card overflow-x-auto rounded-xl border">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/40 text-muted-foreground border-b text-left text-xs uppercase tracking-wide">
+                <tr>
+                  <th className="px-4 py-3 font-medium">Order</th>
+                  <th className="px-4 py-3 font-medium">Platform</th>
+                  <th className="px-4 py-3 font-medium">Ordered</th>
+                  <th className="px-4 py-3 text-right font-medium">Items</th>
+                  <th className="px-4 py-3 text-right font-medium">Fees</th>
+                  <th className="px-4 py-3 text-right font-medium">Payout</th>
+                  <th className="px-4 py-3 font-medium">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {reconciled.map((order) => (
+                  <tr key={order.id} className="hover:bg-muted/30 transition-colors">
+                    <td className="px-4 py-3 font-medium">{order.externalOrderId}</td>
+                    <td className="text-muted-foreground px-4 py-3">{order.platform}</td>
+                    <td className="text-muted-foreground px-4 py-3">{date(order.orderedAt)}</td>
+                    <td className="px-4 py-3 text-right tabular-nums">{money(order.itemsSubtotal)}</td>
+                    <td className="px-4 py-3 text-right tabular-nums">-{money(order.feeTotal)}</td>
+                    <td className="px-4 py-3 text-right tabular-nums">{money(order.payoutAmount)}</td>
+                    <td className="px-4 py-3">
+                      <Badge variant="success">Reconciled</Badge>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+    </div>
+  );
+}

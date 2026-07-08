@@ -717,6 +717,95 @@ public sealed record BundledSaleResultDto(Guid SaleGroupId, string? OrderReferen
 public sealed record SaleCorrectionDto(Guid Id, Guid SaleId, int Version, string Reason, string CorrectedBy, DateTimeOffset CorrectedAt, string BeforeJson, string AfterJson);
 public sealed record RealizedProfitDto(Guid SaleId, decimal SoldPrice, decimal ShippingCharged, decimal SalesRevenue, decimal PurchaseCost, decimal SellingCosts, decimal TotalFeesAndCosts, decimal MarketplaceNetBeforeCogs, decimal SalesTaxOwed, decimal NetProfit, decimal RoiPercent, decimal MarginPercent);
 
+// --- Platform order ingestion (extension-scraped marketplace orders → reconciled into Sales) ---
+
+/// <summary>One scraped line of a marketplace order, exactly as the platform reports it.</summary>
+public sealed record IngestPlatformOrderLineInput(
+    string Title,
+    decimal UnitPrice,
+    int Quantity = 1,
+    string? ExternalItemId = null,
+    string? Sku = null);
+
+/// <summary>One scraped marketplace order with the platform's own money figures. <see cref="ExternalOrderId"/>
+/// is the idempotency key: re-ingesting the same order updates it in place (until it is reconciled).</summary>
+public sealed record IngestPlatformOrderInput(
+    string ExternalOrderId,
+    DateTimeOffset OrderedAt,
+    decimal ItemsSubtotal,
+    decimal ShippingCharged,
+    decimal TaxCollected,
+    decimal FeeTotal,
+    IReadOnlyList<IngestPlatformOrderLineInput> Lines,
+    string? Platform = null,
+    decimal? PayoutAmount = null,
+    string Currency = "USD",
+    bool TaxRemittedByPlatform = true,
+    string? BuyerName = null,
+    string? BuyerReference = null,
+    string? Carrier = null,
+    string? TrackingNumber = null,
+    string? FeeBreakdownJson = null,
+    string? RawJson = null);
+
+/// <summary>A batch of scraped orders pushed by the extension. <see cref="Platform"/> is the default channel for
+/// orders that do not carry their own.</summary>
+public sealed record IngestPlatformOrdersRequest(
+    string Platform,
+    IReadOnlyList<IngestPlatformOrderInput> Orders,
+    Guid? ChannelAccountId = null);
+
+public sealed record PlatformOrderLineDto(
+    Guid Id,
+    string Title,
+    decimal UnitPrice,
+    int Quantity,
+    string? ExternalItemId,
+    string? Sku,
+    Guid? InventoryItemId,
+    string? InventoryItemTitle,
+    Guid? SuggestedInventoryItemId,
+    string? SuggestedInventoryItemTitle,
+    bool SuggestedInventoryItemAlreadySold);
+
+public sealed record PlatformOrderDto(
+    Guid Id,
+    string Platform,
+    string ExternalOrderId,
+    string? BuyerName,
+    string? BuyerReference,
+    DateTimeOffset OrderedAt,
+    decimal ItemsSubtotal,
+    decimal ShippingCharged,
+    decimal TaxCollected,
+    decimal FeeTotal,
+    decimal? PayoutAmount,
+    decimal ExpectedPayout,
+    decimal PayoutVariance,
+    string Currency,
+    bool TaxRemittedByPlatform,
+    string? FeeBreakdownJson,
+    string? Carrier,
+    string? TrackingNumber,
+    PlatformOrderStatus Status,
+    Guid? ReconciledSaleGroupId,
+    DateTimeOffset? ReconciledAt,
+    DateTimeOffset OrderedAtUtc,
+    DateTimeOffset ScrapedAt,
+    IReadOnlyList<PlatformOrderLineDto> Lines);
+
+public sealed record IngestPlatformOrdersResultDto(int Created, int Updated, int Skipped, IReadOnlyList<PlatformOrderDto> Orders);
+
+/// <summary>Maps one scraped order line to the ScoutHaul inventory item it represents, for reconciliation.</summary>
+public sealed record ReconcilePlatformOrderLineMap(Guid PlatformOrderLineId, Guid InventoryItemId);
+
+/// <summary>Turns a scraped order into ScoutHaul <see cref="SaleDto"/>(s) using the platform's exact money figures.</summary>
+public sealed record ReconcilePlatformOrderRequest(
+    IReadOnlyList<ReconcilePlatformOrderLineMap> Lines,
+    string? Notes = null);
+
+public sealed record PlatformOrderReconcileResultDto(Guid PlatformOrderId, Guid SaleGroupId, int CreatedSaleCount, int CorrectedSaleCount, IReadOnlyList<SaleDto> Sales);
+
 public sealed record CreateTaskRequest(Guid? InventoryItemId, Guid? AssignedToUserId, string Title, string? Description, DateTimeOffset? DueAt);
 public sealed record AssignTaskRequest(Guid? AssignedToUserId);
 public sealed record UpdateTaskStatusRequest(WorkTaskStatus Status);

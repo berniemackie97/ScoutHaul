@@ -83,11 +83,15 @@ New (additive migrations, one per phase):
 
 **Done (foundation):** ChannelAccount + ChannelListing ledger, delist-on-sale cascade, delist worklist, MV3 extension scaffold, per-item cross-list panel (PRs #37–#42, merged).
 
-1. **P1 — Finance/order ingestion (eBay first) — THE PRIORITY (fixes "numbers don't match" + auto-sync).**
-   - `PlatformOrder` + fee/payout capture entities + API ingest endpoint (idempotent).
-   - eBay adapter READ: Seller Hub → Orders + order detail fee breakdown + Payouts page → normalized push.
-   - Reconcile into `Sale`s (create/update, exact fees), match by order id, back-correct existing hand-entered sales with an audit reason.
-   - Admin: "Sync eBay" button + a reconciliation view (ours vs eBay, variance).
+1. **P1 — Finance/order ingestion (eBay first) — THE PRIORITY (fixes "numbers don't match" + auto-sync).** — *core shipped*
+   - ✅ `PlatformOrder` + `PlatformOrderLine` entities + additive migration (`AddPlatformOrders`), unique on org+platform+externalOrderId.
+   - ✅ Idempotent `POST /api/platform-orders/ingest` (batch upsert; reconciled orders never overwritten) + list/get with auto-match suggestions + `ignore`.
+   - ✅ `POST /api/platform-orders/{id}/reconcile` → **create-or-correct** per line via `BundledSaleAllocator`: an unmatched item becomes a NEW sale; an item that already has an active sale (e.g. hand-entered) is CORRECTED in place — overwrite only what the platform reports (price, buyer shipping, tax, fee total), preserve the seller's own label/supply costs, recompute net, write an audited `SaleCorrection`. One order can mix both. Fees apportioned by price; payout variance surfaced.
+   - ✅ Auto-match suggestions: platform listing id → `ChannelListing`, then `TitleMatch` (pure token-containment) against ALL inventory (sold + unsold) so matching works with **zero links**; suggestions flag already-sold (→ "will correct" vs "will record"). Operator always confirms.
+   - ✅ Admin `/finance/platform-orders`: reconcile queue (line→item mapping over all inventory, per-line new/correct badges, create/correct summary), variance flags, reconciled history, manual JSON import fallback.
+   - ✅ Extension READ adapter: `content-ebay.js` `readOrders()` (defensive, selector-mapped, never guesses money) + popup "Sync eBay orders" → `ingestPlatformOrders`.
+   - Tests: 16 (ingest idempotency, reconciled-skip, exact-fee single + multi-line allocation, create-or-correct in place + mixed order, all-lines-mapped, negative-money reject, external-id + title suggestion, payout variance, 5 `TitleMatch` units).
+   - ⏳ Live-gated: tune `ORDER_SELECTORS` against the operator's real Seller Hub DOM; add a Payments/Payouts read for the exact fee stack (Orders page carries item price only).
 2. **P2 — Import existing active listings (eBay).** Adapter reads active listings → creates/links inventory + `ChannelListing`s (dedup). Seeds the system without re-entry.
 3. **P3 — Cross-list push (eBay + storefront).** `ListingTemplate` + eBay field/category mapping; extension prefills the eBay create-listing form; record external id/URL. Then bulk.
 4. **P4 — Delist-on-sale end-to-end** via the extension (detect → delist others automatically on the operator's next platform visit / open tab).
