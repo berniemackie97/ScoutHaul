@@ -70,6 +70,52 @@ export async function updateLot(id: string, _previous: LotActionResult, formData
   return { ok: true, message: "Lot updated and cost basis re-allocated." };
 }
 
+/** Attach existing inventory items to a lot and re-allocate. Merges them with the lot's current items via PUT. */
+export async function attachItemsToLot(id: string, _previous: LotActionResult, formData: FormData): Promise<LotActionResult> {
+  const newIds = formData.getAll("inventoryItemId").filter((value): value is string => typeof value === "string" && value.length > 0);
+  if (newIds.length === 0) return { ok: false, message: "Select at least one item to attach." };
+
+  const api = await getApiClient();
+  const current = await api.GET("/api/acquisition-lots/{id}", { params: { path: { id } } });
+  const lot = current.data;
+  if (!lot) return { ok: false, message: apiErrorMessage(current.error, "The lot could not be loaded.") };
+
+  const manual = lot.allocationMethod === "Manual";
+  const existing = (lot.items ?? []).map((item) => ({
+    inventoryItemId: item.inventoryItemId!,
+    manualAllocatedCost: manual ? item.allocatedCost ?? 0 : null,
+    allocationWeight: item.allocationWeight ?? null,
+    notes: null,
+  }));
+  const additions = newIds
+    .filter((newId) => !existing.some((item) => item.inventoryItemId === newId))
+    .map((newId) => ({ inventoryItemId: newId, manualAllocatedCost: manual ? 0 : null, allocationWeight: null, notes: null }));
+
+  const body: UpsertAcquisitionLotRequest = {
+    name: lot.name ?? "Lot",
+    purchasedAt: lot.purchasedAt ?? new Date().toISOString(),
+    purchaseSubtotal: lot.purchaseSubtotal ?? 0,
+    shippingCost: lot.shippingCost ?? 0,
+    taxCost: lot.taxCost ?? 0,
+    feeCost: lot.feeCost ?? 0,
+    otherCost: lot.otherCost ?? 0,
+    allocationMethod: (lot.allocationMethod ?? "Equal") as AcquisitionLotAllocationMethod,
+    supplierName: lot.supplierName ?? null,
+    sourceLocationId: null,
+    sourcingTripId: null,
+    sourcingTripStopId: null,
+    externalReference: lot.externalReference ?? null,
+    notes: lot.notes ?? null,
+    items: [...existing, ...additions],
+  };
+
+  const result = await api.PUT("/api/acquisition-lots/{id}", { params: { path: { id } }, body });
+  if (!result.data) return { ok: false, message: apiErrorMessage(result.error, "Items could not be attached. Manual-allocation lots need per-item costs — set them in the lot editor.") };
+
+  revalidateLot(id);
+  return { ok: true, message: `Attached ${additions.length} item${additions.length === 1 ? "" : "s"} and re-allocated.` };
+}
+
 const nonNegative = (value: unknown): number | null => {
   const parsed = typeof value === "number" ? value : Number(value);
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;

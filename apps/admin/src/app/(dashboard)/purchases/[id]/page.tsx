@@ -2,9 +2,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { Badge, Card } from "@overhaul/ui";
+import type { InventoryItem } from "@/features/inventory/inventory-operations";
 import { getApiClient } from "@/lib/api";
 import { ItemizeForm } from "./itemize-form";
 import { LotEditor } from "./lot-editor";
+import { AttachItems } from "./attach-items";
 
 export const dynamic = "force-dynamic";
 
@@ -21,8 +23,13 @@ const methodLabel: Record<string, string> = {
 export default async function AcquisitionLotDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const api = await getApiClient();
-  const { data: lot } = await api.GET("/api/acquisition-lots/{id}", { params: { path: { id } } });
+  const [{ data: lot }, { data: inventory }] = await Promise.all([
+    api.GET("/api/acquisition-lots/{id}", { params: { path: { id } } }),
+    api.GET("/api/inventory", { params: { query: { lifecycle: "Active", includeArchived: false } } }),
+  ]);
   if (!lot) notFound();
+
+  const attachCandidates = ((inventory ?? []) as InventoryItem[]).filter((item) => !item.acquisitionLotId && item.status !== "Bundled" && !item.isSold);
 
   const items = lot.items ?? [];
   const allocated = items.reduce((sum, item) => sum + (item.allocatedCost ?? 0), 0);
@@ -115,6 +122,7 @@ export default async function AcquisitionLotDetailPage({ params }: { params: Pro
         )}
       </section>
 
+      <AttachItems lotId={lot.id!} candidates={attachCandidates} />
       <ItemizeForm lotId={lot.id!} allocationMethod={(lot.allocationMethod ?? "Equal") as "Equal" | "WeightedByExpectedValue" | "Manual"} />
       <LotEditor lot={lot} />
     </div>
