@@ -1,23 +1,13 @@
 import Link from "next/link";
 import { CircleDollarSign, Landmark, PlugZap, Plus, ReceiptText, Wallet } from "lucide-react";
-import { Badge, Card } from "@overhaul/ui";
+import { Card } from "@overhaul/ui";
 import { getApiClient } from "@/lib/api";
+import { SalesTable } from "./sales-table";
 
 export const dynamic = "force-dynamic";
 
 const money = (value: number | null | undefined) =>
   typeof value === "number" ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value) : "—";
-
-const date = (value: string | null | undefined) =>
-  value ? new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(new Date(value)) : "—";
-
-const statusVariant = (status: string | undefined) => {
-  if (["Delivered"].includes(status ?? "")) return "success" as const;
-  if (["Returned", "Refunded", "Cancelled"].includes(status ?? "")) return "destructive" as const;
-  if (["ReturnRequested"].includes(status ?? "")) return "warning" as const;
-  if (["Packed", "Shipped"].includes(status ?? "")) return "info" as const;
-  return "secondary" as const;
-};
 
 export default async function FinancePage() {
   const api = await getApiClient();
@@ -146,60 +136,7 @@ export default async function FinancePage() {
           </Link>
         </div>
       ) : (
-        <div className="bg-card overflow-x-auto rounded-xl border">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/40 text-muted-foreground border-b text-left text-xs uppercase tracking-wide">
-              <tr>
-                <th className="px-4 py-3 font-medium">Item</th>
-                <th className="px-4 py-3 font-medium">Channel</th>
-                <th className="px-4 py-3 font-medium">Sold</th>
-                <th className="px-4 py-3 text-right font-medium">Item</th>
-                <th className="px-4 py-3 text-right font-medium">Ship charged</th>
-                <th className="px-4 py-3 text-right font-medium">Tax</th>
-                <th className="px-4 py-3 text-right font-medium">Selling costs</th>
-                <th className="px-4 py-3 text-right font-medium">Net sales</th>
-                <th className="px-4 py-3 text-right font-medium">COGS</th>
-                <th className="px-4 py-3 text-right font-medium">Profit</th>
-                <th className="px-4 py-3 font-medium">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              {sales.map((sale) => (
-                <tr key={sale.id} className="hover:bg-muted/30 transition-colors">
-                  <td className="p-0">
-                    <Link href={`/finance/${sale.id}`} className="text-foreground block px-4 py-3 font-medium">
-                      {sale.inventoryItemTitle || "Item"}
-                    </Link>
-                  </td>
-                  <td className="text-muted-foreground px-4 py-3">{sale.platform}</td>
-                  <td className="text-muted-foreground px-4 py-3">{date(sale.soldAt)}</td>
-                  <td className="px-4 py-3 text-right tabular-nums">{money(sale.soldPrice)}</td>
-                  <td className="px-4 py-3 text-right tabular-nums">{money(sale.shippingCharged)}</td>
-                  <td className="px-4 py-3 text-right tabular-nums">
-                    {sale.taxRemittedByPlatform ? (
-                      <span className="text-muted-foreground text-xs">passed through</span>
-                    ) : (
-                      <span className="text-amber-700">{money(sale.salesTaxOwed)}</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-right tabular-nums">
-                    {money((sale.platformFees ?? 0) + (sale.paymentFees ?? 0) + (sale.shippingCost ?? 0) + (sale.suppliesCost ?? 0) + (sale.otherCosts ?? 0))}
-                  </td>
-                  <td className="px-4 py-3 text-right tabular-nums">
-                    {money((sale.soldPrice ?? 0) + (sale.shippingCharged ?? 0) - (sale.platformFees ?? 0) - (sale.paymentFees ?? 0) - (sale.shippingCost ?? 0) - (sale.suppliesCost ?? 0) - (sale.otherCosts ?? 0))}
-                  </td>
-                  <td className="px-4 py-3 text-right tabular-nums">{money(sale.costOfGoods)}</td>
-                  <td className={`px-4 py-3 text-right font-medium tabular-nums ${(sale.netProfit ?? 0) < 0 ? "text-destructive" : ""}`}>
-                    {money(sale.netProfit)}
-                  </td>
-                  <td className="px-4 py-3">
-                    <Badge variant={statusVariant(sale.status)}>{sale.status}</Badge>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <SalesTable sales={sales} />
       )}
     </div>
   );

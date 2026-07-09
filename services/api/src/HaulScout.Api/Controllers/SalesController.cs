@@ -91,6 +91,94 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
         return items;
     }
 
+    /// <summary>Combine several already-recorded sales into one marketplace order — a shared SaleGroupId + order
+    /// reference, the way eBay groups a multi-item order (one package, one tracking). Each sale keeps its own
+    /// allocated price, fees, and net; this only links them. Selecting sales already in a group merges them.</summary>
+    [HttpPost("group")]
+    [RequireOrganizationPermission(HaulScoutPermissions.ManageFinance)]
+    public async Task<ActionResult<SaleGroupResultDto>> GroupIntoOrder(GroupSalesRequest request, CancellationToken cancellationToken)
+    {
+        Guid[] ids = (request.SaleIds ?? []).Distinct().ToArray();
+        if (ids.Length < 2)
+        {
+            return BadRequest("Select at least two sales to combine into one order.");
+        }
+
+        var sales = await db.Sales
+            .Include(sale => sale.InventoryItem)
+            .Where(sale => ids.Contains(sale.Id) && sale.OrganizationId == currentUser.OrganizationId)
+            .ToListAsync(cancellationToken);
+        if (sales.Count != ids.Length)
+        {
+            return NotFound("One or more sales were not found.");
+        }
+
+        // Reuse an existing group id if any selected sale already belongs to one, so re-grouping merges cleanly.
+        Guid groupId = sales.Select(sale => sale.SaleGroupId).FirstOrDefault(group => group.HasValue) ?? Guid.NewGuid();
+        string? reference = TrimToNull(request.OrderReference)
+            ?? sales.Select(sale => sale.GroupOrderReference).FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
+
+        foreach (var sale in sales)
+        {
+            sale.SaleGroupId = groupId;
+            sale.GroupOrderReference = reference;
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+        var dtos = sales.OrderByDescending(sale => sale.SoldAt).Select(sale => sale.ToDto()).ToList();
+        return new SaleGroupResultDto(groupId, reference, dtos);
+    }
+
+    /// <summary>Remove sales from their order. A group left with a single sale is dissolved — a one-item group is
+    /// not an order.</summary>
+    [HttpPost("ungroup")]
+    [RequireOrganizationPermission(HaulScoutPermissions.ManageFinance)]
+    public async Task<ActionResult<IReadOnlyList<SaleDto>>> RemoveFromOrder(UngroupSalesRequest request, CancellationToken cancellationToken)
+    {
+        Guid[] ids = (request.SaleIds ?? []).Distinct().ToArray();
+        if (ids.Length == 0)
+        {
+            return BadRequest("Select at least one sale to remove from its order.");
+        }
+
+        var selected = await db.Sales
+            .Include(sale => sale.InventoryItem)
+            .Where(sale => ids.Contains(sale.Id) && sale.OrganizationId == currentUser.OrganizationId)
+            .ToListAsync(cancellationToken);
+        if (selected.Count == 0)
+        {
+            return NotFound();
+        }
+
+        var affectedGroups = selected.Where(sale => sale.SaleGroupId.HasValue).Select(sale => sale.SaleGroupId!.Value).Distinct().ToList();
+        var groupSales = affectedGroups.Count == 0
+            ? []
+            : await db.Sales
+                .Where(sale => sale.SaleGroupId != null && affectedGroups.Contains(sale.SaleGroupId.Value) && sale.OrganizationId == currentUser.OrganizationId)
+                .ToListAsync(cancellationToken);
+
+        var selectedIds = ids.ToHashSet();
+        foreach (var group in affectedGroups)
+        {
+            var members = groupSales.Where(sale => sale.SaleGroupId == group).ToList();
+            foreach (var member in members.Where(sale => selectedIds.Contains(sale.Id)))
+            {
+                member.SaleGroupId = null;
+                member.GroupOrderReference = null;
+            }
+
+            var remaining = members.Where(sale => !selectedIds.Contains(sale.Id)).ToList();
+            if (remaining.Count == 1)
+            {
+                remaining[0].SaleGroupId = null;
+                remaining[0].GroupOrderReference = null;
+            }
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+        return selected.Select(sale => sale.ToDto()).ToList();
+    }
+
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<SaleDto>>> List(
         [FromQuery] SaleStatus? status,

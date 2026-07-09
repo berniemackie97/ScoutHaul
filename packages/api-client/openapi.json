@@ -4667,6 +4667,111 @@
         }
       }
     },
+    "/api/sales/group": {
+      "post": {
+        "tags": [
+          "Sales"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GroupSalesRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GroupSalesRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/GroupSalesRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaleGroupResultDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaleGroupResultDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaleGroupResultDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sales/ungroup": {
+      "post": {
+        "tags": [
+          "Sales"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UngroupSalesRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UngroupSalesRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UngroupSalesRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SaleDto"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SaleDto"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SaleDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/sales": {
       "get": {
         "tags": [
@@ -8561,6 +8666,24 @@
         },
         "additionalProperties": false
       },
+      "GroupSalesRequest": {
+        "type": "object",
+        "properties": {
+          "saleIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "nullable": true
+          },
+          "orderReference": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "IngestPlatformOrderInput": {
         "type": "object",
         "properties": {
@@ -11633,6 +11756,27 @@
         },
         "additionalProperties": false
       },
+      "SaleGroupResultDto": {
+        "type": "object",
+        "properties": {
+          "saleGroupId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "orderReference": {
+            "type": "string",
+            "nullable": true
+          },
+          "sales": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SaleDto"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "SaleShipmentDto": {
         "type": "object",
         "properties": {
@@ -12504,6 +12648,20 @@
           "total": {
             "type": "integer",
             "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "UngroupSalesRequest": {
+        "type": "object",
+        "properties": {
+          "saleIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "nullable": true
           }
         },
         "additionalProperties": false

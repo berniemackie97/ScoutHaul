@@ -3755,6 +3755,92 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/sales/group": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["GroupSalesRequest"];
+                    "text/json": components["schemas"]["GroupSalesRequest"];
+                    "application/*+json": components["schemas"]["GroupSalesRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SaleGroupResultDto"];
+                        "application/json": components["schemas"]["SaleGroupResultDto"];
+                        "text/json": components["schemas"]["SaleGroupResultDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sales/ungroup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["UngroupSalesRequest"];
+                    "text/json": components["schemas"]["UngroupSalesRequest"];
+                    "application/*+json": components["schemas"]["UngroupSalesRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SaleDto"][];
+                        "application/json": components["schemas"]["SaleDto"][];
+                        "text/json": components["schemas"]["SaleDto"][];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/sales": {
         parameters: {
             query?: never;
@@ -6277,6 +6363,10 @@ export interface components {
             priceRationale?: string | null;
             comps?: components["schemas"]["ResaleComp"][] | null;
         };
+        GroupSalesRequest: {
+            saleIds?: string[] | null;
+            orderReference?: string | null;
+        };
         IngestPlatformOrderInput: {
             externalOrderId?: string | null;
             /** Format: date-time */
@@ -7320,6 +7410,12 @@ export interface components {
             saleGroupId?: string | null;
             groupOrderReference?: string | null;
         };
+        SaleGroupResultDto: {
+            /** Format: uuid */
+            saleGroupId?: string;
+            orderReference?: string | null;
+            sales?: components["schemas"]["SaleDto"][] | null;
+        };
         SaleShipmentDto: {
             /** Format: uuid */
             id?: string;
@@ -7618,6 +7714,9 @@ export interface components {
             pageSize?: number;
             /** Format: int32 */
             total?: number;
+        };
+        UngroupSalesRequest: {
+            saleIds?: string[] | null;
         };
         UpdateChecklistItemRequest: {
             isCompleted?: boolean;
