@@ -62,6 +62,7 @@ public sealed class HaulScoutDbContext(DbContextOptions<HaulScoutDbContext> opti
     public DbSet<ChannelListing> ChannelListings => Set<ChannelListing>();
     public DbSet<OrgReferenceOverride> OrgReferenceOverrides => Set<OrgReferenceOverride>();
     public DbSet<PlatformOrder> PlatformOrders => Set<PlatformOrder>();
+    public DbSet<PlatformListing> PlatformListings => Set<PlatformListing>();
     public DbSet<PlatformOrderLine> PlatformOrderLines => Set<PlatformOrderLine>();
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
@@ -742,6 +743,28 @@ public sealed class HaulScoutDbContext(DbContextOptions<HaulScoutDbContext> opti
             entity.HasIndex(item => item.PlatformOrderId);
             entity.HasOne(item => item.PlatformOrder).WithMany(item => item.Lines).HasForeignKey(item => item.PlatformOrderId).OnDelete(DeleteBehavior.Cascade);
             entity.HasOne(item => item.InventoryItem).WithMany().HasForeignKey(item => item.InventoryItemId).OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<PlatformListing>(entity =>
+        {
+            entity.ToTable("PlatformListings");
+            entity.Property(item => item.Platform).HasMaxLength(60).IsRequired();
+            entity.Property(item => item.ExternalListingId).HasMaxLength(120).IsRequired();
+            entity.Property(item => item.Title).HasMaxLength(400).IsRequired();
+            entity.Property(item => item.Currency).HasMaxLength(3);
+            entity.Property(item => item.Format).HasMaxLength(24);
+            entity.Property(item => item.Sku).HasMaxLength(120);
+            entity.Property(item => item.CategoryName).HasMaxLength(200);
+            entity.Property(item => item.Condition).HasMaxLength(80);
+            entity.Property(item => item.Url).HasMaxLength(500);
+            entity.Property(item => item.PrimaryImageUrl).HasMaxLength(500);
+            entity.Property(item => item.Status).HasConversion<string>().HasMaxLength(24);
+            entity.Property(item => item.ReconcileStatus).HasConversion<string>().HasMaxLength(24);
+            entity.Property(item => item.RawJson).HasColumnType("jsonb");
+            ConfigureMoney(entity.Property(item => item.Price));
+            entity.HasIndex(item => new { item.OrganizationId, item.Platform, item.ExternalListingId }).IsUnique();
+            entity.HasIndex(item => new { item.OrganizationId, item.ReconcileStatus });
+            entity.HasOne(item => item.ReconciledInventoryItem).WithMany().HasForeignKey(item => item.ReconciledInventoryItemId).OnDelete(DeleteBehavior.SetNull);
         });
 
         ApplyOrganizationQueryFilters(modelBuilder);

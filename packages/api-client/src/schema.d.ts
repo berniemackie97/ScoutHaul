@@ -3151,6 +3151,173 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/platform-listings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    reconcileStatus?: components["schemas"]["PlatformListingReconcileStatus"];
+                    status?: components["schemas"]["PlatformListingStatus"];
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["PlatformListingDto"][];
+                        "application/json": components["schemas"]["PlatformListingDto"][];
+                        "text/json": components["schemas"]["PlatformListingDto"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/platform-listings/ingest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["IngestPlatformListingsRequest"];
+                    "text/json": components["schemas"]["IngestPlatformListingsRequest"];
+                    "application/*+json": components["schemas"]["IngestPlatformListingsRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["IngestPlatformListingsResultDto"];
+                        "application/json": components["schemas"]["IngestPlatformListingsResultDto"];
+                        "text/json": components["schemas"]["IngestPlatformListingsResultDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/platform-listings/{id}/reconcile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["ReconcilePlatformListingRequest"];
+                    "text/json": components["schemas"]["ReconcilePlatformListingRequest"];
+                    "application/*+json": components["schemas"]["ReconcilePlatformListingRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["PlatformListingReconcileResultDto"];
+                        "application/json": components["schemas"]["PlatformListingReconcileResultDto"];
+                        "text/json": components["schemas"]["PlatformListingReconcileResultDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/platform-listings/{id}/ignore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["PlatformListingDto"];
+                        "application/json": components["schemas"]["PlatformListingDto"];
+                        "text/json": components["schemas"]["PlatformListingDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/platform-orders": {
         parameters: {
             query?: never;
@@ -6631,6 +6798,45 @@ export interface components {
             platform?: string | null;
             csv?: string | null;
         };
+        IngestPlatformListingInput: {
+            externalListingId?: string | null;
+            title?: string | null;
+            /** Format: double */
+            price?: number;
+            status?: components["schemas"]["PlatformListingStatus"];
+            /** Format: int32 */
+            quantity?: number;
+            /** Format: int32 */
+            quantitySold?: number | null;
+            platform?: string | null;
+            currency?: string | null;
+            format?: string | null;
+            sku?: string | null;
+            categoryName?: string | null;
+            condition?: string | null;
+            url?: string | null;
+            primaryImageUrl?: string | null;
+            /** Format: date-time */
+            listedAt?: string | null;
+            /** Format: date-time */
+            endsAt?: string | null;
+            rawJson?: string | null;
+        };
+        IngestPlatformListingsRequest: {
+            platform?: string | null;
+            listings?: components["schemas"]["IngestPlatformListingInput"][] | null;
+            /** Format: uuid */
+            channelAccountId?: string | null;
+        };
+        IngestPlatformListingsResultDto: {
+            /** Format: int32 */
+            created?: number;
+            /** Format: int32 */
+            updated?: number;
+            /** Format: int32 */
+            skipped?: number;
+            listings?: components["schemas"]["PlatformListingDto"][] | null;
+        };
         IngestPlatformOrderInput: {
             externalOrderId?: string | null;
             /** Format: date-time */
@@ -7259,6 +7465,55 @@ export interface components {
         PermissionCatalogDto: {
             permissions?: string[] | null;
         };
+        PlatformListingDto: {
+            /** Format: uuid */
+            id?: string;
+            platform?: string | null;
+            externalListingId?: string | null;
+            title?: string | null;
+            /** Format: double */
+            price?: number;
+            /** Format: int32 */
+            quantity?: number;
+            /** Format: int32 */
+            quantitySold?: number | null;
+            currency?: string | null;
+            status?: components["schemas"]["PlatformListingStatus"];
+            format?: string | null;
+            sku?: string | null;
+            categoryName?: string | null;
+            condition?: string | null;
+            url?: string | null;
+            primaryImageUrl?: string | null;
+            /** Format: date-time */
+            listedAt?: string | null;
+            /** Format: date-time */
+            endsAt?: string | null;
+            reconcileStatus?: components["schemas"]["PlatformListingReconcileStatus"];
+            /** Format: uuid */
+            reconciledInventoryItemId?: string | null;
+            reconciledInventoryItemTitle?: string | null;
+            /** Format: uuid */
+            suggestedInventoryItemId?: string | null;
+            suggestedInventoryItemTitle?: string | null;
+            suggestedInventoryItemAlreadySold?: boolean;
+            /** Format: date-time */
+            scrapedAt?: string;
+        };
+        PlatformListingReconcileResultDto: {
+            /** Format: uuid */
+            platformListingId?: string;
+            /** Format: uuid */
+            inventoryItemId?: string;
+            /** Format: uuid */
+            channelListingId?: string;
+            createdInventoryItem?: boolean;
+            listing?: components["schemas"]["PlatformListingDto"];
+        };
+        /** @enum {string} */
+        PlatformListingReconcileStatus: "Pending" | "Linked" | "Ignored";
+        /** @enum {string} */
+        PlatformListingStatus: "Active" | "Draft" | "Scheduled" | "Ended" | "Sold" | "Unsold" | "OutOfStock";
         PlatformOrderDto: {
             /** Format: uuid */
             id?: string;
@@ -7418,6 +7673,11 @@ export interface components {
         };
         /** @enum {string} */
         RecommendationDecisionType: "Buy" | "Negotiate" | "Pass" | "ResearchRequired" | "Unavailable";
+        ReconcilePlatformListingRequest: {
+            /** Format: uuid */
+            inventoryItemId?: string | null;
+            createNewItem?: boolean;
+        };
         ReconcilePlatformOrderLineMap: {
             /** Format: uuid */
             platformOrderLineId?: string;

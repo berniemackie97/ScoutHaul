@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard, Package, ShoppingCart, Users, Wrench,
   HandCoins, Truck, BarChart3, Settings, Wallet,
-  ChevronLeft, ChevronRight, LogOut, Package2, ReceiptText, Radio,
+  ChevronLeft, ChevronRight, LogOut, Package2, ReceiptText, Radio, Tags,
 } from "lucide-react";
 import { useState } from "react";
 import { cn, Button } from "@overhaul/ui";
@@ -24,6 +24,7 @@ const navGroups = [
     items: [
       { name: "Sales & finance", href: "/finance", icon: Wallet },
       { name: "Orders", href: "/orders", icon: ShoppingCart },
+      { name: "Listings", href: "/listings", icon: Tags },
       { name: "Customers", href: "/customers", icon: Users },
       { name: "Channels", href: "/channels", icon: Radio },
     ],

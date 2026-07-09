@@ -880,6 +880,72 @@ public sealed record ReconcilePlatformOrderRequest(
 
 public sealed record PlatformOrderReconcileResultDto(Guid PlatformOrderId, Guid SaleGroupId, int CreatedSaleCount, int CorrectedSaleCount, IReadOnlyList<SaleDto> Sales);
 
+// --- Platform listing ingestion (extension-scraped marketplace listings → seed/link inventory) ---
+
+/// <summary>One scraped marketplace listing in any state. <see cref="ExternalListingId"/> is the idempotency key.</summary>
+public sealed record IngestPlatformListingInput(
+    string ExternalListingId,
+    string Title,
+    decimal Price,
+    PlatformListingStatus Status,
+    int Quantity = 1,
+    int? QuantitySold = null,
+    string? Platform = null,
+    string Currency = "USD",
+    string? Format = null,
+    string? Sku = null,
+    string? CategoryName = null,
+    string? Condition = null,
+    string? Url = null,
+    string? PrimaryImageUrl = null,
+    DateTimeOffset? ListedAt = null,
+    DateTimeOffset? EndsAt = null,
+    string? RawJson = null);
+
+public sealed record IngestPlatformListingsRequest(
+    string Platform,
+    IReadOnlyList<IngestPlatformListingInput> Listings,
+    Guid? ChannelAccountId = null);
+
+public sealed record PlatformListingDto(
+    Guid Id,
+    string Platform,
+    string ExternalListingId,
+    string Title,
+    decimal Price,
+    int Quantity,
+    int? QuantitySold,
+    string Currency,
+    PlatformListingStatus Status,
+    string? Format,
+    string? Sku,
+    string? CategoryName,
+    string? Condition,
+    string? Url,
+    string? PrimaryImageUrl,
+    DateTimeOffset? ListedAt,
+    DateTimeOffset? EndsAt,
+    PlatformListingReconcileStatus ReconcileStatus,
+    Guid? ReconciledInventoryItemId,
+    string? ReconciledInventoryItemTitle,
+    Guid? SuggestedInventoryItemId,
+    string? SuggestedInventoryItemTitle,
+    bool SuggestedInventoryItemAlreadySold,
+    DateTimeOffset ScrapedAt);
+
+public sealed record IngestPlatformListingsResultDto(int Created, int Updated, int Skipped, IReadOnlyList<PlatformListingDto> Listings);
+
+/// <summary>Turn a scraped listing into ScoutHaul inventory: link it to an existing item, or create a new draft
+/// item seeded from the listing. Either way a <c>ChannelListing</c> is created/updated so the item shows on eBay.</summary>
+public sealed record ReconcilePlatformListingRequest(Guid? InventoryItemId = null, bool CreateNewItem = false);
+
+public sealed record PlatformListingReconcileResultDto(
+    Guid PlatformListingId,
+    Guid InventoryItemId,
+    Guid ChannelListingId,
+    bool CreatedInventoryItem,
+    PlatformListingDto Listing);
+
 public sealed record CreateTaskRequest(Guid? InventoryItemId, Guid? AssignedToUserId, string Title, string? Description, DateTimeOffset? DueAt);
 public sealed record AssignTaskRequest(Guid? AssignedToUserId);
 public sealed record UpdateTaskStatusRequest(WorkTaskStatus Status);

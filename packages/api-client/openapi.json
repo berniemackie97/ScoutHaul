@@ -4015,6 +4015,207 @@
         }
       }
     },
+    "/api/platform-listings": {
+      "get": {
+        "tags": [
+          "PlatformListings"
+        ],
+        "parameters": [
+          {
+            "name": "reconcileStatus",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/PlatformListingReconcileStatus"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/PlatformListingStatus"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PlatformListingDto"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PlatformListingDto"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PlatformListingDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/platform-listings/ingest": {
+      "post": {
+        "tags": [
+          "PlatformListings"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IngestPlatformListingsRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IngestPlatformListingsRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/IngestPlatformListingsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/IngestPlatformListingsResultDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IngestPlatformListingsResultDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IngestPlatformListingsResultDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/platform-listings/{id}/reconcile": {
+      "post": {
+        "tags": [
+          "PlatformListings"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReconcilePlatformListingRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReconcilePlatformListingRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReconcilePlatformListingRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformListingReconcileResultDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformListingReconcileResultDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformListingReconcileResultDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/platform-listings/{id}/ignore": {
+      "post": {
+        "tags": [
+          "PlatformListings"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformListingDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformListingDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformListingDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/platform-orders": {
       "get": {
         "tags": [
@@ -9092,6 +9293,129 @@
         },
         "additionalProperties": false
       },
+      "IngestPlatformListingInput": {
+        "type": "object",
+        "properties": {
+          "externalListingId": {
+            "type": "string",
+            "nullable": true
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "price": {
+            "type": "number",
+            "format": "double"
+          },
+          "status": {
+            "$ref": "#/components/schemas/PlatformListingStatus"
+          },
+          "quantity": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "quantitySold": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "platform": {
+            "type": "string",
+            "nullable": true
+          },
+          "currency": {
+            "type": "string",
+            "nullable": true
+          },
+          "format": {
+            "type": "string",
+            "nullable": true
+          },
+          "sku": {
+            "type": "string",
+            "nullable": true
+          },
+          "categoryName": {
+            "type": "string",
+            "nullable": true
+          },
+          "condition": {
+            "type": "string",
+            "nullable": true
+          },
+          "url": {
+            "type": "string",
+            "nullable": true
+          },
+          "primaryImageUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "listedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "endsAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "rawJson": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "IngestPlatformListingsRequest": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string",
+            "nullable": true
+          },
+          "listings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IngestPlatformListingInput"
+            },
+            "nullable": true
+          },
+          "channelAccountId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "IngestPlatformListingsResultDto": {
+        "type": "object",
+        "properties": {
+          "created": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "updated": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "skipped": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "listings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlatformListingDto"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "IngestPlatformOrderInput": {
         "type": "object",
         "properties": {
@@ -11028,6 +11352,154 @@
         },
         "additionalProperties": false
       },
+      "PlatformListingDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "platform": {
+            "type": "string",
+            "nullable": true
+          },
+          "externalListingId": {
+            "type": "string",
+            "nullable": true
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "price": {
+            "type": "number",
+            "format": "double"
+          },
+          "quantity": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "quantitySold": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "currency": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "$ref": "#/components/schemas/PlatformListingStatus"
+          },
+          "format": {
+            "type": "string",
+            "nullable": true
+          },
+          "sku": {
+            "type": "string",
+            "nullable": true
+          },
+          "categoryName": {
+            "type": "string",
+            "nullable": true
+          },
+          "condition": {
+            "type": "string",
+            "nullable": true
+          },
+          "url": {
+            "type": "string",
+            "nullable": true
+          },
+          "primaryImageUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "listedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "endsAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "reconcileStatus": {
+            "$ref": "#/components/schemas/PlatformListingReconcileStatus"
+          },
+          "reconciledInventoryItemId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "reconciledInventoryItemTitle": {
+            "type": "string",
+            "nullable": true
+          },
+          "suggestedInventoryItemId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "suggestedInventoryItemTitle": {
+            "type": "string",
+            "nullable": true
+          },
+          "suggestedInventoryItemAlreadySold": {
+            "type": "boolean"
+          },
+          "scrapedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PlatformListingReconcileResultDto": {
+        "type": "object",
+        "properties": {
+          "platformListingId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "inventoryItemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "channelListingId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "createdInventoryItem": {
+            "type": "boolean"
+          },
+          "listing": {
+            "$ref": "#/components/schemas/PlatformListingDto"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PlatformListingReconcileStatus": {
+        "enum": [
+          "Pending",
+          "Linked",
+          "Ignored"
+        ],
+        "type": "string"
+      },
+      "PlatformListingStatus": {
+        "enum": [
+          "Active",
+          "Draft",
+          "Scheduled",
+          "Ended",
+          "Sold",
+          "Unsold",
+          "OutOfStock"
+        ],
+        "type": "string"
+      },
       "PlatformOrderDto": {
         "type": "object",
         "properties": {
@@ -11505,6 +11977,20 @@
           "Unavailable"
         ],
         "type": "string"
+      },
+      "ReconcilePlatformListingRequest": {
+        "type": "object",
+        "properties": {
+          "inventoryItemId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "createNewItem": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
       },
       "ReconcilePlatformOrderLineMap": {
         "type": "object",
@@ -14359,6 +14845,9 @@
     },
     {
       "name": "Organizations"
+    },
+    {
+      "name": "PlatformListings"
     },
     {
       "name": "PlatformOrders"
