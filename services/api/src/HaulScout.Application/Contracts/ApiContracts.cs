@@ -741,6 +741,13 @@ public sealed record RecordBundledSaleRequest(
     string? OrderReference,
     string? Notes);
 public sealed record BundledSaleResultDto(Guid SaleGroupId, string? OrderReference, int ItemCount, decimal TotalNetProfit, IReadOnlyList<SaleDto> Sales);
+
+/// <summary>Combine several already-recorded sales into one marketplace order (shared group + order reference),
+/// the way eBay groups a multi-item order. Each sale keeps its own allocated price, fees, and net.</summary>
+public sealed record GroupSalesRequest(IReadOnlyList<Guid> SaleIds, string? OrderReference = null);
+public sealed record UngroupSalesRequest(IReadOnlyList<Guid> SaleIds);
+public sealed record SaleGroupResultDto(Guid SaleGroupId, string? OrderReference, IReadOnlyList<SaleDto> Sales);
+
 public sealed record SaleCorrectionDto(Guid Id, Guid SaleId, int Version, string Reason, string CorrectedBy, DateTimeOffset CorrectedAt, string BeforeJson, string AfterJson);
 public sealed record RealizedProfitDto(Guid SaleId, decimal SoldPrice, decimal ShippingCharged, decimal SalesRevenue, decimal PurchaseCost, decimal SellingCosts, decimal TotalFeesAndCosts, decimal MarketplaceNetBeforeCogs, decimal SalesTaxOwed, decimal NetProfit, decimal RoiPercent, decimal MarginPercent);
 
