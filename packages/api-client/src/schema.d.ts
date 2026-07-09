@@ -4254,6 +4254,114 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/sales/{id}/refunds": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["RefundDto"][];
+                        "application/json": components["schemas"]["RefundDto"][];
+                        "text/json": components["schemas"]["RefundDto"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["RecordRefundRequest"];
+                    "text/json": components["schemas"]["RecordRefundRequest"];
+                    "application/*+json": components["schemas"]["RecordRefundRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SaleDto"];
+                        "application/json": components["schemas"]["SaleDto"];
+                        "text/json": components["schemas"]["SaleDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sales/{id}/refunds/{refundId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                    refundId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SaleDto"];
+                        "application/json": components["schemas"]["SaleDto"];
+                        "text/json": components["schemas"]["SaleDto"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/session/bootstrap": {
         parameters: {
             query?: never;
@@ -7120,6 +7228,22 @@ export interface components {
             orderReference?: string | null;
             notes?: string | null;
         };
+        RecordRefundRequest: {
+            type?: components["schemas"]["RefundType"];
+            /** Format: double */
+            itemAmount?: number;
+            reason?: string | null;
+            /** Format: double */
+            shippingRefunded?: number;
+            /** Format: double */
+            taxRefunded?: number;
+            /** Format: double */
+            feeCredit?: number;
+            itemReturned?: boolean;
+            /** Format: date-time */
+            refundedAt?: string | null;
+            notes?: string | null;
+        };
         RecordSaleRequest: {
             /** Format: uuid */
             inventoryItemId?: string;
@@ -7150,6 +7274,29 @@ export interface components {
         RedeemOrganizationInviteCodeRequest: {
             code?: string | null;
         };
+        RefundDto: {
+            /** Format: uuid */
+            id?: string;
+            /** Format: uuid */
+            saleId?: string;
+            type?: components["schemas"]["RefundType"];
+            /** Format: double */
+            itemAmount?: number;
+            /** Format: double */
+            shippingRefunded?: number;
+            /** Format: double */
+            taxRefunded?: number;
+            /** Format: double */
+            feeCredit?: number;
+            itemReturned?: boolean;
+            reason?: string | null;
+            notes?: string | null;
+            /** Format: date-time */
+            refundedAt?: string;
+            recordedBy?: string | null;
+        };
+        /** @enum {string} */
+        RefundType: "Partial" | "Full";
         ReorderSourcingTripStopsRequest: {
             stopIds?: string[] | null;
         };
@@ -7370,6 +7517,12 @@ export interface components {
             /** Format: uuid */
             saleGroupId?: string | null;
             groupOrderReference?: string | null;
+            /** Format: double */
+            totalRefunded?: number;
+            /** Format: double */
+            feeCreditTotal?: number;
+            /** Format: int32 */
+            refundCount?: number;
         };
         SaleShipmentDto: {
             /** Format: uuid */
@@ -7388,7 +7541,7 @@ export interface components {
             deliveredAt?: string | null;
         };
         /** @enum {string} */
-        SaleStatus: "Recorded" | "Packed" | "Shipped" | "Delivered" | "ReturnRequested" | "Returned" | "Refunded" | "Cancelled";
+        SaleStatus: "Recorded" | "Packed" | "Shipped" | "Delivered" | "ReturnRequested" | "Returned" | "Refunded" | "Cancelled" | "PartiallyRefunded";
         SaleStatusTransitionRequest: {
             status?: components["schemas"]["SaleStatus"];
             /** Format: date-time */

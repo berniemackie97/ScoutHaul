@@ -98,6 +98,7 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
     {
         var query = db.Sales
             .Include(item => item.InventoryItem)
+            .Include(item => item.Refunds)
             .Where(item => item.OrganizationId == currentUser.OrganizationId);
 
         if (status.HasValue)
@@ -118,6 +119,7 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
     {
         var sale = await db.Sales
             .Include(item => item.InventoryItem)
+            .Include(item => item.Refunds)
             .SingleOrDefaultAsync(item => item.Id == id && item.OrganizationId == currentUser.OrganizationId, cancellationToken);
 
         return sale is null ? NotFound() : sale.ToDto();
@@ -674,6 +676,183 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
             .ToListAsync(cancellationToken);
 
         return corrections.Select(item => item.ToDto()).ToList();
+    }
+
+    [HttpGet("{id:guid}/refunds")]
+    public async Task<ActionResult<IReadOnlyList<RefundDto>>> ListRefunds(Guid id, CancellationToken cancellationToken)
+    {
+        bool saleExists = await db.Sales.AnyAsync(item => item.Id == id && item.OrganizationId == currentUser.OrganizationId, cancellationToken);
+        if (!saleExists)
+        {
+            return NotFound();
+        }
+
+        var refunds = await db.Refunds
+            .Include(item => item.RecordedByUser)
+            .Where(item => item.SaleId == id && item.OrganizationId == currentUser.OrganizationId)
+            .OrderByDescending(item => item.RefundedAt)
+            .ToListAsync(cancellationToken);
+        return refunds.Select(item => item.ToDto()).ToList();
+    }
+
+    /// <summary>Record a refund (full or partial) against a sale as a first-class financial event. Net profit is
+    /// recomputed from the original figures minus every refund; the change is audited. A partial refund keeps the
+    /// item sold; a full refund with <c>ItemReturned</c> releases the item back to inventory.</summary>
+    [HttpPost("{id:guid}/refunds")]
+    [RequireOrganizationPermission(HaulScoutPermissions.ManageFinance)]
+    public async Task<ActionResult<SaleDto>> RecordRefund(Guid id, RecordRefundRequest request, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(request.Reason))
+        {
+            return BadRequest("A reason is required for a refund.");
+        }
+
+        if (request.ItemAmount < 0 || request.ShippingRefunded < 0 || request.TaxRefunded < 0 || request.FeeCredit < 0)
+        {
+            return BadRequest("Refund amounts cannot be negative.");
+        }
+
+        if (request.ItemAmount + request.ShippingRefunded + request.TaxRefunded + request.FeeCredit <= 0)
+        {
+            return BadRequest("A refund needs at least one non-zero amount.");
+        }
+
+        DateTimeOffset refundedAt = request.RefundedAt ?? DateTimeOffset.UtcNow;
+        if (refundedAt > DateTimeOffset.UtcNow.AddMinutes(5))
+        {
+            return BadRequest("Refund date cannot be in the future.");
+        }
+
+        var sale = await db.Sales
+            .Include(item => item.InventoryItem)
+                .ThenInclude(item => item!.BundleComponents)
+                    .ThenInclude(item => item.ComponentInventoryItem)
+            .Include(item => item.Listing)
+            .Include(item => item.Refunds)
+            .SingleOrDefaultAsync(item => item.Id == id && item.OrganizationId == currentUser.OrganizationId, cancellationToken);
+
+        if (sale is null)
+        {
+            return NotFound();
+        }
+
+        if (sale.Status is SaleStatus.Cancelled)
+        {
+            return Conflict("A cancelled sale cannot be refunded.");
+        }
+
+        decimal alreadyRefundedItem = sale.Refunds.Sum(refund => refund.ItemAmount);
+        if (alreadyRefundedItem + request.ItemAmount > sale.SoldPrice + 0.01m)
+        {
+            return BadRequest("Total item refunds cannot exceed the sold price.");
+        }
+
+        string before = SnapshotSale(sale);
+        var refund = new Refund
+        {
+            OrganizationId = currentUser.OrganizationId,
+            SaleId = sale.Id,
+            Type = request.Type,
+            ItemAmount = request.ItemAmount,
+            ShippingRefunded = request.ShippingRefunded,
+            TaxRefunded = request.TaxRefunded,
+            FeeCredit = request.FeeCredit,
+            ItemReturned = request.ItemReturned,
+            Reason = request.Reason.Trim(),
+            Notes = TrimToNull(request.Notes),
+            RefundedAt = refundedAt,
+            RecordedByUserId = currentUser.UserId,
+            Sale = sale,
+        };
+        // Explicit Add + reference nav (the codebase's pattern); relationship fixup also puts it on sale.Refunds
+        // so the recompute + DTO see it. Adding to the DbSet AND the collection would double-insert.
+        db.Refunds.Add(refund);
+
+        ApplyRefundState(sale);
+        await AddCorrection(sale, before,
+            $"Refund recorded ({request.Type}): item {request.ItemAmount:C}, shipping {request.ShippingRefunded:C}, fee credit {request.FeeCredit:C} — {request.Reason.Trim()}",
+            cancellationToken);
+
+        await db.SaveChangesAsync(cancellationToken);
+        return sale.ToDto();
+    }
+
+    [HttpDelete("{id:guid}/refunds/{refundId:guid}")]
+    [RequireOrganizationPermission(HaulScoutPermissions.ManageFinance)]
+    public async Task<ActionResult<SaleDto>> VoidRefund(Guid id, Guid refundId, CancellationToken cancellationToken)
+    {
+        var sale = await db.Sales
+            .Include(item => item.InventoryItem)
+                .ThenInclude(item => item!.BundleComponents)
+                    .ThenInclude(item => item.ComponentInventoryItem)
+            .Include(item => item.Listing)
+            .Include(item => item.Refunds)
+            .SingleOrDefaultAsync(item => item.Id == id && item.OrganizationId == currentUser.OrganizationId, cancellationToken);
+
+        if (sale is null)
+        {
+            return NotFound();
+        }
+
+        var refund = sale.Refunds.SingleOrDefault(item => item.Id == refundId);
+        if (refund is null)
+        {
+            return NotFound("Refund was not found on this sale.");
+        }
+
+        string before = SnapshotSale(sale);
+        sale.Refunds.Remove(refund);
+        db.Refunds.Remove(refund);
+
+        ApplyRefundState(sale);
+        await AddCorrection(sale, before, $"Refund voided: item {refund.ItemAmount:C} ({refund.Reason})", cancellationToken);
+
+        await db.SaveChangesAsync(cancellationToken);
+        return sale.ToDto();
+    }
+
+    /// <summary>Recomputes a sale's net profit and status from its current set of refunds. Item + buyer shipping
+    /// reduce revenue, the platform's fee credit reduces selling cost, a returned item drops COGS; tax never nets.
+    /// Full/partial + restock decide the resulting status and whether the item releases back to inventory.</summary>
+    private static void ApplyRefundState(Sale sale)
+    {
+        var refunds = sale.Refunds;
+        decimal itemRefunded = refunds.Sum(refund => refund.ItemAmount);
+        bool restocked = refunds.Any(refund => refund.ItemReturned);
+        var impact = new ResaleFinancialCalculator.SaleRefundImpact(
+            itemRefunded,
+            refunds.Sum(refund => refund.ShippingRefunded),
+            refunds.Sum(refund => refund.TaxRefunded),
+            refunds.Sum(refund => refund.FeeCredit),
+            restocked);
+        sale.NetProfit = ResaleFinancialCalculator.NetProfitAfterRefunds(
+            sale.SoldPrice, sale.ShippingCharged, sale.CostOfGoods, sale.PlatformFees, sale.PaymentFees,
+            sale.ShippingCost, sale.SuppliesCost, sale.OtherCosts, impact);
+
+        if (refunds.Count == 0)
+        {
+            // Last refund voided — revert to a realized state; the operator can re-set the exact status.
+            sale.Status = SaleStatus.Delivered;
+            if (sale.InventoryItem is not null && sale.InventoryItem.Status == InventoryStatus.Returned)
+            {
+                sale.InventoryItem.Status = InventoryStatus.Delivered;
+                ApplyBundleComponentInventoryStatus(sale.InventoryItem, InventoryStatus.Delivered, sale.InventoryItem.SoldAt);
+            }
+            return;
+        }
+
+        bool isFull = refunds.Any(refund => refund.Type == RefundType.Full) || (sale.SoldPrice > 0 && itemRefunded >= sale.SoldPrice - 0.01m);
+        sale.Status = restocked ? SaleStatus.Returned : isFull ? SaleStatus.Refunded : SaleStatus.PartiallyRefunded;
+
+        if (sale.InventoryItem is not null)
+        {
+            if (restocked)
+            {
+                sale.InventoryItem.Status = InventoryStatus.Returned;
+                ApplyBundleComponentInventoryStatus(sale.InventoryItem, InventoryStatus.Returned, sale.InventoryItem.SoldAt);
+            }
+            // Partial or full-but-kept: the buyer still has the item, so inventory state is unchanged.
+        }
     }
 
     // Serializes a sale's financial state for the immutable before/after audit snapshot.

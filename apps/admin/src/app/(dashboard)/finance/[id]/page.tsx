@@ -5,6 +5,7 @@ import { Badge, Card, CardContent, CardHeader, CardTitle } from "@overhaul/ui";
 import { getApiClient } from "@/lib/api";
 import { SaleEditor } from "./sale-editor";
 import { SaleStatusControl } from "./status-control";
+import { RefundPanel } from "./refund-panel";
 
 export const dynamic = "force-dynamic";
 
@@ -27,13 +28,17 @@ function netFrom(json: string | null | undefined): number | null {
 export default async function SaleDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const api = await getApiClient();
-  const [{ data: sale }, { data: corrections }, { data: shipment }, { data: reference }] = await Promise.all([
+  const [{ data: sale }, { data: corrections }, { data: shipment }, { data: reference }, { data: refunds }] = await Promise.all([
     api.GET("/api/sales/{id}", { params: { path: { id } } }),
     api.GET("/api/sales/{id}/corrections", { params: { path: { id } } }),
     api.GET("/api/sales/{id}/shipment", { params: { path: { id } } }),
     api.GET("/api/sales/reference-data"),
+    api.GET("/api/sales/{id}/refunds", { params: { path: { id } } }),
   ]);
   if (!sale?.id) notFound();
+
+  const totalRefunded = sale.totalRefunded ?? 0;
+  const feeCreditTotal = sale.feeCreditTotal ?? 0;
 
   const lines = [
     { label: "Sold price", value: sale.soldPrice, strong: true },
@@ -44,8 +49,10 @@ export default async function SaleDetailPage({ params }: { params: Promise<{ id:
     { label: "Supplies", value: -(sale.suppliesCost ?? 0) },
     { label: "Other costs", value: -(sale.otherCosts ?? 0) },
   ];
-  const sellingCosts = (sale.platformFees ?? 0) + (sale.paymentFees ?? 0) + (sale.shippingCost ?? 0) + (sale.suppliesCost ?? 0) + (sale.otherCosts ?? 0);
-  const marketplaceNet = (sale.soldPrice ?? 0) + (sale.shippingCharged ?? 0) - sellingCosts;
+  if (totalRefunded > 0) lines.push({ label: "Refunds to buyer", value: -totalRefunded, strong: false });
+  if (feeCreditTotal > 0) lines.push({ label: "Platform fee credits", value: feeCreditTotal, strong: false });
+  const sellingCosts = (sale.platformFees ?? 0) + (sale.paymentFees ?? 0) + (sale.shippingCost ?? 0) + (sale.suppliesCost ?? 0) + (sale.otherCosts ?? 0) - feeCreditTotal;
+  const marketplaceNet = (sale.soldPrice ?? 0) + (sale.shippingCharged ?? 0) - totalRefunded - sellingCosts;
 
   return (
     <div className="space-y-6">
@@ -68,6 +75,7 @@ export default async function SaleDetailPage({ params }: { params: Promise<{ id:
         <div className="space-y-6">
           <SaleStatusControl sale={sale} shipment={shipment} />
           <SaleEditor sale={sale} channels={reference?.channels ?? []} />
+          <RefundPanel saleId={sale.id} refunds={refunds ?? []} />
         </div>
 
         <aside className="space-y-6">

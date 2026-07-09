@@ -140,7 +140,19 @@ public enum SaleStatus
     ReturnRequested,
     Returned,
     Refunded,
-    Cancelled
+    Cancelled,
+    /// <summary>The buyer was refunded part of the order but kept the item — the sale stays realized with
+    /// reduced revenue. Appended (not reordered) so existing stored status integers are unchanged.</summary>
+    PartiallyRefunded
+}
+
+/// <summary>How much of an order a refund covers. Drives the sale's resulting status and inventory release.</summary>
+public enum RefundType
+{
+    /// <summary>Buyer kept the item, refunded part of what they paid. Sale stays realized (reduced).</summary>
+    Partial,
+    /// <summary>Full refund — the whole item value is returned. Optionally the item comes back to inventory.</summary>
+    Full
 }
 
 public enum WorkTaskStatus
