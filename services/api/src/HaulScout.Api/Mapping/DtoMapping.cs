@@ -396,6 +396,32 @@ public static class DtoMapping
     public static decimal ExpectedPayout(this PlatformOrder order) =>
         order.ItemsSubtotal + order.ShippingCharged - order.FeeTotal + (order.TaxRemittedByPlatform ? 0 : order.TaxCollected);
 
+    public static PlatformListingDto ToDto(this PlatformListing listing, (Guid Id, string Title, bool AlreadySold)? suggestion = null) => new(
+        listing.Id,
+        listing.Platform,
+        listing.ExternalListingId,
+        listing.Title,
+        listing.Price,
+        listing.Quantity,
+        listing.QuantitySold,
+        listing.Currency,
+        listing.Status,
+        listing.Format,
+        listing.Sku,
+        listing.CategoryName,
+        listing.Condition,
+        listing.Url,
+        listing.PrimaryImageUrl,
+        listing.ListedAt,
+        listing.EndsAt,
+        listing.ReconcileStatus,
+        listing.ReconciledInventoryItemId,
+        listing.ReconciledInventoryItem?.Title,
+        suggestion?.Id,
+        suggestion?.Title,
+        suggestion?.AlreadySold ?? false,
+        listing.ScrapedAt);
+
     public static PlatformOrderDto ToDto(this PlatformOrder order, IReadOnlyDictionary<Guid, (Guid Id, string Title, bool AlreadySold)>? lineSuggestions = null)
     {
         decimal expectedPayout = order.ExpectedPayout();

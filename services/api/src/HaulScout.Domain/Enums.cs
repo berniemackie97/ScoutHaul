@@ -175,6 +175,29 @@ public enum PlatformOrderStatus
     Ignored
 }
 
+/// <summary>The marketplace's own state for a scraped listing — every state the extension can pull, not just live ones.</summary>
+public enum PlatformListingStatus
+{
+    Active,
+    Draft,
+    Scheduled,
+    Ended,
+    Sold,
+    Unsold,
+    OutOfStock
+}
+
+/// <summary>Whether a scraped listing has been tied into ScoutHaul inventory yet.</summary>
+public enum PlatformListingReconcileStatus
+{
+    /// <summary>Scraped, not yet linked to an inventory item.</summary>
+    Pending,
+    /// <summary>Linked to an inventory item + ChannelListing.</summary>
+    Linked,
+    /// <summary>Deliberately excluded from import.</summary>
+    Ignored
+}
+
 public enum SourcingRouteStatus
 {
     Draft,
