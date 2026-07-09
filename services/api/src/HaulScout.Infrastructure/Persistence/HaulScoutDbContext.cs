@@ -41,6 +41,7 @@ public sealed class HaulScoutDbContext(DbContextOptions<HaulScoutDbContext> opti
     public DbSet<Listing> Listings => Set<Listing>();
     public DbSet<Sale> Sales => Set<Sale>();
     public DbSet<SaleCorrection> SaleCorrections => Set<SaleCorrection>();
+    public DbSet<Refund> Refunds => Set<Refund>();
     public DbSet<Shipment> Shipments => Set<Shipment>();
     public DbSet<Expense> Expenses => Set<Expense>();
     public DbSet<Budget> Budgets => Set<Budget>();
@@ -444,6 +445,22 @@ public sealed class HaulScoutDbContext(DbContextOptions<HaulScoutDbContext> opti
             entity.HasOne(item => item.CorrectedByUser).WithMany().HasForeignKey(item => item.CorrectedByUserId).OnDelete(DeleteBehavior.Restrict);
         });
 
+        modelBuilder.Entity<Refund>(entity =>
+        {
+            entity.ToTable("Refunds");
+            entity.Property(item => item.Type).HasConversion<string>().HasMaxLength(16);
+            entity.Property(item => item.Reason).HasMaxLength(1000).IsRequired();
+            entity.Property(item => item.Notes).HasMaxLength(2000);
+            entity.Ignore(item => item.BuyerRefundTotal);
+            ConfigureMoney(entity.Property(item => item.ItemAmount));
+            ConfigureMoney(entity.Property(item => item.ShippingRefunded));
+            ConfigureMoney(entity.Property(item => item.TaxRefunded));
+            ConfigureMoney(entity.Property(item => item.FeeCredit));
+            entity.HasIndex(item => new { item.OrganizationId, item.SaleId });
+            entity.HasOne(item => item.Sale).WithMany(item => item.Refunds).HasForeignKey(item => item.SaleId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(item => item.RecordedByUser).WithMany().HasForeignKey(item => item.RecordedByUserId).OnDelete(DeleteBehavior.Restrict);
+        });
+
         modelBuilder.Entity<Shipment>(entity =>
         {
             entity.ToTable("Shipments");
@@ -709,6 +726,7 @@ public sealed class HaulScoutDbContext(DbContextOptions<HaulScoutDbContext> opti
             ConfigureMoney(entity.Property(item => item.ShippingCharged));
             ConfigureMoney(entity.Property(item => item.TaxCollected));
             ConfigureMoney(entity.Property(item => item.FeeTotal));
+            ConfigureMoney(entity.Property(item => item.SellerShippingCost));
             ConfigureMoney(entity.Property(item => item.PayoutAmount));
             entity.HasIndex(item => new { item.OrganizationId, item.Platform, item.ExternalOrderId }).IsUnique();
             entity.HasIndex(item => new { item.OrganizationId, item.Status });

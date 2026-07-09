@@ -33,6 +33,11 @@ public sealed class PlatformOrder : EntityBase, IOrganizationScoped
     public decimal ShippingCharged { get; set; }
     public decimal TaxCollected { get; set; }
     public decimal FeeTotal { get; set; }
+
+    /// <summary>The seller's own shipping-label cost, when the platform reports it (e.g. eBay labels bought on
+    /// eBay). Null when unknown — reconciliation then preserves whatever cost the operator already recorded.</summary>
+    public decimal? SellerShippingCost { get; set; }
+
     public decimal? PayoutAmount { get; set; }
     public string Currency { get; set; } = "USD";
 

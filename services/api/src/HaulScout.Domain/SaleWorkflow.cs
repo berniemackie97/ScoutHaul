@@ -13,6 +13,8 @@ public static class SaleWorkflow
             [SaleStatus.Returned] = [SaleStatus.Refunded],
             [SaleStatus.Refunded] = [],
             [SaleStatus.Cancelled] = [],
+            // A partially refunded sale is still realized; it can later escalate to a return / full refund.
+            [SaleStatus.PartiallyRefunded] = [SaleStatus.ReturnRequested, SaleStatus.Returned, SaleStatus.Refunded],
         };
 
     public static IReadOnlyList<SaleStatus> Next(SaleStatus status) =>
@@ -40,6 +42,8 @@ public static class SaleWorkflow
         SaleStatus.ReturnRequested => InventoryStatus.Delivered,
         SaleStatus.Returned or SaleStatus.Refunded => InventoryStatus.Returned,
         SaleStatus.Cancelled => hasListing ? InventoryStatus.Listed : InventoryStatus.ReadyToList,
+        // Partial refund: the buyer kept the item, so its inventory state is unchanged (stays sold/fulfilled).
+        SaleStatus.PartiallyRefunded => InventoryStatus.Sold,
         _ => InventoryStatus.Sold,
     };
 }

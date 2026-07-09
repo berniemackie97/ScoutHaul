@@ -352,7 +352,24 @@ public static class DtoMapping
         item.Notes,
         SaleWorkflow.Next(item.Status),
         item.SaleGroupId,
-        item.GroupOrderReference);
+        item.GroupOrderReference,
+        item.Refunds.Sum(refund => refund.ItemAmount + refund.ShippingRefunded),
+        item.Refunds.Sum(refund => refund.FeeCredit),
+        item.Refunds.Count);
+
+    public static RefundDto ToDto(this Refund item) => new(
+        item.Id,
+        item.SaleId,
+        item.Type,
+        item.ItemAmount,
+        item.ShippingRefunded,
+        item.TaxRefunded,
+        item.FeeCredit,
+        item.ItemReturned,
+        item.Reason,
+        item.Notes,
+        item.RefundedAt,
+        item.RecordedByUser?.DisplayName ?? item.RecordedByUser?.Email ?? "Operator");
 
     public static SaleShipmentDto ToDto(this Shipment item) => new(
         item.Id,
@@ -393,6 +410,7 @@ public static class DtoMapping
             order.ShippingCharged,
             order.TaxCollected,
             order.FeeTotal,
+            order.SellerShippingCost,
             order.PayoutAmount,
             expectedPayout,
             order.PayoutAmount.HasValue ? order.PayoutAmount.Value - expectedPayout : 0,

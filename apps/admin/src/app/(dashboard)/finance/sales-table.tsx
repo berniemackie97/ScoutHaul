@@ -106,7 +106,7 @@ export function SalesTable({ sales }: { sales: Sale[] }) {
               <th className="px-4 py-3 font-medium">Sold</th>
               <th className="px-4 py-3 text-right font-medium">Item</th>
               <th className="px-4 py-3 text-right font-medium">Ship</th>
-              <th className="px-4 py-3 text-right font-medium">Selling costs</th>
+              <th className="px-4 py-3 text-right font-medium">Refunded</th>
               <th className="px-4 py-3 text-right font-medium">Profit</th>
               <th className="px-4 py-3 font-medium">Status</th>
             </tr>
@@ -150,7 +150,7 @@ export function SalesTable({ sales }: { sales: Sale[] }) {
                   <td className="px-4 py-3 text-right tabular-nums">{money(sale.soldPrice)}</td>
                   <td className="px-4 py-3 text-right tabular-nums">{money(sale.shippingCharged)}</td>
                   <td className="px-4 py-3 text-right tabular-nums">
-                    {money((sale.platformFees ?? 0) + (sale.paymentFees ?? 0) + (sale.shippingCost ?? 0) + (sale.suppliesCost ?? 0) + (sale.otherCosts ?? 0))}
+                    {(sale.totalRefunded ?? 0) > 0 ? <span className="text-amber-700">-{money(sale.totalRefunded)}</span> : <span className="text-muted-foreground text-xs">—</span>}
                   </td>
                   <td className={`px-4 py-3 text-right font-medium tabular-nums ${(sale.netProfit ?? 0) < 0 ? "text-destructive" : ""}`}>
                     {money(sale.netProfit)}
