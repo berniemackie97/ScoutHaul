@@ -573,6 +573,90 @@ public sealed class InventoryController(
         return items;
     }
 
+    /// <summary>Searchable, sortable, paged inventory for the admin table, plus a summary over the whole filtered
+    /// set (so the KPIs stay correct while the table pages). Separate from <see cref="List"/> to keep that plain
+    /// array response stable for its many callers (mobile, extension, pickers).</summary>
+    [HttpGet("browse")]
+    public async Task<ActionResult<InventoryListDto>> Browse(
+        [FromQuery] InventoryStatus? status,
+        [FromQuery] InventoryLifecycleGroup? lifecycle,
+        [FromQuery] bool includeArchived,
+        [FromQuery] string? search,
+        [FromQuery] string? sort,
+        [FromQuery] bool desc = true,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 25,
+        CancellationToken cancellationToken = default)
+    {
+        page = Math.Max(1, page);
+        pageSize = Math.Clamp(pageSize, 1, 100);
+
+        var query = db.InventoryItems.Where(item => item.OrganizationId == currentUser.OrganizationId);
+
+        if (!includeArchived)
+        {
+            query = query.Where(item => !item.IsArchived);
+        }
+
+        if (status.HasValue)
+        {
+            query = query.Where(item => item.Status == status.Value);
+        }
+
+        if (lifecycle.HasValue)
+        {
+            var groupStatuses = InventoryLifecycle.InGroup(lifecycle.Value).ToArray();
+            query = query.Where(item => groupStatuses.Contains(item.Status));
+        }
+
+        string? term = TrimToNull(search)?.ToLower();
+        if (term is not null)
+        {
+            query = query.Where(item =>
+                item.Title.ToLower().Contains(term)
+                || (item.Brand != null && item.Brand.ToLower().Contains(term))
+                || (item.Model != null && item.Model.ToLower().Contains(term))
+                || (item.Category != null && item.Category.ToLower().Contains(term))
+                || (item.Barcode != null && item.Barcode.ToLower().Contains(term))
+                || (item.StorageLocation != null && item.StorageLocation.ToLower().Contains(term)));
+        }
+
+        // Summary over the whole filtered set (scalars only — no includes).
+        var scalars = await query
+            .Select(item => new { item.Status, item.PurchasePrice, item.EstimatedSalePrice, item.SellerAskingPrice })
+            .ToListAsync(cancellationToken);
+        int total = scalars.Count;
+        var summary = new InventorySummaryDto(
+            total,
+            scalars.Count(item => InventoryLifecycle.Group(item.Status) == InventoryLifecycleGroup.Active),
+            scalars.Count(item => item.Status is InventoryStatus.ReadyToList or InventoryStatus.Listed),
+            scalars.Count(item => InventoryLifecycle.IsSold(item.Status)),
+            scalars.Sum(item => item.PurchasePrice ?? 0),
+            scalars.Sum(item => item.EstimatedSalePrice ?? item.SellerAskingPrice ?? 0));
+
+        query = sort?.ToLowerInvariant() switch
+        {
+            "title" => desc ? query.OrderByDescending(item => item.Title) : query.OrderBy(item => item.Title),
+            "purchaseprice" => desc ? query.OrderByDescending(item => item.PurchasePrice) : query.OrderBy(item => item.PurchasePrice),
+            "estimatedsaleprice" => desc ? query.OrderByDescending(item => item.EstimatedSalePrice) : query.OrderBy(item => item.EstimatedSalePrice),
+            "createdat" => desc ? query.OrderByDescending(item => item.CreatedAt) : query.OrderBy(item => item.CreatedAt),
+            _ => desc ? query.OrderByDescending(item => item.UpdatedAt) : query.OrderBy(item => item.UpdatedAt),
+        };
+
+        var pageItems = await query
+            .Include(item => item.Photos)
+            .Include(item => item.AcquisitionLotItems)
+                .ThenInclude(item => item.AcquisitionLot)
+            .Include(item => item.BundleComponents)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
+
+        var dtos = pageItems.Select(item => item.ToDto()).ToList();
+        int pageCount = Math.Max(1, (int)Math.Ceiling(total / (double)pageSize));
+        return new InventoryListDto(dtos, total, page, pageSize, pageCount, summary);
+    }
+
     [HttpGet("{id:guid}/issues")]
     public async Task<ActionResult<IReadOnlyList<InventoryIssueDto>>> ListIssues(Guid id, CancellationToken cancellationToken)
     {

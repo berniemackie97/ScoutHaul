@@ -1577,6 +1577,98 @@
         }
       }
     },
+    "/api/inventory/browse": {
+      "get": {
+        "tags": [
+          "Inventory"
+        ],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/InventoryStatus"
+            }
+          },
+          {
+            "name": "lifecycle",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/InventoryLifecycleGroup"
+            }
+          },
+          {
+            "name": "includeArchived",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "desc",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "default": true
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 25
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/InventoryListDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InventoryListDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InventoryListDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/inventory/{id}/issues": {
       "get": {
         "tags": [
@@ -9525,6 +9617,38 @@
         ],
         "type": "string"
       },
+      "InventoryListDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InventoryItemDto"
+            },
+            "nullable": true
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/InventorySummaryDto"
+          }
+        },
+        "additionalProperties": false
+      },
       "InventoryOwnershipType": {
         "enum": [
           "Owned",
@@ -9745,6 +9869,36 @@
           "Disposed"
         ],
         "type": "string"
+      },
+      "InventorySummaryDto": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "activeItems": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "readyOrListed": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "sold": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "capitalDeployed": {
+            "type": "number",
+            "format": "double"
+          },
+          "estimatedResaleValue": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "additionalProperties": false
       },
       "ListingDto": {
         "type": "object",

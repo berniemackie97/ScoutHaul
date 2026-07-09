@@ -6,7 +6,6 @@ import {
   LIFECYCLE_FILTERS,
   LIFECYCLE_GROUP_VALUES,
   inventoryStatusLabel,
-  matchesInventorySearch,
   type InventoryItem,
   type InventoryLifecycleGroup,
   type InventoryStatus,
@@ -27,30 +26,44 @@ export default async function InventoryPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const query = await searchParams;
-  const search = typeof query.q === "string" ? query.q.trim().toLowerCase() : "";
+  const search = typeof query.q === "string" ? query.q.trim() : "";
   const selectedStatus = typeof query.status === "string" && INVENTORY_STATUSES.includes(query.status as InventoryStatus)
     ? query.status as InventoryStatus
     : undefined;
   const selectedLifecycle = typeof query.lifecycle === "string" && LIFECYCLE_GROUP_VALUES.includes(query.lifecycle as InventoryLifecycleGroup)
     ? query.lifecycle as InventoryLifecycleGroup
     : undefined;
+  const sort = typeof query.sort === "string" ? query.sort : "updatedAt";
+  const desc = query.desc !== "false";
+  const page = Math.max(1, Number(query.page) || 1);
 
   const api = await getApiClient();
-  const { data } = await api.GET("/api/inventory", {
-    params: { query: { status: selectedStatus as never, lifecycle: selectedLifecycle, includeArchived: false } },
+  const { data } = await api.GET("/api/inventory/browse", {
+    params: {
+      query: {
+        status: selectedStatus as never,
+        lifecycle: selectedLifecycle,
+        includeArchived: false,
+        search: search || undefined,
+        sort,
+        desc,
+        page,
+        pageSize: 25,
+      },
+    },
   });
-  const allItems = (data ?? []) as InventoryItem[];
-  const items = search
-    ? allItems.filter((item) => matchesInventorySearch(item, search))
-    : allItems;
+  const items = (data?.items ?? []) as InventoryItem[];
+  const summary = data?.summary;
   const rows: InventoryTableRow[] = items.map((item) => ({
     ...item,
     thumbnailUrl: getApiAssetUrl(item.heroPhotoThumbnailUrl),
   }));
 
-  const activeItems = allItems.filter((item) => !["Sold", "Delivered", "Donated", "Disposed"].includes(item.status ?? "")).length;
-  const readyItems = allItems.filter((item) => ["ReadyToList", "Listed"].includes(item.status ?? "")).length;
-  const inventoryCost = allItems.reduce((sum, item) => sum + (item.purchasePrice ?? 0), 0);
+  const activeItems = summary?.activeItems ?? 0;
+  const readyItems = summary?.readyOrListed ?? 0;
+  const inventoryCost = summary?.capitalDeployed ?? 0;
+  const totalMatching = data?.total ?? 0;
+  const pageCount = data?.pageCount ?? 1;
 
   return (
     <div className="space-y-6">
@@ -88,14 +101,14 @@ export default async function InventoryPage({
       </form>
 
       <div className="flex items-center justify-between text-sm">
-        <span className="text-muted-foreground">{items.length} matching records</span>
+        <span className="text-muted-foreground">{totalMatching} matching records</span>
         {(search || selectedStatus || selectedLifecycle) && <Link href="/inventory" className="text-brand-600 hover:underline">Clear filters</Link>}
       </div>
 
-      {items.length === 0 ? (
+      {totalMatching === 0 ? (
         <p className="rounded-xl border border-dashed bg-muted/20 p-12 text-center text-sm text-muted-foreground">No inventory matches these filters.</p>
       ) : (
-        <InventoryTable items={rows} />
+        <InventoryTable items={rows} page={page} pageCount={pageCount} sort={sort} desc={desc} />
       )}
     </div>
   );
