@@ -697,6 +697,28 @@ public sealed record ChannelFeeEstimateDto(string Platform, string FeeProfileId,
 public sealed record SaleShipmentDto(Guid Id, Guid SaleId, string? Carrier, string? TrackingNumber, decimal? Cost, DateTimeOffset? PackedAt, DateTimeOffset? ShippedAt, DateTimeOffset? DeliveredAt);
 public sealed record SaleDto(Guid Id, Guid InventoryItemId, string InventoryItemTitle, Guid? ListingId, string Platform, decimal SoldPrice, decimal ShippingCharged, decimal CostOfGoods, decimal PlatformFees, decimal PaymentFees, decimal ShippingCost, decimal SuppliesCost, decimal OtherCosts, decimal SalesTaxCollected, bool TaxRemittedByPlatform, decimal SalesTaxOwed, decimal NetProfit, SaleStatus Status, DateTimeOffset SoldAt, string? Notes, IReadOnlyList<SaleStatus> AllowedTransitions, Guid? SaleGroupId = null, string? GroupOrderReference = null, decimal TotalRefunded = 0, decimal FeeCreditTotal = 0, int RefundCount = 0);
 
+/// <summary>Aggregate P&amp;L over a filtered set of sales (realized only) — powers the finance KPIs so they reflect
+/// the whole filtered result, not just the current page.</summary>
+public sealed record SalesSummaryDto(
+    int RealizedCount,
+    decimal ItemSales,
+    decimal BuyerShipping,
+    decimal SalesTaxCollected,
+    decimal GrossBuyerSales,
+    decimal PlatformFees,
+    decimal PaymentFees,
+    decimal ShippingLabels,
+    decimal SuppliesAndOther,
+    decimal SellingCosts,
+    decimal MarketplaceNetSales,
+    decimal CostOfGoods,
+    decimal NetProfit,
+    decimal SalesTaxOwed,
+    decimal TotalRefunded);
+
+/// <summary>A searchable, sortable, paged page of sales plus the summary over the whole filtered set.</summary>
+public sealed record SaleListDto(IReadOnlyList<SaleDto> Items, int Total, int Page, int PageSize, int PageCount, SalesSummaryDto Summary);
+
 /// <summary>Record a refund (full or partial) against a sale. Item amount + buyer shipping reduce revenue; the
 /// platform's fee credit reduces selling cost; tax refunded is pass-through. Net profit is recomputed + audited.</summary>
 public sealed record RecordRefundRequest(

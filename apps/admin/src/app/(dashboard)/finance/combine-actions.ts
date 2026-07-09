@@ -40,3 +40,10 @@ export async function ungroupSale(saleId: string): Promise<void> {
   await api.POST("/api/sales/ungroup", { body: { saleIds: [saleId] } });
   revalidatePath("/finance");
 }
+
+export async function deleteSale(saleId: string): Promise<void> {
+  const api = await getApiClient();
+  await api.DELETE("/api/sales/{id}", { params: { path: { id: saleId } } });
+  revalidatePath("/finance");
+  revalidatePath("/inventory");
+}

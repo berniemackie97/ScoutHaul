@@ -4913,6 +4913,84 @@
         }
       }
     },
+    "/api/sales/browse": {
+      "get": {
+        "tags": [
+          "Sales"
+        ],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/SaleStatus"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "desc",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "default": true
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 25
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaleListDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaleListDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaleListDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/sales/{id}": {
       "get": {
         "tags": [
@@ -4949,6 +5027,27 @@
                 }
               }
             }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Sales"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
           }
         }
       },
@@ -12116,6 +12215,38 @@
         },
         "additionalProperties": false
       },
+      "SaleListDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SaleDto"
+            },
+            "nullable": true
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/SalesSummaryDto"
+          }
+        },
+        "additionalProperties": false
+      },
       "SaleShipmentDto": {
         "type": "object",
         "properties": {
@@ -12207,6 +12338,72 @@
               "$ref": "#/components/schemas/SaleChannelOptionDto"
             },
             "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "SalesSummaryDto": {
+        "type": "object",
+        "properties": {
+          "realizedCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "itemSales": {
+            "type": "number",
+            "format": "double"
+          },
+          "buyerShipping": {
+            "type": "number",
+            "format": "double"
+          },
+          "salesTaxCollected": {
+            "type": "number",
+            "format": "double"
+          },
+          "grossBuyerSales": {
+            "type": "number",
+            "format": "double"
+          },
+          "platformFees": {
+            "type": "number",
+            "format": "double"
+          },
+          "paymentFees": {
+            "type": "number",
+            "format": "double"
+          },
+          "shippingLabels": {
+            "type": "number",
+            "format": "double"
+          },
+          "suppliesAndOther": {
+            "type": "number",
+            "format": "double"
+          },
+          "sellingCosts": {
+            "type": "number",
+            "format": "double"
+          },
+          "marketplaceNetSales": {
+            "type": "number",
+            "format": "double"
+          },
+          "costOfGoods": {
+            "type": "number",
+            "format": "double"
+          },
+          "netProfit": {
+            "type": "number",
+            "format": "double"
+          },
+          "salesTaxOwed": {
+            "type": "number",
+            "format": "double"
+          },
+          "totalRefunded": {
+            "type": "number",
+            "format": "double"
           }
         },
         "additionalProperties": false
