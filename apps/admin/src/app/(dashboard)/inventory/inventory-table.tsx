@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
-import { Archive, ImageIcon, Trash2 } from "lucide-react";
+import { Archive, ArrowDown, ArrowUp, ChevronLeft, ChevronRight, ImageIcon, Trash2 } from "lucide-react";
 import { Badge, Button } from "@overhaul/ui";
 import {
   getInventoryCost,
@@ -39,8 +39,22 @@ function deleteBlockReason(item: InventoryTableRow) {
   return null;
 }
 
-export function InventoryTable({ items }: { items: InventoryTableRow[] }) {
+export function InventoryTable({
+  items,
+  page = 1,
+  pageCount = 1,
+  sort = "updatedAt",
+  desc = true,
+}: {
+  items: InventoryTableRow[];
+  page?: number;
+  pageCount?: number;
+  sort?: string;
+  desc?: boolean;
+}) {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [result, setResult] = useState<BulkInventoryDeleteResult | null>(null);
   const [pending, startTransition] = useTransition();
@@ -69,6 +83,29 @@ export function InventoryTable({ items }: { items: InventoryTableRow[] }) {
       return next;
     });
   }
+
+  function navigate(updates: Record<string, string | null>) {
+    const next = new URLSearchParams(searchParams.toString());
+    for (const [key, value] of Object.entries(updates)) {
+      if (value === null || value === "") next.delete(key);
+      else next.set(key, value);
+    }
+    router.push(`${pathname}?${next.toString()}`);
+  }
+
+  function applySort(column: string) {
+    const nextDesc = sort === column ? !desc : true;
+    navigate({ sort: column, desc: nextDesc ? null : "false", page: null });
+  }
+
+  const SortHeader = ({ column, label, align = "left" }: { column: string; label: string; align?: "left" | "right" }) => (
+    <th className={`px-4 py-3 font-medium ${align === "right" ? "text-right" : ""}`}>
+      <button onClick={() => applySort(column)} className={`inline-flex items-center gap-1 hover:text-foreground ${align === "right" ? "flex-row-reverse" : ""}`}>
+        {label}
+        {sort === column && (desc ? <ArrowDown className="h-3 w-3" /> : <ArrowUp className="h-3 w-3" />)}
+      </button>
+    </th>
+  );
 
   function archiveSelected() {
     if (selectedItems.length === 0 || blockedItems.length > 0) return;
@@ -128,11 +165,11 @@ export function InventoryTable({ items }: { items: InventoryTableRow[] }) {
                   className="h-4 w-4 rounded border-input"
                 />
               </th>
-              <th className="px-4 py-3 font-medium">Item</th>
+              <SortHeader column="title" label="Item" />
               <th className="px-4 py-3 font-medium">Stage</th>
               <th className="px-4 py-3 font-medium">Location</th>
-              <th className="px-4 py-3 text-right font-medium">Cost</th>
-              <th className="px-4 py-3 text-right font-medium">Expected</th>
+              <SortHeader column="purchasePrice" label="Cost" align="right" />
+              <SortHeader column="estimatedSalePrice" label="Expected" align="right" />
               <th className="px-4 py-3 text-right font-medium">Projected profit</th>
             </tr>
           </thead>
@@ -186,6 +223,28 @@ export function InventoryTable({ items }: { items: InventoryTableRow[] }) {
           </tbody>
         </table>
       </div>
+
+      {pageCount > 1 && (
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-muted-foreground">Page {page} of {pageCount}</span>
+          <div className="flex gap-2">
+            <button
+              disabled={page <= 1}
+              onClick={() => navigate({ page: String(page - 1) })}
+              className="inline-flex h-8 items-center gap-1 rounded-lg border px-3 hover:bg-muted disabled:opacity-40"
+            >
+              <ChevronLeft className="h-4 w-4" /> Prev
+            </button>
+            <button
+              disabled={page >= pageCount}
+              onClick={() => navigate({ page: String(page + 1) })}
+              className="inline-flex h-8 items-center gap-1 rounded-lg border px-3 hover:bg-muted disabled:opacity-40"
+            >
+              Next <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -198,6 +198,18 @@ public sealed record InventoryItemDto(
     decimal? Weight,
     WeightUnit WeightUnit);
 
+/// <summary>Aggregate over a filtered inventory set (whole result, not just the page) for the inventory KPIs.</summary>
+public sealed record InventorySummaryDto(
+    int Total,
+    int ActiveItems,
+    int ReadyOrListed,
+    int Sold,
+    decimal CapitalDeployed,
+    decimal EstimatedResaleValue);
+
+/// <summary>A searchable, sortable, paged page of inventory plus the summary over the whole filtered set.</summary>
+public sealed record InventoryListDto(IReadOnlyList<InventoryItemDto> Items, int Total, int Page, int PageSize, int PageCount, InventorySummaryDto Summary);
+
 public sealed record AcquisitionLotItemInputDto(
     Guid InventoryItemId,
     decimal? ManualAllocatedCost = null,

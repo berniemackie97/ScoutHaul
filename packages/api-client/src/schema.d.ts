@@ -1336,6 +1336,52 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/inventory/browse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    status?: components["schemas"]["InventoryStatus"];
+                    lifecycle?: components["schemas"]["InventoryLifecycleGroup"];
+                    includeArchived?: boolean;
+                    search?: string;
+                    sort?: string;
+                    desc?: boolean;
+                    page?: number;
+                    pageSize?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["InventoryListDto"];
+                        "application/json": components["schemas"]["InventoryListDto"];
+                        "text/json": components["schemas"]["InventoryListDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/inventory/{id}/issues": {
         parameters: {
             query?: never;
@@ -6754,6 +6800,18 @@ export interface components {
         };
         /** @enum {string} */
         InventoryLifecycleGroup: "Active" | "Sold" | "Returned" | "Removed";
+        InventoryListDto: {
+            items?: components["schemas"]["InventoryItemDto"][] | null;
+            /** Format: int32 */
+            total?: number;
+            /** Format: int32 */
+            page?: number;
+            /** Format: int32 */
+            pageSize?: number;
+            /** Format: int32 */
+            pageCount?: number;
+            summary?: components["schemas"]["InventorySummaryDto"];
+        };
         /** @enum {string} */
         InventoryOwnershipType: "Owned" | "Consigned" | "CustomerRepair" | "VendorManaged";
         /** @enum {string} */
@@ -6807,6 +6865,20 @@ export interface components {
         };
         /** @enum {string} */
         InventoryStatus: "Draft" | "Researching" | "Watchlist" | "Purchased" | "NeedsCleaning" | "NeedsTesting" | "NeedsRepair" | "NeedsPhotos" | "ReadyToList" | "Bundled" | "Listed" | "Sold" | "Packed" | "Shipped" | "Delivered" | "Returned" | "Donated" | "Disposed";
+        InventorySummaryDto: {
+            /** Format: int32 */
+            total?: number;
+            /** Format: int32 */
+            activeItems?: number;
+            /** Format: int32 */
+            readyOrListed?: number;
+            /** Format: int32 */
+            sold?: number;
+            /** Format: double */
+            capitalDeployed?: number;
+            /** Format: double */
+            estimatedResaleValue?: number;
+        };
         ListingDto: {
             /** Format: uuid */
             id?: string;
