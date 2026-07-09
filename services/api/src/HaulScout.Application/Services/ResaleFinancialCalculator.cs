@@ -59,6 +59,44 @@ public static class ResaleFinancialCalculator
     public static decimal SalesTaxOwed(decimal salesTaxCollected, bool remittedByPlatform) =>
         remittedByPlatform ? 0m : RoundMoney(Math.Max(0, salesTaxCollected));
 
+    /// <summary>Aggregate refund impact on a sale: money returned to the buyer, fee the platform credited back,
+    /// and whether the item returned to sellable inventory (its COGS is no longer consumed by this sale).</summary>
+    public sealed record SaleRefundImpact(
+        decimal ItemRefunded,
+        decimal ShippingRefunded,
+        decimal TaxRefunded,
+        decimal FeeCredit,
+        bool ItemRestocked)
+    {
+        public static readonly SaleRefundImpact None = new(0, 0, 0, 0, false);
+    }
+
+    /// <summary>
+    /// Net profit after refunds: the original figures with the refunded item price and buyer shipping removed
+    /// from revenue, the platform's fee credit removed from selling costs, and COGS dropped when the item was
+    /// returned to inventory. Tax (collected or refunded) never touches net. This is the authoritative stored
+    /// <c>Sale.NetProfit</c> whenever a sale carries refunds.
+    /// </summary>
+    public static decimal NetProfitAfterRefunds(
+        decimal soldPrice,
+        decimal shippingCharged,
+        decimal costOfGoods,
+        decimal platformFees,
+        decimal paymentFees,
+        decimal shippingCost,
+        decimal suppliesCost,
+        decimal otherCosts,
+        SaleRefundImpact refunds) =>
+        CalculateRealizedSale(
+            soldPrice - refunds.ItemRefunded,
+            shippingCharged - refunds.ShippingRefunded,
+            refunds.ItemRestocked ? 0 : costOfGoods,
+            platformFees - refunds.FeeCredit,
+            paymentFees,
+            shippingCost,
+            suppliesCost,
+            otherCosts).NetProfit;
+
     private static decimal RoundMoney(decimal value) => decimal.Round(value, 2, MidpointRounding.AwayFromZero);
     private static decimal RoundPercent(decimal value) => decimal.Round(value, 2, MidpointRounding.AwayFromZero);
 }

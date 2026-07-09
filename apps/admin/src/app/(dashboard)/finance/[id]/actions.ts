@@ -8,6 +8,7 @@ import { failedFormState, type FailedFormState, type FieldErrors } from "@/lib/f
 type UpdateSaleRequest = components["schemas"]["UpdateSaleRequest"];
 type SaleStatusTransitionRequest = components["schemas"]["SaleStatusTransitionRequest"];
 type SaleStatus = components["schemas"]["SaleStatus"];
+type RecordRefundRequest = components["schemas"]["RecordRefundRequest"];
 
 export type SaleActionResult = { ok: boolean; message: string } & FailedFormState;
 
@@ -146,4 +147,53 @@ export async function transitionSale(id: string, _previous: SaleActionResult, fo
   revalidatePath(`/finance/${id}`);
   revalidatePath("/inventory");
   return { ok: true, message: `Sale moved to ${result.data.status}.` };
+}
+
+export async function recordRefund(id: string, _previous: SaleActionResult, formData: FormData): Promise<SaleActionResult> {
+  const fieldErrors: FieldErrors = {};
+  const reason = textValue(formData, "reason");
+  if (!reason) fieldErrors.reason = "A reason is required for a refund.";
+
+  const itemAmount = numberValue(formData, "itemAmount", "Item amount refunded", fieldErrors) ?? 0;
+  const shippingRefunded = numberValue(formData, "shippingRefunded", "Shipping refunded", fieldErrors) ?? 0;
+  const taxRefunded = numberValue(formData, "taxRefunded", "Tax refunded", fieldErrors) ?? 0;
+  const feeCredit = numberValue(formData, "feeCredit", "Fee credit", fieldErrors) ?? 0;
+  if (itemAmount + shippingRefunded + taxRefunded + feeCredit <= 0) {
+    fieldErrors.itemAmount = "Enter at least one non-zero refund amount.";
+  }
+
+  const refundedAtRaw = textValue(formData, "refundedAt");
+  const refundedAtDate = refundedAtRaw ? new Date(`${refundedAtRaw}T12:00:00Z`) : new Date();
+  if (Number.isNaN(refundedAtDate.getTime())) fieldErrors.refundedAt = "Enter a valid refund date.";
+  if (Object.keys(fieldErrors).length > 0) return failure("Fix the highlighted fields.", formData, fieldErrors);
+
+  const itemReturned = formData.get("itemReturned") === "on";
+  const body: RecordRefundRequest = {
+    type: itemReturned || formData.get("full") === "on" ? "Full" : "Partial",
+    itemAmount,
+    shippingRefunded,
+    taxRefunded,
+    feeCredit,
+    itemReturned,
+    reason: reason!,
+    refundedAt: refundedAtDate.toISOString(),
+    notes: textValue(formData, "notes"),
+  };
+
+  const api = await getApiClient();
+  const result = await api.POST("/api/sales/{id}/refunds", { params: { path: { id } }, body });
+  if (!result.data) return failure(errorMessage(result.error, "Could not record the refund."), formData);
+
+  revalidatePath("/finance");
+  revalidatePath(`/finance/${id}`);
+  revalidatePath("/inventory");
+  return { ok: true, message: `Refund recorded. True net is now ${money(result.data.netProfit)}.` };
+}
+
+export async function voidRefund(id: string, refundId: string): Promise<void> {
+  const api = await getApiClient();
+  await api.DELETE("/api/sales/{id}/refunds/{refundId}", { params: { path: { id, refundId } } });
+  revalidatePath("/finance");
+  revalidatePath(`/finance/${id}`);
+  revalidatePath("/inventory");
 }

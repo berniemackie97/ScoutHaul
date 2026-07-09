@@ -115,6 +115,7 @@ public sealed class Sale : EntityBase, IOrganizationScoped
     public string? GroupOrderReference { get; set; }
 
     public ICollection<SaleCorrection> Corrections { get; set; } = [];
+    public ICollection<Refund> Refunds { get; set; } = [];
 }
 
 /// <summary>

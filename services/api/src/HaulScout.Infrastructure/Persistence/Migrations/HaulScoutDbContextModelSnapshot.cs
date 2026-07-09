@@ -2156,6 +2156,74 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                     b.ToTable("ProductIdentities", (string)null);
                 });
 
+            modelBuilder.Entity("HaulScout.Domain.Entities.Refund", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("FeeCredit")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
+
+                    b.Property<decimal>("ItemAmount")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
+
+                    b.Property<bool>("ItemReturned")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<Guid>("RecordedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("RefundedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("SaleId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("ShippingRefunded")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
+
+                    b.Property<decimal>("TaxRefunded")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RecordedByUserId");
+
+                    b.HasIndex("SaleId");
+
+                    b.HasIndex("OrganizationId", "SaleId");
+
+                    b.ToTable("Refunds", (string)null);
+                });
+
             modelBuilder.Entity("HaulScout.Domain.Entities.ResaleTask", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3414,6 +3482,25 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                     b.Navigation("Organization");
                 });
 
+            modelBuilder.Entity("HaulScout.Domain.Entities.Refund", b =>
+                {
+                    b.HasOne("HaulScout.Domain.Entities.AppUser", "RecordedByUser")
+                        .WithMany()
+                        .HasForeignKey("RecordedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("HaulScout.Domain.Entities.Sale", "Sale")
+                        .WithMany("Refunds")
+                        .HasForeignKey("SaleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("RecordedByUser");
+
+                    b.Navigation("Sale");
+                });
+
             modelBuilder.Entity("HaulScout.Domain.Entities.ResaleTask", b =>
                 {
                     b.HasOne("HaulScout.Domain.Entities.AppUser", "AssignedToUser")
@@ -3709,6 +3796,8 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("HaulScout.Domain.Entities.Sale", b =>
                 {
                     b.Navigation("Corrections");
+
+                    b.Navigation("Refunds");
                 });
 
             modelBuilder.Entity("HaulScout.Domain.Entities.SourcingTrip", b =>
