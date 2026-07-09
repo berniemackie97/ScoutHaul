@@ -202,6 +202,82 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
         return sales.Select(item => item.ToDto()).ToList();
     }
 
+    /// <summary>Searchable, sortable, paged sales for the finance table, plus the P&amp;L summary over the whole
+    /// filtered set (so the KPIs stay correct while the table pages). Separate from <see cref="List"/> to keep the
+    /// plain array response stable for the mobile app.</summary>
+    [HttpGet("browse")]
+    public async Task<ActionResult<SaleListDto>> Browse(
+        [FromQuery] SaleStatus? status,
+        [FromQuery] string? search,
+        [FromQuery] string? sort,
+        [FromQuery] bool desc = true,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 25,
+        CancellationToken cancellationToken = default)
+    {
+        page = Math.Max(1, page);
+        pageSize = Math.Clamp(pageSize, 1, 100);
+
+        var query = db.Sales
+            .Include(item => item.InventoryItem)
+            .Include(item => item.Refunds)
+            .Where(item => item.OrganizationId == currentUser.OrganizationId);
+
+        if (status.HasValue)
+        {
+            query = query.Where(item => item.Status == status.Value);
+        }
+
+        string? term = TrimToNull(search)?.ToLower();
+        if (term is not null)
+        {
+            query = query.Where(item =>
+                (item.InventoryItem != null && item.InventoryItem.Title.ToLower().Contains(term))
+                || item.Platform.ToLower().Contains(term)
+                || (item.GroupOrderReference != null && item.GroupOrderReference.ToLower().Contains(term)));
+        }
+
+        var filtered = await query.ToListAsync(cancellationToken);
+        var realized = filtered.Where(item => SaleWorkflow.IsRealized(item.Status)).ToList();
+
+        decimal itemSales = realized.Sum(item => item.SoldPrice);
+        decimal buyerShipping = realized.Sum(item => item.ShippingCharged);
+        decimal taxCollected = realized.Sum(item => item.SalesTaxCollected);
+        decimal platformFees = realized.Sum(item => item.PlatformFees);
+        decimal paymentFees = realized.Sum(item => item.PaymentFees);
+        decimal shippingLabels = realized.Sum(item => item.ShippingCost);
+        decimal suppliesAndOther = realized.Sum(item => item.SuppliesCost + item.OtherCosts);
+        decimal sellingCosts = platformFees + paymentFees + shippingLabels + suppliesAndOther;
+        var summary = new SalesSummaryDto(
+            realized.Count,
+            itemSales,
+            buyerShipping,
+            taxCollected,
+            itemSales + buyerShipping + taxCollected,
+            platformFees,
+            paymentFees,
+            shippingLabels,
+            suppliesAndOther,
+            sellingCosts,
+            itemSales + buyerShipping - sellingCosts,
+            realized.Sum(item => item.CostOfGoods),
+            realized.Sum(item => item.NetProfit),
+            realized.Sum(item => ResaleFinancialCalculator.SalesTaxOwed(item.SalesTaxCollected, item.TaxRemittedByPlatform)),
+            realized.Sum(item => item.Refunds.Sum(refund => refund.ItemAmount + refund.ShippingRefunded)));
+
+        IEnumerable<Sale> ordered = sort?.ToLowerInvariant() switch
+        {
+            "netprofit" => desc ? filtered.OrderByDescending(item => item.NetProfit) : filtered.OrderBy(item => item.NetProfit),
+            "soldprice" => desc ? filtered.OrderByDescending(item => item.SoldPrice) : filtered.OrderBy(item => item.SoldPrice),
+            "item" => desc ? filtered.OrderByDescending(item => item.InventoryItem!.Title) : filtered.OrderBy(item => item.InventoryItem!.Title),
+            _ => desc ? filtered.OrderByDescending(item => item.SoldAt) : filtered.OrderBy(item => item.SoldAt),
+        };
+
+        var items = ordered.Skip((page - 1) * pageSize).Take(pageSize).Select(item => item.ToDto()).ToList();
+        int pageCount = (int)Math.Ceiling(filtered.Count / (double)pageSize);
+        return new SaleListDto(items, filtered.Count, page, pageSize, Math.Max(1, pageCount), summary);
+    }
+
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<SaleDto>> Get(Guid id, CancellationToken cancellationToken)
     {
@@ -211,6 +287,77 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
             .SingleOrDefaultAsync(item => item.Id == id && item.OrganizationId == currentUser.OrganizationId, cancellationToken);
 
         return sale is null ? NotFound() : sale.ToDto();
+    }
+
+    /// <summary>Permanently delete a recorded sale (its corrections, refunds, and shipment cascade away). The item
+    /// is released back to sellable inventory unless another live sale still holds it; the internal-sale comp is
+    /// removed and the deletion is written to the audit log.</summary>
+    [HttpDelete("{id:guid}")]
+    [RequireOrganizationPermission(HaulScoutPermissions.ManageFinance)]
+    public async Task<ActionResult> Delete(Guid id, CancellationToken cancellationToken)
+    {
+        var sale = await db.Sales
+            .Include(item => item.InventoryItem)
+                .ThenInclude(item => item!.BundleComponents)
+                    .ThenInclude(item => item.ComponentInventoryItem)
+            .Include(item => item.Listing)
+            .SingleOrDefaultAsync(item => item.Id == id && item.OrganizationId == currentUser.OrganizationId, cancellationToken);
+
+        if (sale is null)
+        {
+            return NotFound();
+        }
+
+        if (sale.InventoryItem is not null)
+        {
+            bool otherActiveSale = await db.Sales.AnyAsync(
+                other => other.InventoryItemId == sale.InventoryItemId && other.Id != id
+                    && other.OrganizationId == currentUser.OrganizationId && !ReleasedInventoryStatuses.Contains(other.Status),
+                cancellationToken);
+            if (!otherActiveSale)
+            {
+                sale.InventoryItem.Status = sale.ListingId.HasValue ? InventoryStatus.Listed : InventoryStatus.ReadyToList;
+                sale.InventoryItem.SoldAt = null;
+                ApplyBundleComponentInventoryStatus(sale.InventoryItem, sale.InventoryItem.Status, null);
+            }
+        }
+
+        if (sale.Listing is not null && sale.Listing.Status == ListingStatus.Sold)
+        {
+            sale.Listing.Status = ListingStatus.Active;
+            sale.Listing.EndedAt = null;
+        }
+
+        var observations = await db.MarketObservations
+            .Where(observation => observation.InventoryItemId == sale.InventoryItemId
+                && observation.ObservationType == MarketObservationType.InternalSale
+                && observation.OrganizationId == currentUser.OrganizationId
+                && observation.SoldAt == sale.SoldAt)
+            .ToListAsync(cancellationToken);
+        db.MarketObservations.RemoveRange(observations);
+
+        db.AuditLogs.Add(new AuditLog
+        {
+            OrganizationId = currentUser.OrganizationId,
+            ActorUserId = currentUser.UserId,
+            EntityName = "Sale",
+            EntityId = id,
+            Action = "Deleted",
+            DetailsJson = SnapshotSale(sale),
+        });
+
+        // Remove the sale's dependents explicitly (rather than lean on DB cascade) so the delete is deterministic.
+        db.Refunds.RemoveRange(await db.Refunds.Where(refund => refund.SaleId == id && refund.OrganizationId == currentUser.OrganizationId).ToListAsync(cancellationToken));
+        db.SaleCorrections.RemoveRange(await db.SaleCorrections.Where(correction => correction.SaleId == id && correction.OrganizationId == currentUser.OrganizationId).ToListAsync(cancellationToken));
+        Shipment? shipment = await db.Shipments.SingleOrDefaultAsync(item => item.SaleId == id && item.OrganizationId == currentUser.OrganizationId, cancellationToken);
+        if (shipment is not null)
+        {
+            db.Shipments.Remove(shipment);
+        }
+
+        db.Sales.Remove(sale);
+        await db.SaveChangesAsync(cancellationToken);
+        return NoContent();
     }
 
     [HttpPost]

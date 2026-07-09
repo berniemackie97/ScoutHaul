@@ -3950,6 +3950,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/sales/browse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    status?: components["schemas"]["SaleStatus"];
+                    search?: string;
+                    sort?: string;
+                    desc?: boolean;
+                    page?: number;
+                    pageSize?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SaleListDto"];
+                        "application/json": components["schemas"]["SaleListDto"];
+                        "text/json": components["schemas"]["SaleListDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/sales/{id}": {
         parameters: {
             query?: never;
@@ -4012,7 +4056,26 @@ export interface paths {
             };
         };
         post?: never;
-        delete?: never;
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
         options?: never;
         head?: never;
         patch?: never;
@@ -7620,6 +7683,18 @@ export interface components {
             orderReference?: string | null;
             sales?: components["schemas"]["SaleDto"][] | null;
         };
+        SaleListDto: {
+            items?: components["schemas"]["SaleDto"][] | null;
+            /** Format: int32 */
+            total?: number;
+            /** Format: int32 */
+            page?: number;
+            /** Format: int32 */
+            pageSize?: number;
+            /** Format: int32 */
+            pageCount?: number;
+            summary?: components["schemas"]["SalesSummaryDto"];
+        };
         SaleShipmentDto: {
             /** Format: uuid */
             id?: string;
@@ -7648,6 +7723,38 @@ export interface components {
         };
         SalesReferenceDataDto: {
             channels?: components["schemas"]["SaleChannelOptionDto"][] | null;
+        };
+        SalesSummaryDto: {
+            /** Format: int32 */
+            realizedCount?: number;
+            /** Format: double */
+            itemSales?: number;
+            /** Format: double */
+            buyerShipping?: number;
+            /** Format: double */
+            salesTaxCollected?: number;
+            /** Format: double */
+            grossBuyerSales?: number;
+            /** Format: double */
+            platformFees?: number;
+            /** Format: double */
+            paymentFees?: number;
+            /** Format: double */
+            shippingLabels?: number;
+            /** Format: double */
+            suppliesAndOther?: number;
+            /** Format: double */
+            sellingCosts?: number;
+            /** Format: double */
+            marketplaceNetSales?: number;
+            /** Format: double */
+            costOfGoods?: number;
+            /** Format: double */
+            netProfit?: number;
+            /** Format: double */
+            salesTaxOwed?: number;
+            /** Format: double */
+            totalRefunded?: number;
         };
         SessionBootstrapDto: {
             user?: components["schemas"]["SessionUserDto"];
