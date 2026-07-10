@@ -33,3 +33,12 @@ playwright-report/
 *.tsbuildinfo
 .pnp
 .pnp.js
+
+# Platform report exports (eBay/Poshmark/Mercari/Depop). Contain buyer PII — never commit.
+docs/platform-samples/
+docs/*.csv
+docs/*.xlsx
+docs/*.zip
+
+# JetBrains
+.idea/

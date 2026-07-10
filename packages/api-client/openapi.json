@@ -880,6 +880,13 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "channel",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -2634,6 +2641,13 @@
           },
           {
             "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "channel",
             "in": "query",
             "schema": {
               "type": "string"
@@ -8899,6 +8913,40 @@
         },
         "additionalProperties": false
       },
+      "CustomerChannelIdentityDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "channel": {
+            "type": "string",
+            "nullable": true
+          },
+          "externalUserId": {
+            "type": "string",
+            "nullable": true
+          },
+          "displayName": {
+            "type": "string",
+            "nullable": true
+          },
+          "email": {
+            "type": "string",
+            "nullable": true
+          },
+          "firstSeenAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lastSeenAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
       "CustomerDetailDto": {
         "type": "object",
         "properties": {
@@ -8955,6 +9003,13 @@
               "$ref": "#/components/schemas/OrderSummaryDto"
             },
             "nullable": true
+          },
+          "channelIdentities": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CustomerChannelIdentityDto"
+            },
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -9000,6 +9055,13 @@
           "lastOrderAt": {
             "type": "string",
             "format": "date-time",
+            "nullable": true
+          },
+          "channels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
             "nullable": true
           }
         },
@@ -10906,6 +10968,22 @@
               "$ref": "#/components/schemas/OrderLineDto"
             },
             "nullable": true
+          },
+          "channel": {
+            "type": "string",
+            "nullable": true
+          },
+          "externalOrderId": {
+            "type": "string",
+            "nullable": true
+          },
+          "externalOrderUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "buyerReference": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -11034,6 +11112,18 @@
           "deliveredAt": {
             "type": "string",
             "format": "date-time",
+            "nullable": true
+          },
+          "channel": {
+            "type": "string",
+            "nullable": true
+          },
+          "externalOrderId": {
+            "type": "string",
+            "nullable": true
+          },
+          "buyerReference": {
+            "type": "string",
             "nullable": true
           }
         },

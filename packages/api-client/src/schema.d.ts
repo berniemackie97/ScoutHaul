@@ -737,6 +737,7 @@ export interface paths {
             parameters: {
                 query?: {
                     search?: string;
+                    channel?: string;
                 };
                 header?: never;
                 path?: never;
@@ -2138,6 +2139,7 @@ export interface paths {
                 query?: {
                     status?: string;
                     search?: string;
+                    channel?: string;
                 };
                 header?: never;
                 path?: never;
@@ -6666,6 +6668,18 @@ export interface components {
             phone?: string | null;
             isDefault?: boolean;
         };
+        CustomerChannelIdentityDto: {
+            /** Format: uuid */
+            id?: string;
+            channel?: string | null;
+            externalUserId?: string | null;
+            displayName?: string | null;
+            email?: string | null;
+            /** Format: date-time */
+            firstSeenAt?: string;
+            /** Format: date-time */
+            lastSeenAt?: string;
+        };
         CustomerDetailDto: {
             /** Format: uuid */
             id?: string;
@@ -6685,6 +6699,7 @@ export interface components {
             lastOrderAt?: string | null;
             addresses?: components["schemas"]["CustomerAddressDto"][] | null;
             orders?: components["schemas"]["OrderSummaryDto"][] | null;
+            channelIdentities?: components["schemas"]["CustomerChannelIdentityDto"][] | null;
         };
         CustomerSummaryDto: {
             /** Format: uuid */
@@ -6703,6 +6718,7 @@ export interface components {
             createdAt?: string;
             /** Format: date-time */
             lastOrderAt?: string | null;
+            channels?: string[] | null;
         };
         DashboardSummaryDto: {
             /** Format: int32 */
@@ -7310,6 +7326,10 @@ export interface components {
             /** Format: date-time */
             cancelledAt?: string | null;
             lines?: components["schemas"]["OrderLineDto"][] | null;
+            channel?: string | null;
+            externalOrderId?: string | null;
+            externalOrderUrl?: string | null;
+            buyerReference?: string | null;
         };
         OrderLineDto: {
             /** Format: uuid */
@@ -7356,6 +7376,9 @@ export interface components {
             shippedAt?: string | null;
             /** Format: date-time */
             deliveredAt?: string | null;
+            channel?: string | null;
+            externalOrderId?: string | null;
+            buyerReference?: string | null;
         };
         OrgReferenceOverrideDto: {
             /** Format: uuid */

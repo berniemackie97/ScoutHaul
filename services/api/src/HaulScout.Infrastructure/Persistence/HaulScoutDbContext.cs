@@ -49,6 +49,7 @@ public sealed class HaulScoutDbContext(DbContextOptions<HaulScoutDbContext> opti
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();
     public DbSet<Customer> Customers => Set<Customer>();
+    public DbSet<CustomerChannelIdentity> CustomerChannelIdentities => Set<CustomerChannelIdentity>();
     public DbSet<CustomerAddress> CustomerAddresses => Set<CustomerAddress>();
     public DbSet<StoreCategory> StoreCategories => Set<StoreCategory>();
     public DbSet<StoreListing> StoreListings => Set<StoreListing>();
@@ -431,6 +432,8 @@ public sealed class HaulScoutDbContext(DbContextOptions<HaulScoutDbContext> opti
             entity.Property(item => item.GroupOrderReference).HasMaxLength(120);
             entity.HasIndex(item => new { item.OrganizationId, item.SoldAt });
             entity.HasIndex(item => new { item.OrganizationId, item.SaleGroupId });
+            entity.HasIndex(item => new { item.OrganizationId, item.OrderId });
+            entity.HasOne(item => item.Order).WithMany().HasForeignKey(item => item.OrderId).OnDelete(DeleteBehavior.SetNull);
             entity.HasOne(item => item.InventoryItem).WithMany(item => item.Sales).HasForeignKey(item => item.InventoryItemId);
             entity.HasOne(item => item.Listing).WithMany().HasForeignKey(item => item.ListingId).OnDelete(DeleteBehavior.SetNull);
         });
@@ -529,13 +532,29 @@ public sealed class HaulScoutDbContext(DbContextOptions<HaulScoutDbContext> opti
         {
             entity.ToTable("Customers");
             entity.Property(item => item.ExternalSubject).HasMaxLength(256);
-            entity.Property(item => item.Email).HasMaxLength(320).IsRequired();
+            // Nullable: a marketplace buyer is identified by their channel username (CustomerChannelIdentity).
+            entity.Property(item => item.Email).HasMaxLength(320);
             entity.Property(item => item.DisplayName).HasMaxLength(160);
             entity.Property(item => item.Phone).HasMaxLength(40);
             ConfigureMoney(entity.Property(item => item.StoreCreditBalance));
-            entity.HasIndex(item => new { item.OrganizationId, item.Email }).IsUnique();
+            entity.HasIndex(item => new { item.OrganizationId, item.Email })
+                .IsUnique()
+                .HasFilter("\"Email\" IS NOT NULL");
             entity.HasIndex(item => new { item.OrganizationId, item.ExternalSubject });
             entity.HasOne(item => item.Organization).WithMany().HasForeignKey(item => item.OrganizationId);
+        });
+
+        modelBuilder.Entity<CustomerChannelIdentity>(entity =>
+        {
+            entity.ToTable("CustomerChannelIdentities");
+            entity.Property(item => item.Channel).HasMaxLength(60).IsRequired();
+            entity.Property(item => item.ExternalUserId).HasMaxLength(200).IsRequired();
+            entity.Property(item => item.DisplayName).HasMaxLength(200);
+            entity.Property(item => item.Email).HasMaxLength(320);
+            // One buyer handle per channel, per org — this is what dedupes a repeat buyer across orders.
+            entity.HasIndex(item => new { item.OrganizationId, item.Channel, item.ExternalUserId }).IsUnique();
+            entity.HasOne(item => item.Customer).WithMany(item => item.ChannelIdentities)
+                .HasForeignKey(item => item.CustomerId).OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<CustomerAddress>(entity =>
@@ -608,7 +627,18 @@ public sealed class HaulScoutDbContext(DbContextOptions<HaulScoutDbContext> opti
         {
             entity.ToTable("Orders");
             entity.Property(item => item.OrderNumber).HasMaxLength(40).IsRequired();
-            entity.Property(item => item.Email).HasMaxLength(320).IsRequired();
+            // Nullable: marketplace buyers have a username, not an email. See Order.BuyerReference.
+            entity.Property(item => item.Email).HasMaxLength(320);
+            entity.Property(item => item.Channel).HasMaxLength(60).IsRequired();
+            entity.Property(item => item.ExternalOrderId).HasMaxLength(120);
+            entity.Property(item => item.ExternalOrderUrl).HasMaxLength(500);
+            entity.Property(item => item.BuyerReference).HasMaxLength(200);
+            entity.HasIndex(item => new { item.OrganizationId, item.Channel });
+            // One order per marketplace order id, per channel. Storefront rows leave ExternalOrderId null.
+            entity.HasIndex(item => new { item.OrganizationId, item.Channel, item.ExternalOrderId })
+                .IsUnique()
+                .HasFilter("\"ExternalOrderId\" IS NOT NULL");
+            entity.HasOne(item => item.ChannelAccount).WithMany().HasForeignKey(item => item.ChannelAccountId).OnDelete(DeleteBehavior.SetNull);
             entity.Property(item => item.Currency).HasMaxLength(8);
             entity.Property(item => item.Status).HasConversion<string>().HasMaxLength(24);
             entity.Property(item => item.PaymentStatus).HasConversion<string>().HasMaxLength(24);

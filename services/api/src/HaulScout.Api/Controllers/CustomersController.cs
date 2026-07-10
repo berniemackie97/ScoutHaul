@@ -13,19 +13,32 @@ namespace HaulScout.Api.Controllers;
 [RequireOrganizationPermission(HaulScoutPermissions.ManageOrders)]
 public sealed class CustomersController(HaulScoutDbContext db, ICurrentUserContext currentUser) : ControllerBase
 {
+    /// <summary>Buyers from every channel — a storefront shopper (email) and an eBay/Depop buyer (username) are
+    /// both customers here. Pass <paramref name="channel"/> to narrow to one platform.</summary>
     [HttpGet]
-    public async Task<ActionResult<IReadOnlyList<CustomerSummaryDto>>> List([FromQuery] string? search, CancellationToken cancellationToken)
+    public async Task<ActionResult<IReadOnlyList<CustomerSummaryDto>>> List(
+        [FromQuery] string? search,
+        [FromQuery] string? channel,
+        CancellationToken cancellationToken)
     {
         var query = db.Customers
             .Include(customer => customer.Orders)
+            .Include(customer => customer.ChannelIdentities)
             .Where(customer => customer.OrganizationId == currentUser.OrganizationId);
+
+        if (!string.IsNullOrWhiteSpace(channel))
+        {
+            string wanted = channel.Trim();
+            query = query.Where(customer => customer.ChannelIdentities.Any(identity => identity.Channel == wanted));
+        }
 
         if (!string.IsNullOrWhiteSpace(search))
         {
             string term = search.Trim();
             query = query.Where(customer =>
-                EF.Functions.ILike(customer.Email, $"%{term}%")
-                || (customer.DisplayName != null && EF.Functions.ILike(customer.DisplayName, $"%{term}%")));
+                (customer.Email != null && EF.Functions.ILike(customer.Email, $"%{term}%"))
+                || (customer.DisplayName != null && EF.Functions.ILike(customer.DisplayName, $"%{term}%"))
+                || customer.ChannelIdentities.Any(identity => EF.Functions.ILike(identity.ExternalUserId, $"%{term}%")));
         }
 
         var customers = await query
@@ -41,6 +54,7 @@ public sealed class CustomersController(HaulScoutDbContext db, ICurrentUserConte
     {
         var customer = await db.Customers
             .Include(item => item.Addresses)
+            .Include(item => item.ChannelIdentities)
             .Include(item => item.Orders)
                 .ThenInclude(order => order.Lines)
             .SingleOrDefaultAsync(item => item.Id == id && item.OrganizationId == currentUser.OrganizationId, cancellationToken);

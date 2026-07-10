@@ -563,7 +563,6 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(160)");
 
                     b.Property<string>("Email")
-                        .IsRequired()
                         .HasMaxLength(320)
                         .HasColumnType("character varying(320)");
 
@@ -588,7 +587,8 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("OrganizationId", "Email")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("\"Email\" IS NOT NULL");
 
                     b.HasIndex("OrganizationId", "ExternalSubject");
 
@@ -665,6 +665,58 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                     b.HasIndex("OrganizationId", "CustomerId");
 
                     b.ToTable("CustomerAddresses", (string)null);
+                });
+
+            modelBuilder.Entity("HaulScout.Domain.Entities.CustomerChannelIdentity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Channel")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("CustomerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("DisplayName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Email")
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)");
+
+                    b.Property<string>("ExternalUserId")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTimeOffset>("FirstSeenAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("LastSeenAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CustomerId");
+
+                    b.HasIndex("OrganizationId", "Channel", "ExternalUserId")
+                        .IsUnique();
+
+                    b.ToTable("CustomerChannelIdentities", (string)null);
                 });
 
             modelBuilder.Entity("HaulScout.Domain.Entities.Expense", b =>
@@ -1404,8 +1456,20 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("BuyerReference")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
                     b.Property<DateTimeOffset?>("CancelledAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Channel")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
+                    b.Property<Guid?>("ChannelAccountId")
+                        .HasColumnType("uuid");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -1430,9 +1494,16 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                         .HasColumnType("numeric(12,2)");
 
                     b.Property<string>("Email")
-                        .IsRequired()
                         .HasMaxLength(320)
                         .HasColumnType("character varying(320)");
+
+                    b.Property<string>("ExternalOrderId")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<string>("ExternalOrderUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
 
                     b.Property<string>("FulfillmentStatus")
                         .IsRequired()
@@ -1535,7 +1606,11 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("ChannelAccountId");
+
                     b.HasIndex("CustomerId");
+
+                    b.HasIndex("OrganizationId", "Channel");
 
                     b.HasIndex("OrganizationId", "CreatedAt");
 
@@ -1543,6 +1618,10 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.HasIndex("OrganizationId", "Status");
+
+                    b.HasIndex("OrganizationId", "Channel", "ExternalOrderId")
+                        .IsUnique()
+                        .HasFilter("\"ExternalOrderId\" IS NOT NULL");
 
                     b.ToTable("Orders", (string)null);
                 });
@@ -2473,6 +2552,9 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                     b.Property<string>("Notes")
                         .HasColumnType("text");
 
+                    b.Property<Guid?>("OrderId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("OrganizationId")
                         .HasColumnType("uuid");
 
@@ -2535,6 +2617,10 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                     b.HasIndex("InventoryItemId");
 
                     b.HasIndex("ListingId");
+
+                    b.HasIndex("OrderId");
+
+                    b.HasIndex("OrganizationId", "OrderId");
 
                     b.HasIndex("OrganizationId", "SaleGroupId");
 
@@ -3227,6 +3313,17 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                     b.Navigation("Customer");
                 });
 
+            modelBuilder.Entity("HaulScout.Domain.Entities.CustomerChannelIdentity", b =>
+                {
+                    b.HasOne("HaulScout.Domain.Entities.Customer", "Customer")
+                        .WithMany("ChannelIdentities")
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Customer");
+                });
+
             modelBuilder.Entity("HaulScout.Domain.Entities.Expense", b =>
                 {
                     b.HasOne("HaulScout.Domain.Entities.AcquisitionLot", "AcquisitionLot")
@@ -3394,6 +3491,11 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("HaulScout.Domain.Entities.Order", b =>
                 {
+                    b.HasOne("HaulScout.Domain.Entities.ChannelAccount", "ChannelAccount")
+                        .WithMany()
+                        .HasForeignKey("ChannelAccountId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("HaulScout.Domain.Entities.Customer", "Customer")
                         .WithMany("Orders")
                         .HasForeignKey("CustomerId")
@@ -3404,6 +3506,8 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                         .HasForeignKey("OrganizationId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("ChannelAccount");
 
                     b.Navigation("Customer");
 
@@ -3695,9 +3799,16 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                         .HasForeignKey("ListingId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("HaulScout.Domain.Entities.Order", "Order")
+                        .WithMany()
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.Navigation("InventoryItem");
 
                     b.Navigation("Listing");
+
+                    b.Navigation("Order");
                 });
 
             modelBuilder.Entity("HaulScout.Domain.Entities.SaleCorrection", b =>
@@ -3869,6 +3980,8 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("HaulScout.Domain.Entities.Customer", b =>
                 {
                     b.Navigation("Addresses");
+
+                    b.Navigation("ChannelIdentities");
 
                     b.Navigation("Orders");
 

@@ -99,6 +99,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
             <thead className="bg-muted/40 text-muted-foreground border-b text-left text-xs uppercase tracking-wide">
               <tr>
                 <th className="px-4 py-3 font-medium">Order</th>
+                <th className="px-4 py-3 font-medium">Channel</th>
                 <th className="px-4 py-3 font-medium">Customer</th>
                 <th className="px-4 py-3 font-medium">Placed</th>
                 <th className="px-4 py-3 text-right font-medium">Items</th>
@@ -117,7 +118,11 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
                       {order.isLocalPickup && <span className="text-muted-foreground ml-2 text-xs">· pickup</span>}
                     </Link>
                   </td>
-                  <td className="text-muted-foreground px-4 py-3">{order.customerName || order.email}</td>
+                  <td className="px-4 py-3">
+                    <span className="bg-muted rounded-md px-2 py-0.5 text-xs font-medium">{order.channel ?? "Storefront"}</span>
+                  </td>
+                  {/* Marketplace buyers have a username, not an email. */}
+                  <td className="text-muted-foreground px-4 py-3">{order.customerName || order.buyerReference || order.email || "—"}</td>
                   <td className="text-muted-foreground px-4 py-3">{date(order.createdAt)}</td>
                   <td className="px-4 py-3 text-right tabular-nums">{order.itemCount}</td>
                   <td className="px-4 py-3 text-right font-medium tabular-nums">{money(order.grandTotal)}</td>
