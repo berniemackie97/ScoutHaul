@@ -3,9 +3,23 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
-  LayoutDashboard, Package, ShoppingCart, Users, Wrench,
-  HandCoins, Truck, BarChart3, Settings, Wallet,
-  ChevronLeft, ChevronRight, LogOut, Package2, ReceiptText, Radio,
+  LayoutDashboard,
+  Package,
+  ShoppingCart,
+  Users,
+  Wrench,
+  HandCoins,
+  Truck,
+  BarChart3,
+  Settings,
+  Wallet,
+  ChevronLeft,
+  ChevronRight,
+  LogOut,
+  Package2,
+  ReceiptText,
+  Radio,
+  FileSpreadsheet,
 } from "lucide-react";
 import { useState } from "react";
 import { cn, Button } from "@overhaul/ui";
@@ -38,6 +52,10 @@ const navGroups = [
     ],
   },
   {
+    label: "Data",
+    items: [{ name: "Imports", href: "/imports", icon: FileSpreadsheet }],
+  },
+  {
     label: "Intelligence",
     items: [{ name: "Reports", href: "/analytics", icon: BarChart3 }],
   },
@@ -62,20 +80,22 @@ export function Sidebar() {
   return (
     <aside
       className={cn(
-        "flex flex-col border-r bg-card transition-all duration-200 shrink-0",
+        "bg-card flex shrink-0 flex-col border-r transition-all duration-200",
         collapsed ? "w-[68px]" : "w-[240px]"
       )}
     >
       {/* Header */}
-      <div className="flex h-16 items-center justify-between px-4 border-b">
+      <div className="flex h-16 items-center justify-between border-b px-4">
         {!collapsed && (
           <Link href="/" className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-brand-600 flex items-center justify-center">
+            <div className="bg-brand-600 flex h-8 w-8 items-center justify-center rounded-lg">
               <Package2 className="h-4 w-4 text-white" />
             </div>
             <div>
-              <p className="font-bold text-sm leading-none">HaulScout</p>
-              <p className="text-[10px] text-muted-foreground leading-none mt-0.5">Operator Console</p>
+              <p className="text-sm font-bold leading-none">HaulScout</p>
+              <p className="text-muted-foreground mt-0.5 text-[10px] leading-none">
+                Operator Console
+              </p>
             </div>
           </Link>
         )}
@@ -90,12 +110,17 @@ export function Sidebar() {
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 px-2 py-4 space-y-1 overflow-y-auto">
+      <nav className="flex-1 space-y-1 overflow-y-auto px-2 py-4">
         {navGroups.map((group) => (
           <div key={group.label} className="mb-4">
-            {!collapsed && <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/70">{group.label}</p>}
+            {!collapsed && (
+              <p className="text-muted-foreground/70 mb-1 px-3 text-[10px] font-semibold uppercase tracking-widest">
+                {group.label}
+              </p>
+            )}
             {group.items.map((item) => {
-              const isActive = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
+              const isActive =
+                pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
               return (
                 <Link
                   key={item.href}
@@ -121,13 +146,13 @@ export function Sidebar() {
       {/* Footer */}
       <div className="border-t p-4">
         <div className={cn("flex items-center", collapsed ? "justify-center" : "gap-3")}>
-          <div className="h-8 w-8 rounded-full bg-brand-200 flex items-center justify-center text-xs font-bold text-brand-700 shrink-0">
+          <div className="bg-brand-200 text-brand-700 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold">
             A
           </div>
           {!collapsed && (
             <div className="min-w-0 flex-1">
-              <p className="text-xs font-medium truncate">Operator</p>
-              <p className="text-[10px] text-muted-foreground truncate">Signed in</p>
+              <p className="truncate text-xs font-medium">Operator</p>
+              <p className="text-muted-foreground truncate text-[10px]">Signed in</p>
             </div>
           )}
           <Button

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CircleDollarSign, Landmark, PlugZap, Plus, ReceiptText, Wallet } from "lucide-react";
+import { CircleDollarSign, Landmark, Plus, ReceiptText, Wallet } from "lucide-react";
 import { Card } from "@overhaul/ui";
 import { getApiClient } from "@/lib/api";
 import { SalesTable } from "./sales-table";
@@ -7,9 +7,15 @@ import { SalesTable } from "./sales-table";
 export const dynamic = "force-dynamic";
 
 const money = (value: number | null | undefined) =>
-  typeof value === "number" ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value) : "—";
+  typeof value === "number"
+    ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value)
+    : "—";
 
-export default async function FinancePage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
+export default async function FinancePage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | undefined>>;
+}) {
   const params = await searchParams;
   const search = params.search?.trim() || undefined;
   const status = params.status || undefined;
@@ -75,7 +81,8 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
           <p className="text-muted-foreground text-sm">Finance</p>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight">Sales &amp; profit</h1>
           <p className="text-muted-foreground mt-1 text-sm">
-            Every recorded sale with its true net after fees and tax. Open a sale to correct it — every change is audited.
+            Every recorded sale with its true net after fees and tax. Open a sale to correct it —
+            every change is audited.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -90,12 +97,6 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
             className="hover:bg-muted inline-flex h-10 items-center justify-center gap-2 rounded-lg border px-4 text-sm font-medium"
           >
             <Plus className="h-4 w-4" /> Bundled sale
-          </Link>
-          <Link
-            href="/finance/platform-orders"
-            className="hover:bg-muted inline-flex h-10 items-center justify-center gap-2 rounded-lg border px-4 text-sm font-medium"
-          >
-            <PlugZap className="h-4 w-4" /> Reconcile platform orders
           </Link>
         </div>
       </header>
@@ -131,9 +132,16 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
         </Card>
         <Card className="p-5">
           <h2 className="text-sm font-semibold">Profit bridge</h2>
-          <BreakdownRow label="Item + shipping revenue" value={summary.itemSales + summary.buyerShipping} />
+          <BreakdownRow
+            label="Item + shipping revenue"
+            value={summary.itemSales + summary.buyerShipping}
+          />
           <BreakdownRow label="Selling costs" value={summary.sellingCosts} negative />
-          <BreakdownRow label="Marketplace net before COGS" value={summary.marketplaceNetSales} strong />
+          <BreakdownRow
+            label="Marketplace net before COGS"
+            value={summary.marketplaceNetSales}
+            strong
+          />
           <BreakdownRow label="Cost of goods" value={summary.costOfGoods} negative />
           <BreakdownRow label="True net profit" value={summary.netProfit} strong />
         </Card>
@@ -142,7 +150,10 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
       {sales.length === 0 && !hasQuery ? (
         <div className="bg-muted/20 text-muted-foreground rounded-xl border border-dashed p-12 text-center text-sm">
           <p>No sales recorded yet.</p>
-          <Link href="/finance/new" className="text-foreground mt-3 inline-block font-medium underline">
+          <Link
+            href="/finance/new"
+            className="text-foreground mt-3 inline-block font-medium underline"
+          >
             Record the first sale
           </Link>
         </div>
@@ -173,9 +184,14 @@ function BreakdownRow({
   muted?: boolean;
 }) {
   return (
-    <div className={`mt-3 flex justify-between gap-4 text-sm ${strong ? "border-t pt-3 font-semibold" : ""}`}>
+    <div
+      className={`mt-3 flex justify-between gap-4 text-sm ${strong ? "border-t pt-3 font-semibold" : ""}`}
+    >
       <span className={muted ? "text-muted-foreground/80" : "text-muted-foreground"}>{label}</span>
-      <span className="tabular-nums">{negative ? "-" : ""}{money(value)}</span>
+      <span className="tabular-nums">
+        {negative ? "-" : ""}
+        {money(value)}
+      </span>
     </div>
   );
 }
