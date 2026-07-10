@@ -2133,9 +2133,17 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("BuyerEmail")
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)");
+
                     b.Property<string>("BuyerName")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
+
+                    b.Property<string>("BuyerNote")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
 
                     b.Property<string>("BuyerReference")
                         .HasMaxLength(200)
@@ -2178,6 +2186,9 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("OrganizationId")
                         .HasColumnType("uuid");
 
+                    b.Property<DateTimeOffset?>("PaidAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<decimal?>("PayoutAmount")
                         .HasPrecision(12, 2)
                         .HasColumnType("numeric(12,2)");
@@ -2202,6 +2213,41 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                     b.Property<decimal?>("SellerShippingCost")
                         .HasPrecision(12, 2)
                         .HasColumnType("numeric(12,2)");
+
+                    b.Property<string>("ShipToCity")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<string>("ShipToCountry")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<string>("ShipToLine1")
+                        .HasMaxLength(240)
+                        .HasColumnType("character varying(240)");
+
+                    b.Property<string>("ShipToLine2")
+                        .HasMaxLength(240)
+                        .HasColumnType("character varying(240)");
+
+                    b.Property<string>("ShipToName")
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)");
+
+                    b.Property<string>("ShipToPhone")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<string>("ShipToPostalCode")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("ShipToRegion")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<DateTimeOffset?>("ShippedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<decimal>("ShippingCharged")
                         .HasPrecision(12, 2)
@@ -2251,11 +2297,22 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                         .HasMaxLength(120)
                         .HasColumnType("character varying(120)");
 
+                    b.Property<string>("FeeBreakdownJson")
+                        .HasColumnType("jsonb");
+
                     b.Property<Guid?>("InventoryItemId")
                         .HasColumnType("uuid");
 
+                    b.Property<decimal?>("NetSales")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
+
                     b.Property<Guid>("OrganizationId")
                         .HasColumnType("uuid");
+
+                    b.Property<decimal?>("PlatformFees")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
 
                     b.Property<Guid>("PlatformOrderId")
                         .HasColumnType("uuid");
@@ -2263,14 +2320,33 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                     b.Property<int>("Quantity")
                         .HasColumnType("integer");
 
+                    b.Property<string>("RawJson")
+                        .HasColumnType("jsonb");
+
+                    b.Property<decimal?>("SellerShippingCost")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
+
+                    b.Property<decimal?>("ShippingCharged")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
+
                     b.Property<string>("Sku")
                         .HasMaxLength(120)
                         .HasColumnType("character varying(120)");
+
+                    b.Property<decimal?>("TaxCollected")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
 
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasMaxLength(400)
                         .HasColumnType("character varying(400)");
+
+                    b.Property<decimal?>("TotalSales")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
 
                     b.Property<decimal>("UnitPrice")
                         .HasPrecision(12, 2)
