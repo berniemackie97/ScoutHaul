@@ -1,7 +1,7 @@
 {
   "openapi": "3.0.4",
   "info": {
-    "title": "HaulScout.Api",
+    "title": "HaulScout.Api, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null",
     "version": "1.0"
   },
   "paths": {
@@ -994,7 +994,7 @@
     "/": {
       "get": {
         "tags": [
-          "HaulScout.Api"
+          "HaulScout.Api, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
         ],
         "responses": {
           "200": {
@@ -9541,12 +9541,62 @@
             "type": "string",
             "nullable": true
           },
+          "buyerEmail": {
+            "type": "string",
+            "nullable": true
+          },
+          "buyerNote": {
+            "type": "string",
+            "nullable": true
+          },
+          "shipToName": {
+            "type": "string",
+            "nullable": true
+          },
+          "shipToPhone": {
+            "type": "string",
+            "nullable": true
+          },
+          "shipToLine1": {
+            "type": "string",
+            "nullable": true
+          },
+          "shipToLine2": {
+            "type": "string",
+            "nullable": true
+          },
+          "shipToCity": {
+            "type": "string",
+            "nullable": true
+          },
+          "shipToRegion": {
+            "type": "string",
+            "nullable": true
+          },
+          "shipToPostalCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "shipToCountry": {
+            "type": "string",
+            "nullable": true
+          },
           "carrier": {
             "type": "string",
             "nullable": true
           },
           "trackingNumber": {
             "type": "string",
+            "nullable": true
+          },
+          "paidAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "shippedAt": {
+            "type": "string",
+            "format": "date-time",
             "nullable": true
           },
           "feeBreakdownJson": {
@@ -9580,6 +9630,44 @@
             "nullable": true
           },
           "sku": {
+            "type": "string",
+            "nullable": true
+          },
+          "shippingCharged": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "taxCollected": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "platformFees": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "sellerShippingCost": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "netSales": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "totalSales": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "feeBreakdownJson": {
+            "type": "string",
+            "nullable": true
+          },
+          "rawJson": {
             "type": "string",
             "nullable": true
           }
@@ -11613,6 +11701,46 @@
             "type": "string",
             "nullable": true
           },
+          "buyerEmail": {
+            "type": "string",
+            "nullable": true
+          },
+          "buyerNote": {
+            "type": "string",
+            "nullable": true
+          },
+          "shipToName": {
+            "type": "string",
+            "nullable": true
+          },
+          "shipToPhone": {
+            "type": "string",
+            "nullable": true
+          },
+          "shipToLine1": {
+            "type": "string",
+            "nullable": true
+          },
+          "shipToLine2": {
+            "type": "string",
+            "nullable": true
+          },
+          "shipToCity": {
+            "type": "string",
+            "nullable": true
+          },
+          "shipToRegion": {
+            "type": "string",
+            "nullable": true
+          },
+          "shipToPostalCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "shipToCountry": {
+            "type": "string",
+            "nullable": true
+          },
           "orderedAt": {
             "type": "string",
             "format": "date-time"
@@ -11670,6 +11798,16 @@
             "type": "string",
             "nullable": true
           },
+          "paidAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "shippedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
           "status": {
             "$ref": "#/components/schemas/PlatformOrderStatus"
           },
@@ -11725,6 +11863,40 @@
             "nullable": true
           },
           "sku": {
+            "type": "string",
+            "nullable": true
+          },
+          "shippingCharged": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "taxCollected": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "platformFees": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "sellerShippingCost": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "netSales": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "totalSales": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "feeBreakdownJson": {
             "type": "string",
             "nullable": true
           },
@@ -14927,7 +15099,7 @@
       "name": "Dashboard"
     },
     {
-      "name": "HaulScout.Api"
+      "name": "HaulScout.Api, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
     },
     {
       "name": "Inventory"

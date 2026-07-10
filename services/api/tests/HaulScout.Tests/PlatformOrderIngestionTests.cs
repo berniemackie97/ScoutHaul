@@ -96,24 +96,31 @@ public class PlatformOrderIngestionTests
     }
 
     [Fact]
-    public async Task Reingesting_a_reconciled_order_is_skipped()
+    public async Task Reingesting_a_reconciled_order_refreshes_it_for_re_reconciliation()
     {
-        var (db, org, user) = NewContext(nameof(Reingesting_a_reconciled_order_is_skipped));
+        var (db, org, user) = NewContext(nameof(Reingesting_a_reconciled_order_refreshes_it_for_re_reconciliation));
         await using var _ = db;
         var controller = NewController(db, org, user);
         var item = SeedItem(db, org, "Leather Boots", 30m);
 
-        IngestPlatformOrderLineInput[] lines = [new("Leather Boots", 90m)];
+        IngestPlatformOrderLineInput[] lines = [new("Leather Boots", 90m, ExternalItemId: "EBAY-BOOTS-9")];
         await controller.Ingest(new IngestPlatformOrdersRequest("eBay", [Order("ORD-9", lines, fee: 12m)]), CancellationToken.None);
         PlatformOrder order = await db.PlatformOrders.Include(o => o.Lines).SingleAsync();
         await controller.Reconcile(order.Id, new ReconcilePlatformOrderRequest([new ReconcilePlatformOrderLineMap(order.Lines.First().Id, item.Id)]), CancellationToken.None);
 
-        ActionResult<IngestPlatformOrdersResultDto> reingest = await controller.Ingest(new IngestPlatformOrdersRequest("eBay", [Order("ORD-9", lines, fee: 999m)]), CancellationToken.None);
-        Assert.Equal(1, reingest.Value!.Skipped);
+        ActionResult<IngestPlatformOrdersResultDto> reingest = await controller.Ingest(new IngestPlatformOrdersRequest("eBay", [Order("ORD-9", lines, fee: 15m)]), CancellationToken.None);
+        Assert.Equal(0, reingest.Value!.Skipped);
+        Assert.Equal(1, reingest.Value.Updated);
 
-        PlatformOrder unchanged = await db.PlatformOrders.SingleAsync();
-        Assert.Equal(12m, unchanged.FeeTotal); // reconciled numbers are posted; never overwritten
-        Assert.Equal(PlatformOrderStatus.Reconciled, unchanged.Status);
+        PlatformOrder refreshed = await db.PlatformOrders.Include(o => o.Lines).SingleAsync();
+        Assert.Equal(15m, refreshed.FeeTotal);
+        Assert.Equal(PlatformOrderStatus.Imported, refreshed.Status);
+        Assert.Equal(item.Id, refreshed.Lines.Single().InventoryItemId);
+
+        await controller.Reconcile(refreshed.Id, new ReconcilePlatformOrderRequest([]), CancellationToken.None);
+        Sale corrected = await db.Sales.SingleAsync(sale => sale.InventoryItemId == item.Id);
+        Assert.Equal(15m, corrected.PlatformFees);
+        Assert.Single(await db.Orders.ToListAsync());
     }
 
     [Fact]
@@ -308,10 +315,27 @@ public class PlatformOrderIngestionTests
         Assert.Equal(15m, result.Value.Sales.Sum(sale => sale.PlatformFees)); // full fee allocated across both
     }
 
-    private const string EbayCsv = """
+    private const string EbayAllOrdersCsv = """
+Order Number,Buyer Username,Buyer Name,Buyer Email,Buyer Note,Ship To Name,Ship To Phone,Ship To Address 1,Ship To Address 2,Ship To City,Ship To State,Ship To Zip,Ship To Country,Sale Date,Paid On Date,Shipped On Date,Shipping Service,Tracking Number,Item Number,Item Title,Custom Label,Quantity,Sold For,Shipping And Handling,Seller Collected Tax,eBay Collected Tax,Total Price
+27-12513-18593,brassbuyer,Brass Buyer,buyer@example.com,,Brass Buyer,,1 Main St,,Scranton,PA,18503,United States,Jun-30-26,Jun-30-26,Jul-1-26,USPS Ground Advantage,9400111100000000000000,377251318593,Brass Lamp,SKU-LAMP,1,$77.28,$3.69,$0.00,$7.15,$88.12
+""";
+
+    private const string EbayListingSalesCsv = """
 "Report for Apr 9, 2026 to Jul 7, 2026"
 Listing title,eBay item ID,Store category L1,Store category L2,Quantity sold,Total sales (Includes taxes),Item sales,Taxes and government fees paid by buyer to you,Taxes and government fees paid by buyer to eBay,Shipping and handling paid by buyer to you,Total selling costs,Insertion fees,Optional listing upgrade fees,Final value fees,Promoted Listings - General fees,Promoted Listings - Priority fees,Ads Express fees,Promoted Offsite - Fees,International fees,Other eBay fees,Deposit processing fees,Fee credits,Shipping labels cost (Amount you paid to buy shipping labels on eBay),Net sales (Net of taxes and selling costs),Average Selling price,Quantity sold via promoted listing,Quantity sold via Best Offers,Quantity sold via Seller Initiated Offers,
 Brass Lamp,377251318593,-,-,1,$88.12,$77.28,$0.00,$7.15,$3.69,$18.05,$0.00,$0.00,$19.29,$0.00,$0.00,$0.00,$0.00,$0.00,$0.00,$0.00,$7.21,$5.97,$62.92,$88.12,0,1,0
+""";
+
+    private const string EbayRepeatListingAllOrdersCsv = """
+Order Number,Buyer Username,Buyer Name,Buyer Email,Buyer Note,Ship To Name,Ship To Phone,Ship To Address 1,Ship To Address 2,Ship To City,Ship To State,Ship To Zip,Ship To Country,Sale Date,Paid On Date,Shipped On Date,Shipping Service,Tracking Number,Item Number,Item Title,Custom Label,Quantity,Sold For,Shipping And Handling,Seller Collected Tax,eBay Collected Tax,Total Price
+ORD-A,buyer-a,Buyer A,,,,,,,,,,United States,Jun-30-26,Jun-30-26,,,TRACK-A,REPEAT-ITEM,Repeat Listing Item,,1,$60.00,$6.00,$0.00,$0.00,$66.00
+ORD-B,buyer-b,Buyer B,,,,,,,,,,United States,Jul-1-26,Jul-1-26,,,TRACK-B,REPEAT-ITEM,Repeat Listing Item,,1,$40.00,$4.00,$0.00,$0.00,$44.00
+""";
+
+    private const string EbayRepeatListingSalesCsv = """
+"Report for Jun 1, 2026 to Jul 7, 2026"
+Listing title,eBay item ID,Store category L1,Store category L2,Quantity sold,Total sales (Includes taxes),Item sales,Taxes and government fees paid by buyer to you,Taxes and government fees paid by buyer to eBay,Shipping and handling paid by buyer to you,Total selling costs,Insertion fees,Optional listing upgrade fees,Final value fees,Promoted Listings - General fees,Promoted Listings - Priority fees,Ads Express fees,Promoted Offsite - Fees,International fees,Other eBay fees,Deposit processing fees,Fee credits,Shipping labels cost (Amount you paid to buy shipping labels on eBay),Net sales (Net of taxes and selling costs),Average Selling price,Quantity sold via promoted listing,Quantity sold via Best Offers,Quantity sold via Seller Initiated Offers,
+Repeat Listing Item,REPEAT-ITEM,-,-,2,$110.00,$100.00,$0.00,$0.00,$10.00,$20.00,$0.00,$0.00,$14.00,$0.00,$0.00,$0.00,$0.00,$0.00,$0.00,$0.00,$0.00,$6.00,$84.00,$55.00,0,0,0
 """;
 
     [Fact]
@@ -321,18 +345,50 @@ Brass Lamp,377251318593,-,-,1,$88.12,$77.28,$0.00,$7.15,$3.69,$18.05,$0.00,$0.00
         await using var _ = db;
         var controller = NewController(db, org, user);
 
-        ActionResult<IngestPlatformOrdersResultDto> first = await controller.ImportEbayCsv(new ImportPlatformOrdersCsvRequest("eBay", EbayCsv), CancellationToken.None);
+        ActionResult<IngestPlatformOrdersResultDto> first = await controller.ImportEbayCsv(new ImportPlatformOrdersCsvRequest("eBay", EbayAllOrdersCsv), CancellationToken.None);
         Assert.Equal(1, first.Value!.Created);
 
         PlatformOrder order = await db.PlatformOrders.Include(o => o.Lines).SingleAsync();
-        Assert.Equal("377251318593", order.ExternalOrderId);
+        Assert.Equal("27-12513-18593", order.ExternalOrderId);
+        Assert.Equal("brassbuyer", order.BuyerReference);
+        Assert.Equal("9400111100000000000000", order.TrackingNumber);
+        Assert.Equal(0m, order.FeeTotal);                // the all-orders report has order truth, not fee truth
+
+        ActionResult<IngestPlatformOrdersResultDto> enrichment = await controller.ImportEbayCsv(new ImportPlatformOrdersCsvRequest("eBay", EbayListingSalesCsv), CancellationToken.None);
+        Assert.Equal(1, enrichment.Value!.Updated);
+        order = await db.PlatformOrders.Include(o => o.Lines).SingleAsync();
         Assert.Equal(12.08m, order.FeeTotal);            // exact eBay cut (18.05 − 5.97 label)
         Assert.Equal(5.97m, order.SellerShippingCost);
+        Assert.Equal(62.92m, order.PayoutAmount);
 
-        ActionResult<IngestPlatformOrdersResultDto> second = await controller.ImportEbayCsv(new ImportPlatformOrdersCsvRequest("eBay", EbayCsv), CancellationToken.None);
+        ActionResult<IngestPlatformOrdersResultDto> second = await controller.ImportEbayCsv(new ImportPlatformOrdersCsvRequest("eBay", EbayAllOrdersCsv), CancellationToken.None);
         Assert.Equal(0, second.Value!.Created);
         Assert.Equal(1, second.Value.Updated);
         Assert.Single(await db.PlatformOrders.ToListAsync());
+    }
+
+    [Fact]
+    public async Task Listing_sales_enrichment_allocates_repeat_listing_totals_without_double_counting()
+    {
+        var (db, org, user) = NewContext(nameof(Listing_sales_enrichment_allocates_repeat_listing_totals_without_double_counting));
+        await using var _ = db;
+        var controller = NewController(db, org, user);
+
+        await controller.ImportEbayCsv(new ImportPlatformOrdersCsvRequest("eBay", EbayRepeatListingAllOrdersCsv), CancellationToken.None);
+        await controller.ImportEbayCsv(new ImportPlatformOrdersCsvRequest("eBay", EbayRepeatListingSalesCsv), CancellationToken.None);
+
+        List<PlatformOrderLine> lines = await db.PlatformOrderLines
+            .Include(line => line.PlatformOrder)
+            .OrderBy(line => line.PlatformOrder!.ExternalOrderId)
+            .ToListAsync();
+        Assert.Equal(2, lines.Count);
+        Assert.Equal(14.00m, lines.Sum(line => line.PlatformFees));
+        Assert.Equal(6.00m, lines.Sum(line => line.SellerShippingCost));
+        Assert.Equal(84.00m, lines.Sum(line => line.NetSales));
+        Assert.Equal(8.40m, lines[0].PlatformFees);
+        Assert.Equal(5.60m, lines[1].PlatformFees);
+        Assert.Equal(3.60m, lines[0].SellerShippingCost);
+        Assert.Equal(2.40m, lines[1].SellerShippingCost);
     }
 
     [Fact]
@@ -343,7 +399,8 @@ Brass Lamp,377251318593,-,-,1,$88.12,$77.28,$0.00,$7.15,$3.69,$18.05,$0.00,$0.00
         var controller = NewController(db, org, user);
         var item = SeedItem(db, org, "Brass Lamp", 40m);
 
-        await controller.ImportEbayCsv(new ImportPlatformOrdersCsvRequest("eBay", EbayCsv), CancellationToken.None);
+        await controller.ImportEbayCsv(new ImportPlatformOrdersCsvRequest("eBay", EbayAllOrdersCsv), CancellationToken.None);
+        await controller.ImportEbayCsv(new ImportPlatformOrdersCsvRequest("eBay", EbayListingSalesCsv), CancellationToken.None);
         PlatformOrder order = await db.PlatformOrders.Include(o => o.Lines).SingleAsync();
 
         ActionResult<PlatformOrderReconcileResultDto> result = await controller.Reconcile(order.Id,
@@ -354,6 +411,35 @@ Brass Lamp,377251318593,-,-,1,$88.12,$77.28,$0.00,$7.15,$3.69,$18.05,$0.00,$0.00
         Assert.Equal(12.08m, sale.PlatformFees);
         Assert.Equal(5.97m, sale.ShippingCost);                         // seller label cost carried from the report
         Assert.Equal(77.28m + 3.69m - 40m - 12.08m - 5.97m, sale.NetProfit); // label included in net
+    }
+
+    [Fact]
+    public async Task Listing_sales_import_corrects_an_already_reconciled_sale()
+    {
+        var (db, org, user) = NewContext(nameof(Listing_sales_import_corrects_an_already_reconciled_sale));
+        await using var _ = db;
+        var controller = NewController(db, org, user);
+        var item = SeedItem(db, org, "Brass Lamp", 40m);
+
+        await controller.ImportEbayCsv(new ImportPlatformOrdersCsvRequest("eBay", EbayAllOrdersCsv), CancellationToken.None);
+        PlatformOrder order = await db.PlatformOrders.Include(o => o.Lines).SingleAsync();
+        await controller.Reconcile(order.Id,
+            new ReconcilePlatformOrderRequest([new ReconcilePlatformOrderLineMap(order.Lines.First().Id, item.Id)]), CancellationToken.None);
+
+        Sale before = await db.Sales.SingleAsync(sale => sale.InventoryItemId == item.Id);
+        Assert.Equal(0m, before.PlatformFees);
+        Assert.Equal(0m, before.ShippingCost);
+
+        ActionResult<IngestPlatformOrdersResultDto> enrichment = await controller.ImportEbayCsv(new ImportPlatformOrdersCsvRequest("eBay", EbayListingSalesCsv), CancellationToken.None);
+        Assert.Equal(2, enrichment.Value!.Updated); // one imported line refreshed + one posted sale corrected
+
+        Sale sale = await db.Sales.SingleAsync(sale => sale.InventoryItemId == item.Id);
+        Assert.Equal(12.08m, sale.PlatformFees);
+        Assert.Equal(5.97m, sale.ShippingCost);
+        Assert.Equal(3.69m, sale.ShippingCharged);
+        Assert.Equal(7.15m, sale.SalesTaxCollected);
+        Assert.Equal(77.28m + 3.69m - 40m - 12.08m - 5.97m, sale.NetProfit);
+        Assert.Single(await db.SaleCorrections.Where(correction => correction.SaleId == sale.Id).ToListAsync());
     }
 
     [Fact]
@@ -378,7 +464,8 @@ Brass Lamp,377251318593,-,-,1,$88.12,$77.28,$0.00,$7.15,$3.69,$18.05,$0.00,$0.00
         });
         await db.SaveChangesAsync();
 
-        await controller.ImportEbayCsv(new ImportPlatformOrdersCsvRequest("eBay", EbayCsv), CancellationToken.None);
+        await controller.ImportEbayCsv(new ImportPlatformOrdersCsvRequest("eBay", EbayAllOrdersCsv), CancellationToken.None);
+        await controller.ImportEbayCsv(new ImportPlatformOrdersCsvRequest("eBay", EbayListingSalesCsv), CancellationToken.None);
         PlatformOrder order = await db.PlatformOrders.Include(o => o.Lines).SingleAsync();
         await controller.Reconcile(order.Id,
             new ReconcilePlatformOrderRequest([new ReconcilePlatformOrderLineMap(order.Lines.First().Id, item.Id)]), CancellationToken.None);

@@ -15,16 +15,31 @@ const initial: ActionResult = { ok: false, message: "" };
 const selectClass =
   "h-9 w-full rounded-lg border border-input bg-background px-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring";
 const currency = (value: number | null | undefined) =>
-  typeof value === "number" ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value) : "—";
+  typeof value === "number"
+    ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value)
+    : "—";
 const date = (value: string | null | undefined) =>
   value ? new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(new Date(value)) : "—";
 
-function ReconcileButton({ disabled, willCreate, willCorrect }: { disabled: boolean; willCreate: number; willCorrect: number }) {
+function ReconcileButton({
+  disabled,
+  willCreate,
+  willCorrect,
+}: {
+  disabled: boolean;
+  willCreate: number;
+  willCorrect: number;
+}) {
   const { pending } = useFormStatus();
   const label =
     willCreate + willCorrect === 0
       ? "Match every line first"
-      : [willCreate > 0 ? `record ${willCreate}` : null, willCorrect > 0 ? `correct ${willCorrect}` : null].filter(Boolean).join(" · ");
+      : [
+          willCreate > 0 ? `record ${willCreate}` : null,
+          willCorrect > 0 ? `correct ${willCorrect}` : null,
+        ]
+          .filter(Boolean)
+          .join(" · ");
   return (
     <Button type="submit" disabled={pending || disabled}>
       {pending ? "Reconciling…" : `Reconcile (${label})`}
@@ -46,15 +61,26 @@ function OrderCard({ order, targets }: { order: PlatformOrder; targets: MatchTar
   const [ignoreState, ignoreAction] = useActionState(ignorePlatformOrder, initial);
   const lines = order.lines ?? [];
 
-  const soldById = useMemo(() => new Map(targets.map((target) => [target.id, target.isSold])), [targets]);
+  const soldById = useMemo(
+    () => new Map(targets.map((target) => [target.id, target.isSold])),
+    [targets]
+  );
   // Unsold first (a new sale), then already-recorded (a correction); each alphabetical.
   const sortedTargets = useMemo(
-    () => [...targets].sort((a, b) => Number(a.isSold) - Number(b.isSold) || a.title.localeCompare(b.title)),
+    () =>
+      [...targets].sort(
+        (a, b) => Number(a.isSold) - Number(b.isSold) || a.title.localeCompare(b.title)
+      ),
     [targets]
   );
 
   const [map, setMap] = useState<Record<string, string>>(() =>
-    Object.fromEntries(lines.map((line) => [line.id ?? "", line.inventoryItemId ?? line.suggestedInventoryItemId ?? ""]))
+    Object.fromEntries(
+      lines.map((line) => [
+        line.id ?? "",
+        line.inventoryItemId ?? line.suggestedInventoryItemId ?? "",
+      ])
+    )
   );
 
   const chosen = Object.values(map).filter(Boolean);
@@ -89,7 +115,9 @@ function OrderCard({ order, targets }: { order: PlatformOrder; targets: MatchTar
             <p className="text-muted-foreground mt-1 text-xs">
               {date(order.orderedAt)}
               {order.buyerName ? ` · ${order.buyerName}` : ""}
-              {order.trackingNumber ? ` · ${order.carrier ?? "tracking"} ${order.trackingNumber}` : ""}
+              {order.trackingNumber
+                ? ` · ${order.carrier ?? "tracking"} ${order.trackingNumber}`
+                : ""}
             </p>
           </div>
           <form action={ignoreAction}>
@@ -98,16 +126,26 @@ function OrderCard({ order, targets }: { order: PlatformOrder; targets: MatchTar
           </form>
         </div>
         <div className="flex flex-wrap gap-x-5 gap-y-1 text-xs tabular-nums">
-          <span className="text-muted-foreground">Items <span className="text-foreground">{currency(order.itemsSubtotal)}</span></span>
-          <span className="text-muted-foreground">Shipping <span className="text-foreground">{currency(order.shippingCharged)}</span></span>
-          <span className="text-muted-foreground">Tax <span className="text-foreground">{currency(order.taxCollected)}</span></span>
-          <span className="text-muted-foreground">Fees <span className="text-foreground">-{currency(order.feeTotal)}</span></span>
           <span className="text-muted-foreground">
-            Expected payout <span className="text-foreground">{currency(order.expectedPayout)}</span>
+            Items <span className="text-foreground">{currency(order.itemsSubtotal)}</span>
+          </span>
+          <span className="text-muted-foreground">
+            Shipping <span className="text-foreground">{currency(order.shippingCharged)}</span>
+          </span>
+          <span className="text-muted-foreground">
+            Tax <span className="text-foreground">{currency(order.taxCollected)}</span>
+          </span>
+          <span className="text-muted-foreground">
+            Fees <span className="text-foreground">-{currency(order.feeTotal)}</span>
+          </span>
+          <span className="text-muted-foreground">
+            Expected payout{" "}
+            <span className="text-foreground">{currency(order.expectedPayout)}</span>
           </span>
           {hasPayout && (
             <span className="text-muted-foreground">
-              {order.platform} payout <span className="text-foreground">{currency(order.payoutAmount)}</span>
+              {order.platform} payout{" "}
+              <span className="text-foreground">{currency(order.payoutAmount)}</span>
             </span>
           )}
           {varianceOff && (
@@ -136,6 +174,15 @@ function OrderCard({ order, targets }: { order: PlatformOrder; targets: MatchTar
                   const id = line.id ?? "";
                   const selected = map[id];
                   const willCorrectLine = selected ? soldById.get(selected) : false;
+                  const importedMoneyDetails = [
+                    typeof line.platformFees === "number"
+                      ? `fees -${currency(line.platformFees)}`
+                      : null,
+                    typeof line.sellerShippingCost === "number"
+                      ? `label -${currency(line.sellerShippingCost)}`
+                      : null,
+                    typeof line.netSales === "number" ? `net ${currency(line.netSales)}` : null,
+                  ].filter(Boolean);
                   return (
                     <tr key={id}>
                       <td className="px-3 py-2">
@@ -144,6 +191,11 @@ function OrderCard({ order, targets }: { order: PlatformOrder; targets: MatchTar
                           {line.quantity && line.quantity > 1 ? `×${line.quantity} · ` : ""}
                           {line.externalItemId ? `item ${line.externalItemId}` : "no platform id"}
                         </span>
+                        {importedMoneyDetails.length > 0 && (
+                          <span className="text-muted-foreground mt-1 block text-xs">
+                            {importedMoneyDetails.join(" · ")}
+                          </span>
+                        )}
                       </td>
                       <td className="px-3 py-2 text-right tabular-nums">
                         {currency((line.unitPrice ?? 0) * (line.quantity ?? 1))}
@@ -152,7 +204,9 @@ function OrderCard({ order, targets }: { order: PlatformOrder; targets: MatchTar
                         <select
                           className={selectClass}
                           value={map[id] ?? ""}
-                          onChange={(event) => setMap((current) => ({ ...current, [id]: event.target.value }))}
+                          onChange={(event) =>
+                            setMap((current) => ({ ...current, [id]: event.target.value }))
+                          }
                         >
                           <option value="">Select item…</option>
                           {sortedTargets.map((target) => (
@@ -164,8 +218,12 @@ function OrderCard({ order, targets }: { order: PlatformOrder; targets: MatchTar
                           ))}
                         </select>
                         {selected && (
-                          <span className={`mt-1 block text-xs ${willCorrectLine ? "text-amber-700" : "text-emerald-700"}`}>
-                            {willCorrectLine ? "→ corrects the recorded sale (exact fees)" : "→ records a new sale"}
+                          <span
+                            className={`mt-1 block text-xs ${willCorrectLine ? "text-amber-700" : "text-emerald-700"}`}
+                          >
+                            {willCorrectLine
+                              ? "→ corrects the recorded sale (exact fees)"
+                              : "→ records a new sale"}
                           </span>
                         )}
                       </td>
@@ -177,17 +235,23 @@ function OrderCard({ order, targets }: { order: PlatformOrder; targets: MatchTar
           </div>
 
           {!allDistinct && (
-            <p className="text-destructive text-xs">Two lines point to the same item. Each item can match only one line.</p>
+            <p className="text-destructive text-xs">
+              Two lines point to the same item. Each item can match only one line.
+            </p>
           )}
 
           <Textarea name="notes" rows={2} placeholder="Reconciliation note (optional)" />
 
           <div className="flex items-center justify-between gap-3">
             <p className="text-muted-foreground text-xs">
-              Writes {order.platform}&apos;s exact price, shipping, tax, and fees. Items you already recorded are
-              corrected in place (audited); the rest become new sales.
+              Writes {order.platform}&apos;s exact price, shipping, tax, and fees. Items you already
+              recorded are corrected in place (audited); the rest become new sales.
             </p>
-            <ReconcileButton disabled={!canReconcile} willCreate={willCreate} willCorrect={willCorrect} />
+            <ReconcileButton
+              disabled={!canReconcile}
+              willCreate={willCreate}
+              willCorrect={willCorrect}
+            />
           </div>
 
           {reconcileState.message && (
@@ -202,17 +266,26 @@ function OrderCard({ order, targets }: { order: PlatformOrder; targets: MatchTar
             </div>
           )}
         </form>
-        {ignoreState.message && !ignoreState.ok && <p className="text-destructive text-xs">{ignoreState.message}</p>}
+        {ignoreState.message && !ignoreState.ok && (
+          <p className="text-destructive text-xs">{ignoreState.message}</p>
+        )}
       </CardContent>
     </Card>
   );
 }
 
-export function PlatformOrderReconciler({ orders, targets }: { orders: PlatformOrder[]; targets: MatchTarget[] }) {
+export function PlatformOrderReconciler({
+  orders,
+  targets,
+}: {
+  orders: PlatformOrder[];
+  targets: MatchTarget[];
+}) {
   if (orders.length === 0) {
     return (
       <div className="bg-muted/20 text-muted-foreground rounded-xl border border-dashed p-12 text-center text-sm">
-        No orders waiting to reconcile. Sync from a marketplace tab with the extension, or import below.
+        No orders waiting to reconcile. Import an eBay All orders report below, then optionally
+        import Listing sales to add exact fees and net-sales figures.
       </div>
     );
   }

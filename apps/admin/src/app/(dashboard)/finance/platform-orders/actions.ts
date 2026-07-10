@@ -19,7 +19,10 @@ function errorMessage(error: unknown, fallback: string): string {
   return fallback;
 }
 
-export async function reconcilePlatformOrder(_previous: ActionResult, formData: FormData): Promise<ActionResult> {
+export async function reconcilePlatformOrder(
+  _previous: ActionResult,
+  formData: FormData
+): Promise<ActionResult> {
   const orderId = formData.get("orderId");
   if (typeof orderId !== "string" || !orderId) return { ok: false, message: "Missing order." };
 
@@ -28,51 +31,74 @@ export async function reconcilePlatformOrder(_previous: ActionResult, formData: 
     const parsed = JSON.parse((formData.get("mappingJson") as string) ?? "[]");
     if (Array.isArray(parsed)) {
       lines = parsed
-        .filter((row) => row && typeof row.platformOrderLineId === "string" && typeof row.inventoryItemId === "string" && row.inventoryItemId)
-        .map((row) => ({ platformOrderLineId: row.platformOrderLineId as string, inventoryItemId: row.inventoryItemId as string }));
+        .filter(
+          (row) =>
+            row &&
+            typeof row.platformOrderLineId === "string" &&
+            typeof row.inventoryItemId === "string" &&
+            row.inventoryItemId
+        )
+        .map((row) => ({
+          platformOrderLineId: row.platformOrderLineId as string,
+          inventoryItemId: row.inventoryItemId as string,
+        }));
     }
   } catch {
     return { ok: false, message: "Line mapping could not be read. Reload and try again." };
   }
-  if (lines.length === 0) return { ok: false, message: "Match every line to an inventory item first." };
+  if (lines.length === 0)
+    return { ok: false, message: "Match every line to an inventory item first." };
 
   const uniqueItems = new Set(lines.map((line) => line.inventoryItemId));
-  if (uniqueItems.size !== lines.length) return { ok: false, message: "Each inventory item can be matched to only one line." };
+  if (uniqueItems.size !== lines.length)
+    return { ok: false, message: "Each inventory item can be matched to only one line." };
 
   const api = await getApiClient();
   const result = await api.POST("/api/platform-orders/{id}/reconcile", {
     params: { path: { id: orderId } },
     body: { lines, notes: (formData.get("notes") as string)?.trim() || null },
   });
-  if (!result.data?.saleGroupId) return { ok: false, message: errorMessage(result.error, "The order could not be reconciled.") };
+  if (!result.data?.saleGroupId)
+    return { ok: false, message: errorMessage(result.error, "The order could not be reconciled.") };
 
   revalidatePath("/finance/platform-orders");
   revalidatePath("/finance");
   revalidatePath("/inventory");
   const created = result.data.createdSaleCount ?? 0;
   const corrected = result.data.correctedSaleCount ?? 0;
-  const parts = [created > 0 ? `${created} new sale${created === 1 ? "" : "s"}` : null, corrected > 0 ? `${corrected} corrected` : null].filter(Boolean);
+  const parts = [
+    created > 0 ? `${created} new sale${created === 1 ? "" : "s"}` : null,
+    corrected > 0 ? `${corrected} corrected` : null,
+  ].filter(Boolean);
   return { ok: true, message: `Reconciled: ${parts.join(", ") || "done"}.` };
 }
 
-export async function ignorePlatformOrder(_previous: ActionResult, formData: FormData): Promise<ActionResult> {
+export async function ignorePlatformOrder(
+  _previous: ActionResult,
+  formData: FormData
+): Promise<ActionResult> {
   const orderId = formData.get("orderId");
   if (typeof orderId !== "string" || !orderId) return { ok: false, message: "Missing order." };
 
   const api = await getApiClient();
-  const result = await api.POST("/api/platform-orders/{id}/ignore", { params: { path: { id: orderId } } });
-  if (!result.data?.id) return { ok: false, message: errorMessage(result.error, "The order could not be ignored.") };
+  const result = await api.POST("/api/platform-orders/{id}/ignore", {
+    params: { path: { id: orderId } },
+  });
+  if (!result.data?.id)
+    return { ok: false, message: errorMessage(result.error, "The order could not be ignored.") };
 
   revalidatePath("/finance/platform-orders");
   return { ok: true, message: "Order set aside." };
 }
 
 /**
- * Import eBay's own Sales report CSV (Seller Hub → Performance → Sales → Download) — the authoritative fee
- * source. Parsed server-side through the same idempotent ingest path as normalized JSON. This is the primary,
- * zero-setup path.
+ * Import eBay seller CSVs. All orders is the authoritative order/customer/tracking source; Listing sales enriches
+ * previously imported order lines with exact fees, shipping-label costs, and net sales.
  */
-export async function importEbayCsv(_previous: ActionResult, formData: FormData): Promise<ActionResult> {
+export async function importEbayCsv(
+  _previous: ActionResult,
+  formData: FormData
+): Promise<ActionResult> {
   const file = formData.get("csvFile");
   const pasted = (formData.get("csvText") as string)?.trim();
   let csv = "";
@@ -81,21 +107,34 @@ export async function importEbayCsv(_previous: ActionResult, formData: FormData)
   } else if (pasted) {
     csv = pasted;
   }
-  if (!csv) return { ok: false, message: "Choose the eBay report CSV file (or paste its contents)." };
+  if (!csv)
+    return { ok: false, message: "Choose the eBay report CSV file (or paste its contents)." };
 
   const api = await getApiClient();
-  const result = await api.POST("/api/platform-orders/import/ebay-csv", { body: { platform: "eBay", csv } });
-  if (!result.data) return { ok: false, message: errorMessage(result.error, "The eBay report could not be imported.") };
+  const result = await api.POST("/api/platform-orders/import/ebay-csv", {
+    body: { platform: "eBay", csv },
+  });
+  if (!result.data)
+    return {
+      ok: false,
+      message: errorMessage(result.error, "The eBay report could not be imported."),
+    };
 
   revalidatePath("/finance/platform-orders");
   const { created, updated, skipped } = result.data;
-  return { ok: true, message: `Imported ${created} new, updated ${updated}, skipped ${skipped}. Reconcile them below.` };
+  return {
+    ok: true,
+    message: `Imported ${created} new, updated ${updated}, skipped ${skipped}. Reconcile or re-reconcile them below.`,
+  };
 }
 
 /**
  * Manual fallback for importing normalized orders when a platform-specific parser is not available yet.
  */
-export async function importPlatformOrders(_previous: ActionResult, formData: FormData): Promise<ActionResult> {
+export async function importPlatformOrders(
+  _previous: ActionResult,
+  formData: FormData
+): Promise<ActionResult> {
   const platform = (formData.get("platform") as string)?.trim();
   const raw = (formData.get("ordersJson") as string)?.trim();
   if (!platform) return { ok: false, message: "Choose the platform these orders came from." };
@@ -108,12 +147,14 @@ export async function importPlatformOrders(_previous: ActionResult, formData: Fo
   } catch {
     return { ok: false, message: "That is not valid JSON. Copy the whole export and try again." };
   }
-  if (!Array.isArray(orders) || orders.length === 0) return { ok: false, message: "No orders found in the pasted JSON." };
+  if (!Array.isArray(orders) || orders.length === 0)
+    return { ok: false, message: "No orders found in the pasted JSON." };
 
   const body = { platform, orders } as unknown as IngestPlatformOrdersRequest;
   const api = await getApiClient();
   const result = await api.POST("/api/platform-orders/ingest", { body });
-  if (!result.data) return { ok: false, message: errorMessage(result.error, "The orders could not be imported.") };
+  if (!result.data)
+    return { ok: false, message: errorMessage(result.error, "The orders could not be imported.") };
 
   revalidatePath("/finance/platform-orders");
   const { created, updated, skipped } = result.data;

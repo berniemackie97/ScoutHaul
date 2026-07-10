@@ -395,7 +395,7 @@ public static class DtoMapping
     /// <summary>The payout a marketplace should deposit: item + buyer shipping − fees, plus any tax the seller
     /// keeps (when the platform does not remit it). Compared to the imported payout to surface fee/import drift.</summary>
     public static decimal ExpectedPayout(this PlatformOrder order) =>
-        order.ItemsSubtotal + order.ShippingCharged - order.FeeTotal + (order.TaxRemittedByPlatform ? 0 : order.TaxCollected);
+        order.ItemsSubtotal + order.ShippingCharged - order.FeeTotal - (order.SellerShippingCost ?? 0) + (order.TaxRemittedByPlatform ? 0 : order.TaxCollected);
 
     public static PlatformListingDto ToDto(this PlatformListing listing, (Guid Id, string Title, bool AlreadySold)? suggestion = null) => new(
         listing.Id,
@@ -432,6 +432,16 @@ public static class DtoMapping
             order.ExternalOrderId,
             order.BuyerName,
             order.BuyerReference,
+            order.BuyerEmail,
+            order.BuyerNote,
+            order.ShipToName,
+            order.ShipToPhone,
+            order.ShipToLine1,
+            order.ShipToLine2,
+            order.ShipToCity,
+            order.ShipToRegion,
+            order.ShipToPostalCode,
+            order.ShipToCountry,
             order.OrderedAt,
             order.ItemsSubtotal,
             order.ShippingCharged,
@@ -446,6 +456,8 @@ public static class DtoMapping
             order.FeeBreakdownJson,
             order.Carrier,
             order.TrackingNumber,
+            order.PaidAt,
+            order.ShippedAt,
             order.Status,
             order.ReconciledSaleGroupId,
             order.ReconciledAt,
@@ -463,6 +475,13 @@ public static class DtoMapping
                         line.Quantity,
                         line.ExternalItemId,
                         line.Sku,
+                        line.ShippingCharged,
+                        line.TaxCollected,
+                        line.PlatformFees,
+                        line.SellerShippingCost,
+                        line.NetSales,
+                        line.TotalSales,
+                        line.FeeBreakdownJson,
                         line.InventoryItemId,
                         line.InventoryItem?.Title,
                         suggestion?.Id,

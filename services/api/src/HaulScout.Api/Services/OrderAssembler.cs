@@ -27,7 +27,19 @@ public sealed class OrderAssembler(HaulScoutDbContext db, ICurrentUserContext cu
         decimal taxTotal,
         CancellationToken cancellationToken,
         string? shippingCarrier = null,
-        string? trackingNumber = null)
+        string? trackingNumber = null,
+        string? buyerEmail = null,
+        string? buyerNote = null,
+        string? shipToName = null,
+        string? shipToPhone = null,
+        string? shipToLine1 = null,
+        string? shipToLine2 = null,
+        string? shipToCity = null,
+        string? shipToRegion = null,
+        string? shipToPostalCode = null,
+        string? shipToCountry = null,
+        DateTimeOffset? paidAt = null,
+        DateTimeOffset? shippedAt = null)
     {
         string? normalizedExternalOrderId = TrimToNull(externalOrderId);
         string? normalizedTrackingNumber = TrimToNull(trackingNumber);
@@ -55,18 +67,22 @@ public sealed class OrderAssembler(HaulScoutDbContext db, ICurrentUserContext cu
                     cancellationToken);
         }
 
-        Customer? buyer = await ResolveBuyerAsync(channel, buyerReference, buyerName, cancellationToken);
+        Customer? buyer = await ResolveBuyerAsync(channel, buyerReference, buyerName, buyerEmail, cancellationToken);
 
         if (existing is not null)
         {
             existing.CustomerId ??= buyer?.Id;
+            existing.Email ??= TrimToNull(buyerEmail);
             existing.ExternalOrderId ??= normalizedExternalOrderId;
             existing.ExternalOrderUrl ??= TrimToNull(externalOrderUrl);
             existing.BuyerReference ??= TrimToNull(buyerReference);
             existing.ChannelAccountId ??= channelAccountId;
             existing.ShippingCarrier ??= normalizedCarrier;
             existing.TrackingNumber ??= normalizedTrackingNumber;
-            existing.PaidAt ??= orderedAt;
+            existing.CustomerNote ??= TrimToNull(buyerNote);
+            existing.PaidAt ??= paidAt ?? orderedAt;
+            existing.ShippedAt ??= shippedAt;
+            ApplyShipTo(existing, shipToName, shipToPhone, shipToLine1, shipToLine2, shipToCity, shipToRegion, shipToPostalCode, shipToCountry);
             return existing;
         }
 
@@ -81,7 +97,7 @@ public sealed class OrderAssembler(HaulScoutDbContext db, ICurrentUserContext cu
             CustomerId = buyer?.Id,
             // Marketplaces number their own orders; the storefront generates ours.
             OrderNumber = BuildOrderNumber(channel, normalizedExternalOrderId, normalizedTrackingNumber),
-            Email = null,
+            Email = TrimToNull(buyerEmail),
             Subtotal = itemsSubtotal,
             ShippingTotal = shippingTotal,
             TaxTotal = taxTotal,
@@ -90,10 +106,19 @@ public sealed class OrderAssembler(HaulScoutDbContext db, ICurrentUserContext cu
             Status = OrderStatus.Paid,
             PaymentStatus = PaymentStatus.Paid,
             FulfillmentStatus = FulfillmentStatus.Unfulfilled,
-            PaidAt = orderedAt,
+            PaidAt = paidAt ?? orderedAt,
             CreatedAt = orderedAt,
             ShippingCarrier = normalizedCarrier,
             TrackingNumber = normalizedTrackingNumber,
+            CustomerNote = TrimToNull(buyerNote),
+            ShipToName = TrimToNull(shipToName),
+            ShipToLine1 = TrimToNull(shipToLine1),
+            ShipToLine2 = TrimToNull(shipToLine2),
+            ShipToCity = TrimToNull(shipToCity),
+            ShipToRegion = TrimToNull(shipToRegion),
+            ShipToPostalCode = TrimToNull(shipToPostalCode),
+            ShipToCountry = NormalizeCountry(shipToCountry),
+            ShippedAt = shippedAt,
         };
         db.Orders.Add(order);
         return order;
@@ -192,9 +217,38 @@ public sealed class OrderAssembler(HaulScoutDbContext db, ICurrentUserContext cu
         order.FulfillmentStatus = ResolveFulfillmentStatus(allSales);
     }
 
+    /// <summary>Deletes a non-storefront order that no longer has sale lines. Used when a corrected import moves
+    /// sales from a bad/generated order onto the platform's real order number.</summary>
+    public async Task PruneEmptyMarketplaceOrderAsync(Guid orderId, CancellationToken cancellationToken)
+    {
+        Order? order = await db.Orders
+            .Include(item => item.Lines)
+            .SingleOrDefaultAsync(
+                item => item.Id == orderId && item.OrganizationId == currentUser.OrganizationId && item.Channel != "Storefront",
+                cancellationToken);
+        if (order is null)
+        {
+            return;
+        }
+
+        bool hasSales = await db.Sales.AnyAsync(
+            sale => sale.OrganizationId == currentUser.OrganizationId && sale.OrderId == order.Id,
+            cancellationToken);
+        if (hasSales)
+        {
+            return;
+        }
+
+        if (order.Lines.Count > 0)
+        {
+            db.OrderLines.RemoveRange(order.Lines);
+        }
+        db.Orders.Remove(order);
+    }
+
     /// <summary>Resolves the buyer on a channel by their handle, creating the customer + channel identity on first
     /// sight. Marketplace buyers have no email, so the (channel, username) pair is the durable key.</summary>
-    public async Task<Customer?> ResolveBuyerAsync(string channel, string? buyerReference, string? buyerName, CancellationToken cancellationToken)
+    public async Task<Customer?> ResolveBuyerAsync(string channel, string? buyerReference, string? buyerName, string? buyerEmail, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(buyerReference))
         {
@@ -211,13 +265,20 @@ public sealed class OrderAssembler(HaulScoutDbContext db, ICurrentUserContext cu
         if (identity is not null)
         {
             identity.LastSeenAt = DateTimeOffset.UtcNow;
+            identity.Email ??= TrimToNull(buyerEmail);
+            identity.DisplayName ??= TrimToNull(buyerName);
+            if (identity.Customer is not null)
+            {
+                identity.Customer.Email ??= TrimToNull(buyerEmail);
+                identity.Customer.DisplayName ??= TrimToNull(buyerName);
+            }
             return identity.Customer;
         }
 
         var customer = new Customer
         {
             OrganizationId = currentUser.OrganizationId,
-            Email = null,
+            Email = TrimToNull(buyerEmail),
             DisplayName = string.IsNullOrWhiteSpace(buyerName) ? handle : buyerName.Trim(),
         };
         db.Customers.Add(customer);
@@ -229,6 +290,7 @@ public sealed class OrderAssembler(HaulScoutDbContext db, ICurrentUserContext cu
             Channel = channel,
             ExternalUserId = handle,
             DisplayName = string.IsNullOrWhiteSpace(buyerName) ? null : buyerName.Trim(),
+            Email = TrimToNull(buyerEmail),
         });
 
         return customer;
@@ -245,6 +307,42 @@ public sealed class OrderAssembler(HaulScoutDbContext db, ICurrentUserContext cu
     {
         string? trimmed = value?.Trim();
         return string.IsNullOrWhiteSpace(trimmed) ? null : trimmed;
+    }
+
+    private static string NormalizeCountry(string? value)
+    {
+        string? country = TrimToNull(value);
+        if (country is null) return "US";
+        if (country.Equals("United States", StringComparison.OrdinalIgnoreCase)
+            || country.Equals("United States of America", StringComparison.OrdinalIgnoreCase))
+        {
+            return "US";
+        }
+        return country.Length <= 2 ? country.ToUpperInvariant() : country[..2].ToUpperInvariant();
+    }
+
+    private static void ApplyShipTo(
+        Order order,
+        string? shipToName,
+        string? shipToPhone,
+        string? shipToLine1,
+        string? shipToLine2,
+        string? shipToCity,
+        string? shipToRegion,
+        string? shipToPostalCode,
+        string? shipToCountry)
+    {
+        order.ShipToName ??= TrimToNull(shipToName);
+        order.ShipToLine1 ??= TrimToNull(shipToLine1);
+        order.ShipToLine2 ??= TrimToNull(shipToLine2);
+        order.ShipToCity ??= TrimToNull(shipToCity);
+        order.ShipToRegion ??= TrimToNull(shipToRegion);
+        order.ShipToPostalCode ??= TrimToNull(shipToPostalCode);
+        if (order.ShipToCountry is null)
+        {
+            order.ShipToCountry = NormalizeCountry(shipToCountry);
+        }
+        _ = shipToPhone; // Phone is retained on PlatformOrder for audit; Order currently has no ship-to phone field.
     }
 
     private static OrderStatus ResolveOrderStatus(IReadOnlyCollection<Sale> sales)

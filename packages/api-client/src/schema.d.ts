@@ -6875,8 +6875,22 @@ export interface components {
             taxRemittedByPlatform?: boolean;
             buyerName?: string | null;
             buyerReference?: string | null;
+            buyerEmail?: string | null;
+            buyerNote?: string | null;
+            shipToName?: string | null;
+            shipToPhone?: string | null;
+            shipToLine1?: string | null;
+            shipToLine2?: string | null;
+            shipToCity?: string | null;
+            shipToRegion?: string | null;
+            shipToPostalCode?: string | null;
+            shipToCountry?: string | null;
             carrier?: string | null;
             trackingNumber?: string | null;
+            /** Format: date-time */
+            paidAt?: string | null;
+            /** Format: date-time */
+            shippedAt?: string | null;
             feeBreakdownJson?: string | null;
             rawJson?: string | null;
         };
@@ -6888,6 +6902,20 @@ export interface components {
             quantity?: number;
             externalItemId?: string | null;
             sku?: string | null;
+            /** Format: double */
+            shippingCharged?: number | null;
+            /** Format: double */
+            taxCollected?: number | null;
+            /** Format: double */
+            platformFees?: number | null;
+            /** Format: double */
+            sellerShippingCost?: number | null;
+            /** Format: double */
+            netSales?: number | null;
+            /** Format: double */
+            totalSales?: number | null;
+            feeBreakdownJson?: string | null;
+            rawJson?: string | null;
         };
         IngestPlatformOrdersRequest: {
             platform?: string | null;
@@ -7544,6 +7572,16 @@ export interface components {
             externalOrderId?: string | null;
             buyerName?: string | null;
             buyerReference?: string | null;
+            buyerEmail?: string | null;
+            buyerNote?: string | null;
+            shipToName?: string | null;
+            shipToPhone?: string | null;
+            shipToLine1?: string | null;
+            shipToLine2?: string | null;
+            shipToCity?: string | null;
+            shipToRegion?: string | null;
+            shipToPostalCode?: string | null;
+            shipToCountry?: string | null;
             /** Format: date-time */
             orderedAt?: string;
             /** Format: double */
@@ -7567,6 +7605,10 @@ export interface components {
             feeBreakdownJson?: string | null;
             carrier?: string | null;
             trackingNumber?: string | null;
+            /** Format: date-time */
+            paidAt?: string | null;
+            /** Format: date-time */
+            shippedAt?: string | null;
             status?: components["schemas"]["PlatformOrderStatus"];
             /** Format: uuid */
             reconciledSaleGroupId?: string | null;
@@ -7588,6 +7630,19 @@ export interface components {
             quantity?: number;
             externalItemId?: string | null;
             sku?: string | null;
+            /** Format: double */
+            shippingCharged?: number | null;
+            /** Format: double */
+            taxCollected?: number | null;
+            /** Format: double */
+            platformFees?: number | null;
+            /** Format: double */
+            sellerShippingCost?: number | null;
+            /** Format: double */
+            netSales?: number | null;
+            /** Format: double */
+            totalSales?: number | null;
+            feeBreakdownJson?: string | null;
             /** Format: uuid */
             inventoryItemId?: string | null;
             inventoryItemTitle?: string | null;

@@ -8,7 +8,9 @@ import { ManualImporter } from "./importer";
 export const dynamic = "force-dynamic";
 
 const money = (value: number | null | undefined) =>
-  typeof value === "number" ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value) : "—";
+  typeof value === "number"
+    ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value)
+    : "—";
 const date = (value: string | null | undefined) =>
   value ? new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(new Date(value)) : "—";
 
@@ -27,31 +29,56 @@ export default async function PlatformOrdersPage() {
   // Match against ALL inventory (sold + unsold): unsold → new sale, already-recorded → correct that sale.
   const targets = (inventoryResult.data ?? [])
     .filter((item) => item.id && (!item.isBundle || item.bundleComponentCount === 0))
-    .map((item) => ({ id: item.id as string, title: item.title ?? "Untitled item", isSold: item.isSold ?? false }));
+    .map((item) => ({
+      id: item.id as string,
+      title: item.title ?? "Untitled item",
+      isSold: item.isSold ?? false,
+    }));
 
   const flagged = openOrders.filter(
     (order) => typeof order.payoutAmount === "number" && Math.abs(order.payoutVariance ?? 0) >= 0.01
   ).length;
 
   const kpis = [
-    { label: "Waiting to reconcile", value: String(openOrders.length), detail: "Scraped orders not yet turned into sales", icon: ScanLine },
-    { label: "Payout variances", value: String(flagged), detail: "Where the deposit ≠ item + shipping − fees", icon: Wallet },
-    { label: "Reconciled", value: String(reconciled.length), detail: "Posted with the platform's exact figures", icon: PlugZap },
+    {
+      label: "Waiting to reconcile",
+      value: String(openOrders.length),
+      detail: "Imported platform orders not yet posted to sales",
+      icon: ScanLine,
+    },
+    {
+      label: "Payout variances",
+      value: String(flagged),
+      detail: "Where imported payout ≠ computed expected payout",
+      icon: Wallet,
+    },
+    {
+      label: "Reconciled",
+      value: String(reconciled.length),
+      detail: "Posted with marketplace order + fee data",
+      icon: PlugZap,
+    },
   ];
 
   return (
     <div className="space-y-6">
       <header className="space-y-3">
-        <Link href="/finance" className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-sm">
+        <Link
+          href="/finance"
+          className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-sm"
+        >
           <ArrowLeft className="h-4 w-4" /> Finance
         </Link>
         <div>
           <p className="text-muted-foreground text-sm">Finance</p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight">Platform orders &amp; reconciliation</h1>
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight">
+            Platform orders &amp; reconciliation
+          </h1>
           <p className="text-muted-foreground mt-1 max-w-3xl text-sm">
-            Marketplace orders captured from your logged-in tabs by the browser extension. Reconciling one posts the
-            platform&apos;s own item price, buyer shipping, sales tax, and exact fee total onto ScoutHaul sales — so
-            your numbers match eBay&apos;s report instead of a hand-typed estimate.
+            Marketplace orders imported from platform reports and normalized manual data.
+            Reconciling one posts the platform&apos;s own order number, buyer, item price, buyer
+            shipping, sales tax, tracking, and fee details onto ScoutHaul sales — so customers,
+            orders, sales, and payouts resolve against the same source data.
           </p>
         </div>
       </header>
@@ -85,7 +112,9 @@ export default async function PlatformOrdersPage() {
                 <tr>
                   <th className="px-4 py-3 font-medium">Order</th>
                   <th className="px-4 py-3 font-medium">Platform</th>
+                  <th className="px-4 py-3 font-medium">Buyer</th>
                   <th className="px-4 py-3 font-medium">Ordered</th>
+                  <th className="px-4 py-3 font-medium">Tracking</th>
                   <th className="px-4 py-3 text-right font-medium">Items</th>
                   <th className="px-4 py-3 text-right font-medium">Fees</th>
                   <th className="px-4 py-3 text-right font-medium">Payout</th>
@@ -97,10 +126,20 @@ export default async function PlatformOrdersPage() {
                   <tr key={order.id} className="hover:bg-muted/30 transition-colors">
                     <td className="px-4 py-3 font-medium">{order.externalOrderId}</td>
                     <td className="text-muted-foreground px-4 py-3">{order.platform}</td>
+                    <td className="text-muted-foreground px-4 py-3">
+                      {order.buyerName ?? order.buyerReference ?? "—"}
+                    </td>
                     <td className="text-muted-foreground px-4 py-3">{date(order.orderedAt)}</td>
-                    <td className="px-4 py-3 text-right tabular-nums">{money(order.itemsSubtotal)}</td>
+                    <td className="text-muted-foreground px-4 py-3">
+                      {order.trackingNumber ?? "—"}
+                    </td>
+                    <td className="px-4 py-3 text-right tabular-nums">
+                      {money(order.itemsSubtotal)}
+                    </td>
                     <td className="px-4 py-3 text-right tabular-nums">-{money(order.feeTotal)}</td>
-                    <td className="px-4 py-3 text-right tabular-nums">{money(order.payoutAmount)}</td>
+                    <td className="px-4 py-3 text-right tabular-nums">
+                      {money(order.payoutAmount)}
+                    </td>
                     <td className="px-4 py-3">
                       <Badge variant="success">Reconciled</Badge>
                     </td>

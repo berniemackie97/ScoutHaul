@@ -6,100 +6,276 @@ using HaulScout.Application.Contracts;
 namespace HaulScout.Application.Services;
 
 /// <summary>
-/// Parses eBay's Seller Hub "Sales / Listings" report CSV — the authoritative fee source — into normalized
-/// ingest orders. The report is per listing sold in a date range: each row already carries eBay's exact fee
-/// stack (final value, promoted, international, credits) plus the shipping-label cost, keyed by eBay item id.
-/// It has no per-sale date or order id, so we key each row by its item id and date it to the report's end date;
-/// reconciliation preserves an existing sale's real date and only overwrites the money. Columns are mapped by
-/// HEADER NAME (not position) so eBay reordering a column can't silently corrupt the numbers.
+/// Parses eBay seller CSV reports by header name. The all-orders report is the authoritative source for order
+/// identity, buyer, item lines, tax, shipping, and tracking. The listing-sales report is an enrichment source for
+/// line-level selling costs/net sales; it is not an order source because it is keyed by listing/item id.
 /// </summary>
 public static class EbayReportParser
 {
-    public sealed record ParseResult(IReadOnlyList<IngestPlatformOrderInput> Orders, int RowsParsed, int RowsSkipped, string? Warning);
+    public enum EbayReportKind
+    {
+        Unknown,
+        AllOrders,
+        ListingSales
+    }
 
-    private const string ItemIdHeader = "eBay item ID";
-    private const string TitleHeader = "Listing title";
+    public sealed record ParseResult(
+        EbayReportKind Kind,
+        IReadOnlyList<IngestPlatformOrderInput> Orders,
+        IReadOnlyList<EbayListingSalesMetric> ListingSales,
+        int RowsParsed,
+        int RowsSkipped,
+        string? Warning);
 
-    public static ParseResult ParseSalesReport(string csv)
+    public sealed record EbayListingSalesMetric(
+        string ExternalItemId,
+        string Title,
+        int QuantitySold,
+        decimal TotalSales,
+        decimal ItemSales,
+        decimal TaxCollected,
+        decimal ShippingCharged,
+        decimal PlatformFees,
+        decimal SellerShippingCost,
+        decimal NetSales,
+        decimal AverageSellingPrice,
+        int QuantitySoldViaPromotedListing,
+        int QuantitySoldViaBestOffers,
+        int QuantitySoldViaSellerInitiatedOffers,
+        string FeeBreakdownJson,
+        string RawJson);
+
+    private const string ListingSalesItemIdHeader = "eBay item ID";
+    private const string ListingSalesTitleHeader = "Listing title";
+    private const string AllOrdersOrderNumberHeader = "Order Number";
+    private const string AllOrdersItemNumberHeader = "Item Number";
+
+    public static ParseResult ParseReport(string csv)
     {
         if (string.IsNullOrWhiteSpace(csv))
         {
-            return new ParseResult([], 0, 0, "The file was empty.");
+            return new ParseResult(EbayReportKind.Unknown, [], [], 0, 0, "The file was empty.");
         }
 
         List<List<string>> rows = SplitRecords(csv).Select(ParseCsvLine).ToList();
-        int headerIndex = rows.FindIndex(fields => fields.Contains(TitleHeader) && fields.Contains(ItemIdHeader));
-        if (headerIndex < 0)
+        int allOrdersHeader = rows.FindIndex(fields => fields.Contains(AllOrdersOrderNumberHeader) && fields.Contains(AllOrdersItemNumberHeader));
+        if (allOrdersHeader >= 0)
         {
-            return new ParseResult([], 0, 0, "This does not look like an eBay sales report (no 'eBay item ID' header row).");
+            return ParseAllOrdersReport(rows, allOrdersHeader);
         }
 
-        List<string> header = rows[headerIndex];
-        Dictionary<string, int> column = new(StringComparer.OrdinalIgnoreCase);
-        for (int i = 0; i < header.Count; i++)
+        int listingSalesHeader = rows.FindIndex(fields => fields.Contains(ListingSalesTitleHeader) && fields.Contains(ListingSalesItemIdHeader));
+        if (listingSalesHeader >= 0)
         {
-            column.TryAdd(header[i].Trim(), i);
+            return ParseListingSalesReport(rows, listingSalesHeader);
         }
 
-        DateTimeOffset orderedAt = ExtractReportEndDate(rows, headerIndex) ?? DateTimeOffset.UtcNow;
+        return new ParseResult(
+            EbayReportKind.Unknown,
+            [],
+            [],
+            0,
+            0,
+            "This does not look like a supported eBay report. Use the all-orders CSV for order reconciliation, or the listing-sales CSV for fee enrichment.");
+    }
+
+    // Back-compatible entry point used by older tests/callers.
+    public static ParseResult ParseSalesReport(string csv) => ParseReport(csv);
+
+    private static ParseResult ParseAllOrdersReport(IReadOnlyList<List<string>> rows, int headerIndex)
+    {
+        Dictionary<string, int> column = BuildColumnMap(rows[headerIndex]);
+        List<Dictionary<string, string>> dataRows = [];
+        for (int i = headerIndex + 1; i < rows.Count; i++)
+        {
+            List<string> row = rows[i];
+            if (string.IsNullOrWhiteSpace(Field(row, column, "Order Number")))
+            {
+                continue;
+            }
+            dataRows.Add(Materialize(row, column));
+        }
 
         List<IngestPlatformOrderInput> orders = [];
+        int skipped = 0;
+        foreach (IGrouping<string, Dictionary<string, string>> group in dataRows.GroupBy(row => row["Order Number"].Trim()))
+        {
+            List<Dictionary<string, string>> rowsForOrder = group.ToList();
+            List<Dictionary<string, string>> itemRows = rowsForOrder.Where(row => !string.IsNullOrWhiteSpace(row.GetValueOrDefault("Item Number"))).ToList();
+            if (itemRows.Count == 0)
+            {
+                skipped++;
+                continue;
+            }
+
+            Dictionary<string, string>? summaryRow = rowsForOrder.FirstOrDefault(row => string.IsNullOrWhiteSpace(row.GetValueOrDefault("Item Number")));
+            Dictionary<string, string> orderRow = summaryRow ?? itemRows[0];
+            DateTimeOffset orderedAt = Date(Field(orderRow, "Sale Date")) ?? Date(Field(orderRow, "Paid On Date")) ?? DateTimeOffset.UtcNow;
+            DateTimeOffset? paidAt = Date(Field(orderRow, "Paid On Date"));
+            DateTimeOffset? shippedAt = Date(FirstNonBlank(rowsForOrder, "Shipped On Date"));
+
+            List<IngestPlatformOrderLineInput> lines = [];
+            foreach (Dictionary<string, string> itemRow in itemRows)
+            {
+                decimal soldFor = Money(Field(itemRow, "Sold For"));
+                int quantity = (int)Math.Max(1, Money(Field(itemRow, "Quantity")));
+                lines.Add(new IngestPlatformOrderLineInput(
+                    Title: TrimToDefault(Field(itemRow, "Item Title"), "Untitled eBay item"),
+                    UnitPrice: quantity > 0 ? decimal.Round(soldFor / quantity, 2, MidpointRounding.AwayFromZero) : soldFor,
+                    Quantity: quantity,
+                    ExternalItemId: TrimToNull(Field(itemRow, "Item Number")),
+                    Sku: TrimToNull(Field(itemRow, "Custom Label")),
+                    ShippingCharged: Money(Field(itemRow, "Shipping And Handling")),
+                    TaxCollected: Money(Field(itemRow, "Seller Collected Tax")) + Money(Field(itemRow, "eBay Collected Tax")),
+                    TotalSales: Money(Field(itemRow, "Total Price")),
+                    RawJson: JsonSerializer.Serialize(itemRow)));
+            }
+
+            decimal itemSubtotal = itemRows.Sum(row => Money(Field(row, "Sold For")));
+            decimal orderSubtotal = Money(Field(orderRow, "Sold For"));
+            if (orderSubtotal > itemSubtotal)
+            {
+                itemSubtotal = orderSubtotal;
+            }
+
+            decimal shipping = summaryRow is not null
+                ? Money(Field(summaryRow, "Shipping And Handling"))
+                : itemRows.Sum(row => Money(Field(row, "Shipping And Handling")));
+            decimal sellerTax = summaryRow is not null
+                ? Money(Field(summaryRow, "Seller Collected Tax"))
+                : itemRows.Sum(row => Money(Field(row, "Seller Collected Tax")));
+            decimal ebayTax = summaryRow is not null
+                ? Money(Field(summaryRow, "eBay Collected Tax"))
+                : itemRows.Sum(row => Money(Field(row, "eBay Collected Tax")));
+            string? tracking = TrimToNull(FirstNonBlank(rowsForOrder, "Tracking Number"));
+            string? carrier = TrimToNull(FirstNonBlank(rowsForOrder, "Shipping Service"));
+
+            orders.Add(new IngestPlatformOrderInput(
+                ExternalOrderId: group.Key,
+                OrderedAt: orderedAt,
+                ItemsSubtotal: itemSubtotal,
+                ShippingCharged: shipping,
+                TaxCollected: sellerTax + ebayTax,
+                FeeTotal: 0,
+                Lines: lines,
+                Platform: "eBay",
+                ShippingCost: null,
+                PayoutAmount: null,
+                Currency: "USD",
+                TaxRemittedByPlatform: sellerTax == 0,
+                BuyerName: TrimToNull(Field(orderRow, "Buyer Name")),
+                BuyerReference: TrimToNull(Field(orderRow, "Buyer Username")),
+                BuyerEmail: TrimToNull(Field(orderRow, "Buyer Email")),
+                BuyerNote: TrimToNull(Field(orderRow, "Buyer Note")),
+                ShipToName: TrimToNull(Field(orderRow, "Ship To Name")),
+                ShipToPhone: TrimToNull(Field(orderRow, "Ship To Phone")),
+                ShipToLine1: TrimToNull(Field(orderRow, "Ship To Address 1")),
+                ShipToLine2: TrimToNull(Field(orderRow, "Ship To Address 2")),
+                ShipToCity: TrimToNull(Field(orderRow, "Ship To City")),
+                ShipToRegion: TrimToNull(Field(orderRow, "Ship To State")),
+                ShipToPostalCode: TrimToNull(Field(orderRow, "Ship To Zip")),
+                ShipToCountry: TrimToNull(Field(orderRow, "Ship To Country")),
+                Carrier: carrier,
+                TrackingNumber: tracking,
+                PaidAt: paidAt,
+                ShippedAt: shippedAt,
+                RawJson: JsonSerializer.Serialize(rowsForOrder)));
+        }
+
+        string? warning = orders.Count == 0
+            ? "No order rows were found in the eBay all-orders report."
+            : skipped > 0 ? $"{skipped} order group(s) skipped because they contained no item rows." : null;
+        return new ParseResult(EbayReportKind.AllOrders, orders, [], orders.Count, skipped, warning);
+    }
+
+    private static ParseResult ParseListingSalesReport(IReadOnlyList<List<string>> rows, int headerIndex)
+    {
+        Dictionary<string, int> column = BuildColumnMap(rows[headerIndex]);
+        List<EbayListingSalesMetric> metrics = [];
         int skipped = 0;
         for (int i = headerIndex + 1; i < rows.Count; i++)
         {
             List<string> fields = rows[i];
-            string itemId = Field(fields, column, ItemIdHeader).Trim();
-            string title = Field(fields, column, TitleHeader).Trim();
+            string itemId = Field(fields, column, ListingSalesItemIdHeader).Trim();
+            string title = Field(fields, column, ListingSalesTitleHeader).Trim();
             if (itemId.Length == 0 || title.Length == 0)
             {
-                continue; // blank/trailer line, not a data row
+                continue;
             }
 
             decimal itemSales = Money(Field(fields, column, "Item sales"));
             decimal totalSales = Money(Field(fields, column, "Total sales (Includes taxes)"));
             if (itemSales <= 0 && totalSales <= 0)
             {
-                skipped++; // a $0 report artifact (e.g. a fee-only adjustment row) — nothing to reconcile
+                skipped++;
                 continue;
             }
 
             decimal taxToYou = Money(Field(fields, column, "Taxes and government fees paid by buyer to you"));
             decimal taxToEbay = Money(Field(fields, column, "Taxes and government fees paid by buyer to eBay"));
-            decimal shipToBuyer = Money(Field(fields, column, "Shipping and handling paid by buyer to you"));
             decimal totalSellingCosts = Money(FieldStartsWith(fields, column, "Total selling costs"));
             decimal shippingLabel = Money(FieldStartsWith(fields, column, "Shipping labels cost"));
-            int quantity = (int)Math.Max(1, Money(Field(fields, column, "Quantity sold")));
-
-            // eBay's own cut = every selling cost EXCEPT the shipping label the seller bought (that's a seller cost,
-            // tracked separately). Identity holds on the report: sellingCosts = fees − credits + label.
             decimal platformFees = Math.Max(0, totalSellingCosts - shippingLabel);
 
-            orders.Add(new IngestPlatformOrderInput(
-                ExternalOrderId: itemId,
-                OrderedAt: orderedAt,
-                ItemsSubtotal: itemSales,
-                ShippingCharged: shipToBuyer,
+            var feeBreakdown = new SortedDictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
+            foreach (string header in new[]
+            {
+                "Insertion fees",
+                "Optional listing upgrade fees",
+                "Final value fees",
+                "Promoted Listings - General fees",
+                "Promoted Listings - Priority fees",
+                "Ads Express fees",
+                "Promoted Offsite - Fees",
+                "International fees",
+                "Other eBay fees",
+                "Deposit processing fees",
+                "Fee credits"
+            })
+            {
+                feeBreakdown[header] = Money(Field(fields, column, header));
+            }
+
+            metrics.Add(new EbayListingSalesMetric(
+                ExternalItemId: itemId,
+                Title: title,
+                QuantitySold: (int)Math.Max(1, Money(Field(fields, column, "Quantity sold"))),
+                TotalSales: totalSales,
+                ItemSales: itemSales,
                 TaxCollected: taxToYou + taxToEbay,
-                FeeTotal: platformFees,
-                Lines: [new IngestPlatformOrderLineInput(
-                    Title: title,
-                    UnitPrice: quantity > 0 ? decimal.Round(itemSales / quantity, 2, MidpointRounding.AwayFromZero) : itemSales,
-                    Quantity: quantity,
-                    ExternalItemId: itemId)],
-                Platform: "eBay",
-                ShippingCost: shippingLabel > 0 ? shippingLabel : null,
-                PayoutAmount: null,
-                Currency: "USD",
-                // eBay remits the tax it collected ("to eBay"); tax "to you" is seller-collected and owed.
-                TaxRemittedByPlatform: taxToYou == 0,
+                ShippingCharged: Money(Field(fields, column, "Shipping and handling paid by buyer to you")),
+                PlatformFees: platformFees,
+                SellerShippingCost: shippingLabel,
+                NetSales: Money(FieldStartsWith(fields, column, "Net sales")),
+                AverageSellingPrice: Money(Field(fields, column, "Average Selling price")),
+                QuantitySoldViaPromotedListing: (int)Money(Field(fields, column, "Quantity sold via promoted listing")),
+                QuantitySoldViaBestOffers: (int)Money(Field(fields, column, "Quantity sold via Best Offers")),
+                QuantitySoldViaSellerInitiatedOffers: (int)Money(Field(fields, column, "Quantity sold via Seller Initiated Offers")),
+                FeeBreakdownJson: JsonSerializer.Serialize(feeBreakdown),
                 RawJson: JsonSerializer.Serialize(fields)));
         }
 
-        string? warning = orders.Count == 0
-            ? "No sold-listing rows were found in the report."
+        string? warning = metrics.Count == 0
+            ? "No listing-sales rows were found in the eBay report."
             : skipped > 0 ? $"{skipped} zero-value row(s) skipped." : null;
-        return new ParseResult(orders, orders.Count, skipped, warning);
+        return new ParseResult(EbayReportKind.ListingSales, [], metrics, metrics.Count, skipped, warning);
     }
+
+    private static Dictionary<string, int> BuildColumnMap(IReadOnlyList<string> header)
+    {
+        Dictionary<string, int> column = new(StringComparer.OrdinalIgnoreCase);
+        for (int i = 0; i < header.Count; i++)
+        {
+            column.TryAdd(header[i].Trim(), i);
+        }
+        return column;
+    }
+
+    private static Dictionary<string, string> Materialize(IReadOnlyList<string> row, IReadOnlyDictionary<string, int> column) =>
+        column.ToDictionary(pair => pair.Key, pair => pair.Value < row.Count ? row[pair.Value] : string.Empty, StringComparer.OrdinalIgnoreCase);
+
+    private static string Field(IReadOnlyDictionary<string, string> row, string name) =>
+        row.TryGetValue(name, out string? value) ? value : string.Empty;
 
     private static string Field(IReadOnlyList<string> fields, IReadOnlyDictionary<string, int> column, string name) =>
         column.TryGetValue(name, out int index) && index < fields.Count ? fields[index] : string.Empty;
@@ -116,6 +292,9 @@ public static class EbayReportParser
         }
         return string.Empty;
     }
+
+    private static string FirstNonBlank(IEnumerable<IReadOnlyDictionary<string, string>> rows, string name) =>
+        rows.Select(row => Field(row, name)).FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? string.Empty;
 
     /// <summary>Parses eBay money: "$1,234.56", "($12.34)" (negative), "-", "" → decimal.</summary>
     private static decimal Money(string? raw)
@@ -138,24 +317,31 @@ public static class EbayReportParser
         return negative ? -value : value;
     }
 
-    private static DateTimeOffset? ExtractReportEndDate(IReadOnlyList<IReadOnlyList<string>> rows, int headerIndex)
+    private static DateTimeOffset? Date(string? raw)
     {
-        for (int i = 0; i < headerIndex; i++)
+        if (string.IsNullOrWhiteSpace(raw))
         {
-            foreach (string cell in rows[i])
+            return null;
+        }
+
+        foreach (string format in new[] { "MMM-dd-yy", "MMM-d-yy", "M/d/yyyy", "MM/dd/yyyy", "yyyy-MM-dd" })
+        {
+            if (DateTimeOffset.TryParseExact(raw.Trim(), format, CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out DateTimeOffset parsed))
             {
-                int to = cell.IndexOf(" to ", StringComparison.OrdinalIgnoreCase);
-                if (to > 0 && cell.Contains("Report", StringComparison.OrdinalIgnoreCase))
-                {
-                    string tail = cell[(to + 4)..].Trim().TrimEnd('"');
-                    if (DateTimeOffset.TryParse(tail, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out DateTimeOffset parsed))
-                    {
-                        return parsed;
-                    }
-                }
+                return parsed;
             }
         }
-        return null;
+
+        return DateTimeOffset.TryParse(raw, CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out DateTimeOffset fallback) ? fallback : null;
+    }
+
+    private static string TrimToDefault(string? value, string fallback) =>
+        string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
+
+    private static string? TrimToNull(string? value)
+    {
+        string? trimmed = value?.Trim();
+        return string.IsNullOrWhiteSpace(trimmed) ? null : trimmed;
     }
 
     // Records are newline-separated, but a quoted field may contain newlines — split with quote awareness.
