@@ -1,7 +1,7 @@
 {
   "openapi": "3.0.4",
   "info": {
-    "title": "HaulScout.Api, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null",
+    "title": "HaulScout.Api",
     "version": "1.0"
   },
   "paths": {
@@ -994,7 +994,7 @@
     "/": {
       "get": {
         "tags": [
-          "HaulScout.Api, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+          "HaulScout.Api"
         ],
         "responses": {
           "200": {
@@ -4076,6 +4076,54 @@
                   "items": {
                     "$ref": "#/components/schemas/PlatformListingDto"
                   }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/platform-listings/import/ebay-csv": {
+      "post": {
+        "tags": [
+          "PlatformListings"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportPlatformListingsCsvRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportPlatformListingsCsvRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportPlatformListingsCsvRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/IngestPlatformListingsResultDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IngestPlatformListingsResultDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IngestPlatformListingsResultDto"
                 }
               }
             }
@@ -9335,6 +9383,20 @@
             "nullable": true
           },
           "orderReference": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ImportPlatformListingsCsvRequest": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string",
+            "nullable": true
+          },
+          "csv": {
             "type": "string",
             "nullable": true
           }
@@ -15099,7 +15161,7 @@
       "name": "Dashboard"
     },
     {
-      "name": "HaulScout.Api, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+      "name": "HaulScout.Api"
     },
     {
       "name": "Inventory"

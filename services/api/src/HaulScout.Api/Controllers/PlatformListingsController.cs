@@ -4,6 +4,7 @@ using HaulScout.Api.Authorization;
 using HaulScout.Api.Mapping;
 using HaulScout.Api.Services;
 using HaulScout.Application.Contracts;
+using HaulScout.Application.Imports;
 using HaulScout.Application.Services;
 using static HaulScout.Api.Helpers.StringHelpers;
 using HaulScout.Domain;
@@ -50,6 +51,27 @@ public sealed class PlatformListingsController(HaulScoutDbContext db, ICurrentUs
 
         Dictionary<Guid, (Guid Id, string Title, bool AlreadySold)> suggestions = await BuildSuggestions(listings, cancellationToken);
         return listings.Select(listing => listing.ToDto(Suggestion(suggestions, listing))).ToList();
+    }
+
+    /// <summary>Import eBay's own Active Listings export (Seller Hub → Listings → Download) — parsed server-side
+    /// into the same idempotent ingest, so legacy listings seed/link inventory without re-entry.</summary>
+    [HttpPost("import/ebay-csv")]
+    public async Task<ActionResult<IngestPlatformListingsResultDto>> ImportEbayCsv(ImportPlatformListingsCsvRequest request, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(request.Csv))
+        {
+            return BadRequest("Paste or upload the eBay Active Listings CSV.");
+        }
+
+        EbayActiveListingsParser.ParseResult parsed = EbayActiveListingsParser.Parse(request.Csv);
+        if (parsed.Listings.Count == 0)
+        {
+            return BadRequest(parsed.Warning ?? "No active-listing rows were found in the report.");
+        }
+
+        return await Ingest(
+            new IngestPlatformListingsRequest(string.IsNullOrWhiteSpace(request.Platform) ? "eBay" : request.Platform, parsed.Listings, null),
+            cancellationToken);
     }
 
     /// <summary>Idempotent batch upsert of imported/captured listings. Re-ingesting a listing that is not yet linked
