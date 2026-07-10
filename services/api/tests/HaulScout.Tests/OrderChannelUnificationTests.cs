@@ -50,6 +50,9 @@ public class OrderChannelUnificationTests
         return new SalesController(db, currentUser, new OrderAssembler(db, currentUser));
     }
 
+    private static OrdersController NewOrders(HaulScoutDbContext db, Guid org, Guid user) =>
+        new(db, new StubCurrentUser(org, user));
+
     private static async Task<InventoryItem> SeedItem(HaulScoutDbContext db, Guid org, string title)
     {
         var item = new InventoryItem { OrganizationId = org, Title = title, PurchasePrice = 10m, Status = InventoryStatus.Listed };
@@ -105,6 +108,29 @@ public class OrderChannelUnificationTests
         // The sale is a line of that order — not a naked row carrying a group id.
         var sale = Assert.Single(await db.Sales.ToListAsync());
         Assert.Equal(order.Id, sale.OrderId);
+    }
+
+    [Fact]
+    public async Task Order_detail_exposes_reconciled_sale_financials_on_each_line()
+    {
+        var (db, org, user) = NewContext(nameof(Order_detail_exposes_reconciled_sale_financials_on_each_line));
+        await using var _ = db;
+        var (itemId, platformOrderId, lineId) = await SeedEbayOrder(db, org, user, "EB-ORDER-FIN", "buyer_bob");
+
+        await NewPlatformOrders(db, org, user).Reconcile(platformOrderId,
+            new ReconcilePlatformOrderRequest([new ReconcilePlatformOrderLineMap(lineId, itemId)]), CancellationToken.None);
+
+        Order order = await db.Orders.SingleAsync();
+        ActionResult<OrderDetailDto> result = await NewOrders(db, org, user).Get(order.Id, CancellationToken.None);
+
+        OrderLineDto line = Assert.Single(result.Value!.Lines);
+        Assert.NotNull(line.Sale);
+        SaleDto sale = line.Sale;
+        Assert.Equal("eBay", sale.Platform);
+        Assert.Equal(120m, sale.SoldPrice);
+        Assert.Equal(10m, sale.ShippingCharged);
+        Assert.Equal(18m, sale.PlatformFees + sale.PaymentFees);
+        Assert.Equal(72m, sale.NetProfit);
     }
 
     [Fact]

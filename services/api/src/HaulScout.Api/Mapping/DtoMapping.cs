@@ -501,7 +501,7 @@ public static class DtoMapping
         item.DueAt,
         item.CreatedAt);
 
-    public static OrderLineDto ToDto(this OrderLine item) => new(
+    public static OrderLineDto ToDto(this OrderLine item, Sale? sale = null) => new(
         item.Id,
         item.InventoryItemId,
         item.TitleSnapshot,
@@ -509,7 +509,8 @@ public static class DtoMapping
         item.UnitPrice,
         item.Quantity,
         item.LineTotal,
-        item.UnitCostSnapshot);
+        item.UnitCostSnapshot,
+        sale?.ToDto());
 
     public static OrderSummaryDto ToSummaryDto(this Order item) => new(
         item.Id,
@@ -543,8 +544,13 @@ public static class DtoMapping
         item.FirstSeenAt,
         item.LastSeenAt);
 
-    public static OrderDetailDto ToDetailDto(this Order item)
+    public static OrderDetailDto ToDetailDto(this Order item, IReadOnlyDictionary<Guid, Sale>? salesByInventoryItem = null)
     {
+        Sale? SaleFor(OrderLine line) =>
+            salesByInventoryItem is not null && salesByInventoryItem.TryGetValue(line.InventoryItemId, out Sale? sale)
+                ? sale
+                : null;
+
         decimal cogs = item.Lines.Sum(line => (line.UnitCostSnapshot ?? 0) * line.Quantity);
         return new(
             item.Id,
@@ -581,7 +587,7 @@ public static class DtoMapping
             item.ShippedAt,
             item.DeliveredAt,
             item.CancelledAt,
-            item.Lines.OrderBy(line => line.TitleSnapshot).Select(line => line.ToDto()).ToList(),
+            item.Lines.OrderBy(line => line.TitleSnapshot).Select(line => line.ToDto(SaleFor(line))).ToList(),
             item.Channel,
             item.ExternalOrderId,
             item.ExternalOrderUrl,

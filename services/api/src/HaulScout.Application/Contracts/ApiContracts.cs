@@ -1137,7 +1137,8 @@ public sealed record OrderLineDto(
     decimal UnitPrice,
     int Quantity,
     decimal LineTotal,
-    decimal? UnitCostSnapshot);
+    decimal? UnitCostSnapshot,
+    SaleDto? Sale = null);
 
 public sealed record OrderSummaryDto(
     Guid Id,
