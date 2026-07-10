@@ -14,9 +14,9 @@ public class ChannelListingSyncTests
     [Fact]
     public void Sale_marks_its_channel_sold_and_flags_the_rest_for_delist()
     {
-        var ebay = Listing("eBay", ChannelListingStatus.Active);
-        var posh = Listing("Poshmark", ChannelListingStatus.Active);
-        var depop = Listing("Depop", ChannelListingStatus.Delisted);
+        ChannelListing ebay = Listing("eBay", ChannelListingStatus.Active);
+        ChannelListing posh = Listing("Poshmark", ChannelListingStatus.Active);
+        ChannelListing depop = Listing("Depop", ChannelListingStatus.Delisted);
 
         ChannelListingSync.ApplySale([ebay, posh, depop], "eBay", DateTimeOffset.UtcNow);
 
@@ -30,7 +30,7 @@ public class ChannelListingSyncTests
     [Fact]
     public void Sale_on_unknown_channel_still_flags_live_listings_for_delist()
     {
-        var ebay = Listing("eBay", ChannelListingStatus.Active);
+        ChannelListing ebay = Listing("eBay", ChannelListingStatus.Active);
         ChannelListingSync.ApplySale([ebay], "Craigslist", DateTimeOffset.UtcNow);
         Assert.Equal(ChannelListingStatus.PendingDelist, ebay.Status);
     }

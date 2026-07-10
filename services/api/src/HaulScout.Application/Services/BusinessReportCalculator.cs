@@ -56,15 +56,15 @@ public static class BusinessReportCalculator
         ReportKpiDto previous = CalculateKpis(previousSales, previousExpenses);
         string granularity = SelectGranularity(from, toExclusive);
 
-        var salesByPeriod = currentSales
+        Dictionary<DateTimeOffset, ReportSaleInput[]> salesByPeriod = currentSales
             .Where(sale => SaleWorkflow.IsRealized(sale.Status))
             .GroupBy(sale => BucketStart(sale.SoldAt, granularity))
             .ToDictionary(group => group.Key, group => group.ToArray());
-        var expensesByPeriod = currentExpenses
+        Dictionary<DateTimeOffset, ReportExpenseInput[]> expensesByPeriod = currentExpenses
             .GroupBy(expense => BucketStart(expense.OccurredAt, granularity))
             .ToDictionary(group => group.Key, group => group.ToArray());
 
-        var series = new List<ReportSeriesPointDto>();
+        List<ReportSeriesPointDto> series = [];
         for (DateTimeOffset cursor = BucketStart(from, granularity); cursor < toExclusive; cursor = NextBucket(cursor, granularity))
         {
             ReportSaleInput[] sales = salesByPeriod.GetValueOrDefault(cursor) ?? [];
@@ -104,7 +104,7 @@ public static class BusinessReportCalculator
             .OrderByDescending(item => item.Count)
             .ToArray();
 
-        var ageNow = generatedAt;
+        DateTimeOffset ageNow = generatedAt;
         ReportAgingBucketDto[] aging =
         [
             Aging("0–30 days", inventory, ageNow, 0, 30),
@@ -122,7 +122,7 @@ public static class BusinessReportCalculator
             .ToArray();
 
         int staleCount = inventory.Count(item => (ageNow - item.AcquiredAt).TotalDays > 60 && item.Status != InventoryStatus.Listed);
-        var inventorySnapshot = new ReportInventorySnapshotDto(
+        ReportInventorySnapshotDto inventorySnapshot = new(
             inventory.Count,
             inventory.Sum(item => item.PurchasePrice),
             inventory.Sum(item => item.EstimatedSalePrice),
@@ -133,7 +133,7 @@ public static class BusinessReportCalculator
             inventory.Count(item => !item.HasStorageLocation),
             inventory.Count(item => !item.HasPhoto));
 
-        var comparison = new ReportComparisonDto(
+        ReportComparisonDto comparison = new(
             Change(current.GrossSales, previous.GrossSales),
             Change(current.RealizedNetProfit, previous.RealizedNetProfit),
             Change(current.SalesCount, previous.SalesCount),
@@ -218,7 +218,7 @@ public static class BusinessReportCalculator
 
     private static DateTimeOffset BucketStart(DateTimeOffset value, string granularity)
     {
-        var utc = value.ToUniversalTime();
+        DateTimeOffset utc = value.ToUniversalTime();
         if (granularity == "month") return new DateTimeOffset(utc.Year, utc.Month, 1, 0, 0, 0, TimeSpan.Zero);
         if (granularity == "week")
         {

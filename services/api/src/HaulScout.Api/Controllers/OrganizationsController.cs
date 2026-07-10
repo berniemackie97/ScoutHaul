@@ -24,7 +24,7 @@ public sealed class OrganizationsController(
     public async Task<ActionResult<IReadOnlyList<OrganizationDto>>> ListMine(CancellationToken cancellationToken)
     {
         await currentUser.ResolveAsync();
-        var memberships = await db.OrganizationMembers
+        List<OrganizationMember> memberships = await db.OrganizationMembers
             .Include(member => member.Organization)
             .Where(member => member.UserId == currentUser.UserId)
             .OrderBy(member => member.Organization!.Name)
@@ -51,10 +51,10 @@ public sealed class OrganizationsController(
             return BadRequest("Organization name is required.");
         }
 
-        var user = await db.Users.FindAsync([currentUser.UserId], cancellationToken)
-            ?? throw new InvalidOperationException("User must be resolved before creating an organization.");
+        AppUser user = await db.Users.FindAsync([currentUser.UserId], cancellationToken)
+                       ?? throw new InvalidOperationException("User must be resolved before creating an organization.");
 
-        var organization = new Organization { Name = request.Name.Trim() };
+        Organization organization = new() { Name = request.Name.Trim() };
         db.Organizations.Add(organization);
         OrganizationRoleDefinition ownerRole = OrganizationRoleDefaults.CreateOwnerRole(organization.Id);
         OrganizationRoleDefinition operatorRole = OrganizationRoleDefaults.CreateOperatorRole(organization.Id);
@@ -76,7 +76,7 @@ public sealed class OrganizationsController(
     public async Task<ActionResult<OrganizationDto>> Get(Guid id, CancellationToken cancellationToken)
     {
         await access.RequirePermission(id, HaulScoutPermissions.ViewReports, cancellationToken);
-        var organization = await db.Organizations.FindAsync([id], cancellationToken);
+        Organization? organization = await db.Organizations.FindAsync([id], cancellationToken);
         return organization is null ? NotFound() : organization.ToDto();
     }
 
@@ -84,7 +84,7 @@ public sealed class OrganizationsController(
     public async Task<ActionResult<IReadOnlyList<OrganizationMemberDto>>> ListMembers(Guid id, CancellationToken cancellationToken)
     {
         await access.RequirePermission(id, HaulScoutPermissions.ManageMembers, cancellationToken);
-        var members = await db.OrganizationMembers
+        List<OrganizationMember> members = await db.OrganizationMembers
             .Include(member => member.User)
             .Include(member => member.RoleDefinition)
             .Where(member => member.OrganizationId == id)
@@ -120,21 +120,21 @@ public sealed class OrganizationsController(
             return BadRequest("Email and display name are required.");
         }
 
-        var organization = await db.Organizations.SingleOrDefaultAsync(item => item.Id == id, cancellationToken);
+        Organization? organization = await db.Organizations.SingleOrDefaultAsync(item => item.Id == id, cancellationToken);
         if (organization is null)
         {
             return NotFound();
         }
 
-        var email = request.Email.Trim().ToLowerInvariant();
-        var user = await db.Users.SingleOrDefaultAsync(existing => existing.Email == email, cancellationToken);
+        string email = request.Email.Trim().ToLowerInvariant();
+        AppUser? user = await db.Users.SingleOrDefaultAsync(existing => existing.Email == email, cancellationToken);
         if (user is null)
         {
             user = new AppUser { Email = email, DisplayName = request.DisplayName.Trim() };
             db.Users.Add(user);
         }
 
-        var existingMember = await db.OrganizationMembers
+        OrganizationMember? existingMember = await db.OrganizationMembers
             .SingleOrDefaultAsync(member => member.OrganizationId == id && member.UserId == user.Id, cancellationToken);
 
         if (existingMember is not null)
@@ -151,7 +151,7 @@ public sealed class OrganizationsController(
             return BadRequest("Owner role is not configured for this organization.");
         }
 
-        var member = new OrganizationMember
+        OrganizationMember member = new()
         {
             OrganizationId = id,
             UserId = user.Id,
@@ -174,7 +174,7 @@ public sealed class OrganizationsController(
     {
         await access.RequirePermission(id, HaulScoutPermissions.ManageMembers, cancellationToken);
 
-        var member = await db.OrganizationMembers
+        OrganizationMember? member = await db.OrganizationMembers
             .Include(item => item.User)
             .Include(item => item.RoleDefinition)
             .SingleOrDefaultAsync(item => item.Id == memberId && item.OrganizationId == id, cancellationToken);
@@ -185,7 +185,7 @@ public sealed class OrganizationsController(
             return BadRequest("Member already has an active authentication account.");
         }
 
-        var organization = await db.Organizations.SingleAsync(item => item.Id == id, cancellationToken);
+        Organization organization = await db.Organizations.SingleAsync(item => item.Id == id, cancellationToken);
         _ = await inviteService.SendInviteAsync(member.User.Email, member.User.DisplayName, id, organization.Name, cancellationToken);
         return member.ToDto();
     }
@@ -195,7 +195,7 @@ public sealed class OrganizationsController(
     {
         await access.RequirePermission(id, HaulScoutPermissions.ManageMembers, cancellationToken);
 
-        var inviteCodes = await db.OrganizationInviteCodes
+        List<OrganizationInviteCode> inviteCodes = await db.OrganizationInviteCodes
             .Include(item => item.Team)
             .Include(item => item.RoleDefinition)
             .Where(item => item.OrganizationId == id)
@@ -270,7 +270,7 @@ public sealed class OrganizationsController(
             return Problem("Unable to generate invite code.");
         }
 
-        var inviteCode = new OrganizationInviteCode
+        OrganizationInviteCode inviteCode = new()
         {
             OrganizationId = id,
             TeamId = team?.Id,
@@ -300,7 +300,7 @@ public sealed class OrganizationsController(
     {
         await access.RequirePermission(id, HaulScoutPermissions.ManageMembers, cancellationToken);
 
-        var inviteCode = await db.OrganizationInviteCodes
+        OrganizationInviteCode? inviteCode = await db.OrganizationInviteCodes
             .Include(item => item.Team)
             .Include(item => item.RoleDefinition)
             .SingleOrDefaultAsync(item => item.Id == inviteCodeId && item.OrganizationId == id, cancellationToken);
@@ -321,7 +321,7 @@ public sealed class OrganizationsController(
         if (string.IsNullOrWhiteSpace(request.Code)) return BadRequest("Invite code is required.");
 
         string codeHash = HashInviteCode(request.Code);
-        var inviteCode = await db.OrganizationInviteCodes
+        OrganizationInviteCode? inviteCode = await db.OrganizationInviteCodes
             .Include(item => item.Organization)
             .Include(item => item.Team)
             .Include(item => item.RoleDefinition)
@@ -339,10 +339,10 @@ public sealed class OrganizationsController(
             return BadRequest("Invite code is expired or inactive.");
         }
 
-        var user = await db.Users.FindAsync([currentUser.UserId], cancellationToken)
-            ?? throw new InvalidOperationException("User must be resolved before creating an organization.");
+        AppUser user = await db.Users.FindAsync([currentUser.UserId], cancellationToken)
+                       ?? throw new InvalidOperationException("User must be resolved before creating an organization.");
 
-        var member = await db.OrganizationMembers
+        OrganizationMember? member = await db.OrganizationMembers
             .Include(item => item.User)
             .Include(item => item.RoleDefinition)
             .SingleOrDefaultAsync(
@@ -417,7 +417,7 @@ public sealed class OrganizationsController(
             await access.RequirePermission(id, HaulScoutPermissions.ManageMembers, cancellationToken);
         }
 
-        var member = await db.OrganizationMembers
+        OrganizationMember? member = await db.OrganizationMembers
             .Include(item => item.User)
             .SingleOrDefaultAsync(item => item.Id == memberId && item.OrganizationId == id, cancellationToken);
 
@@ -443,7 +443,7 @@ public sealed class OrganizationsController(
     [HttpDelete("{id:guid}/members/{memberId:guid}")]
     public async Task<IActionResult> RemoveMember(Guid id, Guid memberId, CancellationToken cancellationToken)
     {
-        var member = await db.OrganizationMembers
+        OrganizationMember? member = await db.OrganizationMembers
             .Include(item => item.RoleDefinition)
             .SingleOrDefaultAsync(item => item.Id == memberId && item.OrganizationId == id, cancellationToken);
 
@@ -469,7 +469,7 @@ public sealed class OrganizationsController(
             await access.RequirePermission(id, HaulScoutPermissions.ManageMembers, cancellationToken);
         }
 
-        var teamMemberships = await db.OrganizationTeamMembers
+        List<OrganizationTeamMember> teamMemberships = await db.OrganizationTeamMembers
             .Where(item => item.UserId == member.UserId && item.Team!.OrganizationId == id)
             .ToListAsync(cancellationToken);
 
@@ -483,7 +483,7 @@ public sealed class OrganizationsController(
     public async Task<ActionResult<IReadOnlyList<OrganizationRoleDto>>> ListRoles(Guid id, CancellationToken cancellationToken)
     {
         await access.RequirePermission(id, HaulScoutPermissions.ManageRoles, cancellationToken);
-        var roles = await db.OrganizationRoles
+        List<OrganizationRoleDefinition> roles = await db.OrganizationRoles
             .Include(role => role.Permissions)
             .Where(role => role.OrganizationId == id)
             .OrderByDescending(role => role.IsOwnerRole)
@@ -520,7 +520,7 @@ public sealed class OrganizationsController(
             await access.RequirePermission(id, HaulScoutPermissions.ManageRoles, cancellationToken);
         }
 
-        var role = new OrganizationRoleDefinition
+        OrganizationRoleDefinition role = new()
         {
             OrganizationId = id,
             Name = request.Name.Trim(),
@@ -543,7 +543,7 @@ public sealed class OrganizationsController(
         UpsertOrganizationRoleRequest request,
         CancellationToken cancellationToken)
     {
-        var role = await db.OrganizationRoles
+        OrganizationRoleDefinition? role = await db.OrganizationRoles
             .Include(item => item.Permissions)
             .SingleOrDefaultAsync(item => item.Id == roleId && item.OrganizationId == id, cancellationToken);
 
@@ -583,7 +583,7 @@ public sealed class OrganizationsController(
     [HttpDelete("{id:guid}/roles/{roleId:guid}")]
     public async Task<IActionResult> DeleteRole(Guid id, Guid roleId, CancellationToken cancellationToken)
     {
-        var role = await db.OrganizationRoles
+        OrganizationRoleDefinition? role = await db.OrganizationRoles
             .Include(item => item.Permissions)
             .SingleOrDefaultAsync(item => item.Id == roleId && item.OrganizationId == id, cancellationToken);
 
@@ -608,7 +608,7 @@ public sealed class OrganizationsController(
     public async Task<ActionResult<IReadOnlyList<OrganizationTeamDto>>> ListTeams(Guid id, CancellationToken cancellationToken)
     {
         await access.RequirePermission(id, HaulScoutPermissions.ManageTeams, cancellationToken);
-        var teams = await db.OrganizationTeams
+        List<OrganizationTeam> teams = await db.OrganizationTeams
             .Include(team => team.Members)
             .Where(team => team.OrganizationId == id)
             .OrderBy(team => team.Name)
@@ -626,7 +626,7 @@ public sealed class OrganizationsController(
         await access.RequirePermission(id, HaulScoutPermissions.ManageTeams, cancellationToken);
         if (string.IsNullOrWhiteSpace(request.Name)) return BadRequest("Team name is required.");
 
-        var team = new OrganizationTeam
+        OrganizationTeam team = new()
         {
             OrganizationId = id,
             Name = request.Name.Trim(),
@@ -648,7 +648,7 @@ public sealed class OrganizationsController(
         await access.RequirePermission(id, HaulScoutPermissions.ManageTeams, cancellationToken);
         if (string.IsNullOrWhiteSpace(request.Name)) return BadRequest("Team name is required.");
 
-        var team = await db.OrganizationTeams
+        OrganizationTeam? team = await db.OrganizationTeams
             .Include(item => item.Members)
             .SingleOrDefaultAsync(item => item.Id == teamId && item.OrganizationId == id, cancellationToken);
 
@@ -665,7 +665,7 @@ public sealed class OrganizationsController(
     public async Task<IActionResult> DeleteTeam(Guid id, Guid teamId, CancellationToken cancellationToken)
     {
         await access.RequirePermission(id, HaulScoutPermissions.ManageTeams, cancellationToken);
-        var team = await db.OrganizationTeams
+        OrganizationTeam? team = await db.OrganizationTeams
             .SingleOrDefaultAsync(item => item.Id == teamId && item.OrganizationId == id, cancellationToken);
 
         if (team is null) return NotFound();
@@ -684,7 +684,7 @@ public sealed class OrganizationsController(
         await access.RequirePermission(id, HaulScoutPermissions.ManageTeams, cancellationToken);
         if (!await TeamBelongsToOrganization(id, teamId, cancellationToken)) return NotFound();
 
-        var members = await db.OrganizationTeamMembers
+        List<OrganizationTeamMember> members = await db.OrganizationTeamMembers
             .Include(item => item.User)
             .Include(item => item.RoleDefinition)
             .Where(item => item.TeamId == teamId)
@@ -721,7 +721,7 @@ public sealed class OrganizationsController(
             await access.RequireOwner(id, cancellationToken);
         }
 
-        var member = new OrganizationTeamMember
+        OrganizationTeamMember member = new()
         {
             TeamId = teamId,
             UserId = request.UserId,
@@ -743,7 +743,7 @@ public sealed class OrganizationsController(
         await access.RequirePermission(id, HaulScoutPermissions.ManageTeams, cancellationToken);
         if (!await TeamBelongsToOrganization(id, teamId, cancellationToken)) return NotFound();
 
-        var member = await db.OrganizationTeamMembers
+        OrganizationTeamMember? member = await db.OrganizationTeamMembers
             .SingleOrDefaultAsync(item => item.Id == memberId && item.TeamId == teamId, cancellationToken);
 
         if (member is null) return NotFound();

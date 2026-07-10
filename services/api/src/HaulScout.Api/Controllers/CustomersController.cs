@@ -4,6 +4,7 @@ using HaulScout.Api.Authorization;
 using HaulScout.Api.Mapping;
 using HaulScout.Api.Services;
 using HaulScout.Application.Contracts;
+using HaulScout.Domain.Entities;
 using HaulScout.Infrastructure.Persistence;
 
 namespace HaulScout.Api.Controllers;
@@ -21,7 +22,7 @@ public sealed class CustomersController(HaulScoutDbContext db, ICurrentUserConte
         [FromQuery] string? channel,
         CancellationToken cancellationToken)
     {
-        var query = db.Customers
+        IQueryable<Customer> query = db.Customers
             .Include(customer => customer.Orders)
             .Include(customer => customer.ChannelIdentities)
             .Where(customer => customer.OrganizationId == currentUser.OrganizationId);
@@ -41,7 +42,7 @@ public sealed class CustomersController(HaulScoutDbContext db, ICurrentUserConte
                 || customer.ChannelIdentities.Any(identity => EF.Functions.ILike(identity.ExternalUserId, $"%{term}%")));
         }
 
-        var customers = await query
+        List<Customer> customers = await query
             .OrderByDescending(customer => customer.CreatedAt)
             .Take(200)
             .ToListAsync(cancellationToken);
@@ -52,7 +53,7 @@ public sealed class CustomersController(HaulScoutDbContext db, ICurrentUserConte
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<CustomerDetailDto>> Get(Guid id, CancellationToken cancellationToken)
     {
-        var customer = await db.Customers
+        Customer? customer = await db.Customers
             .Include(item => item.Addresses)
             .Include(item => item.ChannelIdentities)
             .Include(item => item.Orders)

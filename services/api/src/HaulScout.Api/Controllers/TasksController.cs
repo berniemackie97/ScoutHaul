@@ -23,7 +23,7 @@ public sealed class TasksController(HaulScoutDbContext db, ICurrentUserContext c
             return BadRequest("Task title is required.");
         }
 
-        var task = new ResaleTask
+        ResaleTask task = new()
         {
             OrganizationId = currentUser.OrganizationId,
             InventoryItemId = request.InventoryItemId,
@@ -42,7 +42,7 @@ public sealed class TasksController(HaulScoutDbContext db, ICurrentUserContext c
     [HttpPatch("{id:guid}/assignee")]
     public async Task<ActionResult<ResaleTaskDto>> Assign(Guid id, AssignTaskRequest request, CancellationToken cancellationToken)
     {
-        var task = await FindTask(id, cancellationToken);
+        ResaleTask? task = await FindTask(id, cancellationToken);
         if (task is null)
         {
             return NotFound();
@@ -56,7 +56,7 @@ public sealed class TasksController(HaulScoutDbContext db, ICurrentUserContext c
     [HttpPatch("{id:guid}/status")]
     public async Task<ActionResult<ResaleTaskDto>> UpdateStatus(Guid id, UpdateTaskStatusRequest request, CancellationToken cancellationToken)
     {
-        var task = await FindTask(id, cancellationToken);
+        ResaleTask? task = await FindTask(id, cancellationToken);
         if (task is null)
         {
             return NotFound();
@@ -70,7 +70,7 @@ public sealed class TasksController(HaulScoutDbContext db, ICurrentUserContext c
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<ResaleTaskDto>>> List(CancellationToken cancellationToken)
     {
-        var tasks = await db.Tasks
+        List<ResaleTaskDto> tasks = await db.Tasks
             .Where(item => item.OrganizationId == currentUser.OrganizationId)
             .OrderBy(item => item.Status)
             .ThenBy(item => item.DueAt)
@@ -85,7 +85,7 @@ public sealed class TasksController(HaulScoutDbContext db, ICurrentUserContext c
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
     {
-        var task = await FindTask(id, cancellationToken);
+        ResaleTask? task = await FindTask(id, cancellationToken);
         if (task is null)
         {
             return NotFound();

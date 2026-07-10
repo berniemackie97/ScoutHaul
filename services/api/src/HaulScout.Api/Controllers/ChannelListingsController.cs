@@ -24,7 +24,7 @@ public sealed class ChannelListingsController(HaulScoutDbContext db, ICurrentUse
             return NotFound();
         }
 
-        var listings = await Query(itemId)
+        List<ChannelListing> listings = await Query(itemId)
             .OrderBy(item => item.ChannelAccount!.DisplayName)
             .ToListAsync(cancellationToken);
 
@@ -48,7 +48,7 @@ public sealed class ChannelListingsController(HaulScoutDbContext db, ICurrentUse
             return BadRequest("Channel account not found.");
         }
 
-        var listing = await Query(itemId).SingleOrDefaultAsync(item => item.ChannelAccountId == request.ChannelAccountId, cancellationToken);
+        ChannelListing? listing = await Query(itemId).SingleOrDefaultAsync(item => item.ChannelAccountId == request.ChannelAccountId, cancellationToken);
         if (listing is null)
         {
             listing = new ChannelListing
@@ -77,13 +77,13 @@ public sealed class ChannelListingsController(HaulScoutDbContext db, ICurrentUse
             listing.SoldAt ??= DateTimeOffset.UtcNow;
             // Sold here → every other channel still live needs to come down. Flag them so the
             // extension surfaces one-click delists; the operator (not a bot) actually removes them.
-            var siblings = await db.ChannelListings
+            List<ChannelListing> siblings = await db.ChannelListings
                 .Where(item => item.InventoryItemId == itemId
                     && item.OrganizationId == currentUser.OrganizationId
                     && item.ChannelAccountId != request.ChannelAccountId
                     && item.Status == ChannelListingStatus.Active)
                 .ToListAsync(cancellationToken);
-            foreach (var sibling in siblings)
+            foreach (ChannelListing sibling in siblings)
             {
                 sibling.Status = ChannelListingStatus.PendingDelist;
                 sibling.LastSyncedAt = DateTimeOffset.UtcNow;
@@ -92,14 +92,14 @@ public sealed class ChannelListingsController(HaulScoutDbContext db, ICurrentUse
 
         await db.SaveChangesAsync(cancellationToken);
 
-        var saved = await Query(itemId).SingleAsync(item => item.Id == listing.Id, cancellationToken);
+        ChannelListing saved = await Query(itemId).SingleAsync(item => item.Id == listing.Id, cancellationToken);
         return saved.ToDto();
     }
 
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid itemId, Guid id, CancellationToken cancellationToken)
     {
-        var listing = await db.ChannelListings.SingleOrDefaultAsync(
+        ChannelListing? listing = await db.ChannelListings.SingleOrDefaultAsync(
             item => item.Id == id && item.InventoryItemId == itemId && item.OrganizationId == currentUser.OrganizationId,
             cancellationToken);
         if (listing is null)
@@ -116,17 +116,17 @@ public sealed class ChannelListingsController(HaulScoutDbContext db, ICurrentUse
     [HttpGet("~/api/channel-listings")]
     public async Task<ActionResult<IReadOnlyList<ChannelListingDto>>> Worklist([FromQuery] string? status, CancellationToken cancellationToken)
     {
-        var query = db.ChannelListings
+        IQueryable<ChannelListing> query = db.ChannelListings
             .Include(item => item.ChannelAccount)
             .Include(item => item.InventoryItem)
             .Where(item => item.OrganizationId == currentUser.OrganizationId);
 
-        if (!string.IsNullOrWhiteSpace(status) && Enum.TryParse<ChannelListingStatus>(status, ignoreCase: true, out var parsed))
+        if (!string.IsNullOrWhiteSpace(status) && Enum.TryParse<ChannelListingStatus>(status, ignoreCase: true, out ChannelListingStatus parsed))
         {
             query = query.Where(item => item.Status == parsed);
         }
 
-        var listings = await query
+        List<ChannelListing> listings = await query
             .OrderByDescending(item => item.LastSyncedAt)
             .Take(500)
             .ToListAsync(cancellationToken);

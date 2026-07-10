@@ -4,6 +4,7 @@ using HaulScout.Api.Authorization;
 using HaulScout.Api.Services;
 using HaulScout.Application.Contracts;
 using HaulScout.Domain;
+using HaulScout.Domain.Entities;
 using HaulScout.Infrastructure.Persistence;
 
 namespace HaulScout.Api.Controllers;
@@ -24,28 +25,28 @@ public sealed class DashboardController(HaulScoutDbContext db, ICurrentUserConte
         // Current inventory = the Active lifecycle group (unsold, workable). Sold/fulfilling items
         // (Sold, Packed, Shipped, Delivered) are intentionally excluded so they never inflate
         // inventory value or show up as "stale" / "unlisted".
-        var currentInventoryStatuses = InventoryLifecycle.InGroup(InventoryLifecycleGroup.Active).ToArray();
+        InventoryStatus[] currentInventoryStatuses = InventoryLifecycle.InGroup(InventoryLifecycleGroup.Active).ToArray();
 
-        var unlistedStatuses = new[]
-        {
+        InventoryStatus[] unlistedStatuses =
+        [
             InventoryStatus.Purchased,
             InventoryStatus.NeedsCleaning,
             InventoryStatus.NeedsTesting,
             InventoryStatus.NeedsPhotos,
             InventoryStatus.ReadyToList
-        };
+        ];
 
-        var currentInventoryQuery = db.InventoryItems
+        IQueryable<InventoryItem> currentInventoryQuery = db.InventoryItems
             .Where(item => item.OrganizationId == organizationId && !item.IsArchived && currentInventoryStatuses.Contains(item.Status));
 
-        var staleCutoff = DateTimeOffset.UtcNow.AddDays(-60);
+        DateTimeOffset staleCutoff = DateTimeOffset.UtcNow.AddDays(-60);
 
         // EF Core DbContext is NOT thread-safe — sequential queries, but all are SQL projections (fast)
         int currentInventoryCount = await currentInventoryQuery.CountAsync(cancellationToken);
         int activeListingsCount = await db.Listings.CountAsync(item => item.OrganizationId == organizationId && item.Status == ListingStatus.Active, cancellationToken);
         decimal totalInventoryCost = await currentInventoryQuery.SumAsync(item => (decimal?)(item.PurchasePrice ?? 0) ?? 0, cancellationToken);
         decimal estimatedInventoryValue = await currentInventoryQuery.SumAsync(item => (decimal?)(item.EstimatedSalePrice ?? 0) ?? 0, cancellationToken);
-        var realizedSalesQuery = db.Sales.Where(item =>
+        IQueryable<Sale> realizedSalesQuery = db.Sales.Where(item =>
             item.OrganizationId == organizationId && !ExcludedRevenueStatuses.Contains(item.Status));
         decimal grossSales = await realizedSalesQuery.SumAsync(item => (decimal?)(item.SoldPrice + item.ShippingCharged) ?? 0, cancellationToken);
         decimal netProfit = await realizedSalesQuery.SumAsync(item => (decimal?)item.NetProfit ?? 0, cancellationToken);

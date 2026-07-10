@@ -23,25 +23,25 @@ public class AcquisitionLotTests
 
     private static (HaulScoutDbContext Db, AcquisitionLotsController Controller, Guid Org) NewController([System.Runtime.CompilerServices.CallerMemberName] string store = "")
     {
-        var org = Guid.NewGuid();
-        var user = Guid.NewGuid();
-        var options = new DbContextOptionsBuilder<HaulScoutDbContext>()
+        Guid org = Guid.NewGuid();
+        Guid user = Guid.NewGuid();
+        DbContextOptions<HaulScoutDbContext> options = new DbContextOptionsBuilder<HaulScoutDbContext>()
             .UseInMemoryDatabase(store)
             // The in-memory provider has no real transactions; itemize uses one, so silence the warning under test.
             .ConfigureWarnings(warnings => warnings.Ignore(InMemoryEventId.TransactionIgnoredWarning))
             .Options;
-        var tenant = new TenantContext();
+        TenantContext tenant = new();
         tenant.SetOrganization(org);
-        var db = new HaulScoutDbContext(options, tenant);
+        HaulScoutDbContext db = new(options, tenant);
         db.Organizations.Add(new Organization { Id = org, Name = "Overhaul Trading Company" });
         db.SaveChanges();
-        var controller = new AcquisitionLotsController(db, new StubCurrentUser(org, user));
+        AcquisitionLotsController controller = new(db, new StubCurrentUser(org, user));
         return (db, controller, org);
     }
 
     private static Guid SeedItem(HaulScoutDbContext db, Guid org, string title)
     {
-        var item = new InventoryItem { OrganizationId = org, Title = title, Status = InventoryStatus.Draft };
+        InventoryItem item = new() { OrganizationId = org, Title = title, Status = InventoryStatus.Draft };
         db.InventoryItems.Add(item);
         db.SaveChanges();
         return item.Id;
@@ -59,10 +59,10 @@ public class AcquisitionLotTests
     [Fact]
     public async Task Create_allows_a_costs_only_lot_with_no_items()
     {
-        var (db, controller, org) = NewController();
+        (HaulScoutDbContext db, AcquisitionLotsController controller, Guid org) = NewController();
 
-        var result = await controller.Create(LotRequest(AcquisitionLotAllocationMethod.Equal, 60m), default);
-        var lot = Value(result);
+        ActionResult<AcquisitionLotDto> result = await controller.Create(LotRequest(AcquisitionLotAllocationMethod.Equal, 60m), default);
+        AcquisitionLotDto lot = Value(result);
 
         Assert.Empty(lot.Items);
         Assert.Equal(60m, lot.TotalLandedCost);
@@ -74,14 +74,14 @@ public class AcquisitionLotTests
     [Fact]
     public async Task Equal_allocation_splits_landed_cost_evenly()
     {
-        var (db, controller, org) = NewController();
-        var a = SeedItem(db, org, "A");
-        var b = SeedItem(db, org, "B");
+        (HaulScoutDbContext db, AcquisitionLotsController controller, Guid org) = NewController();
+        Guid a = SeedItem(db, org, "A");
+        Guid b = SeedItem(db, org, "B");
 
-        var result = await controller.Create(
+        ActionResult<AcquisitionLotDto> result = await controller.Create(
             LotRequest(AcquisitionLotAllocationMethod.Equal, 100m, new AcquisitionLotItemInputDto(a), new AcquisitionLotItemInputDto(b)),
             default);
-        var lot = Value(result);
+        AcquisitionLotDto lot = Value(result);
 
         Assert.Equal(100m, lot.TotalAllocatedCost);
         Assert.Equal(50m, db.InventoryItems.Single(item => item.Id == a).PurchasePrice);
@@ -93,18 +93,18 @@ public class AcquisitionLotTests
     [Fact]
     public async Task Itemize_creates_draft_items_and_reallocates_across_the_full_set()
     {
-        var (db, controller, org) = NewController();
-        var seeded = SeedItem(db, org, "Seed");
-        var created = Value(await controller.Create(
+        (HaulScoutDbContext db, AcquisitionLotsController controller, Guid org) = NewController();
+        Guid seeded = SeedItem(db, org, "Seed");
+        AcquisitionLotDto created = Value(await controller.Create(
             LotRequest(AcquisitionLotAllocationMethod.Equal, 120m, new AcquisitionLotItemInputDto(seeded)),
             default));
         Assert.Equal(120m, db.InventoryItems.Single(item => item.Id == seeded).PurchasePrice);
 
-        var itemized = await controller.AddItems(
+        ActionResult<AcquisitionLotDto> itemized = await controller.AddItems(
             created.Id,
             new AddLotItemsRequest([new NewLotItemDto("New A"), new NewLotItemDto("New B")]),
             default);
-        var lot = itemized.Value!;
+        AcquisitionLotDto lot = itemized.Value!;
 
         // 3 items now share the $120 landed cost → $40 each.
         Assert.Equal(3, lot.Items.Count);
@@ -116,11 +116,11 @@ public class AcquisitionLotTests
     [Fact]
     public async Task Weighted_allocation_uses_expected_value()
     {
-        var (db, controller, org) = NewController();
-        var cheap = SeedItem(db, org, "Cheap");
-        var pricey = SeedItem(db, org, "Pricey");
+        (HaulScoutDbContext db, AcquisitionLotsController controller, Guid org) = NewController();
+        Guid cheap = SeedItem(db, org, "Cheap");
+        Guid pricey = SeedItem(db, org, "Pricey");
 
-        var lot = Value(await controller.Create(
+        AcquisitionLotDto lot = Value(await controller.Create(
             LotRequest(
                 AcquisitionLotAllocationMethod.WeightedByExpectedValue,
                 100m,

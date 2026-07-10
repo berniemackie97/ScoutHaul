@@ -7,7 +7,7 @@ public sealed class DealAnalyzer : IDealAnalyzer
 {
     public DealAnalysisResult Analyze(DealAnalysisInput input)
     {
-        List<string> warnings = new List<string>();
+        List<string> warnings = [];
 
         if (input.PricingBasis == PricingBasisType.Unavailable)
         {

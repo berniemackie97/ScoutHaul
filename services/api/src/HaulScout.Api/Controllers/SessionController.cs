@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using HaulScout.Api.Mapping;
 using HaulScout.Api.Services;
 using HaulScout.Application.Contracts;
+using HaulScout.Domain.Entities;
 using HaulScout.Infrastructure.Persistence;
 
 namespace HaulScout.Api.Controllers;
@@ -21,8 +22,8 @@ public sealed class SessionController(HaulScoutDbContext db, ICurrentUserContext
         Guid? organizationId = currentUser.ActiveOrganizationId;
 
         // EF Core DbContext not thread-safe — sequential queries
-        var user = await db.Users.SingleAsync(item => item.Id == userId, cancellationToken);
-        var organizations = await db.OrganizationMembers
+        AppUser user = await db.Users.SingleAsync(item => item.Id == userId, cancellationToken);
+        List<OrganizationDto> organizations = await db.OrganizationMembers
             .Include(item => item.Organization)
             .Where(item => item.UserId == userId)
             .OrderBy(item => item.Organization!.Name)
@@ -35,7 +36,7 @@ public sealed class SessionController(HaulScoutDbContext db, ICurrentUserContext
         int listingsCount = await db.Listings.CountAsync(item => item.OrganizationId == organizationId, cancellationToken);
         int tasksCount = await db.Tasks.CountAsync(item => item.OrganizationId == organizationId, cancellationToken);
 
-        var counts = new SessionRemoteCountsDto(
+        SessionRemoteCountsDto counts = new(
             InventoryItems: inventoryCount,
             Budgets: budgetsCount,
             MarketObservations: observationsCount,

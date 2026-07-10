@@ -45,7 +45,7 @@ public static class ResaleSearchHintBuilder
         string? condition,
         string? notes)
     {
-        var terms = new List<string>();
+        List<string> terms = [];
         Add(terms, brand);
         Add(terms, title);
         Add(terms, model);

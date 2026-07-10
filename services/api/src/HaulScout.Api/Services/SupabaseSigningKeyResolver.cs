@@ -54,7 +54,7 @@ public sealed class SupabaseSigningKeyResolver(SupabaseAuthOptions options)
             }
 
             using Stream stream = httpClient.GetStreamAsync(options.JwksUrl).GetAwaiter().GetResult();
-            using var document = JsonDocument.Parse(stream);
+            using JsonDocument document = JsonDocument.Parse(stream);
             string jwks = document.RootElement.GetRawText();
             cachedKeys = new JsonWebKeySet(jwks).GetSigningKeys().ToArray();
             expiresAt = DateTimeOffset.UtcNow.Add(CacheDuration);

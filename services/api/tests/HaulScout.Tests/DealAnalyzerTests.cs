@@ -9,9 +9,9 @@ public sealed class DealAnalyzerTests
     [Fact]
     public void Analyze_UsesLowerOfProfitAndMarginCeilings()
     {
-        var analyzer = new DealAnalyzer();
+        DealAnalyzer analyzer = new();
 
-        var result = analyzer.Analyze(new DealAnalysisInput(
+        DealAnalysisResult result = analyzer.Analyze(new DealAnalysisInput(
             ExpectedSalePrice: 100m,
             SellerAskingPrice: 40m,
             PurchasePrice: null,
@@ -35,9 +35,9 @@ public sealed class DealAnalyzerTests
     [Fact]
     public void Analyze_DoesNotInventPriceWhenExpectedSalePriceMissing()
     {
-        var analyzer = new DealAnalyzer();
+        DealAnalyzer analyzer = new();
 
-        var result = analyzer.Analyze(new DealAnalysisInput(
+        DealAnalysisResult result = analyzer.Analyze(new DealAnalysisInput(
             ExpectedSalePrice: null,
             SellerAskingPrice: 10m,
             PurchasePrice: null,
@@ -60,9 +60,9 @@ public sealed class DealAnalyzerTests
     [Fact]
     public void Analyze_RejectsNegativeCostInputs()
     {
-        var analyzer = new DealAnalyzer();
+        DealAnalyzer analyzer = new();
 
-        var result = analyzer.Analyze(new DealAnalysisInput(
+        DealAnalysisResult result = analyzer.Analyze(new DealAnalysisInput(
             ExpectedSalePrice: 100m,
             SellerAskingPrice: 25m,
             PurchasePrice: null,

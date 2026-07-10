@@ -25,12 +25,12 @@ public class OrderChannelUnificationTests
 
     private static (HaulScoutDbContext Db, Guid Org, Guid User) NewContext(string store)
     {
-        var org = Guid.NewGuid();
-        var user = Guid.NewGuid();
-        var options = new DbContextOptionsBuilder<HaulScoutDbContext>().UseInMemoryDatabase(store).Options;
-        var tenant = new TenantContext();
+        Guid org = Guid.NewGuid();
+        Guid user = Guid.NewGuid();
+        DbContextOptions<HaulScoutDbContext> options = new DbContextOptionsBuilder<HaulScoutDbContext>().UseInMemoryDatabase(store).Options;
+        TenantContext tenant = new();
         tenant.SetOrganization(org);
-        var db = new HaulScoutDbContext(options, tenant);
+        HaulScoutDbContext db = new(options, tenant);
         db.Organizations.Add(new Organization { Id = org, Name = "Overhaul Trading Company" });
         db.Users.Add(new AppUser { Id = user, Email = "op@x.com", DisplayName = "Operator" });
         db.SaveChanges();
@@ -39,18 +39,18 @@ public class OrderChannelUnificationTests
 
     private static PlatformOrdersController NewPlatformOrders(HaulScoutDbContext db, Guid org, Guid user)
     {
-        var currentUser = new StubCurrentUser(org, user);
+        StubCurrentUser currentUser = new(org, user);
         return new PlatformOrdersController(db, currentUser, new OrderAssembler(db, currentUser));
     }
 
     private static async Task<(Guid ItemId, Guid PlatformOrderId, Guid LineId)> SeedEbayOrder(
         HaulScoutDbContext db, Guid org, Guid user, string externalOrderId, string buyer)
     {
-        var item = new InventoryItem { OrganizationId = org, Title = "Brass Lamp", PurchasePrice = 40m, Status = InventoryStatus.Listed };
+        InventoryItem item = new() { OrganizationId = org, Title = "Brass Lamp", PurchasePrice = 40m, Status = InventoryStatus.Listed };
         db.InventoryItems.Add(item);
         await db.SaveChangesAsync();
 
-        var controller = NewPlatformOrders(db, org, user);
+        PlatformOrdersController controller = NewPlatformOrders(db, org, user);
         await controller.Ingest(new IngestPlatformOrdersRequest("eBay", [
             new IngestPlatformOrderInput(
                 ExternalOrderId: externalOrderId,
@@ -64,22 +64,22 @@ public class OrderChannelUnificationTests
                 BuyerName: "Some Buyer")
         ]), CancellationToken.None);
 
-        var platformOrder = await db.PlatformOrders.Include(o => o.Lines).SingleAsync(o => o.ExternalOrderId == externalOrderId);
+        PlatformOrder platformOrder = await db.PlatformOrders.Include(o => o.Lines).SingleAsync(o => o.ExternalOrderId == externalOrderId);
         return (item.Id, platformOrder.Id, platformOrder.Lines.First().Id);
     }
 
     [Fact]
     public async Task Reconciling_a_marketplace_order_creates_a_real_Order_on_that_channel()
     {
-        var (db, org, user) = NewContext(nameof(Reconciling_a_marketplace_order_creates_a_real_Order_on_that_channel));
-        await using var _ = db;
-        var (itemId, platformOrderId, lineId) = await SeedEbayOrder(db, org, user, "EB-ORDER-1", "buyer_bob");
+        (HaulScoutDbContext db, Guid org, Guid user) = NewContext(nameof(Reconciling_a_marketplace_order_creates_a_real_Order_on_that_channel));
+        await using HaulScoutDbContext _ = db;
+        (Guid itemId, Guid platformOrderId, Guid lineId) = await SeedEbayOrder(db, org, user, "EB-ORDER-1", "buyer_bob");
 
         await NewPlatformOrders(db, org, user).Reconcile(platformOrderId,
             new ReconcilePlatformOrderRequest([new ReconcilePlatformOrderLineMap(lineId, itemId)]), CancellationToken.None);
 
         // An eBay order is an Order — same entity the storefront uses.
-        var order = Assert.Single(await db.Orders.ToListAsync());
+        Order order = Assert.Single(await db.Orders.ToListAsync());
         Assert.Equal("eBay", order.Channel);
         Assert.Equal("EB-ORDER-1", order.ExternalOrderId);
         Assert.Equal("buyer_bob", order.BuyerReference);
@@ -88,41 +88,41 @@ public class OrderChannelUnificationTests
         Assert.Equal(139m, order.GrandTotal);           // 120 item + 10 shipping + 9 tax
 
         // The sale is a line of that order — not a naked row carrying a group id.
-        var sale = Assert.Single(await db.Sales.ToListAsync());
+        Sale sale = Assert.Single(await db.Sales.ToListAsync());
         Assert.Equal(order.Id, sale.OrderId);
     }
 
     [Fact]
     public async Task A_marketplace_buyer_becomes_a_customer_with_a_channel_identity()
     {
-        var (db, org, user) = NewContext(nameof(A_marketplace_buyer_becomes_a_customer_with_a_channel_identity));
-        await using var _ = db;
-        var (itemId, platformOrderId, lineId) = await SeedEbayOrder(db, org, user, "EB-ORDER-2", "buyer_bob");
+        (HaulScoutDbContext db, Guid org, Guid user) = NewContext(nameof(A_marketplace_buyer_becomes_a_customer_with_a_channel_identity));
+        await using HaulScoutDbContext _ = db;
+        (Guid itemId, Guid platformOrderId, Guid lineId) = await SeedEbayOrder(db, org, user, "EB-ORDER-2", "buyer_bob");
 
         await NewPlatformOrders(db, org, user).Reconcile(platformOrderId,
             new ReconcilePlatformOrderRequest([new ReconcilePlatformOrderLineMap(lineId, itemId)]), CancellationToken.None);
 
-        var customer = Assert.Single(await db.Customers.Include(c => c.ChannelIdentities).ToListAsync());
+        Customer customer = Assert.Single(await db.Customers.Include(c => c.ChannelIdentities).ToListAsync());
         Assert.Null(customer.Email);                    // no email — identified by handle
-        var identity = Assert.Single(customer.ChannelIdentities);
+        CustomerChannelIdentity identity = Assert.Single(customer.ChannelIdentities);
         Assert.Equal("eBay", identity.Channel);
         Assert.Equal("buyer_bob", identity.ExternalUserId);
 
-        var order = await db.Orders.SingleAsync();
+        Order order = await db.Orders.SingleAsync();
         Assert.Equal(customer.Id, order.CustomerId);
     }
 
     [Fact]
     public async Task The_same_buyer_on_a_second_order_is_recognised_not_duplicated()
     {
-        var (db, org, user) = NewContext(nameof(The_same_buyer_on_a_second_order_is_recognised_not_duplicated));
-        await using var _ = db;
+        (HaulScoutDbContext db, Guid org, Guid user) = NewContext(nameof(The_same_buyer_on_a_second_order_is_recognised_not_duplicated));
+        await using HaulScoutDbContext _ = db;
 
-        var first = await SeedEbayOrder(db, org, user, "EB-ORDER-3", "repeat_buyer");
+        (Guid ItemId, Guid PlatformOrderId, Guid LineId) first = await SeedEbayOrder(db, org, user, "EB-ORDER-3", "repeat_buyer");
         await NewPlatformOrders(db, org, user).Reconcile(first.PlatformOrderId,
             new ReconcilePlatformOrderRequest([new ReconcilePlatformOrderLineMap(first.LineId, first.ItemId)]), CancellationToken.None);
 
-        var second = await SeedEbayOrder(db, org, user, "EB-ORDER-4", "repeat_buyer");
+        (Guid ItemId, Guid PlatformOrderId, Guid LineId) second = await SeedEbayOrder(db, org, user, "EB-ORDER-4", "repeat_buyer");
         await NewPlatformOrders(db, org, user).Reconcile(second.PlatformOrderId,
             new ReconcilePlatformOrderRequest([new ReconcilePlatformOrderLineMap(second.LineId, second.ItemId)]), CancellationToken.None);
 
@@ -134,14 +134,14 @@ public class OrderChannelUnificationTests
     [Fact]
     public async Task Reconciling_the_same_platform_order_twice_reuses_the_order_header()
     {
-        var (db, org, user) = NewContext(nameof(Reconciling_the_same_platform_order_twice_reuses_the_order_header));
-        await using var _ = db;
-        var currentUser = new StubCurrentUser(org, user);
-        var assembler = new OrderAssembler(db, currentUser);
+        (HaulScoutDbContext db, Guid org, Guid user) = NewContext(nameof(Reconciling_the_same_platform_order_twice_reuses_the_order_header));
+        await using HaulScoutDbContext _ = db;
+        StubCurrentUser currentUser = new(org, user);
+        OrderAssembler assembler = new(db, currentUser);
 
-        var a = await assembler.GetOrCreateAsync("eBay", "DUP-1", null, "bob", "Bob", DateTimeOffset.UtcNow, null, 10m, 1m, 0m, CancellationToken.None);
+        Order a = await assembler.GetOrCreateAsync("eBay", "DUP-1", null, "bob", "Bob", DateTimeOffset.UtcNow, null, 10m, 1m, 0m, CancellationToken.None);
         await db.SaveChangesAsync();
-        var b = await assembler.GetOrCreateAsync("eBay", "DUP-1", null, "bob", "Bob", DateTimeOffset.UtcNow, null, 10m, 1m, 0m, CancellationToken.None);
+        Order b = await assembler.GetOrCreateAsync("eBay", "DUP-1", null, "bob", "Bob", DateTimeOffset.UtcNow, null, 10m, 1m, 0m, CancellationToken.None);
         await db.SaveChangesAsync();
 
         Assert.Equal(a.Id, b.Id);
@@ -151,8 +151,8 @@ public class OrderChannelUnificationTests
     [Fact]
     public async Task Storefront_orders_are_just_another_channel()
     {
-        var (db, org, user) = NewContext(nameof(Storefront_orders_are_just_another_channel));
-        await using var _ = db;
+        (HaulScoutDbContext db, Guid org, Guid user) = NewContext(nameof(Storefront_orders_are_just_another_channel));
+        await using HaulScoutDbContext _ = db;
         db.Orders.Add(new Order
         {
             OrganizationId = org,
@@ -162,7 +162,7 @@ public class OrderChannelUnificationTests
         });
         await db.SaveChangesAsync();
 
-        var order = await db.Orders.SingleAsync();
+        Order order = await db.Orders.SingleAsync();
         Assert.Equal("Storefront", order.Channel);
         Assert.Null(order.ExternalOrderId);
     }

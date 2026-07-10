@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using HaulScout.Api.Controllers;
 using HaulScout.Application.Common;
+using HaulScout.Application.Contracts;
 using HaulScout.Domain;
 using HaulScout.Domain.Entities;
 using HaulScout.Infrastructure.Persistence;
@@ -13,8 +14,8 @@ public class StorefrontCatalogTests
 {
     private static StorefrontController NewController(HaulScoutDbContext db, ITenantContext tenant, Guid? storeHeader)
     {
-        var controller = new StorefrontController(db, tenant);
-        var httpContext = new DefaultHttpContext();
+        StorefrontController controller = new(db, tenant);
+        DefaultHttpContext httpContext = new();
         if (storeHeader is Guid id)
         {
             httpContext.Request.Headers["X-HaulScout-Store"] = id.ToString();
@@ -27,14 +28,14 @@ public class StorefrontCatalogTests
     [Fact]
     public async Task Browse_returns_only_sellable_inventory_for_the_resolved_store()
     {
-        var org = Guid.NewGuid();
-        var options = new DbContextOptionsBuilder<HaulScoutDbContext>()
+        Guid org = Guid.NewGuid();
+        DbContextOptions<HaulScoutDbContext> options = new DbContextOptionsBuilder<HaulScoutDbContext>()
             .UseInMemoryDatabase(nameof(Browse_returns_only_sellable_inventory_for_the_resolved_store))
             .Options;
 
-        var seedTenant = new TenantContext();
+        TenantContext seedTenant = new();
         seedTenant.SetOrganization(org);
-        await using (var seed = new HaulScoutDbContext(options, seedTenant))
+        await using (HaulScoutDbContext seed = new(options, seedTenant))
         {
             seed.Organizations.Add(new Organization { Id = org, Name = "Overhaul Trading" });
             // Sellable: listed + priced.
@@ -53,14 +54,14 @@ public class StorefrontCatalogTests
 
         // Read context shares ONE tenant instance with the controller (as in request DI scope);
         // the controller resolves the store from the header and sets it.
-        var tenant = new TenantContext();
-        await using var db = new HaulScoutDbContext(options, tenant);
-        var controller = NewController(db, tenant, org);
+        TenantContext tenant = new();
+        await using HaulScoutDbContext db = new(options, tenant);
+        StorefrontController controller = NewController(db, tenant, org);
 
-        var result = await controller.Browse(category: null, search: null, page: 1, pageSize: 24);
+        ActionResult<StorefrontPageDto<StorefrontListingDto>> result = await controller.Browse(category: null, search: null, page: 1, pageSize: 24);
 
         Assert.Null(result.Result);
-        var page = result.Value!;
+        StorefrontPageDto<StorefrontListingDto>? page = result.Value!;
         Assert.Equal(2, page.Total);
         Assert.Contains(page.Items, x => x.Title == "Listed item");
         Assert.Contains(page.Items, x => x.Title == "Listed single");
@@ -70,13 +71,13 @@ public class StorefrontCatalogTests
     [Fact]
     public async Task Detail_exposes_safe_structured_specs_without_private_identifiers()
     {
-        var org = Guid.NewGuid();
-        var options = new DbContextOptionsBuilder<HaulScoutDbContext>()
+        Guid org = Guid.NewGuid();
+        DbContextOptions<HaulScoutDbContext> options = new DbContextOptionsBuilder<HaulScoutDbContext>()
             .UseInMemoryDatabase(nameof(Detail_exposes_safe_structured_specs_without_private_identifiers))
             .Options;
-        var seedTenant = new TenantContext();
+        TenantContext seedTenant = new();
         seedTenant.SetOrganization(org);
-        await using (var seed = new HaulScoutDbContext(options, seedTenant))
+        await using (HaulScoutDbContext seed = new(options, seedTenant))
         {
             seed.Organizations.Add(new Organization { Id = org, Name = "Overhaul Trading" });
             seed.InventoryItems.Add(new InventoryItem
@@ -97,11 +98,11 @@ public class StorefrontCatalogTests
             await seed.SaveChangesAsync();
         }
 
-        var tenant = new TenantContext();
-        await using var db = new HaulScoutDbContext(options, tenant);
-        var controller = NewController(db, tenant, org);
-        var browse = await controller.Browse(category: null, search: null, page: 1, pageSize: 24);
-        var detail = await controller.Detail(browse.Value!.Items.Single().Slug, CancellationToken.None);
+        TenantContext tenant = new();
+        await using HaulScoutDbContext db = new(options, tenant);
+        StorefrontController controller = NewController(db, tenant, org);
+        ActionResult<StorefrontPageDto<StorefrontListingDto>> browse = await controller.Browse(category: null, search: null, page: 1, pageSize: 24);
+        ActionResult<StorefrontListingDetailDto> detail = await controller.Detail(browse.Value!.Items.Single().Slug, CancellationToken.None);
 
         Assert.Equal("Switch OLED", detail.Value!.Model);
         Assert.Equal(InventoryFunctionalStatus.FullyFunctional, detail.Value.FunctionalStatus);
@@ -112,15 +113,15 @@ public class StorefrontCatalogTests
     [Fact]
     public async Task Browse_rejects_an_unknown_store()
     {
-        var options = new DbContextOptionsBuilder<HaulScoutDbContext>()
+        DbContextOptions<HaulScoutDbContext> options = new DbContextOptionsBuilder<HaulScoutDbContext>()
             .UseInMemoryDatabase(nameof(Browse_rejects_an_unknown_store))
             .Options;
 
-        var tenant = new TenantContext();
-        await using var db = new HaulScoutDbContext(options, tenant);
-        var controller = NewController(db, tenant, Guid.NewGuid()); // header points at a store that doesn't exist
+        TenantContext tenant = new();
+        await using HaulScoutDbContext db = new(options, tenant);
+        StorefrontController controller = NewController(db, tenant, Guid.NewGuid()); // header points at a store that doesn't exist
 
-        var result = await controller.Browse(category: null, search: null, page: 1, pageSize: 24);
+        ActionResult<StorefrontPageDto<StorefrontListingDto>> result = await controller.Browse(category: null, search: null, page: 1, pageSize: 24);
 
         Assert.IsType<BadRequestObjectResult>(result.Result);
     }

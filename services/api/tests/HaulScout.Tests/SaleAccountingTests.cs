@@ -23,12 +23,12 @@ public class SaleAccountingTests
 
     private static (HaulScoutDbContext Db, Guid Org, Guid User) NewContext(string store)
     {
-        var org = Guid.NewGuid();
-        var user = Guid.NewGuid();
-        var options = new DbContextOptionsBuilder<HaulScoutDbContext>().UseInMemoryDatabase(store).Options;
-        var tenant = new TenantContext();
+        Guid org = Guid.NewGuid();
+        Guid user = Guid.NewGuid();
+        DbContextOptions<HaulScoutDbContext> options = new DbContextOptionsBuilder<HaulScoutDbContext>().UseInMemoryDatabase(store).Options;
+        TenantContext tenant = new();
         tenant.SetOrganization(org);
-        var db = new HaulScoutDbContext(options, tenant);
+        HaulScoutDbContext db = new(options, tenant);
         db.Organizations.Add(new Organization { Id = org, Name = "Overhaul Trading Company" });
         db.Users.Add(new AppUser { Id = user, Email = "op@x.com", DisplayName = "Operator" });
         db.SaveChanges();
@@ -37,9 +37,9 @@ public class SaleAccountingTests
 
     private static Sale SeedSale(HaulScoutDbContext db, Guid org)
     {
-        var item = new InventoryItem { Title = "Brass Lamp", PurchasePrice = 40m };
+        InventoryItem item = new() { Title = "Brass Lamp", PurchasePrice = 40m };
         db.InventoryItems.Add(item);
-        var sale = new Sale
+        Sale sale = new()
         {
             OrganizationId = org,
             InventoryItemId = item.Id,
@@ -73,32 +73,32 @@ public class SaleAccountingTests
     [Fact]
     public void Net_profit_excludes_tax_entirely()
     {
-        var f = ResaleFinancialCalculator.CalculateRealizedSale(120m, 0m, 40m, 15.60m, 3.80m, 8m, 0m, 0m);
+        RealizedSaleFinancials f = ResaleFinancialCalculator.CalculateRealizedSale(120m, 0m, 40m, 15.60m, 3.80m, 8m, 0m, 0m);
         Assert.Equal(52.60m, f.NetProfit);
     }
 
     [Fact]
     public async Task Editing_a_sale_recomputes_net_backdates_and_writes_a_correction()
     {
-        var (db, org, user) = NewContext(nameof(Editing_a_sale_recomputes_net_backdates_and_writes_a_correction));
-        await using var _ = db;
-        var sale = SeedSale(db, org);
-        var controller = new SalesController(db, new StubCurrentUser(org, user));
+        (HaulScoutDbContext db, Guid org, Guid user) = NewContext(nameof(Editing_a_sale_recomputes_net_backdates_and_writes_a_correction));
+        await using HaulScoutDbContext _ = db;
+        Sale sale = SeedSale(db, org);
+        SalesController controller = new(db, new StubCurrentUser(org, user));
 
-        var backdated = DateTimeOffset.UtcNow.AddDays(-30);
-        var result = await controller.Update(sale.Id, new UpdateSaleRequest(
+        DateTimeOffset backdated = DateTimeOffset.UtcNow.AddDays(-30);
+        ActionResult<SaleDto> result = await controller.Update(sale.Id, new UpdateSaleRequest(
             Platform: "eBay", SoldPrice: 120m, ShippingCharged: 0m, PlatformFees: 20m, PaymentFees: 3.80m,
             ShippingCost: 8m, SuppliesCost: 0m, OtherCosts: 0m, SalesTaxCollected: 9.90m,
             TaxRemittedByPlatform: false, SoldAt: backdated, Notes: null,
             Reason: "Actual eBay fee was higher than estimated"), CancellationToken.None);
 
         Assert.Null(result.Result);
-        var dto = result.Value!;
+        SaleDto dto = result.Value!;
         Assert.Equal(48.20m, dto.NetProfit);   // 120 - 40 - 20 - 3.80 - 8 (tax excluded)
         Assert.Equal(9.90m, dto.SalesTaxOwed);  // now seller-owed
         Assert.Equal(backdated, dto.SoldAt);
 
-        var correction = Assert.Single(await db.SaleCorrections.Where(c => c.SaleId == sale.Id).ToListAsync());
+        SaleCorrection correction = Assert.Single(await db.SaleCorrections.Where(c => c.SaleId == sale.Id).ToListAsync());
         Assert.Equal(1, correction.Version);
         Assert.Equal(user, correction.CorrectedByUserId);
         Assert.Contains("higher than estimated", correction.Reason);
@@ -109,16 +109,16 @@ public class SaleAccountingTests
     [Fact]
     public async Task A_second_edit_increments_the_correction_version()
     {
-        var (db, org, user) = NewContext(nameof(A_second_edit_increments_the_correction_version));
-        await using var _ = db;
-        var sale = SeedSale(db, org);
-        var controller = new SalesController(db, new StubCurrentUser(org, user));
+        (HaulScoutDbContext db, Guid org, Guid user) = NewContext(nameof(A_second_edit_increments_the_correction_version));
+        await using HaulScoutDbContext _ = db;
+        Sale sale = SeedSale(db, org);
+        SalesController controller = new(db, new StubCurrentUser(org, user));
         UpdateSaleRequest Req(string reason) => new("eBay", 120m, 0m, 16m, 3.80m, 8m, 0m, 0m, 9.90m, true, sale.SoldAt, null, reason);
 
         await controller.Update(sale.Id, Req("first fix"), CancellationToken.None);
         await controller.Update(sale.Id, Req("second fix"), CancellationToken.None);
 
-        var versions = await db.SaleCorrections
+        List<int> versions = await db.SaleCorrections
             .Where(c => c.SaleId == sale.Id).Select(c => c.Version).OrderBy(v => v).ToListAsync();
         Assert.Equal([1, 2], versions);
     }
@@ -126,12 +126,12 @@ public class SaleAccountingTests
     [Fact]
     public async Task Editing_requires_a_reason()
     {
-        var (db, org, user) = NewContext(nameof(Editing_requires_a_reason));
-        await using var _ = db;
-        var sale = SeedSale(db, org);
-        var controller = new SalesController(db, new StubCurrentUser(org, user));
+        (HaulScoutDbContext db, Guid org, Guid user) = NewContext(nameof(Editing_requires_a_reason));
+        await using HaulScoutDbContext _ = db;
+        Sale sale = SeedSale(db, org);
+        SalesController controller = new(db, new StubCurrentUser(org, user));
 
-        var result = await controller.Update(sale.Id, new UpdateSaleRequest(
+        ActionResult<SaleDto> result = await controller.Update(sale.Id, new UpdateSaleRequest(
             "eBay", 120m, 0m, 16m, 3.80m, 8m, 0m, 0m, 9.90m, true, sale.SoldAt, null, "  "), CancellationToken.None);
 
         Assert.IsType<BadRequestObjectResult>(result.Result);
@@ -141,9 +141,9 @@ public class SaleAccountingTests
     [Fact]
     public async Task Recording_rejects_a_future_sale_without_mutating_inventory()
     {
-        var (db, org, user) = NewContext(nameof(Recording_rejects_a_future_sale_without_mutating_inventory));
-        await using var _ = db;
-        var item = new InventoryItem
+        (HaulScoutDbContext db, Guid org, Guid user) = NewContext(nameof(Recording_rejects_a_future_sale_without_mutating_inventory));
+        await using HaulScoutDbContext _ = db;
+        InventoryItem item = new()
         {
             OrganizationId = org,
             Title = "Walnut Desk",
@@ -152,9 +152,9 @@ public class SaleAccountingTests
         };
         db.InventoryItems.Add(item);
         await db.SaveChangesAsync();
-        var controller = new SalesController(db, new StubCurrentUser(org, user));
+        SalesController controller = new(db, new StubCurrentUser(org, user));
 
-        var result = await controller.Record(new RecordSaleRequest(
+        ActionResult<SaleDto> result = await controller.Record(new RecordSaleRequest(
             item.Id, null, "eBay", 240m, 31m, 7m, 20m, 2m, 0m,
             DateTimeOffset.UtcNow.AddDays(1), null), CancellationToken.None);
 
@@ -167,16 +167,16 @@ public class SaleAccountingTests
     [Fact]
     public async Task Fulfillment_transitions_are_ordered_audited_and_create_one_shipment()
     {
-        var (db, org, user) = NewContext(nameof(Fulfillment_transitions_are_ordered_audited_and_create_one_shipment));
-        await using var _ = db;
-        var sale = SeedSale(db, org);
+        (HaulScoutDbContext db, Guid org, Guid user) = NewContext(nameof(Fulfillment_transitions_are_ordered_audited_and_create_one_shipment));
+        await using HaulScoutDbContext _ = db;
+        Sale sale = SeedSale(db, org);
         sale.InventoryItem!.Status = InventoryStatus.Sold;
         await db.SaveChangesAsync();
-        var controller = new SalesController(db, new StubCurrentUser(org, user));
+        SalesController controller = new(db, new StubCurrentUser(org, user));
 
         await controller.Transition(sale.Id, new SaleStatusTransitionRequest(SaleStatus.Packed, sale.SoldAt.AddDays(1), null, null, null), CancellationToken.None);
         await controller.Transition(sale.Id, new SaleStatusTransitionRequest(SaleStatus.Shipped, sale.SoldAt.AddDays(2), null, "USPS", "9400TEST"), CancellationToken.None);
-        var delivered = await controller.Transition(sale.Id, new SaleStatusTransitionRequest(SaleStatus.Delivered, sale.SoldAt.AddDays(5), null, null, null), CancellationToken.None);
+        ActionResult<SaleDto> delivered = await controller.Transition(sale.Id, new SaleStatusTransitionRequest(SaleStatus.Delivered, sale.SoldAt.AddDays(5), null, null, null), CancellationToken.None);
 
         Assert.Equal(SaleStatus.Delivered, delivered.Value!.Status);
         Assert.Equal(InventoryStatus.Delivered, sale.InventoryItem.Status);
@@ -191,15 +191,15 @@ public class SaleAccountingTests
     [Fact]
     public async Task Fulfillment_rejects_skipped_stages_and_requires_exception_reasons()
     {
-        var (db, org, user) = NewContext(nameof(Fulfillment_rejects_skipped_stages_and_requires_exception_reasons));
-        await using var _ = db;
-        var sale = SeedSale(db, org);
-        var controller = new SalesController(db, new StubCurrentUser(org, user));
+        (HaulScoutDbContext db, Guid org, Guid user) = NewContext(nameof(Fulfillment_rejects_skipped_stages_and_requires_exception_reasons));
+        await using HaulScoutDbContext _ = db;
+        Sale sale = SeedSale(db, org);
+        SalesController controller = new(db, new StubCurrentUser(org, user));
 
-        var skipped = await controller.Transition(sale.Id, new SaleStatusTransitionRequest(SaleStatus.Delivered, null, null, null, null), CancellationToken.None);
+        ActionResult<SaleDto> skipped = await controller.Transition(sale.Id, new SaleStatusTransitionRequest(SaleStatus.Delivered, null, null, null, null), CancellationToken.None);
         await controller.Transition(sale.Id, new SaleStatusTransitionRequest(SaleStatus.Packed, sale.SoldAt.AddDays(2), null, null, null), CancellationToken.None);
-        var chronologicallyInvalid = await controller.Transition(sale.Id, new SaleStatusTransitionRequest(SaleStatus.Shipped, sale.SoldAt.AddDays(1), null, null, null), CancellationToken.None);
-        var cancelledWithoutReason = await controller.Transition(sale.Id, new SaleStatusTransitionRequest(SaleStatus.Cancelled, null, null, null, null), CancellationToken.None);
+        ActionResult<SaleDto> chronologicallyInvalid = await controller.Transition(sale.Id, new SaleStatusTransitionRequest(SaleStatus.Shipped, sale.SoldAt.AddDays(1), null, null, null), CancellationToken.None);
+        ActionResult<SaleDto> cancelledWithoutReason = await controller.Transition(sale.Id, new SaleStatusTransitionRequest(SaleStatus.Cancelled, null, null, null, null), CancellationToken.None);
 
         Assert.IsType<ConflictObjectResult>(skipped.Result);
         Assert.IsType<BadRequestObjectResult>(chronologicallyInvalid.Result);
@@ -209,17 +209,17 @@ public class SaleAccountingTests
     [Fact]
     public async Task Return_and_refund_release_inventory_for_a_future_resale()
     {
-        var (db, org, user) = NewContext(nameof(Return_and_refund_release_inventory_for_a_future_resale));
-        await using var _ = db;
-        var sale = SeedSale(db, org);
+        (HaulScoutDbContext db, Guid org, Guid user) = NewContext(nameof(Return_and_refund_release_inventory_for_a_future_resale));
+        await using HaulScoutDbContext _ = db;
+        Sale sale = SeedSale(db, org);
         sale.Status = SaleStatus.Delivered;
         sale.InventoryItem!.Status = InventoryStatus.Delivered;
         await db.SaveChangesAsync();
-        var controller = new SalesController(db, new StubCurrentUser(org, user));
+        SalesController controller = new(db, new StubCurrentUser(org, user));
 
         await controller.Transition(sale.Id, new SaleStatusTransitionRequest(SaleStatus.ReturnRequested, null, "Customer reported damage", null, null), CancellationToken.None);
         await controller.Transition(sale.Id, new SaleStatusTransitionRequest(SaleStatus.Returned, null, "Return received and inspected", null, null), CancellationToken.None);
-        var refunded = await controller.Transition(sale.Id, new SaleStatusTransitionRequest(SaleStatus.Refunded, null, "Full refund issued", null, null), CancellationToken.None);
+        ActionResult<SaleDto> refunded = await controller.Transition(sale.Id, new SaleStatusTransitionRequest(SaleStatus.Refunded, null, "Full refund issued", null, null), CancellationToken.None);
 
         Assert.Equal(SaleStatus.Refunded, refunded.Value!.Status);
         Assert.Equal(InventoryStatus.Returned, sale.InventoryItem.Status);

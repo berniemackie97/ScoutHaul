@@ -1,3 +1,4 @@
+using HaulScout.Application.Contracts;
 using HaulScout.Application.Services;
 
 namespace HaulScout.Tests;
@@ -21,7 +22,7 @@ The Pokémon Company Charizard EX XY121 XY Promo Holo Eng 2016,377251374220,-,-,
     [Fact]
     public void Parses_rows_skips_the_preamble_and_the_zero_value_artifact()
     {
-        var result = EbayReportParser.ParseSalesReport(Sample);
+        EbayReportParser.ParseResult result = EbayReportParser.ParseSalesReport(Sample);
 
         Assert.Equal(2, result.Orders.Count); // 3 data rows, the $0.00 Charizard row is skipped
         Assert.Equal(1, result.RowsSkipped);
@@ -31,7 +32,7 @@ The Pokémon Company Charizard EX XY121 XY Promo Holo Eng 2016,377251374220,-,-,
     [Fact]
     public void Maps_the_exact_fee_stack_and_shipping_label_for_a_row()
     {
-        var order = EbayReportParser.ParseSalesReport(Sample).Orders.Single(o => o.ExternalOrderId == "377251318593");
+        IngestPlatformOrderInput order = EbayReportParser.ParseSalesReport(Sample).Orders.Single(o => o.ExternalOrderId == "377251318593");
 
         Assert.Equal(77.28m, order.ItemsSubtotal);
         Assert.Equal(3.69m, order.ShippingCharged);
@@ -39,7 +40,7 @@ The Pokémon Company Charizard EX XY121 XY Promo Holo Eng 2016,377251374220,-,-,
         Assert.True(order.TaxRemittedByPlatform);         // nothing was collected "to you"
         Assert.Equal(12.08m, order.FeeTotal);            // total selling costs 18.05 − shipping label 5.97
         Assert.Equal(5.97m, order.ShippingCost);         // seller's eBay label cost
-        var line = Assert.Single(order.Lines);
+        IngestPlatformOrderLineInput line = Assert.Single(order.Lines);
         Assert.Equal("377251318593", line.ExternalItemId);
         Assert.Equal(77.28m, line.UnitPrice);
     }
@@ -47,7 +48,7 @@ The Pokémon Company Charizard EX XY121 XY Promo Holo Eng 2016,377251374220,-,-,
     [Fact]
     public void Handles_quoted_titles_that_contain_commas()
     {
-        var order = EbayReportParser.ParseSalesReport(Sample).Orders.Single(o => o.ExternalOrderId == "377272846397");
+        IngestPlatformOrderInput order = EbayReportParser.ParseSalesReport(Sample).Orders.Single(o => o.ExternalOrderId == "377272846397");
         Assert.Equal("Nintendo Mario Kart Wii - Nintendo Wii, Disc w/ Case & Manual, E, NTSC 2008", order.Lines.Single().Title);
         Assert.Equal(27.00m, order.ItemsSubtotal);
         Assert.Equal(4.88m, order.FeeTotal); // 10.85 selling costs − 5.97 label
@@ -56,7 +57,7 @@ The Pokémon Company Charizard EX XY121 XY Promo Holo Eng 2016,377251374220,-,-,
     [Fact]
     public void Dates_rows_to_the_reports_end_date()
     {
-        var order = EbayReportParser.ParseSalesReport(Sample).Orders.First();
+        IngestPlatformOrderInput order = EbayReportParser.ParseSalesReport(Sample).Orders.First();
         Assert.Equal(2026, order.OrderedAt.Year);
         Assert.Equal(7, order.OrderedAt.Month);
         Assert.Equal(7, order.OrderedAt.Day);
@@ -65,7 +66,7 @@ The Pokémon Company Charizard EX XY121 XY Promo Holo Eng 2016,377251374220,-,-,
     [Fact]
     public void Rejects_a_file_that_is_not_an_ebay_report()
     {
-        var result = EbayReportParser.ParseSalesReport("name,amount\nfoo,10");
+        EbayReportParser.ParseResult result = EbayReportParser.ParseSalesReport("name,amount\nfoo,10");
         Assert.Empty(result.Orders);
         Assert.NotNull(result.Warning);
     }

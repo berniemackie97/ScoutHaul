@@ -32,7 +32,7 @@ public sealed class InventoryReferenceDataServiceTests
         });
         await db.SaveChangesAsync();
 
-        var service = new InventoryReferenceDataService(db, new StubCurrentUser(organizationId));
+        InventoryReferenceDataService service = new(db, new StubCurrentUser(organizationId));
         InventoryReferenceDataDto data = await service.GetAsync(CancellationToken.None);
 
         Assert.Contains(data.Categories, option => option.Value == "Collectibles" && option.IsLegacy == false);
@@ -55,9 +55,9 @@ public sealed class InventoryReferenceDataServiceTests
         db.ProductIdentities.Add(new ProductIdentity { Title = "Console", Brand = "Nintendo", Model = "Switch OLED" });
         await db.SaveChangesAsync();
 
-        var service = new InventoryReferenceDataService(db, new StubCurrentUser(organizationId));
-        var accepted = await service.ResolveAsync(Request(category: "video games", brand: "nintendo", model: "switch oled"), CancellationToken.None);
-        var corrected = await service.ResolveAsync(Request(category: "Collectibels", brand: "Nintenndo", model: "Switch-ish"), CancellationToken.None);
+        InventoryReferenceDataService service = new(db, new StubCurrentUser(organizationId));
+        (InventoryReferenceDataService.ControlledValues? Values, string? Error) accepted = await service.ResolveAsync(Request(category: "video games", brand: "nintendo", model: "switch oled"), CancellationToken.None);
+        (InventoryReferenceDataService.ControlledValues? Values, string? Error) corrected = await service.ResolveAsync(Request(category: "Collectibels", brand: "Nintenndo", model: "Switch-ish"), CancellationToken.None);
 
         Assert.Null(accepted.Error);
         Assert.Equal("Video Games", accepted.Values!.Category);
@@ -71,10 +71,10 @@ public sealed class InventoryReferenceDataServiceTests
 
     private static HaulScoutDbContext NewContext(Guid organizationId, string databaseName)
     {
-        var options = new DbContextOptionsBuilder<HaulScoutDbContext>()
+        DbContextOptions<HaulScoutDbContext> options = new DbContextOptionsBuilder<HaulScoutDbContext>()
             .UseInMemoryDatabase(databaseName)
             .Options;
-        var tenant = new TenantContext();
+        TenantContext tenant = new();
         tenant.SetOrganization(organizationId);
         return new HaulScoutDbContext(options, tenant);
     }

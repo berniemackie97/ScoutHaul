@@ -30,22 +30,22 @@ public sealed class EbayKeywordFallbackTests
     /// </summary>
     private static (EbayMarketplaceLookupService Service, FakeEbayHandler Handler) CreateService()
     {
-        var handler = new FakeEbayHandler();
-        var httpClient = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(5) };
-        var config = BuildConfig();
-        var logger = NullLogger<EbayMarketplaceLookupService>.Instance;
-        var service = new EbayMarketplaceLookupService(httpClient, config, logger);
+        FakeEbayHandler handler = new();
+        HttpClient httpClient = new(handler) { Timeout = TimeSpan.FromSeconds(5) };
+        IConfiguration config = BuildConfig();
+        NullLogger<EbayMarketplaceLookupService> logger = NullLogger<EbayMarketplaceLookupService>.Instance;
+        EbayMarketplaceLookupService service = new(httpClient, config, logger);
         return (service, handler);
     }
 
     [Fact]
     public async Task Barcode_search_sends_GTIN_query()
     {
-        var (service, handler) = CreateService();
+        (EbayMarketplaceLookupService service, FakeEbayHandler handler) = CreateService();
         handler.SetTokenResponse();
         handler.SetSearchResponse([]); // empty — no GTIN match
 
-        var request = new MarketplacePricingRequest("070038643951", "070038643951", null);
+        MarketplacePricingRequest request = new("070038643951", "070038643951", null);
         await service.SearchByBarcodeAsync(request, CancellationToken.None);
 
         // Should have called with gtin= parameter
@@ -55,12 +55,12 @@ public sealed class EbayKeywordFallbackTests
     [Fact]
     public async Task Barcode_search_does_NOT_keyword_fallback_with_raw_barcode()
     {
-        var (service, handler) = CreateService();
+        (EbayMarketplaceLookupService service, FakeEbayHandler handler) = CreateService();
         handler.SetTokenResponse();
         handler.SetSearchResponse([]); // GTIN returns nothing
 
         // No product resolved — Product is null
-        var request = new MarketplacePricingRequest("070038643951", "070038643951", null);
+        MarketplacePricingRequest request = new("070038643951", "070038643951", null);
         await service.SearchByBarcodeAsync(request, CancellationToken.None);
 
         // Should NOT have made a keyword search with the barcode digits
@@ -72,14 +72,14 @@ public sealed class EbayKeywordFallbackTests
     [Fact]
     public async Task Barcode_search_keyword_fallback_uses_product_name_when_resolved()
     {
-        var (service, handler) = CreateService();
+        (EbayMarketplaceLookupService service, FakeEbayHandler handler) = CreateService();
         handler.SetTokenResponse();
         handler.SetSearchResponse([]); // GTIN returns nothing, then keyword returns something
 
-        var product = new BarcodeLookupResult(
+        BarcodeLookupResult product = new(
             "070038643951", "Ranch Cup", "Hidden Valley", null, null, null, "070038643951", null);
 
-        var request = new MarketplacePricingRequest("Hidden Valley Ranch Cup", "070038643951", product);
+        MarketplacePricingRequest request = new("Hidden Valley Ranch Cup", "070038643951", product);
         await service.SearchByBarcodeAsync(request, CancellationToken.None);
 
         // Should have keyword fallback with product name, NOT barcode digits
@@ -92,15 +92,15 @@ public sealed class EbayKeywordFallbackTests
     [Fact]
     public async Task Barcode_search_no_keyword_fallback_when_product_title_is_empty()
     {
-        var (service, handler) = CreateService();
+        (EbayMarketplaceLookupService service, FakeEbayHandler handler) = CreateService();
         handler.SetTokenResponse();
         handler.SetSearchResponse([]);
 
         // Product resolved but with empty title
-        var product = new BarcodeLookupResult(
+        BarcodeLookupResult product = new(
             "070038643951", "", null, null, null, null, "070038643951", null);
 
-        var request = new MarketplacePricingRequest("070038643951", "070038643951", product);
+        MarketplacePricingRequest request = new("070038643951", "070038643951", product);
         await service.SearchByBarcodeAsync(request, CancellationToken.None);
 
         // Only token + GTIN search, no keyword fallback
@@ -110,11 +110,11 @@ public sealed class EbayKeywordFallbackTests
     [Fact]
     public void IsConfigured_false_when_no_credentials()
     {
-        var config = new ConfigurationBuilder()
+        IConfigurationRoot config = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>())
             .Build();
-        var httpClient = new HttpClient();
-        var service = new EbayMarketplaceLookupService(httpClient, config,
+        HttpClient httpClient = new();
+        EbayMarketplaceLookupService service = new(httpClient, config,
             NullLogger<EbayMarketplaceLookupService>.Instance);
 
         Assert.False(service.IsConfigured);
@@ -123,9 +123,9 @@ public sealed class EbayKeywordFallbackTests
     [Fact]
     public void IsConfigured_true_when_credentials_present()
     {
-        var config = BuildConfig();
-        var httpClient = new HttpClient();
-        var service = new EbayMarketplaceLookupService(httpClient, config,
+        IConfiguration config = BuildConfig();
+        HttpClient httpClient = new();
+        EbayMarketplaceLookupService service = new(httpClient, config,
             NullLogger<EbayMarketplaceLookupService>.Instance);
 
         Assert.True(service.IsConfigured);

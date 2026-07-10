@@ -101,7 +101,7 @@ public sealed class ReportsController(HaulScoutDbContext db, ICurrentUserContext
                 item.PurchasePrice ?? 0,
                 item.EstimatedSalePrice ?? item.SellerAskingPrice ?? 0,
                 item.PurchasedAt ?? item.CreatedAt,
-                item.PurchasePrice > 0,
+                item.PurchasePrice.HasValue,
                 item.EstimatedSalePrice > 0 || item.SellerAskingPrice > 0,
                 item.StorageLocation != null && item.StorageLocation != "",
                 item.Photos.Any()))
@@ -125,17 +125,16 @@ public sealed class ReportsController(HaulScoutDbContext db, ICurrentUserContext
         DateOnly start = from ?? end.AddDays(-89);
         int days = end.DayNumber - start.DayNumber + 1;
 
-        if (days <= 0)
+        switch (days)
         {
-            range = default;
-            error = "The report start date must be on or before the end date.";
-            return false;
-        }
-        if (days > 731)
-        {
-            range = default;
-            error = "Report ranges are limited to 731 days.";
-            return false;
+            case <= 0:
+                range = default;
+                error = "The report start date must be on or before the end date.";
+                return false;
+            case > 731:
+                range = default;
+                error = "Report ranges are limited to 731 days.";
+                return false;
         }
 
         DateTimeOffset fromValue = new(start.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc));
@@ -147,7 +146,7 @@ public sealed class ReportsController(HaulScoutDbContext db, ICurrentUserContext
 
     private static string ToCsv(BusinessReportDto report)
     {
-        var csv = new StringBuilder();
+        StringBuilder csv = new();
         csv.AppendLine("HaulScout Business Report");
         csv.AppendLine($"From,{Csv(report.From.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture))}");
         csv.AppendLine($"To,{Csv(report.To.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture))}");

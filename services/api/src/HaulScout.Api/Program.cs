@@ -37,7 +37,7 @@ builder.Services.AddHttpContextAccessor();
 SupabaseAuthOptions supabaseAuth = SupabaseAuthOptions.FromConfiguration(builder.Configuration)
     ?? throw new InvalidOperationException("Authentication:Supabase:Url is required.");
 
-var signingKeyResolver = new SupabaseSigningKeyResolver(supabaseAuth);
+SupabaseSigningKeyResolver signingKeyResolver = new(supabaseAuth);
 builder.Services.AddSingleton(supabaseAuth);
 builder.Services.AddSingleton(signingKeyResolver);
 builder.Services

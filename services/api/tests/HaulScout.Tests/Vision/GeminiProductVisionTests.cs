@@ -17,11 +17,11 @@ public sealed class GeminiProductVisionTests
 {
     private static async Task<ProductIdentification?> Identify(string geminiJson, HttpStatusCode status = HttpStatusCode.OK)
     {
-        var config = new ConfigurationBuilder()
+        IConfigurationRoot config = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?> { ["Gemini:ApiKey"] = "test-key" })
             .Build();
 
-        var service = new GeminiProductVisionService(
+        GeminiProductVisionService service = new(
             new HttpClient(new FakeHandler(geminiJson, status)),
             config,
             NullLogger<GeminiProductVisionService>.Instance);
@@ -70,7 +70,7 @@ public sealed class GeminiProductVisionTests
         public int CallCount { get; private set; }
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
-            var r = responses[Math.Min(CallCount, responses.Length - 1)];
+            (HttpStatusCode Status, string Body) r = responses[Math.Min(CallCount, responses.Length - 1)];
             CallCount++;
             return Task.FromResult(new HttpResponseMessage(r.Status)
             {
@@ -81,7 +81,7 @@ public sealed class GeminiProductVisionTests
 
     private static GeminiProductVisionService ServiceWith(HttpMessageHandler handler)
     {
-        var config = new ConfigurationBuilder()
+        IConfigurationRoot config = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?> { ["Gemini:ApiKey"] = "test-key" })
             .Build();
         return new GeminiProductVisionService(new HttpClient(handler), config, NullLogger<GeminiProductVisionService>.Instance);
@@ -91,7 +91,7 @@ public sealed class GeminiProductVisionTests
     public async Task Text_only_identification_sends_adaptive_prompt_without_image_part()
     {
         string ok = GeminiEnvelope("""{"name":"Sony WH-1000XM4 Headphones","brand":"Sony","model":"WH-1000XM4","category":"Electronics","confidence":"high","searchKeywords":["Sony WH-1000XM4"]}""");
-        var handler = new CaptureHandler(ok);
+        CaptureHandler handler = new(ok);
 
         ProductIdentification? result = (await ServiceWith(handler).IdentifyAsync(
             null,
@@ -109,7 +109,7 @@ public sealed class GeminiProductVisionTests
     public async Task Photo_with_context_sends_ground_truth_facts_and_image_part()
     {
         string ok = GeminiEnvelope("""{"name":"Vintage Pyrex Bowl","category":"Kitchen","confidence":"medium","searchKeywords":["vintage pyrex bowl"]}""");
-        var handler = new CaptureHandler(ok);
+        CaptureHandler handler = new(ok);
 
         ProductIdentification? result = (await ServiceWith(handler).IdentifyAsync(
             new string('A', 200),
@@ -126,7 +126,7 @@ public sealed class GeminiProductVisionTests
     public async Task Retries_once_on_429_then_succeeds()
     {
         string ok = GeminiEnvelope("""{"name":"Lego Set","category":"Toys","confidence":"high","searchKeywords":["lego"]}""");
-        var handler = new SequenceHandler(
+        SequenceHandler handler = new(
             (HttpStatusCode.TooManyRequests, """{"error":"rate limited"}"""),
             (HttpStatusCode.OK, ok));
 
@@ -140,8 +140,8 @@ public sealed class GeminiProductVisionTests
     [Fact]
     public async Task Throws_rate_limited_after_four_429s()
     {
-        var handler = new SequenceHandler((HttpStatusCode.TooManyRequests, "{}"));
-        var ex = await Assert.ThrowsAsync<VisionUnavailableException>(() =>
+        SequenceHandler handler = new((HttpStatusCode.TooManyRequests, "{}"));
+        VisionUnavailableException ex = await Assert.ThrowsAsync<VisionUnavailableException>(() =>
             ServiceWith(handler).IdentifyAsync(new string('A', 200), null, CancellationToken.None));
 
         Assert.Equal("rate_limited", ex.Code);
@@ -152,9 +152,9 @@ public sealed class GeminiProductVisionTests
     public async Task Throws_quota_exhausted_immediately_on_daily_cap()
     {
         // PerDay quota won't clear in seconds → fail fast, no retries wasted.
-        var handler = new SequenceHandler((HttpStatusCode.TooManyRequests,
+        SequenceHandler handler = new((HttpStatusCode.TooManyRequests,
             """{"error":{"status":"RESOURCE_EXHAUSTED","details":[{"violations":[{"quotaId":"GenerateRequestsPerDayPerProjectPerModel-FreeTier"}]}]}}"""));
-        var ex = await Assert.ThrowsAsync<VisionUnavailableException>(() =>
+        VisionUnavailableException ex = await Assert.ThrowsAsync<VisionUnavailableException>(() =>
             ServiceWith(handler).IdentifyAsync(new string('A', 200), null, CancellationToken.None));
 
         Assert.Equal("quota_exhausted", ex.Code);
@@ -280,7 +280,7 @@ public sealed class GeminiProductVisionTests
     {
         // A real provider error (not a 200-with-no-match) must surface as an exception so the client
         // can show the cause, never a misleading "not identified".
-        var handler = new FakeHandler("""{"error":{"code":429}}""", HttpStatusCode.TooManyRequests);
+        FakeHandler handler = new("""{"error":{"code":429}}""", HttpStatusCode.TooManyRequests);
         await Assert.ThrowsAsync<VisionUnavailableException>(() =>
             ServiceWith(handler).IdentifyAsync(new string('A', 200), null, CancellationToken.None));
     }
@@ -302,8 +302,8 @@ public sealed class GeminiProductVisionTests
     [Fact]
     public async Task Not_configured_without_api_key()
     {
-        var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>()).Build();
-        var service = new GeminiProductVisionService(new HttpClient(new FakeHandler("{}", HttpStatusCode.OK)), config, NullLogger<GeminiProductVisionService>.Instance);
+        IConfigurationRoot config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>()).Build();
+        GeminiProductVisionService service = new(new HttpClient(new FakeHandler("{}", HttpStatusCode.OK)), config, NullLogger<GeminiProductVisionService>.Instance);
 
         Assert.False(service.IsConfigured);
         Assert.Null((await service.IdentifyAsync("AAAA", null, CancellationToken.None)).Product);

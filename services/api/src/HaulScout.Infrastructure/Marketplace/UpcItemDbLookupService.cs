@@ -27,7 +27,7 @@ internal sealed class UpcItemDbLookupService : IBarcodeLookupProvider
             string cleanBarcode = barcode.Trim();
             string url = $"https://api.upcitemdb.com/prod/trial/lookup?upc={cleanBarcode}";
 
-            using var response = await _httpClient.GetAsync(url, cancellationToken);
+            using HttpResponseMessage response = await _httpClient.GetAsync(url, cancellationToken);
 
             if (!response.IsSuccessStatusCode)
             {
@@ -35,8 +35,8 @@ internal sealed class UpcItemDbLookupService : IBarcodeLookupProvider
                 return null;
             }
 
-            var result = await response.Content.ReadFromJsonAsync<UpcItemDbResponse>(cancellationToken: cancellationToken);
-            var item = result?.Items?.FirstOrDefault();
+            UpcItemDbResponse? result = await response.Content.ReadFromJsonAsync<UpcItemDbResponse>(cancellationToken: cancellationToken);
+            UpcItem? item = result?.Items?.FirstOrDefault();
 
             if (item is null)
             {

@@ -19,7 +19,7 @@ public sealed class ListingsController(HaulScoutDbContext db, ICurrentUserContex
     [HttpPost]
     public async Task<ActionResult<ListingDto>> Create(CreateListingRequest request, CancellationToken cancellationToken)
     {
-        var item = await db.InventoryItems.SingleOrDefaultAsync(
+        InventoryItem? item = await db.InventoryItems.SingleOrDefaultAsync(
             inventoryItem => inventoryItem.Id == request.InventoryItemId && inventoryItem.OrganizationId == currentUser.OrganizationId,
             cancellationToken);
 
@@ -33,7 +33,7 @@ public sealed class ListingsController(HaulScoutDbContext db, ICurrentUserContex
             return BadRequest("Platform and positive list price are required.");
         }
 
-        var listing = new Listing
+        Listing listing = new()
         {
             OrganizationId = currentUser.OrganizationId,
             InventoryItemId = request.InventoryItemId,
@@ -54,7 +54,7 @@ public sealed class ListingsController(HaulScoutDbContext db, ICurrentUserContex
     [HttpPut("{id:guid}")]
     public async Task<ActionResult<ListingDto>> Update(Guid id, UpdateListingRequest request, CancellationToken cancellationToken)
     {
-        var listing = await FindListing(id, cancellationToken);
+        Listing? listing = await FindListing(id, cancellationToken);
         if (listing is null)
         {
             return NotFound();
@@ -80,20 +80,20 @@ public sealed class ListingsController(HaulScoutDbContext db, ICurrentUserContex
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<ListingDto>> Get(Guid id, CancellationToken cancellationToken)
     {
-        var listing = await FindListing(id, cancellationToken);
+        Listing? listing = await FindListing(id, cancellationToken);
         return listing is null ? NotFound() : listing.ToDto();
     }
 
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<ListingDto>>> List([FromQuery] ListingStatus? status, CancellationToken cancellationToken)
     {
-        var query = db.Listings.Where(item => item.OrganizationId == currentUser.OrganizationId);
+        IQueryable<Listing> query = db.Listings.Where(item => item.OrganizationId == currentUser.OrganizationId);
         if (status.HasValue)
         {
             query = query.Where(item => item.Status == status.Value);
         }
 
-        var listings = await query
+        List<Listing> listings = await query
             .Include(item => item.InventoryItem)
             .OrderByDescending(item => item.UpdatedAt)
             .Take(200)
@@ -105,7 +105,7 @@ public sealed class ListingsController(HaulScoutDbContext db, ICurrentUserContex
     [HttpPost("{id:guid}/mark-listed")]
     public async Task<ActionResult<ListingDto>> MarkListed(Guid id, CancellationToken cancellationToken)
     {
-        var listing = await db.Listings
+        Listing? listing = await db.Listings
             .Include(item => item.InventoryItem)
             .SingleOrDefaultAsync(item => item.Id == id && item.OrganizationId == currentUser.OrganizationId, cancellationToken);
 
@@ -114,7 +114,7 @@ public sealed class ListingsController(HaulScoutDbContext db, ICurrentUserContex
             return NotFound();
         }
 
-        var now = DateTimeOffset.UtcNow;
+        DateTimeOffset now = DateTimeOffset.UtcNow;
         listing.Status = ListingStatus.Active;
         listing.ListedAt ??= now;
         listing.InventoryItem!.Status = InventoryStatus.Listed;
@@ -127,7 +127,7 @@ public sealed class ListingsController(HaulScoutDbContext db, ICurrentUserContex
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
     {
-        var listing = await FindListing(id, cancellationToken);
+        Listing? listing = await FindListing(id, cancellationToken);
         if (listing is null)
         {
             return NotFound();

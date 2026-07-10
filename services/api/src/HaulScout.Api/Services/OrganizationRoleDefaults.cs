@@ -7,7 +7,7 @@ public static class OrganizationRoleDefaults
 {
     public static OrganizationRoleDefinition CreateOwnerRole(Guid organizationId)
     {
-        var role = new OrganizationRoleDefinition
+        OrganizationRoleDefinition role = new()
         {
             OrganizationId = organizationId,
             Name = "Owner",
@@ -26,7 +26,7 @@ public static class OrganizationRoleDefaults
 
     public static OrganizationRoleDefinition CreateOperatorRole(Guid organizationId, string name = "Operator")
     {
-        var role = new OrganizationRoleDefinition
+        OrganizationRoleDefinition role = new()
         {
             OrganizationId = organizationId,
             Name = name,

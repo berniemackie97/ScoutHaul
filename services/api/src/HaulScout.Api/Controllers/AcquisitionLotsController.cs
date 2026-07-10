@@ -9,6 +9,7 @@ using HaulScout.Application.Services;
 using HaulScout.Domain;
 using HaulScout.Domain.Entities;
 using HaulScout.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore.Storage;
 using static HaulScout.Api.Helpers.StringHelpers;
 
 namespace HaulScout.Api.Controllers;
@@ -21,7 +22,7 @@ public sealed class AcquisitionLotsController(HaulScoutDbContext db, ICurrentUse
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<AcquisitionLotDto>>> List(CancellationToken cancellationToken)
     {
-        var lots = await QueryLots()
+        List<AcquisitionLot> lots = await QueryLots()
             .OrderByDescending(item => item.PurchasedAt)
             .ThenByDescending(item => item.UpdatedAt)
             .Take(200)
@@ -33,14 +34,14 @@ public sealed class AcquisitionLotsController(HaulScoutDbContext db, ICurrentUse
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<AcquisitionLotDto>> Get(Guid id, CancellationToken cancellationToken)
     {
-        var lot = await QueryLots().SingleOrDefaultAsync(item => item.Id == id, cancellationToken);
+        AcquisitionLot? lot = await QueryLots().SingleOrDefaultAsync(item => item.Id == id, cancellationToken);
         return lot is null ? NotFound() : lot.ToDto();
     }
 
     [HttpPost]
     public async Task<ActionResult<AcquisitionLotDto>> Create(UpsertAcquisitionLotRequest request, CancellationToken cancellationToken)
     {
-        var result = await Upsert(existingLotId: null, request, cancellationToken);
+        ActionResult<AcquisitionLotDto> result = await Upsert(existingLotId: null, request, cancellationToken);
         if (result.Result is not null)
         {
             return result.Result;
@@ -73,7 +74,7 @@ public sealed class AcquisitionLotsController(HaulScoutDbContext db, ICurrentUse
             return BadRequest("Every new lot item needs a title.");
         }
 
-        var lot = await db.AcquisitionLots
+        AcquisitionLot? lot = await db.AcquisitionLots
             .Include(item => item.Items)
             .SingleOrDefaultAsync(item => item.Id == id && item.OrganizationId == currentUser.OrganizationId, cancellationToken);
         if (lot is null)
@@ -83,12 +84,12 @@ public sealed class AcquisitionLotsController(HaulScoutDbContext db, ICurrentUse
 
         // Creating the items and re-allocating must be atomic: if allocation fails (e.g. a manual lot no
         // longer balances) the new draft items must not be left orphaned without a lot.
-        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        await using IDbContextTransaction transaction = await db.Database.BeginTransactionAsync(cancellationToken);
 
-        var created = new List<(InventoryItem Item, NewLotItemDto Input)>();
-        foreach (var input in request.Items)
+        List<(InventoryItem Item, NewLotItemDto Input)> created = [];
+        foreach (NewLotItemDto input in request.Items)
         {
-            var item = new InventoryItem
+            InventoryItem item = new()
             {
                 OrganizationId = currentUser.OrganizationId,
                 Title = input.Title.Trim(),
@@ -110,7 +111,7 @@ public sealed class AcquisitionLotsController(HaulScoutDbContext db, ICurrentUse
 
         // Preserve each existing item's allocation as its manual input so a Manual-method lot keeps its
         // hand-set costs; Equal/Weighted methods ignore these and re-split across the full set.
-        var mergedItems = lot.Items
+        List<AcquisitionLotItemInputDto> mergedItems = lot.Items
             .Select(existing => new AcquisitionLotItemInputDto(
                 existing.InventoryItemId,
                 ManualAllocatedCost: existing.AllocatedCost,
@@ -123,7 +124,7 @@ public sealed class AcquisitionLotsController(HaulScoutDbContext db, ICurrentUse
                 Notes: TrimToNull(entry.Input.Notes))))
             .ToList();
 
-        var mergedRequest = new UpsertAcquisitionLotRequest(
+        UpsertAcquisitionLotRequest mergedRequest = new(
             lot.Name,
             lot.PurchasedAt,
             lot.PurchaseSubtotal,
@@ -140,7 +141,7 @@ public sealed class AcquisitionLotsController(HaulScoutDbContext db, ICurrentUse
             lot.Notes,
             mergedItems);
 
-        var result = await Upsert(id, mergedRequest, cancellationToken);
+        ActionResult<AcquisitionLotDto> result = await Upsert(id, mergedRequest, cancellationToken);
         if (result.Result is not null)
         {
             // Upsert produced an error response (BadRequest/NotFound/Conflict); roll back the new items.
@@ -174,7 +175,7 @@ public sealed class AcquisitionLotsController(HaulScoutDbContext db, ICurrentUse
         }
 
         Guid[] inventoryItemIds = request.Items.Select(item => item.InventoryItemId).Distinct().ToArray();
-        var items = await db.InventoryItems
+        List<InventoryItem> items = await db.InventoryItems
             .Where(item => inventoryItemIds.Contains(item.Id) && item.OrganizationId == currentUser.OrganizationId)
             .ToListAsync(cancellationToken);
         if (items.Count != inventoryItemIds.Length)
@@ -182,7 +183,7 @@ public sealed class AcquisitionLotsController(HaulScoutDbContext db, ICurrentUse
             return NotFound("One or more inventory items were not found.");
         }
 
-        var existingAssignments = await db.AcquisitionLotItems
+        List<AcquisitionLotItem> existingAssignments = await db.AcquisitionLotItems
             .Where(item => inventoryItemIds.Contains(item.InventoryItemId)
                 && item.OrganizationId == currentUser.OrganizationId
                 && (!existingLotId.HasValue || item.AcquisitionLotId != existingLotId.Value))
@@ -197,7 +198,7 @@ public sealed class AcquisitionLotsController(HaulScoutDbContext db, ICurrentUse
         Guid[] oldItemIds = [];
         if (existingLotId.HasValue)
         {
-            var existingLot = await db.AcquisitionLots
+            AcquisitionLot? existingLot = await db.AcquisitionLots
                 .Include(item => item.Items)
                 .SingleOrDefaultAsync(item => item.Id == existingLotId.Value && item.OrganizationId == currentUser.OrganizationId, cancellationToken);
             if (existingLot is null)
@@ -222,7 +223,7 @@ public sealed class AcquisitionLotsController(HaulScoutDbContext db, ICurrentUse
             .GroupBy(item => item.InventoryItemId)
             .ToDictionary(group => group.Key, group => group.First());
 
-        foreach (var item in items)
+        foreach (InventoryItem item in items)
         {
             decimal allocatedCost = allocations[item.Id];
             item.PurchasePrice = allocatedCost;
@@ -269,7 +270,7 @@ public sealed class AcquisitionLotsController(HaulScoutDbContext db, ICurrentUse
         });
 
         await db.SaveChangesAsync(cancellationToken);
-        var saved = await QueryLots().SingleAsync(item => item.Id == lot.Id, cancellationToken);
+        AcquisitionLot saved = await QueryLots().SingleAsync(item => item.Id == lot.Id, cancellationToken);
         return saved.ToDto();
     }
 
@@ -278,7 +279,7 @@ public sealed class AcquisitionLotsController(HaulScoutDbContext db, ICurrentUse
         IReadOnlyCollection<Guid> affectedInventoryItemIds,
         CancellationToken cancellationToken)
     {
-        var individualExpenses = await db.Expenses
+        List<Expense> individualExpenses = await db.Expenses
             .Where(expense => expense.OrganizationId == currentUser.OrganizationId
                 && expense.Category == ExpenseCategory.InventoryPurchase
                 && expense.InventoryItemId.HasValue
@@ -327,11 +328,11 @@ public sealed class AcquisitionLotsController(HaulScoutDbContext db, ICurrentUse
     {
         Guid[] itemIds = items.Select(item => item.Id).ToArray();
         Dictionary<Guid, decimal> costs = items.ToDictionary(item => item.Id, item => item.PurchasePrice ?? 0);
-        var sales = await db.Sales
+        List<Sale> sales = await db.Sales
             .Where(item => item.OrganizationId == currentUser.OrganizationId && itemIds.Contains(item.InventoryItemId))
             .ToListAsync(cancellationToken);
 
-        foreach (var sale in sales)
+        foreach (Sale sale in sales)
         {
             decimal correctedCost = costs[sale.InventoryItemId];
             if (sale.CostOfGoods == correctedCost)
@@ -382,7 +383,7 @@ public sealed class AcquisitionLotsController(HaulScoutDbContext db, ICurrentUse
             return;
         }
 
-        var budget = await db.Budgets
+        Budget? budget = await db.Budgets
             .Where(item => item.OrganizationId == currentUser.OrganizationId && item.IsActive)
             .OrderByDescending(item => item.StartsAt)
             .FirstOrDefaultAsync(cancellationToken);
@@ -427,7 +428,7 @@ public sealed class AcquisitionLotsController(HaulScoutDbContext db, ICurrentUse
 
         if (request.AllocationMethod == AcquisitionLotAllocationMethod.Manual)
         {
-            var manual = inputs.ToDictionary(
+            Dictionary<Guid, decimal> manual = inputs.ToDictionary(
                 pair => pair.Key,
                 pair => RoundMoney(pair.Value.ManualAllocatedCost ?? 0));
             decimal manualTotal = manual.Sum(pair => pair.Value);
@@ -457,7 +458,7 @@ public sealed class AcquisitionLotsController(HaulScoutDbContext db, ICurrentUse
         }
 
         decimal weightTotal = weights.Sum();
-        var result = new Dictionary<Guid, decimal>();
+        Dictionary<Guid, decimal> result = new();
         decimal allocated = 0;
         for (int index = 0; index < items.Count; index++)
         {
@@ -543,7 +544,7 @@ public sealed class AcquisitionLotsController(HaulScoutDbContext db, ICurrentUse
             return "Total landed cost must be greater than zero.";
         }
 
-        var items = request.Items ?? [];
+        IReadOnlyList<AcquisitionLotItemInputDto> items = request.Items ?? [];
 
         // Manual allocation only has to balance once the lot has been itemized.
         if (items.Count > 0 && request.AllocationMethod == AcquisitionLotAllocationMethod.Manual)

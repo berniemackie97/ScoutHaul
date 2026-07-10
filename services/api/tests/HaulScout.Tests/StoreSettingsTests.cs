@@ -21,13 +21,13 @@ public class StoreSettingsTests
 
     private static (HaulScoutDbContext Db, Guid Org) NewContext(string store)
     {
-        var org = Guid.NewGuid();
-        var options = new DbContextOptionsBuilder<HaulScoutDbContext>()
+        Guid org = Guid.NewGuid();
+        DbContextOptions<HaulScoutDbContext> options = new DbContextOptionsBuilder<HaulScoutDbContext>()
             .UseInMemoryDatabase(store)
             .Options;
-        var tenant = new TenantContext();
+        TenantContext tenant = new();
         tenant.SetOrganization(org);
-        var db = new HaulScoutDbContext(options, tenant);
+        HaulScoutDbContext db = new(options, tenant);
         db.Organizations.Add(new Organization { Id = org, Name = "Overhaul Trading Company" });
         db.SaveChanges();
         return (db, org);
@@ -36,17 +36,17 @@ public class StoreSettingsTests
     [Fact]
     public async Task Get_returns_the_current_org_store_identity()
     {
-        var (db, org) = NewContext(nameof(Get_returns_the_current_org_store_identity));
-        await using var _ = db;
-        var existing = await db.Organizations.FirstAsync(o => o.Id == org);
+        (HaulScoutDbContext db, Guid org) = NewContext(nameof(Get_returns_the_current_org_store_identity));
+        await using HaulScoutDbContext _ = db;
+        Organization existing = await db.Organizations.FirstAsync(o => o.Id == org);
         existing.StoreDomain = "overhaultrading.com";
         await db.SaveChangesAsync();
 
-        var controller = new StoreSettingsController(db, new StubCurrentUser(org));
-        var result = await controller.Get(CancellationToken.None);
+        StoreSettingsController controller = new(db, new StubCurrentUser(org));
+        ActionResult<StoreSettingsDto> result = await controller.Get(CancellationToken.None);
 
         Assert.Null(result.Result);
-        var dto = result.Value!;
+        StoreSettingsDto dto = result.Value!;
         Assert.Equal("Overhaul Trading Company", dto.Name);
         Assert.Equal("overhaultrading.com", dto.StoreDomain);
         Assert.True(dto.IsLive);
@@ -59,18 +59,18 @@ public class StoreSettingsTests
     [InlineData("overhaultrading.com.", "overhaultrading.com")]
     public async Task Update_normalizes_and_saves_a_valid_domain(string input, string expected)
     {
-        var (db, org) = NewContext($"normalize-{expected}-{input.GetHashCode()}");
-        await using var _ = db;
+        (HaulScoutDbContext db, Guid org) = NewContext($"normalize-{expected}-{input.GetHashCode()}");
+        await using HaulScoutDbContext _ = db;
 
-        var controller = new StoreSettingsController(db, new StubCurrentUser(org));
-        var result = await controller.Update(
+        StoreSettingsController controller = new(db, new StubCurrentUser(org));
+        ActionResult<StoreSettingsDto> result = await controller.Update(
             new UpdateStoreSettingsRequest("Overhaul Trading Company", input), CancellationToken.None);
 
         Assert.Null(result.Result);
         Assert.Equal(expected, result.Value!.StoreDomain);
         Assert.True(result.Value!.IsLive);
 
-        var reloaded = await db.Organizations.FirstAsync(o => o.Id == org);
+        Organization reloaded = await db.Organizations.FirstAsync(o => o.Id == org);
         Assert.Equal(expected, reloaded.StoreDomain);
     }
 
@@ -81,11 +81,11 @@ public class StoreSettingsTests
     [InlineData("overhaultrading")]
     public async Task Update_rejects_an_invalid_domain(string input)
     {
-        var (db, org) = NewContext($"invalid-{input.GetHashCode()}");
-        await using var _ = db;
+        (HaulScoutDbContext db, Guid org) = NewContext($"invalid-{input.GetHashCode()}");
+        await using HaulScoutDbContext _ = db;
 
-        var controller = new StoreSettingsController(db, new StubCurrentUser(org));
-        var result = await controller.Update(
+        StoreSettingsController controller = new(db, new StubCurrentUser(org));
+        ActionResult<StoreSettingsDto> result = await controller.Update(
             new UpdateStoreSettingsRequest("Overhaul Trading Company", input), CancellationToken.None);
 
         Assert.IsType<BadRequestObjectResult>(result.Result);
@@ -94,13 +94,13 @@ public class StoreSettingsTests
     [Fact]
     public async Task Update_rejects_a_domain_already_connected_to_another_org()
     {
-        var (db, org) = NewContext(nameof(Update_rejects_a_domain_already_connected_to_another_org));
-        await using var _ = db;
+        (HaulScoutDbContext db, Guid org) = NewContext(nameof(Update_rejects_a_domain_already_connected_to_another_org));
+        await using HaulScoutDbContext _ = db;
         db.Organizations.Add(new Organization { Id = Guid.NewGuid(), Name = "Another Co", StoreDomain = "overhaultrading.com" });
         await db.SaveChangesAsync();
 
-        var controller = new StoreSettingsController(db, new StubCurrentUser(org));
-        var result = await controller.Update(
+        StoreSettingsController controller = new(db, new StubCurrentUser(org));
+        ActionResult<StoreSettingsDto> result = await controller.Update(
             new UpdateStoreSettingsRequest("Overhaul Trading Company", "overhaultrading.com"), CancellationToken.None);
 
         Assert.IsType<ConflictObjectResult>(result.Result);
@@ -109,14 +109,14 @@ public class StoreSettingsTests
     [Fact]
     public async Task Update_with_blank_domain_disconnects_the_storefront()
     {
-        var (db, org) = NewContext(nameof(Update_with_blank_domain_disconnects_the_storefront));
-        await using var _ = db;
-        var existing = await db.Organizations.FirstAsync(o => o.Id == org);
+        (HaulScoutDbContext db, Guid org) = NewContext(nameof(Update_with_blank_domain_disconnects_the_storefront));
+        await using HaulScoutDbContext _ = db;
+        Organization existing = await db.Organizations.FirstAsync(o => o.Id == org);
         existing.StoreDomain = "overhaultrading.com";
         await db.SaveChangesAsync();
 
-        var controller = new StoreSettingsController(db, new StubCurrentUser(org));
-        var result = await controller.Update(
+        StoreSettingsController controller = new(db, new StubCurrentUser(org));
+        ActionResult<StoreSettingsDto> result = await controller.Update(
             new UpdateStoreSettingsRequest("Overhaul Trading Company", "   "), CancellationToken.None);
 
         Assert.Null(result.Result);
@@ -127,11 +127,11 @@ public class StoreSettingsTests
     [Fact]
     public async Task Update_requires_a_store_name()
     {
-        var (db, org) = NewContext(nameof(Update_requires_a_store_name));
-        await using var _ = db;
+        (HaulScoutDbContext db, Guid org) = NewContext(nameof(Update_requires_a_store_name));
+        await using HaulScoutDbContext _ = db;
 
-        var controller = new StoreSettingsController(db, new StubCurrentUser(org));
-        var result = await controller.Update(
+        StoreSettingsController controller = new(db, new StubCurrentUser(org));
+        ActionResult<StoreSettingsDto> result = await controller.Update(
             new UpdateStoreSettingsRequest("  ", "overhaultrading.com"), CancellationToken.None);
 
         Assert.IsType<BadRequestObjectResult>(result.Result);

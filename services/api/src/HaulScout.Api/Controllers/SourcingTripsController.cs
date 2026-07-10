@@ -28,7 +28,7 @@ public sealed class SourcingTripsController(HaulScoutDbContext db, ICurrentUserC
         DateTimeOffset now = DateTimeOffset.UtcNow;
         DateTimeOffset startedAt = request.StartedAt ?? request.PlannedStartAt ?? now;
 
-        var trip = new SourcingTrip
+        SourcingTrip trip = new()
         {
             OrganizationId = currentUser.OrganizationId,
             AssignedToUserId = request.AssignedToUserId,
@@ -52,7 +52,7 @@ public sealed class SourcingTripsController(HaulScoutDbContext db, ICurrentUserC
     [HttpPut("{id:guid}")]
     public async Task<ActionResult<SourcingTripDto>> Update(Guid id, UpdateSourcingTripRequest request, CancellationToken cancellationToken)
     {
-        var trip = await FindTrip(id)
+        SourcingTrip? trip = await FindTrip(id)
             .Include(item => item.Items)
             .Include(item => item.Stops)
             .SingleOrDefaultAsync(cancellationToken);
@@ -87,7 +87,7 @@ public sealed class SourcingTripsController(HaulScoutDbContext db, ICurrentUserC
     [HttpPatch("{id:guid}/status")]
     public async Task<ActionResult<SourcingTripDto>> UpdateStatus(Guid id, UpdateSourcingRouteStatusRequest request, CancellationToken cancellationToken)
     {
-        var trip = await FindTrip(id)
+        SourcingTrip? trip = await FindTrip(id)
             .Include(item => item.Items)
             .Include(item => item.Stops)
             .SingleOrDefaultAsync(cancellationToken);
@@ -106,7 +106,7 @@ public sealed class SourcingTripsController(HaulScoutDbContext db, ICurrentUserC
     [HttpPost("{id:guid}/start")]
     public async Task<ActionResult<SourcingRouteDetailDto>> Start(Guid id, CancellationToken cancellationToken)
     {
-        var trip = await LoadRoute(id, cancellationToken);
+        SourcingTrip? trip = await LoadRoute(id, cancellationToken);
         if (trip is null)
         {
             return NotFound();
@@ -116,7 +116,7 @@ public sealed class SourcingTripsController(HaulScoutDbContext db, ICurrentUserC
         trip.StartedAt = DateTimeOffset.UtcNow;
         trip.PlannedStartAt ??= trip.StartedAt;
 
-        foreach (var stop in trip.Stops.Where(item => item.Status == SourcingStopStatus.AtRisk))
+        foreach (SourcingTripStop stop in trip.Stops.Where(item => item.Status == SourcingStopStatus.AtRisk))
         {
             stop.Status = SourcingStopStatus.Planned;
         }
@@ -128,7 +128,7 @@ public sealed class SourcingTripsController(HaulScoutDbContext db, ICurrentUserC
     [HttpPost("{id:guid}/pause")]
     public async Task<ActionResult<SourcingRouteDetailDto>> Pause(Guid id, CancellationToken cancellationToken)
     {
-        var trip = await LoadRoute(id, cancellationToken);
+        SourcingTrip? trip = await LoadRoute(id, cancellationToken);
         if (trip is null)
         {
             return NotFound();
@@ -142,7 +142,7 @@ public sealed class SourcingTripsController(HaulScoutDbContext db, ICurrentUserC
     [HttpPost("{id:guid}/complete-route")]
     public async Task<ActionResult<SourcingRouteDetailDto>> CompleteRoute(Guid id, CancellationToken cancellationToken)
     {
-        var trip = await LoadRoute(id, cancellationToken);
+        SourcingTrip? trip = await LoadRoute(id, cancellationToken);
         if (trip is null)
         {
             return NotFound();
@@ -157,7 +157,7 @@ public sealed class SourcingTripsController(HaulScoutDbContext db, ICurrentUserC
     [HttpPost("{id:guid}/items")]
     public async Task<IActionResult> AddItem(Guid id, AddItemToTripRequest request, CancellationToken cancellationToken)
     {
-        var tripExists = await FindTrip(id).AnyAsync(cancellationToken);
+        bool tripExists = await FindTrip(id).AnyAsync(cancellationToken);
 
         if (!tripExists)
         {
@@ -178,7 +178,7 @@ public sealed class SourcingTripsController(HaulScoutDbContext db, ICurrentUserC
             }
         }
 
-        var item = await db.InventoryItems.SingleOrDefaultAsync(
+        InventoryItem? item = await db.InventoryItems.SingleOrDefaultAsync(
             inventoryItem => inventoryItem.Id == request.InventoryItemId && inventoryItem.OrganizationId == currentUser.OrganizationId,
             cancellationToken);
 
@@ -197,7 +197,7 @@ public sealed class SourcingTripsController(HaulScoutDbContext db, ICurrentUserC
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<SourcingTripDto>>> List(CancellationToken cancellationToken)
     {
-        var trips = await db.SourcingTrips
+        List<SourcingTrip> trips = await db.SourcingTrips
             .Include(item => item.Items)
             .Include(item => item.Stops)
             .Where(item => item.OrganizationId == currentUser.OrganizationId)
@@ -211,14 +211,14 @@ public sealed class SourcingTripsController(HaulScoutDbContext db, ICurrentUserC
     [HttpGet("{id:guid}/route")]
     public async Task<ActionResult<SourcingRouteDetailDto>> GetRoute(Guid id, CancellationToken cancellationToken)
     {
-        var trip = await LoadRoute(id, cancellationToken);
+        SourcingTrip? trip = await LoadRoute(id, cancellationToken);
         return trip is null ? NotFound() : BuildRouteDetail(trip);
     }
 
     [HttpGet("{id:guid}/summary")]
     public async Task<ActionResult<SourcingTripSummaryDto>> GetSummary(Guid id, CancellationToken cancellationToken)
     {
-        var trip = await LoadRoute(id, cancellationToken);
+        SourcingTrip? trip = await LoadRoute(id, cancellationToken);
 
         if (trip is null)
         {
@@ -231,7 +231,7 @@ public sealed class SourcingTripsController(HaulScoutDbContext db, ICurrentUserC
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
     {
-        var trip = await FindTrip(id).SingleOrDefaultAsync(cancellationToken);
+        SourcingTrip? trip = await FindTrip(id).SingleOrDefaultAsync(cancellationToken);
         if (trip is null)
         {
             return NotFound();
@@ -245,7 +245,7 @@ public sealed class SourcingTripsController(HaulScoutDbContext db, ICurrentUserC
     [HttpPost("{id:guid}/stops")]
     public async Task<ActionResult<SourcingTripStopDto>> CreateStop(Guid id, UpsertSourcingTripStopRequest request, CancellationToken cancellationToken)
     {
-        var trip = await FindTrip(id)
+        SourcingTrip? trip = await FindTrip(id)
             .Include(item => item.Stops)
             .SingleOrDefaultAsync(cancellationToken);
 
@@ -261,7 +261,7 @@ public sealed class SourcingTripsController(HaulScoutDbContext db, ICurrentUserC
         }
 
         int nextOrder = trip.Stops.Count == 0 ? 1 : trip.Stops.Max(item => item.PlannedOrder) + 1;
-        var stop = new SourcingTripStop
+        SourcingTripStop stop = new()
         {
             OrganizationId = currentUser.OrganizationId,
             SourcingTripId = trip.Id,
@@ -282,7 +282,7 @@ public sealed class SourcingTripsController(HaulScoutDbContext db, ICurrentUserC
     [HttpPut("{id:guid}/stops/{stopId:guid}")]
     public async Task<ActionResult<SourcingTripStopDto>> UpdateStop(Guid id, Guid stopId, UpsertSourcingTripStopRequest request, CancellationToken cancellationToken)
     {
-        var stop = await db.SourcingTripStops
+        SourcingTripStop? stop = await db.SourcingTripStops
             .Include(item => item.Items)
             .Include(item => item.ChecklistItems)
             .SingleOrDefaultAsync(
@@ -311,7 +311,7 @@ public sealed class SourcingTripsController(HaulScoutDbContext db, ICurrentUserC
     [HttpDelete("{id:guid}/stops/{stopId:guid}")]
     public async Task<IActionResult> DeleteStop(Guid id, Guid stopId, CancellationToken cancellationToken)
     {
-        var stop = await db.SourcingTripStops
+        SourcingTripStop? stop = await db.SourcingTripStops
             .SingleOrDefaultAsync(
                 item => item.Id == stopId && item.SourcingTripId == id && item.OrganizationId == currentUser.OrganizationId,
                 cancellationToken);
@@ -329,13 +329,13 @@ public sealed class SourcingTripsController(HaulScoutDbContext db, ICurrentUserC
     [HttpPost("{id:guid}/stops/reorder")]
     public async Task<ActionResult<SourcingRouteDetailDto>> ReorderStops(Guid id, ReorderSourcingTripStopsRequest request, CancellationToken cancellationToken)
     {
-        var trip = await LoadRoute(id, cancellationToken);
+        SourcingTrip? trip = await LoadRoute(id, cancellationToken);
         if (trip is null)
         {
             return NotFound();
         }
 
-        var requestedIds = request.StopIds.ToHashSet();
+        HashSet<Guid> requestedIds = request.StopIds.ToHashSet();
         if (requestedIds.Count != trip.Stops.Count || trip.Stops.Any(item => !requestedIds.Contains(item.Id)))
         {
             return BadRequest("Reorder request must include every stop exactly once.");
@@ -343,7 +343,7 @@ public sealed class SourcingTripsController(HaulScoutDbContext db, ICurrentUserC
 
         for (int index = 0; index < request.StopIds.Count; index++)
         {
-            var stop = trip.Stops.Single(item => item.Id == request.StopIds[index]);
+            SourcingTripStop stop = trip.Stops.Single(item => item.Id == request.StopIds[index]);
             stop.PlannedOrder = index + 1;
         }
 
@@ -354,7 +354,7 @@ public sealed class SourcingTripsController(HaulScoutDbContext db, ICurrentUserC
     [HttpPost("{id:guid}/stops/{stopId:guid}/apply-checklist-template")]
     public async Task<ActionResult<SourcingTripStopDto>> ApplyTemplate(Guid id, Guid stopId, CancellationToken cancellationToken)
     {
-        var stop = await db.SourcingTripStops
+        SourcingTripStop? stop = await db.SourcingTripStops
             .Include(item => item.Items)
             .Include(item => item.ChecklistItems)
             .SingleOrDefaultAsync(
@@ -374,8 +374,8 @@ public sealed class SourcingTripsController(HaulScoutDbContext db, ICurrentUserC
     [HttpPost("{id:guid}/stops/{stopId:guid}/navigate")]
     public async Task<ActionResult<SourcingRouteDetailDto>> NavigateStop(Guid id, Guid stopId, CancellationToken cancellationToken)
     {
-        var trip = await LoadRouteSlim(id, cancellationToken);
-        var stop = FindStop(trip, stopId);
+        SourcingTrip? trip = await LoadRouteSlim(id, cancellationToken);
+        SourcingTripStop? stop = FindStop(trip, stopId);
 
         if (trip is null || stop is null)
         {
@@ -391,8 +391,8 @@ public sealed class SourcingTripsController(HaulScoutDbContext db, ICurrentUserC
     [HttpPost("{id:guid}/stops/{stopId:guid}/arrive")]
     public async Task<ActionResult<SourcingRouteDetailDto>> ArriveAtStop(Guid id, Guid stopId, CancellationToken cancellationToken)
     {
-        var trip = await LoadRouteSlim(id, cancellationToken);
-        var stop = FindStop(trip, stopId);
+        SourcingTrip? trip = await LoadRouteSlim(id, cancellationToken);
+        SourcingTripStop? stop = FindStop(trip, stopId);
 
         if (trip is null || stop is null)
         {
@@ -409,8 +409,8 @@ public sealed class SourcingTripsController(HaulScoutDbContext db, ICurrentUserC
     [HttpPost("{id:guid}/stops/{stopId:guid}/complete")]
     public async Task<ActionResult<SourcingRouteDetailDto>> CompleteStop(Guid id, Guid stopId, CompleteSourcingStopRequest request, CancellationToken cancellationToken)
     {
-        var trip = await LoadRouteSlim(id, cancellationToken);
-        var stop = FindStop(trip, stopId);
+        SourcingTrip? trip = await LoadRouteSlim(id, cancellationToken);
+        SourcingTripStop? stop = FindStop(trip, stopId);
 
         if (trip is null || stop is null)
         {
@@ -441,8 +441,8 @@ public sealed class SourcingTripsController(HaulScoutDbContext db, ICurrentUserC
     [HttpPost("{id:guid}/stops/{stopId:guid}/skip")]
     public async Task<ActionResult<SourcingRouteDetailDto>> SkipStop(Guid id, Guid stopId, SkipSourcingStopRequest request, CancellationToken cancellationToken)
     {
-        var trip = await LoadRouteSlim(id, cancellationToken);
-        var stop = FindStop(trip, stopId);
+        SourcingTrip? trip = await LoadRouteSlim(id, cancellationToken);
+        SourcingTripStop? stop = FindStop(trip, stopId);
 
         if (trip is null || stop is null)
         {
@@ -467,7 +467,7 @@ public sealed class SourcingTripsController(HaulScoutDbContext db, ICurrentUserC
     [HttpPost("{id:guid}/stops/{stopId:guid}/checklist")]
     public async Task<ActionResult<SourcingStopChecklistItemDto>> CreateChecklistItem(Guid id, Guid stopId, CreateChecklistItemRequest request, CancellationToken cancellationToken)
     {
-        var stop = await db.SourcingTripStops
+        SourcingTripStop? stop = await db.SourcingTripStops
             .Include(item => item.ChecklistItems)
             .SingleOrDefaultAsync(
                 item => item.Id == stopId && item.SourcingTripId == id && item.OrganizationId == currentUser.OrganizationId,
@@ -483,7 +483,7 @@ public sealed class SourcingTripsController(HaulScoutDbContext db, ICurrentUserC
             return BadRequest("Checklist item text is required.");
         }
 
-        var item = new SourcingStopChecklistItem
+        SourcingStopChecklistItem item = new()
         {
             OrganizationId = currentUser.OrganizationId,
             SourcingTripStopId = stop.Id,
@@ -505,9 +505,9 @@ public sealed class SourcingTripsController(HaulScoutDbContext db, ICurrentUserC
         UpdateChecklistItemRequest request,
         CancellationToken cancellationToken)
     {
-        var trip = await LoadRouteSlim(id, cancellationToken);
-        var stop = FindStop(trip, stopId);
-        var checklistItem = stop?.ChecklistItems.SingleOrDefault(item => item.Id == checklistItemId);
+        SourcingTrip? trip = await LoadRouteSlim(id, cancellationToken);
+        SourcingTripStop? stop = FindStop(trip, stopId);
+        SourcingStopChecklistItem? checklistItem = stop?.ChecklistItems.SingleOrDefault(item => item.Id == checklistItemId);
 
         if (trip is null || stop is null || checklistItem is null)
         {
@@ -572,10 +572,10 @@ public sealed class SourcingTripsController(HaulScoutDbContext db, ICurrentUserC
 
     private static SourcingTripSummaryDto BuildSummary(SourcingTrip trip)
     {
-        var stops = trip.Stops
+        List<SourcingTripStop> stops = trip.Stops
             .Where(item => item.Status != SourcingStopStatus.Cancelled)
             .ToList();
-        var completedStops = stops.Where(item => item.Status == SourcingStopStatus.Completed).ToList();
+        List<SourcingTripStop> completedStops = stops.Where(item => item.Status == SourcingStopStatus.Completed).ToList();
         int plannedMinutes = stops.Sum(item => item.EstimatedDurationMinutes);
         int actualMinutes = completedStops.Sum(item =>
             item.ActualArrivalAt.HasValue && item.ActualDepartureAt.HasValue

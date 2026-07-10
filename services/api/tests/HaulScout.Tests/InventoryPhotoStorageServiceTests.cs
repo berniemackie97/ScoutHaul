@@ -14,33 +14,33 @@ public sealed class InventoryPhotoStorageServiceTests
     [Fact]
     public async Task ProcessAsync_CreatesThumbnailBytesAndMetadata()
     {
-        var configuration = new ConfigurationBuilder()
+        IConfigurationRoot configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["Storage:InventoryPhotos:MaxBytes"] = "8000000",
                 ["Storage:InventoryPhotos:ThumbnailMaxPixels"] = "120"
             })
             .Build();
-        var service = new InventoryPhotoStorageService(
+        InventoryPhotoStorageService service = new(
             new TestWebHostEnvironment(),
             configuration,
             NullLogger<InventoryPhotoStorageService>.Instance);
         byte[] pngBytes;
-        using (var image = new Image<Rgba32>(2, 2, Color.Red))
+        using (Image<Rgba32> image = new(2, 2, Color.Red))
         {
-            await using var pngStream = new MemoryStream();
+            await using MemoryStream pngStream = new();
             await image.SaveAsPngAsync(pngStream);
             pngBytes = pngStream.ToArray();
         }
 
-        await using var stream = new MemoryStream(pngBytes);
-        var file = new FormFile(stream, 0, pngBytes.Length, "file", "item.png")
+        await using MemoryStream stream = new(pngBytes);
+        FormFile file = new(stream, 0, pngBytes.Length, "file", "item.png")
         {
             Headers = new HeaderDictionary(),
             ContentType = "image/png"
         };
 
-        var result = await service.ProcessAsync(file, CancellationToken.None);
+        InventoryPhotoStorageService.ProcessedInventoryPhoto result = await service.ProcessAsync(file, CancellationToken.None);
 
         Assert.Equal("image/png", result.ContentType);
         Assert.Equal("item.png", result.OriginalFileName);

@@ -455,7 +455,7 @@ public static class DtoMapping
                 .OrderBy(line => line.CreatedAt)
                 .Select(line =>
                 {
-                    (Guid Id, string Title, bool AlreadySold)? suggestion = lineSuggestions is not null && lineSuggestions.TryGetValue(line.Id, out var match) ? match : null;
+                    (Guid Id, string Title, bool AlreadySold)? suggestion = lineSuggestions is not null && lineSuggestions.TryGetValue(line.Id, out (Guid Id, string Title, bool AlreadySold) match) ? match : null;
                     return new PlatformOrderLineDto(
                         line.Id,
                         line.Title,

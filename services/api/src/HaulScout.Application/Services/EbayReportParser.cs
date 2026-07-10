@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text;
 using System.Text.Json;
 using HaulScout.Application.Contracts;
 
@@ -26,15 +27,15 @@ public static class EbayReportParser
             return new ParseResult([], 0, 0, "The file was empty.");
         }
 
-        var rows = SplitRecords(csv).Select(ParseCsvLine).ToList();
+        List<List<string>> rows = SplitRecords(csv).Select(ParseCsvLine).ToList();
         int headerIndex = rows.FindIndex(fields => fields.Contains(TitleHeader) && fields.Contains(ItemIdHeader));
         if (headerIndex < 0)
         {
             return new ParseResult([], 0, 0, "This does not look like an eBay sales report (no 'eBay item ID' header row).");
         }
 
-        var header = rows[headerIndex];
-        var column = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        List<string> header = rows[headerIndex];
+        Dictionary<string, int> column = new(StringComparer.OrdinalIgnoreCase);
         for (int i = 0; i < header.Count; i++)
         {
             column.TryAdd(header[i].Trim(), i);
@@ -42,11 +43,11 @@ public static class EbayReportParser
 
         DateTimeOffset orderedAt = ExtractReportEndDate(rows, headerIndex) ?? DateTimeOffset.UtcNow;
 
-        var orders = new List<IngestPlatformOrderInput>();
+        List<IngestPlatformOrderInput> orders = [];
         int skipped = 0;
         for (int i = headerIndex + 1; i < rows.Count; i++)
         {
-            var fields = rows[i];
+            List<string> fields = rows[i];
             string itemId = Field(fields, column, ItemIdHeader).Trim();
             string title = Field(fields, column, TitleHeader).Trim();
             if (itemId.Length == 0 || title.Length == 0)
@@ -106,7 +107,7 @@ public static class EbayReportParser
     // eBay appends parentheticals to some headers ("Shipping labels cost (Amount you paid...)"); match by prefix.
     private static string FieldStartsWith(IReadOnlyList<string> fields, IReadOnlyDictionary<string, int> column, string prefix)
     {
-        foreach (var (key, index) in column)
+        foreach ((string key, int index) in column)
         {
             if (key.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) && index < fields.Count)
             {
@@ -141,13 +142,13 @@ public static class EbayReportParser
     {
         for (int i = 0; i < headerIndex; i++)
         {
-            foreach (var cell in rows[i])
+            foreach (string cell in rows[i])
             {
                 int to = cell.IndexOf(" to ", StringComparison.OrdinalIgnoreCase);
                 if (to > 0 && cell.Contains("Report", StringComparison.OrdinalIgnoreCase))
                 {
                     string tail = cell[(to + 4)..].Trim().TrimEnd('"');
-                    if (DateTimeOffset.TryParse(tail, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var parsed))
+                    if (DateTimeOffset.TryParse(tail, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out DateTimeOffset parsed))
                     {
                         return parsed;
                     }
@@ -160,7 +161,7 @@ public static class EbayReportParser
     // Records are newline-separated, but a quoted field may contain newlines — split with quote awareness.
     private static IEnumerable<string> SplitRecords(string csv)
     {
-        var current = new System.Text.StringBuilder();
+        StringBuilder current = new();
         bool inQuotes = false;
         foreach (char c in csv.Replace("\r\n", "\n").Replace('\r', '\n'))
         {
@@ -187,8 +188,8 @@ public static class EbayReportParser
 
     private static List<string> ParseCsvLine(string line)
     {
-        var fields = new List<string>();
-        var current = new System.Text.StringBuilder();
+        List<string> fields = [];
+        StringBuilder current = new();
         bool inQuotes = false;
         for (int i = 0; i < line.Length; i++)
         {

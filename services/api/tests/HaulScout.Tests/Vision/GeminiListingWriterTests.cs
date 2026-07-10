@@ -31,7 +31,7 @@ public sealed class GeminiListingWriterTests
 
     private static GeminiListingWriter NewWriter(string copyJson, ResaleEstimate? estimate)
     {
-        var config = new ConfigurationBuilder()
+        IConfigurationRoot config = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?> { ["Gemini:ApiKey"] = "test-key" })
             .Build();
         return new GeminiListingWriter(
@@ -44,7 +44,7 @@ public sealed class GeminiListingWriterTests
     [Fact]
     public async Task Generates_title_description_and_deterministic_comp_backed_price()
     {
-        var estimate = new ResaleEstimate(
+        ResaleEstimate estimate = new(
             Low: 40m,
             High: 65m,
             Rationale: "based on recent sold comps",
@@ -52,7 +52,7 @@ public sealed class GeminiListingWriterTests
             PriceRangeType: "moderate",
             Comps: [new ResaleComp(60m, "sold", "good", "eBay sold", null)]);
 
-        var writer = NewWriter(
+        GeminiListingWriter writer = NewWriter(
             """{"title":"Sony WH-1000XM4 Wireless Headphones Black Good Used","description":"Great noise-cancelling headphones, works perfectly.","listPrice":62,"priceRationale":"just under recent sold comps"}""",
             estimate);
 
@@ -71,7 +71,7 @@ public sealed class GeminiListingWriterTests
     [Fact]
     public async Task Ignores_model_lowball_and_filters_bad_collectible_comps()
     {
-        var estimate = new ResaleEstimate(
+        ResaleEstimate estimate = new(
             Low: 50m,
             High: 80m,
             Rationale: "recent eBay sold comps",
@@ -88,7 +88,7 @@ public sealed class GeminiListingWriterTests
                 new ResaleComp(60m, "sold", null, "eBay sold Jun 30 2026 — Gardevoir & Sylveon GX 130/214 Holo Unbroken Bonds", "https://www.ebay.com/itm/7"),
             ]);
 
-        var writer = NewWriter(
+        GeminiListingWriter writer = NewWriter(
             """{"title":"Pokemon TCG Gardevoir & Sylveon GX 130/214 Unbroken Bonds NM","description":"Gardevoir & Sylveon GX TAG TEAM from SM Unbroken Bonds. Near mint raw card; see photos for exact condition.","listPrice":22,"priceRationale":"priced conservatively"}""",
             estimate);
 
@@ -113,9 +113,9 @@ public sealed class GeminiListingWriterTests
     [Fact]
     public async Task Falls_back_to_estimate_range_when_model_omits_price_and_no_sold_comps_exist()
     {
-        var estimate = new ResaleEstimate(Low: 30m, High: 50m, Rationale: null, PriceRangeType: "wide");
+        ResaleEstimate estimate = new(Low: 30m, High: 50m, Rationale: null, PriceRangeType: "wide");
 
-        var writer = NewWriter("""{"title":"Vintage Brass Lamp","description":"A brass table lamp."}""", estimate);
+        GeminiListingWriter writer = NewWriter("""{"title":"Vintage Brass Lamp","description":"A brass table lamp."}""", estimate);
 
         GeneratedListingDto? result = await writer.GenerateAsync(
             new GenerateListingRequest("Vintage Brass Lamp"), CancellationToken.None);

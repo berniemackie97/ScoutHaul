@@ -26,12 +26,12 @@ public sealed class OrdersController(HaulScoutDbContext db, ICurrentUserContext 
         [FromQuery] string? channel,
         CancellationToken cancellationToken)
     {
-        var query = db.Orders
+        IQueryable<Order> query = db.Orders
             .Include(order => order.Customer)
             .Include(order => order.Lines)
             .Where(order => order.OrganizationId == currentUser.OrganizationId);
 
-        if (!string.IsNullOrWhiteSpace(status) && Enum.TryParse<OrderStatus>(status, ignoreCase: true, out var parsed))
+        if (!string.IsNullOrWhiteSpace(status) && Enum.TryParse<OrderStatus>(status, ignoreCase: true, out OrderStatus parsed))
         {
             query = query.Where(order => order.Status == parsed);
         }
@@ -53,7 +53,7 @@ public sealed class OrdersController(HaulScoutDbContext db, ICurrentUserContext 
                 || (order.ExternalOrderId != null && EF.Functions.ILike(order.ExternalOrderId, $"%{term}%")));
         }
 
-        var orders = await query
+        List<Order> orders = await query
             .OrderByDescending(order => order.CreatedAt)
             .Take(200)
             .ToListAsync(cancellationToken);
@@ -64,7 +64,7 @@ public sealed class OrdersController(HaulScoutDbContext db, ICurrentUserContext 
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<OrderDetailDto>> Get(Guid id, CancellationToken cancellationToken)
     {
-        var order = await db.Orders
+        Order? order = await db.Orders
             .Include(item => item.Customer)
             .Include(item => item.Lines)
             .SingleOrDefaultAsync(item => item.Id == id && item.OrganizationId == currentUser.OrganizationId, cancellationToken);
@@ -79,7 +79,7 @@ public sealed class OrdersController(HaulScoutDbContext db, ICurrentUserContext 
     [HttpPatch("{id:guid}/status")]
     public async Task<ActionResult<OrderDetailDto>> UpdateStatus(Guid id, UpdateOrderStatusRequest request, CancellationToken cancellationToken)
     {
-        var order = await db.Orders
+        Order? order = await db.Orders
             .Include(item => item.Customer)
             .Include(item => item.Lines)
             .SingleOrDefaultAsync(item => item.Id == id && item.OrganizationId == currentUser.OrganizationId, cancellationToken);
@@ -142,7 +142,7 @@ public sealed class OrdersController(HaulScoutDbContext db, ICurrentUserContext 
     [HttpPatch("{id:guid}/tracking")]
     public async Task<ActionResult<OrderDetailDto>> UpdateTracking(Guid id, UpdateOrderTrackingRequest request, CancellationToken cancellationToken)
     {
-        var order = await db.Orders
+        Order? order = await db.Orders
             .Include(item => item.Customer)
             .Include(item => item.Lines)
             .SingleOrDefaultAsync(item => item.Id == id && item.OrganizationId == currentUser.OrganizationId, cancellationToken);
@@ -160,7 +160,7 @@ public sealed class OrdersController(HaulScoutDbContext db, ICurrentUserContext 
         }
 
         if (trackingUrl is not null
-            && (!Uri.TryCreate(trackingUrl, UriKind.Absolute, out var uri)
+            && (!Uri.TryCreate(trackingUrl, UriKind.Absolute, out Uri? uri)
                 || (uri.Scheme != Uri.UriSchemeHttps && uri.Scheme != Uri.UriSchemeHttp)))
         {
             return BadRequest("Tracking URL must be a valid absolute http(s) URL.");

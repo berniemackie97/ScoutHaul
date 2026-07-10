@@ -27,7 +27,7 @@ public sealed class StoreController(
     [HttpGet("categories")]
     public async Task<ActionResult<IReadOnlyList<StoreCategoryDto>>> ListCategories(CancellationToken cancellationToken)
     {
-        var categories = await db.StoreCategories
+        List<StoreCategory> categories = await db.StoreCategories
             .OrderBy(category => category.SortOrder)
             .ThenBy(category => category.Name)
             .ToListAsync(cancellationToken);
@@ -38,7 +38,7 @@ public sealed class StoreController(
     [HttpPost("categories")]
     public async Task<ActionResult<StoreCategoryDto>> CreateCategory(UpsertStoreCategoryRequest request, CancellationToken cancellationToken)
     {
-        var name = TrimToNull(request.Name);
+        string? name = TrimToNull(request.Name);
         if (name is null)
         {
             return BadRequest("Category name is required.");
@@ -50,7 +50,7 @@ public sealed class StoreController(
             return BadRequest("Parent category not found.");
         }
 
-        var category = new StoreCategory
+        StoreCategory category = new()
         {
             OrganizationId = currentUser.OrganizationId,
             Name = name,
@@ -72,13 +72,13 @@ public sealed class StoreController(
         [FromQuery] StoreListingStatus? status,
         CancellationToken cancellationToken)
     {
-        var query = db.StoreListings.AsQueryable();
+        IQueryable<StoreListing> query = db.StoreListings.AsQueryable();
         if (status is not null)
         {
             query = query.Where(listing => listing.Status == status);
         }
 
-        var listings = await query
+        List<StoreListing> listings = await query
             .OrderByDescending(listing => listing.CreatedAt)
             .ToListAsync(cancellationToken);
 
@@ -88,7 +88,7 @@ public sealed class StoreController(
     [HttpGet("listings/{id:guid}")]
     public async Task<ActionResult<StoreListingDto>> GetListing(Guid id, CancellationToken cancellationToken)
     {
-        var listing = await db.StoreListings.FirstOrDefaultAsync(listing => listing.Id == id, cancellationToken);
+        StoreListing? listing = await db.StoreListings.FirstOrDefaultAsync(listing => listing.Id == id, cancellationToken);
         return listing is null ? NotFound() : listing.ToDto();
     }
 
@@ -101,7 +101,7 @@ public sealed class StoreController(
         }
 
         // Org scoping is enforced by the global query filter, so this only finds items in our org.
-        var item = await db.InventoryItems.FirstOrDefaultAsync(item => item.Id == request.InventoryItemId, cancellationToken);
+        InventoryItem? item = await db.InventoryItems.FirstOrDefaultAsync(item => item.Id == request.InventoryItemId, cancellationToken);
         if (item is null)
         {
             return BadRequest("Inventory item not found.");
@@ -118,9 +118,9 @@ public sealed class StoreController(
             return BadRequest("Store category not found.");
         }
 
-        var title = TrimToNull(request.Title) ?? item.Title;
+        string title = TrimToNull(request.Title) ?? item.Title;
 
-        var listing = new StoreListing
+        StoreListing listing = new()
         {
             OrganizationId = currentUser.OrganizationId,
             InventoryItemId = item.Id,
@@ -155,7 +155,7 @@ public sealed class StoreController(
             return BadRequest("List price cannot be negative.");
         }
 
-        var listing = await db.StoreListings.FirstOrDefaultAsync(listing => listing.Id == id, cancellationToken);
+        StoreListing? listing = await db.StoreListings.FirstOrDefaultAsync(listing => listing.Id == id, cancellationToken);
         if (listing is null)
         {
             return NotFound();
@@ -189,7 +189,7 @@ public sealed class StoreController(
     [HttpPost("listings/{id:guid}/unpublish")]
     public async Task<ActionResult<StoreListingDto>> Unpublish(Guid id, CancellationToken cancellationToken)
     {
-        var listing = await db.StoreListings.FirstOrDefaultAsync(listing => listing.Id == id, cancellationToken);
+        StoreListing? listing = await db.StoreListings.FirstOrDefaultAsync(listing => listing.Id == id, cancellationToken);
         if (listing is null)
         {
             return NotFound();
@@ -202,9 +202,9 @@ public sealed class StoreController(
 
     private async Task<string> EnsureUniqueListingSlugAsync(string baseSlug, CancellationToken cancellationToken)
     {
-        var stem = string.IsNullOrEmpty(baseSlug) ? "listing" : baseSlug;
-        var candidate = stem;
-        var suffix = 2;
+        string stem = string.IsNullOrEmpty(baseSlug) ? "listing" : baseSlug;
+        string candidate = stem;
+        int suffix = 2;
         while (await db.StoreListings.AnyAsync(listing => listing.Slug == candidate, cancellationToken))
         {
             candidate = $"{stem}-{suffix++}";
@@ -215,9 +215,9 @@ public sealed class StoreController(
 
     private async Task<string> EnsureUniqueCategorySlugAsync(string baseSlug, CancellationToken cancellationToken)
     {
-        var stem = string.IsNullOrEmpty(baseSlug) ? "category" : baseSlug;
-        var candidate = stem;
-        var suffix = 2;
+        string stem = string.IsNullOrEmpty(baseSlug) ? "category" : baseSlug;
+        string candidate = stem;
+        int suffix = 2;
         while (await db.StoreCategories.AnyAsync(category => category.Slug == candidate, cancellationToken))
         {
             candidate = $"{stem}-{suffix++}";

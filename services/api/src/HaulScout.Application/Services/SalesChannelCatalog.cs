@@ -140,11 +140,11 @@ public static class SalesChannelCatalog
     public static ChannelFeeProfileDto? FindProfile(string? channelValue, string? feeProfileId)
     {
         if (string.IsNullOrWhiteSpace(channelValue)) return null;
-        var channel = Channels.FirstOrDefault(item => string.Equals(item.Value, channelValue.Trim(), StringComparison.OrdinalIgnoreCase));
+        SaleChannelOptionDto? channel = Channels.FirstOrDefault(item => string.Equals(item.Value, channelValue.Trim(), StringComparison.OrdinalIgnoreCase));
         if (channel?.FeeProfiles is null || channel.FeeProfiles.Count == 0) return null;
         if (!string.IsNullOrWhiteSpace(feeProfileId))
         {
-            var exact = channel.FeeProfiles.FirstOrDefault(item => string.Equals(item.Id, feeProfileId.Trim(), StringComparison.OrdinalIgnoreCase));
+            ChannelFeeProfileDto? exact = channel.FeeProfiles.FirstOrDefault(item => string.Equals(item.Id, feeProfileId.Trim(), StringComparison.OrdinalIgnoreCase));
             if (exact is not null) return exact;
         }
 

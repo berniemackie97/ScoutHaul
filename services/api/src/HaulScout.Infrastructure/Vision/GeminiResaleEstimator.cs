@@ -87,7 +87,7 @@ internal sealed class GeminiResaleEstimator(
     // Only truly identical descriptions collapse to the same key (same question → same answer).
     private static string NormalizeKey(string description)
     {
-        var sb = new StringBuilder(description.Length);
+        StringBuilder sb = new(description.Length);
         bool prevSpace = false;
         foreach (char ch in description.ToLowerInvariant())
         {
@@ -134,7 +134,7 @@ internal sealed class GeminiResaleEstimator(
         const int maxAttempts = 4;
         for (int attempt = 1; attempt <= maxAttempts; attempt++)
         {
-            using var content = new StringContent(json, Encoding.UTF8, "application/json");
+            using StringContent content = new(json, Encoding.UTF8, "application/json");
             HttpResponseMessage response;
             try
             {
@@ -171,7 +171,7 @@ internal sealed class GeminiResaleEstimator(
 
     private static string BuildPrompt(string productDescription, ResaleSearchHints? searchHints)
     {
-        var sb = new StringBuilder(Prompt);
+        StringBuilder sb = new(Prompt);
         sb.Append("\nPRODUCT FACTS:\n").Append(productDescription.Trim()).Append('\n');
 
         if (searchHints is not null && !string.IsNullOrWhiteSpace(searchHints.SearchQuery))
@@ -207,7 +207,7 @@ internal sealed class GeminiResaleEstimator(
             JsonElement candidate = candidates[0];
 
             // Concatenate all text parts (grounded responses can split across parts).
-            var sb = new StringBuilder();
+            StringBuilder sb = new();
             if (candidate.TryGetProperty("content", out JsonElement contentEl)
                 && contentEl.TryGetProperty("parts", out JsonElement parts)
                 && parts.ValueKind == JsonValueKind.Array)
@@ -298,7 +298,7 @@ internal sealed class GeminiResaleEstimator(
         }
 
         List<ResaleSource> sources = [];
-        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        HashSet<string> seen = new(StringComparer.OrdinalIgnoreCase);
         foreach (JsonElement chunk in chunks.EnumerateArray().Take(8))
         {
             if (!chunk.TryGetProperty("web", out JsonElement web)) continue;

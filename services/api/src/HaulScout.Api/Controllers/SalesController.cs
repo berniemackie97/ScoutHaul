@@ -24,7 +24,7 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
     public async Task<ActionResult<SalesReferenceDataDto>> ReferenceData(CancellationToken cancellationToken)
     {
         List<string> existing = await ExistingChannels(cancellationToken);
-        var channels = SalesChannelCatalog.Channels.ToList();
+        List<SaleChannelOptionDto> channels = SalesChannelCatalog.Channels.ToList();
         channels.AddRange(existing
             .Where(value => channels.All(option => !string.Equals(option.Value, value, StringComparison.OrdinalIgnoreCase)))
             .Select(value => new SaleChannelOptionDto(value, $"{value} (legacy — standardize)", "Legacy data", true, [])));
@@ -57,7 +57,7 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
     [HttpGet("candidates")]
     public async Task<ActionResult<IReadOnlyList<SaleCandidateDto>>> Candidates(CancellationToken cancellationToken)
     {
-        var items = await db.InventoryItems
+        List<SaleCandidateDto> items = await db.InventoryItems
             .AsNoTracking()
             .Where(item => item.OrganizationId == currentUser.OrganizationId
                 && !item.IsArchived
@@ -104,7 +104,7 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
             return BadRequest("Select at least two sales to combine into one order.");
         }
 
-        var sales = await db.Sales
+        List<Sale> sales = await db.Sales
             .Include(sale => sale.InventoryItem)
             .Where(sale => ids.Contains(sale.Id) && sale.OrganizationId == currentUser.OrganizationId)
             .ToListAsync(cancellationToken);
@@ -118,14 +118,14 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
         string? reference = TrimToNull(request.OrderReference)
             ?? sales.Select(sale => sale.GroupOrderReference).FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
 
-        foreach (var sale in sales)
+        foreach (Sale sale in sales)
         {
             sale.SaleGroupId = groupId;
             sale.GroupOrderReference = reference;
         }
 
         await db.SaveChangesAsync(cancellationToken);
-        var dtos = sales.OrderByDescending(sale => sale.SoldAt).Select(sale => sale.ToDto()).ToList();
+        List<SaleDto> dtos = sales.OrderByDescending(sale => sale.SoldAt).Select(sale => sale.ToDto()).ToList();
         return new SaleGroupResultDto(groupId, reference, dtos);
     }
 
@@ -141,7 +141,7 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
             return BadRequest("Select at least one sale to remove from its order.");
         }
 
-        var selected = await db.Sales
+        List<Sale> selected = await db.Sales
             .Include(sale => sale.InventoryItem)
             .Where(sale => ids.Contains(sale.Id) && sale.OrganizationId == currentUser.OrganizationId)
             .ToListAsync(cancellationToken);
@@ -150,24 +150,24 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
             return NotFound();
         }
 
-        var affectedGroups = selected.Where(sale => sale.SaleGroupId.HasValue).Select(sale => sale.SaleGroupId!.Value).Distinct().ToList();
-        var groupSales = affectedGroups.Count == 0
+        List<Guid> affectedGroups = selected.Where(sale => sale.SaleGroupId.HasValue).Select(sale => sale.SaleGroupId!.Value).Distinct().ToList();
+        List<Sale> groupSales = affectedGroups.Count == 0
             ? []
             : await db.Sales
                 .Where(sale => sale.SaleGroupId != null && affectedGroups.Contains(sale.SaleGroupId.Value) && sale.OrganizationId == currentUser.OrganizationId)
                 .ToListAsync(cancellationToken);
 
-        var selectedIds = ids.ToHashSet();
-        foreach (var group in affectedGroups)
+        HashSet<Guid> selectedIds = ids.ToHashSet();
+        foreach (Guid group in affectedGroups)
         {
-            var members = groupSales.Where(sale => sale.SaleGroupId == group).ToList();
-            foreach (var member in members.Where(sale => selectedIds.Contains(sale.Id)))
+            List<Sale> members = groupSales.Where(sale => sale.SaleGroupId == group).ToList();
+            foreach (Sale member in members.Where(sale => selectedIds.Contains(sale.Id)))
             {
                 member.SaleGroupId = null;
                 member.GroupOrderReference = null;
             }
 
-            var remaining = members.Where(sale => !selectedIds.Contains(sale.Id)).ToList();
+            List<Sale> remaining = members.Where(sale => !selectedIds.Contains(sale.Id)).ToList();
             if (remaining.Count == 1)
             {
                 remaining[0].SaleGroupId = null;
@@ -184,7 +184,7 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
         [FromQuery] SaleStatus? status,
         CancellationToken cancellationToken)
     {
-        var query = db.Sales
+        IQueryable<Sale> query = db.Sales
             .Include(item => item.InventoryItem)
             .Include(item => item.Refunds)
             .Where(item => item.OrganizationId == currentUser.OrganizationId);
@@ -194,7 +194,7 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
             query = query.Where(item => item.Status == status.Value);
         }
 
-        var sales = await query
+        List<Sale> sales = await query
             .OrderByDescending(item => item.SoldAt)
             .Take(200)
             .ToListAsync(cancellationToken);
@@ -218,7 +218,7 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
         page = Math.Max(1, page);
         pageSize = Math.Clamp(pageSize, 1, 100);
 
-        var query = db.Sales
+        IQueryable<Sale> query = db.Sales
             .Include(item => item.InventoryItem)
             .Include(item => item.Refunds)
             .Where(item => item.OrganizationId == currentUser.OrganizationId);
@@ -237,8 +237,8 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
                 || (item.GroupOrderReference != null && item.GroupOrderReference.ToLower().Contains(term)));
         }
 
-        var filtered = await query.ToListAsync(cancellationToken);
-        var realized = filtered.Where(item => SaleWorkflow.IsRealized(item.Status)).ToList();
+        List<Sale> filtered = await query.ToListAsync(cancellationToken);
+        List<Sale> realized = filtered.Where(item => SaleWorkflow.IsRealized(item.Status)).ToList();
 
         decimal itemSales = realized.Sum(item => item.SoldPrice);
         decimal buyerShipping = realized.Sum(item => item.ShippingCharged);
@@ -248,7 +248,7 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
         decimal shippingLabels = realized.Sum(item => item.ShippingCost);
         decimal suppliesAndOther = realized.Sum(item => item.SuppliesCost + item.OtherCosts);
         decimal sellingCosts = platformFees + paymentFees + shippingLabels + suppliesAndOther;
-        var summary = new SalesSummaryDto(
+        SalesSummaryDto summary = new(
             realized.Count,
             itemSales,
             buyerShipping,
@@ -273,7 +273,7 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
             _ => desc ? filtered.OrderByDescending(item => item.SoldAt) : filtered.OrderBy(item => item.SoldAt),
         };
 
-        var items = ordered.Skip((page - 1) * pageSize).Take(pageSize).Select(item => item.ToDto()).ToList();
+        List<SaleDto> items = ordered.Skip((page - 1) * pageSize).Take(pageSize).Select(item => item.ToDto()).ToList();
         int pageCount = (int)Math.Ceiling(filtered.Count / (double)pageSize);
         return new SaleListDto(items, filtered.Count, page, pageSize, Math.Max(1, pageCount), summary);
     }
@@ -281,7 +281,7 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<SaleDto>> Get(Guid id, CancellationToken cancellationToken)
     {
-        var sale = await db.Sales
+        Sale? sale = await db.Sales
             .Include(item => item.InventoryItem)
             .Include(item => item.Refunds)
             .SingleOrDefaultAsync(item => item.Id == id && item.OrganizationId == currentUser.OrganizationId, cancellationToken);
@@ -296,7 +296,7 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
     [RequireOrganizationPermission(HaulScoutPermissions.ManageFinance)]
     public async Task<ActionResult> Delete(Guid id, CancellationToken cancellationToken)
     {
-        var sale = await db.Sales
+        Sale? sale = await db.Sales
             .Include(item => item.InventoryItem)
                 .ThenInclude(item => item!.BundleComponents)
                     .ThenInclude(item => item.ComponentInventoryItem)
@@ -328,7 +328,7 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
             sale.Listing.EndedAt = null;
         }
 
-        var observations = await db.MarketObservations
+        List<MarketObservation> observations = await db.MarketObservations
             .Where(observation => observation.InventoryItemId == sale.InventoryItemId
                 && observation.ObservationType == MarketObservationType.InternalSale
                 && observation.OrganizationId == currentUser.OrganizationId
@@ -364,7 +364,7 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
     [RequireOrganizationPermission(HaulScoutPermissions.ManageFinance)]
     public async Task<ActionResult<SaleDto>> Record(RecordSaleRequest request, CancellationToken cancellationToken)
     {
-        var item = await db.InventoryItems
+        InventoryItem? item = await db.InventoryItems
             .Include(inventoryItem => inventoryItem.BundleComponents)
                 .ThenInclude(component => component.ComponentInventoryItem)
             .SingleOrDefaultAsync(
@@ -431,7 +431,7 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
             request.SuppliesCost,
             request.OtherCosts);
 
-        var sale = new Sale
+        Sale sale = new()
         {
             OrganizationId = currentUser.OrganizationId,
             InventoryItemId = request.InventoryItemId,
@@ -481,7 +481,7 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
         });
 
         // Reflect the sale across channels: the channel it sold on → Sold, every other live channel → PendingDelist.
-        var channelListings = await db.ChannelListings
+        List<ChannelListing> channelListings = await db.ChannelListings
             .Include(listing => listing.ChannelAccount)
             .Where(listing => listing.InventoryItemId == item.Id && listing.OrganizationId == currentUser.OrganizationId)
             .ToListAsync(cancellationToken);
@@ -519,7 +519,7 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
             return BadRequest("Sale date cannot be in the future.");
         }
 
-        var items = await db.InventoryItems
+        List<InventoryItem> items = await db.InventoryItems
             .Include(inventoryItem => inventoryItem.BundleComponents).ThenInclude(component => component.ComponentInventoryItem)
             .Where(inventoryItem => itemIds.Contains(inventoryItem.Id) && inventoryItem.OrganizationId == currentUser.OrganizationId)
             .ToListAsync(cancellationToken);
@@ -536,8 +536,8 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
             return Conflict("One or more of these items already has a recorded sale.");
         }
 
-        var manualById = request.Items!.GroupBy(item => item.InventoryItemId).ToDictionary(group => group.Key, group => group.First().ManualPrice);
-        var allocationInputs = items
+        Dictionary<Guid, decimal?> manualById = request.Items!.GroupBy(item => item.InventoryItemId).ToDictionary(group => group.Key, group => group.First().ManualPrice);
+        List<BundledSaleItemAllocation> allocationInputs = items
             .Select(item => new BundledSaleItemAllocation(item.Id, manualById[item.Id], item.EstimatedSalePrice ?? item.SellerAskingPrice ?? item.PurchasePrice ?? 0))
             .ToList();
 
@@ -554,16 +554,16 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
         Guid groupId = Guid.NewGuid();
         string? orderReference = TrimToNull(request.OrderReference);
         DateTimeOffset soldAt = request.SoldAt ?? DateTimeOffset.UtcNow;
-        var byId = items.ToDictionary(item => item.Id);
-        var created = new List<Sale>();
+        Dictionary<Guid, InventoryItem> byId = items.ToDictionary(item => item.Id);
+        List<Sale> created = [];
 
-        foreach (var line in lines)
+        foreach (AllocatedSaleLine line in lines)
         {
-            var item = byId[line.InventoryItemId];
+            InventoryItem item = byId[line.InventoryItemId];
             RealizedSaleFinancials financials = ResaleFinancialCalculator.CalculateRealizedSale(
                 line.Price, line.ShippingCharged, item.PurchasePrice ?? 0, line.PlatformFees, line.PaymentFees, line.ShippingCost, line.SuppliesCost, line.OtherCosts);
 
-            var sale = new Sale
+            Sale sale = new()
             {
                 OrganizationId = currentUser.OrganizationId,
                 InventoryItemId = item.Id,
@@ -592,7 +592,7 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
             item.SoldAt = soldAt;
             ApplyBundleComponentInventoryStatus(item, InventoryStatus.Sold, soldAt);
 
-            var channelListings = await db.ChannelListings
+            List<ChannelListing> channelListings = await db.ChannelListings
                 .Include(listing => listing.ChannelAccount)
                 .Where(listing => listing.InventoryItemId == item.Id && listing.OrganizationId == currentUser.OrganizationId)
                 .ToListAsync(cancellationToken);
@@ -601,14 +601,14 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
 
         await db.SaveChangesAsync(cancellationToken);
 
-        var dtos = created.Select(sale => sale.ToDto()).ToList();
+        List<SaleDto> dtos = created.Select(sale => sale.ToDto()).ToList();
         return new BundledSaleResultDto(groupId, orderReference, dtos.Count, dtos.Sum(sale => sale.NetProfit), dtos);
     }
 
     [HttpGet("{id:guid}/profit")]
     public async Task<ActionResult<RealizedProfitDto>> GetProfit(Guid id, CancellationToken cancellationToken)
     {
-        var sale = await db.Sales
+        Sale? sale = await db.Sales
             .Include(item => item.InventoryItem)
             .SingleOrDefaultAsync(item => item.Id == id && item.OrganizationId == currentUser.OrganizationId, cancellationToken);
 
@@ -674,7 +674,7 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
         SaleStatusTransitionRequest request,
         CancellationToken cancellationToken)
     {
-        var sale = await db.Sales
+        Sale? sale = await db.Sales
             .Include(item => item.InventoryItem)
                 .ThenInclude(item => item!.BundleComponents)
                     .ThenInclude(item => item.ComponentInventoryItem)
@@ -830,7 +830,7 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
             return BadRequest("Sale date cannot be in the future.");
         }
 
-        var sale = await db.Sales
+        Sale? sale = await db.Sales
             .Include(item => item.InventoryItem)
                 .ThenInclude(item => item!.BundleComponents)
                     .ThenInclude(item => item.ComponentInventoryItem)
@@ -904,7 +904,7 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
             return NotFound();
         }
 
-        var corrections = await db.SaleCorrections
+        List<SaleCorrection> corrections = await db.SaleCorrections
             .Include(item => item.CorrectedByUser)
             .Where(item => item.SaleId == id && item.OrganizationId == currentUser.OrganizationId)
             .OrderByDescending(item => item.Version)
@@ -922,7 +922,7 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
             return NotFound();
         }
 
-        var refunds = await db.Refunds
+        List<Refund> refunds = await db.Refunds
             .Include(item => item.RecordedByUser)
             .Where(item => item.SaleId == id && item.OrganizationId == currentUser.OrganizationId)
             .OrderByDescending(item => item.RefundedAt)
@@ -958,7 +958,7 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
             return BadRequest("Refund date cannot be in the future.");
         }
 
-        var sale = await db.Sales
+        Sale? sale = await db.Sales
             .Include(item => item.InventoryItem)
                 .ThenInclude(item => item!.BundleComponents)
                     .ThenInclude(item => item.ComponentInventoryItem)
@@ -983,7 +983,7 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
         }
 
         string before = SnapshotSale(sale);
-        var refund = new Refund
+        Refund refund = new()
         {
             OrganizationId = currentUser.OrganizationId,
             SaleId = sale.Id,
@@ -1016,7 +1016,7 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
     [RequireOrganizationPermission(HaulScoutPermissions.ManageFinance)]
     public async Task<ActionResult<SaleDto>> VoidRefund(Guid id, Guid refundId, CancellationToken cancellationToken)
     {
-        var sale = await db.Sales
+        Sale? sale = await db.Sales
             .Include(item => item.InventoryItem)
                 .ThenInclude(item => item!.BundleComponents)
                     .ThenInclude(item => item.ComponentInventoryItem)
@@ -1029,7 +1029,7 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
             return NotFound();
         }
 
-        var refund = sale.Refunds.SingleOrDefault(item => item.Id == refundId);
+        Refund? refund = sale.Refunds.SingleOrDefault(item => item.Id == refundId);
         if (refund is null)
         {
             return NotFound("Refund was not found on this sale.");
@@ -1051,10 +1051,10 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
     /// Full/partial + restock decide the resulting status and whether the item releases back to inventory.</summary>
     private static void ApplyRefundState(Sale sale)
     {
-        var refunds = sale.Refunds;
+        ICollection<Refund> refunds = sale.Refunds;
         decimal itemRefunded = refunds.Sum(refund => refund.ItemAmount);
         bool restocked = refunds.Any(refund => refund.ItemReturned);
-        var impact = new ResaleFinancialCalculator.SaleRefundImpact(
+        ResaleFinancialCalculator.SaleRefundImpact impact = new(
             itemRefunded,
             refunds.Sum(refund => refund.ShippingRefunded),
             refunds.Sum(refund => refund.TaxRefunded),
@@ -1140,7 +1140,7 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
             return;
         }
 
-        foreach (var componentLink in inventoryItem.BundleComponents)
+        foreach (InventoryBundleComponent componentLink in inventoryItem.BundleComponents)
         {
             if (componentLink.ComponentInventoryItem is null)
             {
