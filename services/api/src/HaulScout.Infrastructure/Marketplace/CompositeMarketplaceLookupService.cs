@@ -15,7 +15,7 @@ internal sealed class CompositeMarketplaceLookupService(
         string cleanBarcode = barcode.Trim();
         BarcodeLookupResult? product = await barcodeLookupService.LookupAsync(cleanBarcode, cancellationToken);
         string pricingQuery = BuildPricingQuery(cleanBarcode, product);
-        var request = new MarketplacePricingRequest(pricingQuery, cleanBarcode, product);
+        MarketplacePricingRequest request = new(pricingQuery, cleanBarcode, product);
         ProviderLookup providerLookup = await RunProviders(request, isBarcodeLookup: true, cancellationToken);
 
         // The free UPC providers return retail/reference links (Amazon, Google Shopping), NOT resale
@@ -36,7 +36,7 @@ internal sealed class CompositeMarketplaceLookupService(
     public async Task<MarketplaceLookupResult> SearchByKeywordAsync(string keyword, CancellationToken cancellationToken = default)
     {
         string query = keyword.Trim();
-        var request = new MarketplacePricingRequest(query, Barcode: null, Product: null);
+        MarketplacePricingRequest request = new(query, Barcode: null, Product: null);
         ProviderLookup providerLookup = await RunProviders(request, isBarcodeLookup: false, cancellationToken);
 
         // Estimate unless we already have real secondhand comps. Retail/reference listings don't

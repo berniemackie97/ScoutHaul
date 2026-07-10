@@ -29,7 +29,7 @@ public sealed class PlatformListingsController(HaulScoutDbContext db, ICurrentUs
         [FromQuery] PlatformListingStatus? status,
         CancellationToken cancellationToken)
     {
-        var query = db.PlatformListings
+        IQueryable<PlatformListing> query = db.PlatformListings
             .Include(listing => listing.ReconciledInventoryItem)
             .Where(listing => listing.OrganizationId == currentUser.OrganizationId);
 
@@ -42,12 +42,12 @@ public sealed class PlatformListingsController(HaulScoutDbContext db, ICurrentUs
             query = query.Where(listing => listing.Status == status.Value);
         }
 
-        var listings = await query
+        List<PlatformListing> listings = await query
             .OrderByDescending(listing => listing.ScrapedAt)
             .Take(500)
             .ToListAsync(cancellationToken);
 
-        var suggestions = await BuildSuggestions(listings, cancellationToken);
+        Dictionary<Guid, (Guid Id, string Title, bool AlreadySold)> suggestions = await BuildSuggestions(listings, cancellationToken);
         return listings.Select(listing => listing.ToDto(Suggestion(suggestions, listing))).ToList();
     }
 
@@ -76,8 +76,8 @@ public sealed class PlatformListingsController(HaulScoutDbContext db, ICurrentUs
             channelAccountId = request.ChannelAccountId;
         }
 
-        var normalized = new List<(IngestPlatformListingInput Input, string Channel, string ExternalId)>();
-        foreach (var input in request.Listings)
+        List<(IngestPlatformListingInput Input, string Channel, string ExternalId)> normalized = [];
+        foreach (IngestPlatformListingInput input in request.Listings)
         {
             string externalId = (input.ExternalListingId ?? string.Empty).Trim();
             if (externalId.Length == 0)
@@ -100,17 +100,17 @@ public sealed class PlatformListingsController(HaulScoutDbContext db, ICurrentUs
             normalized.Add((input, channel, externalId));
         }
 
-        var keys = normalized.Select(entry => entry.ExternalId).ToHashSet();
-        var existing = await db.PlatformListings
+        HashSet<string> keys = normalized.Select(entry => entry.ExternalId).ToHashSet();
+        List<PlatformListing> existing = await db.PlatformListings
             .Where(listing => listing.OrganizationId == currentUser.OrganizationId && keys.Contains(listing.ExternalListingId))
             .ToListAsync(cancellationToken);
 
         int created = 0, updated = 0, skipped = 0;
-        var touched = new List<Guid>();
+        List<Guid> touched = [];
 
-        foreach (var (input, channel, externalId) in normalized)
+        foreach ((IngestPlatformListingInput input, string channel, string externalId) in normalized)
         {
-            var listing = existing.SingleOrDefault(candidate => candidate.Platform == channel && candidate.ExternalListingId == externalId);
+            PlatformListing? listing = existing.SingleOrDefault(candidate => candidate.Platform == channel && candidate.ExternalListingId == externalId);
             if (listing is null)
             {
                 listing = new PlatformListing
@@ -142,12 +142,12 @@ public sealed class PlatformListingsController(HaulScoutDbContext db, ICurrentUs
 
         await db.SaveChangesAsync(cancellationToken);
 
-        var refreshed = await db.PlatformListings
+        List<PlatformListing> refreshed = await db.PlatformListings
             .Include(listing => listing.ReconciledInventoryItem)
             .Where(listing => listing.OrganizationId == currentUser.OrganizationId && touched.Contains(listing.Id))
             .ToListAsync(cancellationToken);
-        var suggestions = await BuildSuggestions(refreshed, cancellationToken);
-        var dtos = refreshed.Select(listing => listing.ToDto(Suggestion(suggestions, listing))).ToList();
+        Dictionary<Guid, (Guid Id, string Title, bool AlreadySold)> suggestions = await BuildSuggestions(refreshed, cancellationToken);
+        List<PlatformListingDto> dtos = refreshed.Select(listing => listing.ToDto(Suggestion(suggestions, listing))).ToList();
         return new IngestPlatformListingsResultDto(created, updated, skipped, dtos);
     }
 
@@ -157,7 +157,7 @@ public sealed class PlatformListingsController(HaulScoutDbContext db, ICurrentUs
     [HttpPost("{id:guid}/reconcile")]
     public async Task<ActionResult<PlatformListingReconcileResultDto>> Reconcile(Guid id, ReconcilePlatformListingRequest request, CancellationToken cancellationToken)
     {
-        var listing = await db.PlatformListings
+        PlatformListing? listing = await db.PlatformListings
             .SingleOrDefaultAsync(item => item.Id == id && item.OrganizationId == currentUser.OrganizationId, cancellationToken);
         if (listing is null)
         {
@@ -196,7 +196,7 @@ public sealed class PlatformListingsController(HaulScoutDbContext db, ICurrentUs
 
         Guid channelAccountId = await ResolveChannelAccountId(listing, cancellationToken);
 
-        var channelListing = await db.ChannelListings.SingleOrDefaultAsync(
+        ChannelListing? channelListing = await db.ChannelListings.SingleOrDefaultAsync(
             existing => existing.OrganizationId == currentUser.OrganizationId
                 && existing.ChannelAccountId == channelAccountId
                 && existing.ExternalListingId == listing.ExternalListingId, cancellationToken);
@@ -237,7 +237,7 @@ public sealed class PlatformListingsController(HaulScoutDbContext db, ICurrentUs
     [HttpPost("{id:guid}/ignore")]
     public async Task<ActionResult<PlatformListingDto>> Ignore(Guid id, CancellationToken cancellationToken)
     {
-        var listing = await db.PlatformListings
+        PlatformListing? listing = await db.PlatformListings
             .Include(item => item.ReconciledInventoryItem)
             .SingleOrDefaultAsync(item => item.Id == id && item.OrganizationId == currentUser.OrganizationId, cancellationToken);
         if (listing is null)
@@ -266,7 +266,7 @@ public sealed class PlatformListingsController(HaulScoutDbContext db, ICurrentUs
             return existingId;
         }
 
-        var account = await db.ChannelAccounts.FirstOrDefaultAsync(
+        ChannelAccount? account = await db.ChannelAccounts.FirstOrDefaultAsync(
             candidate => candidate.OrganizationId == currentUser.OrganizationId && candidate.Channel == listing.Platform, cancellationToken);
         if (account is null)
         {
@@ -309,14 +309,14 @@ public sealed class PlatformListingsController(HaulScoutDbContext db, ICurrentUs
 
     private static (Guid Id, string Title, bool AlreadySold)? Suggestion(
         IReadOnlyDictionary<Guid, (Guid Id, string Title, bool AlreadySold)> suggestions, PlatformListing listing) =>
-        suggestions.TryGetValue(listing.Id, out var match) ? match : null;
+        suggestions.TryGetValue(listing.Id, out (Guid Id, string Title, bool AlreadySold) match) ? match : null;
 
     /// <summary>Best-effort auto-match of unlinked listings to inventory — by the platform's own id (via an existing
     /// <see cref="ChannelListing.ExternalListingId"/>), then by <see cref="TitleMatch"/>. Suggestions only.</summary>
     private async Task<Dictionary<Guid, (Guid Id, string Title, bool AlreadySold)>> BuildSuggestions(IReadOnlyList<PlatformListing> listings, CancellationToken cancellationToken)
     {
-        var suggestions = new Dictionary<Guid, (Guid, string, bool)>();
-        var openListings = listings.Where(listing => listing.ReconcileStatus == PlatformListingReconcileStatus.Pending).ToList();
+        Dictionary<Guid, (Guid, string, bool)> suggestions = new();
+        List<PlatformListing> openListings = listings.Where(listing => listing.ReconcileStatus == PlatformListingReconcileStatus.Pending).ToList();
         if (openListings.Count == 0)
         {
             return suggestions;
@@ -328,22 +328,22 @@ public sealed class PlatformListingsController(HaulScoutDbContext db, ICurrentUs
             .Select(item => new { item.Id, item.Title, item.Status })
             .Take(2000)
             .ToListAsync(cancellationToken);
-        var titleById = inventory.ToDictionary(item => item.Id, item => item.Title);
-        var soldById = inventory.ToDictionary(item => item.Id, item => InventoryLifecycle.IsSold(item.Status));
-        var titleCandidates = inventory.Select(item => (item.Id, item.Title)).ToList();
+        Dictionary<Guid, string> titleById = inventory.ToDictionary(item => item.Id, item => item.Title);
+        Dictionary<Guid, bool> soldById = inventory.ToDictionary(item => item.Id, item => InventoryLifecycle.IsSold(item.Status));
+        List<(Guid Id, string Title)> titleCandidates = inventory.Select(item => (item.Id, item.Title)).ToList();
 
-        var externalIds = openListings.Select(listing => listing.ExternalListingId).Distinct().ToList();
+        List<string> externalIds = openListings.Select(listing => listing.ExternalListingId).Distinct().ToList();
         var byExternalId = await db.ChannelListings
             .Where(channel => channel.OrganizationId == currentUser.OrganizationId
                 && channel.ExternalListingId != null && externalIds.Contains(channel.ExternalListingId))
             .Select(channel => new { channel.ExternalListingId, channel.InventoryItemId })
             .ToListAsync(cancellationToken);
 
-        foreach (var listing in openListings)
+        foreach (PlatformListing listing in openListings)
         {
             Guid? matchId = byExternalId.FirstOrDefault(candidate => candidate.ExternalListingId == listing.ExternalListingId)?.InventoryItemId;
             matchId ??= TitleMatch.Best(listing.Title, titleCandidates);
-            if (matchId is Guid resolved && titleById.TryGetValue(resolved, out var title))
+            if (matchId is Guid resolved && titleById.TryGetValue(resolved, out string? title))
             {
                 suggestions[listing.Id] = (resolved, title, soldById.GetValueOrDefault(resolved));
             }

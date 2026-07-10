@@ -7,7 +7,7 @@ public class InventoryReferenceCatalogTests
     [Fact]
     public void Brands_are_scoped_to_their_category()
     {
-        var videoGameBrands = InventoryReferenceCatalog.Brands
+        List<string> videoGameBrands = InventoryReferenceCatalog.Brands
             .Where(brand => brand.ParentValue == "Video Games")
             .Select(brand => brand.Value)
             .ToList();

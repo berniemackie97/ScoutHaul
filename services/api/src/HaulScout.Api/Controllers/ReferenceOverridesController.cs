@@ -22,7 +22,7 @@ public sealed class ReferenceOverridesController(HaulScoutDbContext db, ICurrent
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<OrgReferenceOverrideDto>>> List(CancellationToken cancellationToken)
     {
-        var rows = await db.OrgReferenceOverrides
+        List<OrgReferenceOverride> rows = await db.OrgReferenceOverrides
             .Where(item => item.OrganizationId == currentUser.OrganizationId)
             .OrderBy(item => item.Kind).ThenBy(item => item.Value)
             .ToListAsync(cancellationToken);
@@ -39,7 +39,7 @@ public sealed class ReferenceOverridesController(HaulScoutDbContext db, ICurrent
         if (value is null) return BadRequest("A value is required.");
         string? parent = TrimToNull(request.ParentValue);
 
-        var row = await db.OrgReferenceOverrides.SingleOrDefaultAsync(
+        OrgReferenceOverride? row = await db.OrgReferenceOverrides.SingleOrDefaultAsync(
             item => item.OrganizationId == currentUser.OrganizationId
                 && item.Kind == kind
                 && item.Value == value
@@ -61,7 +61,7 @@ public sealed class ReferenceOverridesController(HaulScoutDbContext db, ICurrent
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
     {
-        var row = await db.OrgReferenceOverrides.SingleOrDefaultAsync(
+        OrgReferenceOverride? row = await db.OrgReferenceOverrides.SingleOrDefaultAsync(
             item => item.Id == id && item.OrganizationId == currentUser.OrganizationId, cancellationToken);
         if (row is null) return NotFound();
         db.OrgReferenceOverrides.Remove(row);

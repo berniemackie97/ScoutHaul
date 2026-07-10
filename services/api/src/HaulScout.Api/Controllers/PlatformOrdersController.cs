@@ -31,7 +31,7 @@ public sealed class PlatformOrdersController(HaulScoutDbContext db, ICurrentUser
         [FromQuery] PlatformOrderStatus? status,
         CancellationToken cancellationToken)
     {
-        var query = db.PlatformOrders
+        IQueryable<PlatformOrder> query = db.PlatformOrders
             .Include(order => order.Lines).ThenInclude(line => line.InventoryItem)
             .Where(order => order.OrganizationId == currentUser.OrganizationId);
 
@@ -40,19 +40,19 @@ public sealed class PlatformOrdersController(HaulScoutDbContext db, ICurrentUser
             query = query.Where(order => order.Status == status.Value);
         }
 
-        var orders = await query
+        List<PlatformOrder> orders = await query
             .OrderByDescending(order => order.OrderedAt)
             .Take(200)
             .ToListAsync(cancellationToken);
 
-        var suggestions = await BuildSuggestions(orders, cancellationToken);
+        Dictionary<Guid, (Guid Id, string Title, bool AlreadySold)> suggestions = await BuildSuggestions(orders, cancellationToken);
         return orders.Select(order => order.ToDto(suggestions)).ToList();
     }
 
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<PlatformOrderDto>> Get(Guid id, CancellationToken cancellationToken)
     {
-        var order = await db.PlatformOrders
+        PlatformOrder? order = await db.PlatformOrders
             .Include(item => item.Lines).ThenInclude(line => line.InventoryItem)
             .SingleOrDefaultAsync(item => item.Id == id && item.OrganizationId == currentUser.OrganizationId, cancellationToken);
 
@@ -61,7 +61,7 @@ public sealed class PlatformOrdersController(HaulScoutDbContext db, ICurrentUser
             return NotFound();
         }
 
-        var suggestions = await BuildSuggestions([order], cancellationToken);
+        Dictionary<Guid, (Guid Id, string Title, bool AlreadySold)> suggestions = await BuildSuggestions([order], cancellationToken);
         return order.ToDto(suggestions);
     }
 
@@ -88,7 +88,7 @@ public sealed class PlatformOrdersController(HaulScoutDbContext db, ICurrentUser
             channelAccountId = request.ChannelAccountId;
         }
 
-        var (result, error) = await IngestOrders(request.Platform, request.Orders, channelAccountId, cancellationToken);
+        (IngestPlatformOrdersResultDto? result, string? error) = await IngestOrders(request.Platform, request.Orders, channelAccountId, cancellationToken);
         return error is not null ? BadRequest(error) : result!;
     }
 
@@ -102,13 +102,13 @@ public sealed class PlatformOrdersController(HaulScoutDbContext db, ICurrentUser
             return BadRequest("Paste or upload the eBay report CSV.");
         }
 
-        var parsed = EbayReportParser.ParseSalesReport(request.Csv);
+        EbayReportParser.ParseResult parsed = EbayReportParser.ParseSalesReport(request.Csv);
         if (parsed.Orders.Count == 0)
         {
             return BadRequest(parsed.Warning ?? "No sold-listing rows were found in the report.");
         }
 
-        var (result, error) = await IngestOrders(string.IsNullOrWhiteSpace(request.Platform) ? "eBay" : request.Platform, parsed.Orders, null, cancellationToken);
+        (IngestPlatformOrdersResultDto? result, string? error) = await IngestOrders(string.IsNullOrWhiteSpace(request.Platform) ? "eBay" : request.Platform, parsed.Orders, null, cancellationToken);
         return error is not null ? BadRequest(error) : result!;
     }
 
@@ -120,8 +120,8 @@ public sealed class PlatformOrdersController(HaulScoutDbContext db, ICurrentUser
         List<string> existingChannels = await ExistingChannels(cancellationToken);
         string? defaultChannel = SalesChannelCatalog.CanonicalValue(defaultPlatform, existingChannels);
 
-        var normalized = new List<(IngestPlatformOrderInput Input, string Channel, string ExternalOrderId)>();
-        foreach (var input in orders)
+        List<(IngestPlatformOrderInput Input, string Channel, string ExternalOrderId)> normalized = [];
+        foreach (IngestPlatformOrderInput input in orders)
         {
             string externalOrderId = (input.ExternalOrderId ?? string.Empty).Trim();
             if (externalOrderId.Length == 0)
@@ -151,18 +151,18 @@ public sealed class PlatformOrdersController(HaulScoutDbContext db, ICurrentUser
             normalized.Add((input, channel, externalOrderId));
         }
 
-        var keys = normalized.Select(entry => entry.ExternalOrderId).ToHashSet();
-        var existing = await db.PlatformOrders
+        HashSet<string> keys = normalized.Select(entry => entry.ExternalOrderId).ToHashSet();
+        List<PlatformOrder> existing = await db.PlatformOrders
             .Include(order => order.Lines)
             .Where(order => order.OrganizationId == currentUser.OrganizationId && keys.Contains(order.ExternalOrderId))
             .ToListAsync(cancellationToken);
 
         int created = 0, updated = 0, skipped = 0;
-        var touched = new List<Guid>();
+        List<Guid> touched = [];
 
-        foreach (var (input, channel, externalOrderId) in normalized)
+        foreach ((IngestPlatformOrderInput input, string channel, string externalOrderId) in normalized)
         {
-            var order = existing.SingleOrDefault(candidate =>
+            PlatformOrder? order = existing.SingleOrDefault(candidate =>
                 candidate.Platform == channel && candidate.ExternalOrderId == externalOrderId);
 
             if (order is null)
@@ -199,12 +199,12 @@ public sealed class PlatformOrdersController(HaulScoutDbContext db, ICurrentUser
 
         await db.SaveChangesAsync(cancellationToken);
 
-        var refreshed = await db.PlatformOrders
+        List<PlatformOrder> refreshed = await db.PlatformOrders
             .Include(order => order.Lines).ThenInclude(line => line.InventoryItem)
             .Where(order => order.OrganizationId == currentUser.OrganizationId && touched.Contains(order.Id))
             .ToListAsync(cancellationToken);
-        var suggestions = await BuildSuggestions(refreshed, cancellationToken);
-        var dtos = refreshed.Select(order => order.ToDto(suggestions)).ToList();
+        Dictionary<Guid, (Guid Id, string Title, bool AlreadySold)> suggestions = await BuildSuggestions(refreshed, cancellationToken);
+        List<PlatformOrderDto> dtos = refreshed.Select(order => order.ToDto(suggestions)).ToList();
         return (new IngestPlatformOrdersResultDto(created, updated, skipped, dtos), null);
     }
 
@@ -214,7 +214,7 @@ public sealed class PlatformOrdersController(HaulScoutDbContext db, ICurrentUser
     [HttpPost("{id:guid}/reconcile")]
     public async Task<ActionResult<PlatformOrderReconcileResultDto>> Reconcile(Guid id, ReconcilePlatformOrderRequest request, CancellationToken cancellationToken)
     {
-        var order = await db.PlatformOrders
+        PlatformOrder? order = await db.PlatformOrders
             .Include(item => item.Lines)
             .SingleOrDefaultAsync(item => item.Id == id && item.OrganizationId == currentUser.OrganizationId, cancellationToken);
 
@@ -228,7 +228,7 @@ public sealed class PlatformOrdersController(HaulScoutDbContext db, ICurrentUser
             return Conflict("This order has already been reconciled into sales.");
         }
 
-        var mapByLine = (request.Lines ?? []).GroupBy(line => line.PlatformOrderLineId).ToDictionary(group => group.Key, group => group.First().InventoryItemId);
+        Dictionary<Guid, Guid> mapByLine = (request.Lines ?? []).GroupBy(line => line.PlatformOrderLineId).ToDictionary(group => group.Key, group => group.First().InventoryItemId);
         if (order.Lines.Any(line => !mapByLine.ContainsKey(line.Id)))
         {
             return BadRequest("Every order line must be matched to an inventory item before reconciling.");
@@ -240,7 +240,7 @@ public sealed class PlatformOrdersController(HaulScoutDbContext db, ICurrentUser
             return BadRequest("Each inventory item can be matched to only one order line.");
         }
 
-        var items = await db.InventoryItems
+        List<InventoryItem> items = await db.InventoryItems
             .Include(item => item.BundleComponents).ThenInclude(component => component.ComponentInventoryItem)
             .Where(item => itemIds.Contains(item.Id) && item.OrganizationId == currentUser.OrganizationId)
             .ToListAsync(cancellationToken);
@@ -252,17 +252,17 @@ public sealed class PlatformOrdersController(HaulScoutDbContext db, ICurrentUser
         // A matched item that already carries an active sale (e.g. hand-entered) is CORRECTED in place with the
         // platform's exact figures rather than sold twice — so a recorded history and a fresh order both end up
         // matching eBay. Released (returned/refunded/cancelled) sales don't block a new one.
-        var existingSales = await db.Sales
+        List<Sale> existingSales = await db.Sales
             .Include(sale => sale.InventoryItem)
             .Include(sale => sale.Listing)
             .Where(sale => itemIds.Contains(sale.InventoryItemId) && sale.OrganizationId == currentUser.OrganizationId && !ReleasedInventoryStatuses.Contains(sale.Status))
             .ToListAsync(cancellationToken);
-        var saleByItem = existingSales
+        Dictionary<Guid, Sale> saleByItem = existingSales
             .GroupBy(sale => sale.InventoryItemId)
             .ToDictionary(group => group.Key, group => group.OrderByDescending(sale => sale.SoldAt).First());
 
         // Each line carries the platform's exact per-item price; the shared order costs are apportioned by price.
-        var allocationInputs = order.Lines
+        List<BundledSaleItemAllocation> allocationInputs = order.Lines
             .Select(line => new BundledSaleItemAllocation(mapByLine[line.Id], line.UnitPrice * line.Quantity, 0))
             .ToList();
         decimal totalSoldPrice = order.Lines.Sum(line => line.UnitPrice * line.Quantity);
@@ -287,18 +287,18 @@ public sealed class PlatformOrdersController(HaulScoutDbContext db, ICurrentUser
             cancellationToken);
 
         DateTimeOffset soldAt = order.OrderedAt;
-        var byId = items.ToDictionary(item => item.Id);
-        var lineByItem = order.Lines.ToDictionary(line => mapByLine[line.Id], line => line);
-        var resultSales = new List<Sale>();
+        Dictionary<Guid, InventoryItem> byId = items.ToDictionary(item => item.Id);
+        Dictionary<Guid, PlatformOrderLine> lineByItem = order.Lines.ToDictionary(line => mapByLine[line.Id], line => line);
+        List<Sale> resultSales = [];
         int createdCount = 0;
         int correctedCount = 0;
 
-        foreach (var allocated in lines)
+        foreach (AllocatedSaleLine allocated in lines)
         {
-            var item = byId[allocated.InventoryItemId];
+            InventoryItem item = byId[allocated.InventoryItemId];
             lineByItem[item.Id].InventoryItemId = item.Id;
 
-            if (saleByItem.TryGetValue(item.Id, out var existing))
+            if (saleByItem.TryGetValue(item.Id, out Sale? existing))
             {
                 // Correct the recorded sale: overwrite ONLY what the platform reports (price, buyer shipping, tax,
                 // fee total; and the shipping label when the platform gives it). The operator's real sale DATE and
@@ -333,7 +333,7 @@ public sealed class PlatformOrdersController(HaulScoutDbContext db, ICurrentUser
                     allocated.Price, allocated.ShippingCharged, item.PurchasePrice ?? 0, allocated.PlatformFees,
                     allocated.PaymentFees, allocated.ShippingCost, allocated.SuppliesCost, allocated.OtherCosts);
 
-                var sale = new Sale
+                Sale sale = new()
                 {
                     OrganizationId = currentUser.OrganizationId,
                     InventoryItemId = item.Id,
@@ -379,7 +379,7 @@ public sealed class PlatformOrdersController(HaulScoutDbContext db, ICurrentUser
                 });
             }
 
-            var channelListings = await db.ChannelListings
+            List<ChannelListing> channelListings = await db.ChannelListings
                 .Include(listing => listing.ChannelAccount)
                 .Where(listing => listing.InventoryItemId == item.Id && listing.OrganizationId == currentUser.OrganizationId)
                 .ToListAsync(cancellationToken);
@@ -400,7 +400,7 @@ public sealed class PlatformOrdersController(HaulScoutDbContext db, ICurrentUser
     [HttpPost("{id:guid}/ignore")]
     public async Task<ActionResult<PlatformOrderDto>> Ignore(Guid id, CancellationToken cancellationToken)
     {
-        var order = await db.PlatformOrders
+        PlatformOrder? order = await db.PlatformOrders
             .Include(item => item.Lines).ThenInclude(line => line.InventoryItem)
             .SingleOrDefaultAsync(item => item.Id == id && item.OrganizationId == currentUser.OrganizationId, cancellationToken);
 
@@ -447,7 +447,7 @@ public sealed class PlatformOrdersController(HaulScoutDbContext db, ICurrentUser
     // remove-old/add-new never mixes deleted and new rows in one tracked collection.
     private void AddLines(PlatformOrder order, IngestPlatformOrderInput input)
     {
-        foreach (var line in input.Lines)
+        foreach (IngestPlatformOrderLineInput line in input.Lines)
         {
             db.PlatformOrderLines.Add(new PlatformOrderLine
             {
@@ -468,8 +468,8 @@ public sealed class PlatformOrdersController(HaulScoutDbContext db, ICurrentUser
     /// Only surfaces suggestions; the operator always confirms — nothing is posted from here.</summary>
     private async Task<Dictionary<Guid, (Guid Id, string Title, bool AlreadySold)>> BuildSuggestions(IReadOnlyList<PlatformOrder> orders, CancellationToken cancellationToken)
     {
-        var suggestions = new Dictionary<Guid, (Guid, string, bool)>();
-        var openLines = orders
+        Dictionary<Guid, (Guid, string, bool)> suggestions = new();
+        List<PlatformOrderLine> openLines = orders
             .Where(order => order.Status != PlatformOrderStatus.Reconciled)
             .SelectMany(order => order.Lines.Where(line => line.InventoryItemId is null))
             .ToList();
@@ -485,11 +485,11 @@ public sealed class PlatformOrdersController(HaulScoutDbContext db, ICurrentUser
             .Select(item => new { item.Id, item.Title, item.Status })
             .Take(2000)
             .ToListAsync(cancellationToken);
-        var titleById = inventory.ToDictionary(item => item.Id, item => item.Title);
-        var soldById = inventory.ToDictionary(item => item.Id, item => InventoryLifecycle.IsSold(item.Status));
-        var titleCandidates = inventory.Select(item => (item.Id, item.Title)).ToList();
+        Dictionary<Guid, string> titleById = inventory.ToDictionary(item => item.Id, item => item.Title);
+        Dictionary<Guid, bool> soldById = inventory.ToDictionary(item => item.Id, item => InventoryLifecycle.IsSold(item.Status));
+        List<(Guid Id, string Title)> titleCandidates = inventory.Select(item => (item.Id, item.Title)).ToList();
 
-        var externalIds = openLines.Where(line => line.ExternalItemId is not null).Select(line => line.ExternalItemId!).Distinct().ToList();
+        List<string> externalIds = openLines.Where(line => line.ExternalItemId is not null).Select(line => line.ExternalItemId!).Distinct().ToList();
         var byExternalId = externalIds.Count == 0
             ? []
             : await db.ChannelListings
@@ -498,13 +498,13 @@ public sealed class PlatformOrdersController(HaulScoutDbContext db, ICurrentUser
                 .Select(listing => new { listing.ExternalListingId, listing.InventoryItemId })
                 .ToListAsync(cancellationToken);
 
-        foreach (var line in openLines)
+        foreach (PlatformOrderLine line in openLines)
         {
             Guid? matchId = line.ExternalItemId is null
                 ? null
                 : byExternalId.FirstOrDefault(candidate => candidate.ExternalListingId == line.ExternalItemId)?.InventoryItemId;
             matchId ??= TitleMatch.Best(line.Title, titleCandidates);
-            if (matchId is Guid id && titleById.TryGetValue(id, out var title))
+            if (matchId is Guid id && titleById.TryGetValue(id, out string? title))
             {
                 suggestions[line.Id] = (id, title, soldById.GetValueOrDefault(id));
             }
@@ -520,7 +520,7 @@ public sealed class PlatformOrdersController(HaulScoutDbContext db, ICurrentUser
             return;
         }
 
-        foreach (var componentLink in inventoryItem.BundleComponents)
+        foreach (InventoryBundleComponent componentLink in inventoryItem.BundleComponents)
         {
             if (componentLink.ComponentInventoryItem is null)
             {

@@ -19,7 +19,7 @@ public sealed class ChannelAccountsController(HaulScoutDbContext db, ICurrentUse
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<ChannelAccountDto>>> List(CancellationToken cancellationToken)
     {
-        var accounts = await db.ChannelAccounts
+        List<ChannelAccount> accounts = await db.ChannelAccounts
             .Include(item => item.Listings)
             .Where(item => item.OrganizationId == currentUser.OrganizationId)
             .OrderByDescending(item => item.IsActive)
@@ -32,7 +32,7 @@ public sealed class ChannelAccountsController(HaulScoutDbContext db, ICurrentUse
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<ChannelAccountDto>> Get(Guid id, CancellationToken cancellationToken)
     {
-        var account = await db.ChannelAccounts
+        ChannelAccount? account = await db.ChannelAccounts
             .Include(item => item.Listings)
             .SingleOrDefaultAsync(item => item.Id == id && item.OrganizationId == currentUser.OrganizationId, cancellationToken);
 
@@ -53,7 +53,7 @@ public sealed class ChannelAccountsController(HaulScoutDbContext db, ICurrentUse
             return Conflict($"A channel account named \"{displayName}\" already exists.");
         }
 
-        var account = new ChannelAccount
+        ChannelAccount account = new()
         {
             OrganizationId = currentUser.OrganizationId,
             Channel = channel,
@@ -77,7 +77,7 @@ public sealed class ChannelAccountsController(HaulScoutDbContext db, ICurrentUse
             return BadRequest(validation);
         }
 
-        var account = await db.ChannelAccounts
+        ChannelAccount? account = await db.ChannelAccounts
             .Include(item => item.Listings)
             .SingleOrDefaultAsync(item => item.Id == id && item.OrganizationId == currentUser.OrganizationId, cancellationToken);
         if (account is null)
@@ -102,7 +102,7 @@ public sealed class ChannelAccountsController(HaulScoutDbContext db, ICurrentUse
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
     {
-        var account = await db.ChannelAccounts
+        ChannelAccount? account = await db.ChannelAccounts
             .Include(item => item.Listings)
             .SingleOrDefaultAsync(item => item.Id == id && item.OrganizationId == currentUser.OrganizationId, cancellationToken);
         if (account is null)
@@ -147,7 +147,7 @@ public sealed class ChannelAccountsController(HaulScoutDbContext db, ICurrentUse
         }
 
         // Only accept a fee profile that actually belongs to this channel in the catalog.
-        var profile = SalesChannelCatalog.FindProfile(channel, trimmed);
+        ChannelFeeProfileDto? profile = SalesChannelCatalog.FindProfile(channel, trimmed);
         return string.Equals(profile?.Id, trimmed, StringComparison.OrdinalIgnoreCase) ? profile!.Id : null;
     }
 

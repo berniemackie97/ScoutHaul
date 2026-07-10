@@ -26,7 +26,7 @@ public class InventoryLifecycleTests
     [Fact]
     public void Active_group_excludes_sold_and_fulfillment()
     {
-        var active = InventoryLifecycle.InGroup(InventoryLifecycleGroup.Active);
+        IReadOnlyList<InventoryStatus> active = InventoryLifecycle.InGroup(InventoryLifecycleGroup.Active);
         Assert.Contains(InventoryStatus.Listed, active);
         Assert.DoesNotContain(InventoryStatus.Sold, active);
         Assert.DoesNotContain(InventoryStatus.Shipped, active);
@@ -37,7 +37,7 @@ public class InventoryLifecycleTests
     public void Sold_group_includes_all_fulfillment_stages_in_order()
     {
         Assert.Equal(
-            new[] { InventoryStatus.Sold, InventoryStatus.Packed, InventoryStatus.Shipped, InventoryStatus.Delivered },
+            [InventoryStatus.Sold, InventoryStatus.Packed, InventoryStatus.Shipped, InventoryStatus.Delivered],
             InventoryLifecycle.InGroup(InventoryLifecycleGroup.Sold));
     }
 

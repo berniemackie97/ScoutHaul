@@ -11,7 +11,7 @@ public static class ChannelListingSync
 {
     public static void ApplySale(IReadOnlyCollection<ChannelListing> listings, string? soldChannel, DateTimeOffset now)
     {
-        foreach (var listing in listings)
+        foreach (ChannelListing listing in listings)
         {
             bool isSoldChannel = !string.IsNullOrWhiteSpace(soldChannel)
                 && string.Equals(listing.ChannelAccount?.Channel, soldChannel, StringComparison.OrdinalIgnoreCase);

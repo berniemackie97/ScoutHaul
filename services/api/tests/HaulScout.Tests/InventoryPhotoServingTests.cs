@@ -12,19 +12,19 @@ public class InventoryPhotoServingTests
     [Fact]
     public async Task Photo_thumbnail_is_served_to_anonymous_requests_without_a_tenant()
     {
-        var org = Guid.NewGuid();
-        var options = new DbContextOptionsBuilder<HaulScoutDbContext>()
+        Guid org = Guid.NewGuid();
+        DbContextOptions<HaulScoutDbContext> options = new DbContextOptionsBuilder<HaulScoutDbContext>()
             .UseInMemoryDatabase(nameof(Photo_thumbnail_is_served_to_anonymous_requests_without_a_tenant))
             .Options;
 
         Guid itemId, photoId;
-        var seedTenant = new TenantContext();
+        TenantContext seedTenant = new();
         seedTenant.SetOrganization(org);
-        await using (var seed = new HaulScoutDbContext(options, seedTenant))
+        await using (HaulScoutDbContext seed = new(options, seedTenant))
         {
-            var item = new InventoryItem { Title = "Reshiram" };
+            InventoryItem item = new() { Title = "Reshiram" };
             seed.InventoryItems.Add(item);
-            var photo = new InventoryPhoto
+            InventoryPhoto photo = new()
             {
                 InventoryItemId = item.Id,
                 ContentType = "image/jpeg",
@@ -39,13 +39,13 @@ public class InventoryPhotoServingTests
 
         // Anonymous request: no organization resolved on the tenant — exactly like an <img>/Image
         // fetching the photo URL with no bearer token. Must still resolve via IgnoreQueryFilters.
-        var anonTenant = new TenantContext();
-        await using var db = new HaulScoutDbContext(options, anonTenant);
-        var controller = new InventoryController(db, null!, null!, null!);
+        TenantContext anonTenant = new();
+        await using HaulScoutDbContext db = new(options, anonTenant);
+        InventoryController controller = new(db, null!, null!, null!);
 
-        var result = await controller.GetPhotoThumbnail(itemId, photoId, CancellationToken.None);
+        IActionResult result = await controller.GetPhotoThumbnail(itemId, photoId, CancellationToken.None);
 
-        var file = Assert.IsType<FileContentResult>(result);
+        FileContentResult file = Assert.IsType<FileContentResult>(result);
         Assert.Equal("image/jpeg", file.ContentType);
         Assert.Equal(new byte[] { 4, 5, 6 }, file.FileContents);
     }

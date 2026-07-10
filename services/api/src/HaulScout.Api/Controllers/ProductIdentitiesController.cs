@@ -23,7 +23,7 @@ public sealed class ProductIdentitiesController(HaulScoutDbContext db, ICurrentU
             return BadRequest("Product title is required.");
         }
 
-        var product = new ProductIdentity
+        ProductIdentity product = new()
         {
             OrganizationId = currentUser.OrganizationId,
             Title = request.Title.Trim()
@@ -39,7 +39,7 @@ public sealed class ProductIdentitiesController(HaulScoutDbContext db, ICurrentU
     [HttpPut("{id:guid}")]
     public async Task<ActionResult<ProductIdentityDto>> Update(Guid id, UpsertProductIdentityRequest request, CancellationToken cancellationToken)
     {
-        var product = await db.ProductIdentities
+        ProductIdentity? product = await db.ProductIdentities
             .SingleOrDefaultAsync(item => item.Id == id && item.OrganizationId == currentUser.OrganizationId, cancellationToken);
 
         if (product is null)
@@ -61,7 +61,7 @@ public sealed class ProductIdentitiesController(HaulScoutDbContext db, ICurrentU
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<ProductIdentityDto>> Get(Guid id, CancellationToken cancellationToken)
     {
-        var product = await db.ProductIdentities
+        ProductIdentity? product = await db.ProductIdentities
             .SingleOrDefaultAsync(item => item.Id == id && item.OrganizationId == currentUser.OrganizationId, cancellationToken);
 
         return product is null ? NotFound() : product.ToDto();
@@ -70,11 +70,11 @@ public sealed class ProductIdentitiesController(HaulScoutDbContext db, ICurrentU
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<ProductIdentityDto>>> Search([FromQuery] string? search, CancellationToken cancellationToken)
     {
-        var query = db.ProductIdentities.Where(item => item.OrganizationId == currentUser.OrganizationId);
+        IQueryable<ProductIdentity> query = db.ProductIdentities.Where(item => item.OrganizationId == currentUser.OrganizationId);
 
         if (!string.IsNullOrWhiteSpace(search))
         {
-            var pattern = $"%{search.Trim()}%";
+            string pattern = $"%{search.Trim()}%";
             query = query.Where(item =>
                 EF.Functions.ILike(item.Title, pattern)
                 || (item.Brand != null && EF.Functions.ILike(item.Brand, pattern))
@@ -83,7 +83,7 @@ public sealed class ProductIdentitiesController(HaulScoutDbContext db, ICurrentU
                 || (item.SearchQuery != null && EF.Functions.ILike(item.SearchQuery, pattern)));
         }
 
-        var products = await query
+        List<ProductIdentityDto> products = await query
             .OrderByDescending(item => item.UpdatedAt)
             .Take(50)
             .Select(item => item.ToDto())
@@ -95,7 +95,7 @@ public sealed class ProductIdentitiesController(HaulScoutDbContext db, ICurrentU
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
     {
-        var product = await db.ProductIdentities
+        ProductIdentity? product = await db.ProductIdentities
             .SingleOrDefaultAsync(item => item.Id == id && item.OrganizationId == currentUser.OrganizationId, cancellationToken);
 
         if (product is null)

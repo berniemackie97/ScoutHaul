@@ -49,7 +49,7 @@ public sealed class MarketplaceLookupController(
     [HttpGet("status")]
     public ActionResult<MarketplaceProviderStatusDto> Status()
     {
-        var configuredProviders = pricingProviders
+        List<string> configuredProviders = pricingProviders
             .Where(provider => provider.IsConfigured)
             .Select(provider => provider.Name)
             .ToList();

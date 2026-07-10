@@ -23,8 +23,8 @@ public static class TitleMatch
             return [];
         }
 
-        var tokens = new List<string>();
-        foreach (var raw in title.ToLowerInvariant().Split(
+        List<string> tokens = [];
+        foreach (string raw in title.ToLowerInvariant().Split(
             [' ', '\t', '\n', '\r', '-', '_', '/', '\\', ',', '.', '(', ')', '[', ']', '{', '}', ':', ';', '\'', '"', '!', '?', '&', '+', '#', '*', '|', '@'],
             StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
         {
@@ -39,8 +39,8 @@ public static class TitleMatch
     /// <summary>0..1 similarity: how much of the shorter title's identity tokens appear in the other.</summary>
     public static double Score(string? a, string? b)
     {
-        var tokensA = Tokenize(a).ToHashSet(StringComparer.Ordinal);
-        var tokensB = Tokenize(b).ToHashSet(StringComparer.Ordinal);
+        HashSet<string> tokensA = Tokenize(a).ToHashSet(StringComparer.Ordinal);
+        HashSet<string> tokensB = Tokenize(b).ToHashSet(StringComparer.Ordinal);
         if (tokensA.Count == 0 || tokensB.Count == 0)
         {
             return 0;
@@ -55,7 +55,7 @@ public static class TitleMatch
     /// strong containment score and at least two shared identity tokens so a single common word can't match.</summary>
     public static Guid? Best(string? query, IEnumerable<(Guid Id, string Title)> candidates, double threshold = 0.6)
     {
-        var queryTokens = Tokenize(query).ToHashSet(StringComparer.Ordinal);
+        HashSet<string> queryTokens = Tokenize(query).ToHashSet(StringComparer.Ordinal);
         if (queryTokens.Count == 0)
         {
             return null;
@@ -63,9 +63,9 @@ public static class TitleMatch
 
         Guid? best = null;
         double bestScore = 0;
-        foreach (var candidate in candidates)
+        foreach ((Guid Id, string Title) candidate in candidates)
         {
-            var candidateTokens = Tokenize(candidate.Title).ToHashSet(StringComparer.Ordinal);
+            HashSet<string> candidateTokens = Tokenize(candidate.Title).ToHashSet(StringComparer.Ordinal);
             int overlap = candidateTokens.Count(queryTokens.Contains);
             if (overlap < 2)
             {

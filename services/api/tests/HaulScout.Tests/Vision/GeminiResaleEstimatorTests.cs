@@ -34,7 +34,7 @@ public sealed class GeminiResaleEstimatorTests
 
     private static GeminiResaleEstimator Build(HttpMessageHandler handler, IMemoryCache cache)
     {
-        var config = new ConfigurationBuilder()
+        IConfigurationRoot config = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?> { ["Gemini:ApiKey"] = "test-key" })
             .Build();
         return new GeminiResaleEstimator(new HttpClient(handler), config, cache, NullLogger<GeminiResaleEstimator>.Instance);
@@ -43,8 +43,8 @@ public sealed class GeminiResaleEstimatorTests
     [Fact]
     public async Task Parses_estimate_from_response()
     {
-        var handler = new CountingHandler(Envelope("""{"low":150,"high":220,"rationale":"eBay sold avg"}"""));
-        var sut = Build(handler, new MemoryCache(new MemoryCacheOptions()));
+        CountingHandler handler = new(Envelope("""{"low":150,"high":220,"rationale":"eBay sold avg"}"""));
+        GeminiResaleEstimator sut = Build(handler, new MemoryCache(new MemoryCacheOptions()));
 
         ResaleEstimate? result = await sut.EstimateAsync("Sony WH-1000XM4", null, CancellationToken.None);
 
@@ -67,7 +67,7 @@ public sealed class GeminiResaleEstimatorTests
           ]
         }
         """;
-        var sut = Build(new CountingHandler(Envelope(inner)), new MemoryCache(new MemoryCacheOptions()));
+        GeminiResaleEstimator sut = Build(new CountingHandler(Envelope(inner)), new MemoryCache(new MemoryCacheOptions()));
 
         ResaleEstimate? result = await sut.EstimateAsync("Sony WH-1000XM4", null, CancellationToken.None);
 
@@ -81,9 +81,9 @@ public sealed class GeminiResaleEstimatorTests
     [Fact]
     public async Task Includes_ebay_sold_completed_search_url_in_grounded_prompt()
     {
-        var handler = new CountingHandler(Envelope("""{"low":55,"high":80}"""));
-        var sut = Build(handler, new MemoryCache(new MemoryCacheOptions()));
-        var hints = ResaleSearchHintBuilder.FromQuery("Pokemon Gardevoir Sylveon GX 130/214 Unbroken Bonds");
+        CountingHandler handler = new(Envelope("""{"low":55,"high":80}"""));
+        GeminiResaleEstimator sut = Build(handler, new MemoryCache(new MemoryCacheOptions()));
+        ResaleSearchHints hints = ResaleSearchHintBuilder.FromQuery("Pokemon Gardevoir Sylveon GX 130/214 Unbroken Bonds");
 
         ResaleEstimate? result = await sut.EstimateAsync(
             "Pokemon Gardevoir Sylveon GX 130/214 Unbroken Bonds",
@@ -101,12 +101,12 @@ public sealed class GeminiResaleEstimatorTests
     [Fact]
     public async Task Caches_by_product_so_repeat_calls_hit_no_api()
     {
-        var handler = new CountingHandler(Envelope("""{"low":10,"high":20}"""));
-        var cache = new MemoryCache(new MemoryCacheOptions());
-        var sut = Build(handler, cache);
+        CountingHandler handler = new(Envelope("""{"low":10,"high":20}"""));
+        MemoryCache cache = new(new MemoryCacheOptions());
+        GeminiResaleEstimator sut = Build(handler, cache);
 
-        var a = await sut.EstimateAsync("Pyrex 4-Cup Measuring Cup", null, CancellationToken.None);
-        var b = await sut.EstimateAsync("  pyrex   4-cup   measuring cup ", null, CancellationToken.None); // same, normalized
+        ResaleEstimate? a = await sut.EstimateAsync("Pyrex 4-Cup Measuring Cup", null, CancellationToken.None);
+        ResaleEstimate? b = await sut.EstimateAsync("  pyrex   4-cup   measuring cup ", null, CancellationToken.None); // same, normalized
 
         Assert.NotNull(a);
         Assert.NotNull(b);
@@ -117,9 +117,9 @@ public sealed class GeminiResaleEstimatorTests
     [Fact]
     public async Task Different_products_call_api_separately()
     {
-        var handler = new CountingHandler(Envelope("""{"low":10,"high":20}"""));
-        var cache = new MemoryCache(new MemoryCacheOptions());
-        var sut = Build(handler, cache);
+        CountingHandler handler = new(Envelope("""{"low":10,"high":20}"""));
+        MemoryCache cache = new(new MemoryCacheOptions());
+        GeminiResaleEstimator sut = Build(handler, cache);
 
         await sut.EstimateAsync("Product A", null, CancellationToken.None);
         await sut.EstimateAsync("Product B", null, CancellationToken.None);
@@ -131,9 +131,9 @@ public sealed class GeminiResaleEstimatorTests
     public async Task Same_model_different_variant_does_not_share_cache()
     {
         // The exact risk: same product line, different colorway/value. Must NOT collide.
-        var handler = new CountingHandler(Envelope("""{"low":100,"high":400}"""));
-        var cache = new MemoryCache(new MemoryCacheOptions());
-        var sut = Build(handler, cache);
+        CountingHandler handler = new(Envelope("""{"low":100,"high":400}"""));
+        MemoryCache cache = new(new MemoryCacheOptions());
+        GeminiResaleEstimator sut = Build(handler, cache);
 
         await sut.EstimateAsync("Nike Air Jordan 1 Chicago 2015", null, CancellationToken.None);
         await sut.EstimateAsync("Nike Air Jordan 1 Bred 2023", null, CancellationToken.None);
@@ -146,9 +146,9 @@ public sealed class GeminiResaleEstimatorTests
     public async Task Same_name_only_punctuation_or_case_differs_shares_cache()
     {
         // Truly identical product (same question) → one estimate, no wasted call.
-        var handler = new CountingHandler(Envelope("""{"low":150,"high":220}"""));
-        var cache = new MemoryCache(new MemoryCacheOptions());
-        var sut = Build(handler, cache);
+        CountingHandler handler = new(Envelope("""{"low":150,"high":220}"""));
+        MemoryCache cache = new(new MemoryCacheOptions());
+        GeminiResaleEstimator sut = Build(handler, cache);
 
         await sut.EstimateAsync("Sony WH-1000XM4!", null, CancellationToken.None);
         await sut.EstimateAsync("  sony   wh 1000xm4 ", null, CancellationToken.None);
@@ -159,8 +159,8 @@ public sealed class GeminiResaleEstimatorTests
     [Fact]
     public async Task Not_configured_without_key()
     {
-        var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>()).Build();
-        var sut = new GeminiResaleEstimator(new HttpClient(new CountingHandler("{}")), config,
+        IConfigurationRoot config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>()).Build();
+        GeminiResaleEstimator sut = new(new HttpClient(new CountingHandler("{}")), config,
             new MemoryCache(new MemoryCacheOptions()), NullLogger<GeminiResaleEstimator>.Instance);
 
         Assert.False(sut.IsConfigured);

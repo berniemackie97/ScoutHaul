@@ -58,7 +58,7 @@ internal sealed class GeminiListingWriter(
 
     private static string BuildDetails(GenerateListingRequest r)
     {
-        var lines = new List<string> { r.Title.Trim() };
+        List<string> lines = [r.Title.Trim()];
         void Add(string label, string? value)
         {
             if (!string.IsNullOrWhiteSpace(value)) lines.Add($"{label}: {value.Trim()}");
@@ -97,7 +97,7 @@ internal sealed class GeminiListingWriter(
         string apiKey,
         CancellationToken cancellationToken)
     {
-        var context = new StringBuilder();
+        StringBuilder context = new();
         context.Append("ITEM DETAILS:\n").Append(details).Append("\n\n");
         if (estimate is not null)
         {
@@ -140,7 +140,7 @@ internal sealed class GeminiListingWriter(
         const int maxAttempts = 4;
         for (int attempt = 1; attempt <= maxAttempts; attempt++)
         {
-            using var content = new StringContent(json, Encoding.UTF8, "application/json");
+            using StringContent content = new(json, Encoding.UTF8, "application/json");
             HttpResponseMessage response;
             try
             {

@@ -28,16 +28,16 @@ public sealed class BudgetsController(HaulScoutDbContext db, ICurrentUserContext
             return BadRequest("Starting amount cannot be negative.");
         }
 
-        var activeBudgets = await db.Budgets
+        List<Budget> activeBudgets = await db.Budgets
             .Where(item => item.OrganizationId == currentUser.OrganizationId && item.IsActive)
             .ToListAsync(cancellationToken);
 
-        foreach (var activeBudget in activeBudgets)
+        foreach (Budget activeBudget in activeBudgets)
         {
             activeBudget.IsActive = false;
         }
 
-        var budget = new Budget
+        Budget budget = new()
         {
             OrganizationId = currentUser.OrganizationId,
             Name = request.Name.Trim(),
@@ -57,7 +57,7 @@ public sealed class BudgetsController(HaulScoutDbContext db, ICurrentUserContext
     [HttpGet("current")]
     public async Task<ActionResult<BudgetDto>> GetCurrent(CancellationToken cancellationToken)
     {
-        var budget = await db.Budgets
+        Budget? budget = await db.Budgets
             .Where(item => item.OrganizationId == currentUser.OrganizationId && item.IsActive)
             .OrderByDescending(item => item.StartsAt)
             .FirstOrDefaultAsync(cancellationToken);
@@ -68,7 +68,7 @@ public sealed class BudgetsController(HaulScoutDbContext db, ICurrentUserContext
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> DeleteBudget(Guid id, CancellationToken cancellationToken)
     {
-        var budget = await db.Budgets.SingleOrDefaultAsync(
+        Budget? budget = await db.Budgets.SingleOrDefaultAsync(
             item => item.Id == id && item.OrganizationId == currentUser.OrganizationId,
             cancellationToken);
 
@@ -95,7 +95,7 @@ public sealed class BudgetsController(HaulScoutDbContext db, ICurrentUserContext
             return BadRequest("Expense amount must be greater than zero.");
         }
 
-        var expense = new Expense
+        Expense expense = new()
         {
             OrganizationId = currentUser.OrganizationId,
             InventoryItemId = request.InventoryItemId,
@@ -109,7 +109,7 @@ public sealed class BudgetsController(HaulScoutDbContext db, ICurrentUserContext
 
         db.Expenses.Add(expense);
 
-        var budget = await db.Budgets
+        Budget? budget = await db.Budgets
             .Where(item => item.OrganizationId == currentUser.OrganizationId && item.IsActive)
             .OrderByDescending(item => item.StartsAt)
             .FirstOrDefaultAsync(cancellationToken);
@@ -126,7 +126,7 @@ public sealed class BudgetsController(HaulScoutDbContext db, ICurrentUserContext
     [HttpGet("expenses")]
     public async Task<ActionResult<IReadOnlyList<ExpenseDto>>> ListExpenses(CancellationToken cancellationToken)
     {
-        var expenses = await db.Expenses
+        List<ExpenseDto> expenses = await db.Expenses
             .Where(item => item.OrganizationId == currentUser.OrganizationId)
             .OrderByDescending(item => item.OccurredAt)
             .Take(200)
@@ -139,7 +139,7 @@ public sealed class BudgetsController(HaulScoutDbContext db, ICurrentUserContext
     [HttpDelete("expenses/{id:guid}")]
     public async Task<IActionResult> DeleteExpense(Guid id, CancellationToken cancellationToken)
     {
-        var expense = await db.Expenses.SingleOrDefaultAsync(
+        Expense? expense = await db.Expenses.SingleOrDefaultAsync(
             item => item.Id == id && item.OrganizationId == currentUser.OrganizationId,
             cancellationToken);
 
@@ -148,7 +148,7 @@ public sealed class BudgetsController(HaulScoutDbContext db, ICurrentUserContext
             return NotFound();
         }
 
-        var budget = await db.Budgets
+        Budget? budget = await db.Budgets
             .Where(item => item.OrganizationId == currentUser.OrganizationId && item.IsActive)
             .OrderByDescending(item => item.StartsAt)
             .FirstOrDefaultAsync(cancellationToken);
@@ -168,12 +168,12 @@ public sealed class BudgetsController(HaulScoutDbContext db, ICurrentUserContext
     [HttpGet("summary")]
     public async Task<ActionResult<BudgetSummaryDto>> Summary(CancellationToken cancellationToken)
     {
-        var budget = await db.Budgets
+        Budget? budget = await db.Budgets
             .Where(item => item.OrganizationId == currentUser.OrganizationId && item.IsActive)
             .OrderByDescending(item => item.StartsAt)
             .FirstOrDefaultAsync(cancellationToken);
 
-        var expenseQuery = db.Expenses.Where(item => item.OrganizationId == currentUser.OrganizationId);
+        IQueryable<Expense> expenseQuery = db.Expenses.Where(item => item.OrganizationId == currentUser.OrganizationId);
 
         if (budget is not null)
         {
@@ -185,10 +185,10 @@ public sealed class BudgetsController(HaulScoutDbContext db, ICurrentUserContext
             }
         }
 
-        var expenses = await expenseQuery.ToListAsync(cancellationToken);
+        List<Expense> expenses = await expenseQuery.ToListAsync(cancellationToken);
 
-        var totalExpenses = expenses.Sum(item => item.Amount);
-        var inventoryPurchases = expenses
+        decimal totalExpenses = expenses.Sum(item => item.Amount);
+        decimal inventoryPurchases = expenses
             .Where(item => item.Category == ExpenseCategory.InventoryPurchase)
             .Sum(item => item.Amount);
 

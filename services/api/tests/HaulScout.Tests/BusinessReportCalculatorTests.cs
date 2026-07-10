@@ -1,3 +1,4 @@
+using HaulScout.Application.Contracts;
 using HaulScout.Application.Services;
 using HaulScout.Domain;
 
@@ -11,7 +12,7 @@ public sealed class BusinessReportCalculatorTests
     [Fact]
     public void Build_calculates_auditable_sales_expense_and_inventory_metrics()
     {
-        var report = BusinessReportCalculator.Build(
+        BusinessReportDto report = BusinessReportCalculator.Build(
             From,
             ToExclusive,
             [
@@ -50,7 +51,7 @@ public sealed class BusinessReportCalculatorTests
     {
         DateTimeOffset from = new(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
         DateTimeOffset to = from.AddDays(90);
-        var report = BusinessReportCalculator.Build(from, to, [], [], [], [], [], to);
+        BusinessReportDto report = BusinessReportCalculator.Build(from, to, [], [], [], [], [], to);
 
         Assert.Equal("week", report.Granularity);
         Assert.True(report.Series.Count >= 13);
@@ -60,7 +61,7 @@ public sealed class BusinessReportCalculatorTests
     [Fact]
     public void Build_marks_aged_and_incomplete_inventory_without_fabricating_values()
     {
-        var report = BusinessReportCalculator.Build(
+        BusinessReportDto report = BusinessReportCalculator.Build(
             From,
             ToExclusive,
             [], [], [], [],
@@ -77,7 +78,7 @@ public sealed class BusinessReportCalculatorTests
     [Fact]
     public void Build_tracks_seller_owed_sales_tax_and_net_income_after_operating_expenses()
     {
-        var report = BusinessReportCalculator.Build(
+        BusinessReportDto report = BusinessReportCalculator.Build(
             From,
             ToExclusive,
             [

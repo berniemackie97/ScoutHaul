@@ -54,17 +54,17 @@ public sealed class MarketAnalysisController(
             }
         }
 
-        var observations = request.ProductIdentityId.HasValue || request.InventoryItemId.HasValue
+        List<MarketObservation> observations = request.ProductIdentityId.HasValue || request.InventoryItemId.HasValue
             ? await LoadRelevantObservations(request, item, cancellationToken)
-            : new List<MarketObservation>();
+            : [];
         MarketValuationResult valuation = MarketValuation.Estimate(
             request.ExpectedSalePrice,
             item?.EstimatedSalePrice,
             request.PricingBasis,
             observations);
-        var confidence = confidenceScorer.Score(observations, valuation.PricingBasis, request.Condition ?? item?.Condition, request.RiskFlags);
+        ConfidenceScoreResult confidence = confidenceScorer.Score(observations, valuation.PricingBasis, request.Condition ?? item?.Condition, request.RiskFlags);
 
-        var analysisInput = new DealAnalysisInput(
+        DealAnalysisInput analysisInput = new(
             valuation.EstimatedSalePrice,
             request.SellerAskingPrice ?? item?.SellerAskingPrice,
             request.PurchasePrice ?? item?.PurchasePrice,
@@ -80,8 +80,8 @@ public sealed class MarketAnalysisController(
             confidence.Score,
             valuation.PricingBasis);
 
-        var recommendation = dealAnalyzer.Analyze(analysisInput);
-        var combinedWarnings = confidence.Warnings.Concat(recommendation.Warnings).Distinct().ToList();
+        DealAnalysisResult recommendation = dealAnalyzer.Analyze(analysisInput);
+        List<string> combinedWarnings = confidence.Warnings.Concat(recommendation.Warnings).Distinct().ToList();
 
         if (valuation.ActiveListingCount > 0 && valuation.SoldCompCount == 0 && request.ExpectedSalePrice is null && item?.EstimatedSalePrice is null)
         {
@@ -93,7 +93,7 @@ public sealed class MarketAnalysisController(
             combinedWarnings.Add("No sold comps were found. Provider estimates were used for valuation.");
         }
 
-        var analysis = new MarketAnalysis
+        MarketAnalysis analysis = new()
         {
             OrganizationId = currentUser.OrganizationId,
             ProductIdentityId = request.ProductIdentityId ?? item?.ProductIdentityId,
@@ -110,7 +110,7 @@ public sealed class MarketAnalysisController(
         db.MarketAnalyses.Add(analysis);
         await db.SaveChangesAsync(cancellationToken);
 
-        var buyRecommendation = new BuyRecommendation
+        BuyRecommendation buyRecommendation = new()
         {
             OrganizationId = currentUser.OrganizationId,
             MarketAnalysisId = analysis.Id,
@@ -144,10 +144,10 @@ public sealed class MarketAnalysisController(
 
     private async Task<List<MarketObservation>> LoadRelevantObservations(MarketAnalysisRequest request, InventoryItem? item, CancellationToken cancellationToken)
     {
-        var query = db.MarketObservations.Where(observation =>
+        IQueryable<MarketObservation> query = db.MarketObservations.Where(observation =>
             observation.OrganizationId == currentUser.OrganizationId && !observation.IsArchived);
 
-        var productIdentityId = request.ProductIdentityId ?? item?.ProductIdentityId;
+        Guid? productIdentityId = request.ProductIdentityId ?? item?.ProductIdentityId;
         if (request.InventoryItemId.HasValue && productIdentityId.HasValue)
         {
             query = query.Where(observation =>

@@ -44,10 +44,10 @@ public sealed class CompositeBarcodeLookupTests
     [Fact]
     public async Task Returns_first_successful_result()
     {
-        var first = new StubBarcodeLookupProvider("First", true, MakeResult("123", "Widget"));
-        var second = new StubBarcodeLookupProvider("Second", true, MakeResult("123", "Other Widget"));
+        StubBarcodeLookupProvider first = new("First", true, MakeResult("123", "Widget"));
+        StubBarcodeLookupProvider second = new("Second", true, MakeResult("123", "Other Widget"));
 
-        var sut = new CompositeBarcodeLookupService(
+        CompositeBarcodeLookupService sut = new(
             [first, second],
             NullLogger<CompositeBarcodeLookupService>.Instance);
 
@@ -62,10 +62,10 @@ public sealed class CompositeBarcodeLookupTests
     [Fact]
     public async Task Skips_unconfigured_providers()
     {
-        var unconfigured = new StubBarcodeLookupProvider("Unconfigured", false, MakeResult("123", "Should not be returned"));
-        var configured = new StubBarcodeLookupProvider("Configured", true, MakeResult("123", "Correct"));
+        StubBarcodeLookupProvider unconfigured = new("Unconfigured", false, MakeResult("123", "Should not be returned"));
+        StubBarcodeLookupProvider configured = new("Configured", true, MakeResult("123", "Correct"));
 
-        var sut = new CompositeBarcodeLookupService(
+        CompositeBarcodeLookupService sut = new(
             [unconfigured, configured],
             NullLogger<CompositeBarcodeLookupService>.Instance);
 
@@ -79,10 +79,10 @@ public sealed class CompositeBarcodeLookupTests
     [Fact]
     public async Task Falls_through_when_provider_returns_null()
     {
-        var empty = new StubBarcodeLookupProvider("Empty", true, null);
-        var good = new StubBarcodeLookupProvider("Good", true, MakeResult("123", "Found"));
+        StubBarcodeLookupProvider empty = new("Empty", true, null);
+        StubBarcodeLookupProvider good = new("Good", true, MakeResult("123", "Found"));
 
-        var sut = new CompositeBarcodeLookupService(
+        CompositeBarcodeLookupService sut = new(
             [empty, good],
             NullLogger<CompositeBarcodeLookupService>.Instance);
 
@@ -97,11 +97,11 @@ public sealed class CompositeBarcodeLookupTests
     [Fact]
     public async Task Falls_through_when_provider_returns_empty_title()
     {
-        var emptyTitle = new StubBarcodeLookupProvider("EmptyTitle", true,
+        StubBarcodeLookupProvider emptyTitle = new("EmptyTitle", true,
             new BarcodeLookupResult("123", "  ", null, null, null, null, null, null));
-        var good = new StubBarcodeLookupProvider("Good", true, MakeResult("123", "Real Product"));
+        StubBarcodeLookupProvider good = new("Good", true, MakeResult("123", "Real Product"));
 
-        var sut = new CompositeBarcodeLookupService(
+        CompositeBarcodeLookupService sut = new(
             [emptyTitle, good],
             NullLogger<CompositeBarcodeLookupService>.Instance);
 
@@ -114,10 +114,10 @@ public sealed class CompositeBarcodeLookupTests
     [Fact]
     public async Task Survives_provider_exception_and_continues()
     {
-        var throwing = new ThrowingBarcodeLookupProvider("Broken");
-        var good = new StubBarcodeLookupProvider("Good", true, MakeResult("123", "Survived"));
+        ThrowingBarcodeLookupProvider throwing = new("Broken");
+        StubBarcodeLookupProvider good = new("Good", true, MakeResult("123", "Survived"));
 
-        var sut = new CompositeBarcodeLookupService(
+        CompositeBarcodeLookupService sut = new(
             [throwing, good],
             NullLogger<CompositeBarcodeLookupService>.Instance);
 
@@ -131,10 +131,10 @@ public sealed class CompositeBarcodeLookupTests
     [Fact]
     public async Task Returns_null_when_all_providers_fail()
     {
-        var empty = new StubBarcodeLookupProvider("Empty", true, null);
-        var throwing = new ThrowingBarcodeLookupProvider("Broken");
+        StubBarcodeLookupProvider empty = new("Empty", true, null);
+        ThrowingBarcodeLookupProvider throwing = new("Broken");
 
-        var sut = new CompositeBarcodeLookupService(
+        CompositeBarcodeLookupService sut = new(
             [empty, throwing],
             NullLogger<CompositeBarcodeLookupService>.Instance);
 
@@ -146,9 +146,9 @@ public sealed class CompositeBarcodeLookupTests
     [Fact]
     public async Task Returns_null_for_blank_barcode()
     {
-        var provider = new StubBarcodeLookupProvider("Provider", true, MakeResult("123", "Thing"));
+        StubBarcodeLookupProvider provider = new("Provider", true, MakeResult("123", "Thing"));
 
-        var sut = new CompositeBarcodeLookupService(
+        CompositeBarcodeLookupService sut = new(
             [provider],
             NullLogger<CompositeBarcodeLookupService>.Instance);
 
@@ -161,11 +161,11 @@ public sealed class CompositeBarcodeLookupTests
     public async Task Trims_barcode_whitespace()
     {
         string? capturedBarcode = null;
-        var provider = new StubBarcodeLookupProvider("Provider", true, null);
+        StubBarcodeLookupProvider provider = new("Provider", true, null);
 
         // Use a capturing provider to verify trimming
-        var capturing = new CapturingProvider(b => capturedBarcode = b);
-        var sut = new CompositeBarcodeLookupService(
+        CapturingProvider capturing = new(b => capturedBarcode = b);
+        CompositeBarcodeLookupService sut = new(
             [capturing],
             NullLogger<CompositeBarcodeLookupService>.Instance);
 

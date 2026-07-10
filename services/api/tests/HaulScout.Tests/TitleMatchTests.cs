@@ -7,7 +7,7 @@ public class TitleMatchTests
     [Fact]
     public void Tokenize_lowercases_splits_and_drops_filler()
     {
-        var tokens = TitleMatch.Tokenize("Vintage Levi's 501 Denim Jacket - Men's M (USA)");
+        IReadOnlyList<string> tokens = TitleMatch.Tokenize("Vintage Levi's 501 Denim Jacket - Men's M (USA)");
         Assert.Contains("levi", tokens);
         Assert.Contains("501", tokens);
         Assert.Contains("denim", tokens);
@@ -32,22 +32,22 @@ public class TitleMatchTests
     [Fact]
     public void Best_picks_the_right_candidate_and_ignores_weak_single_token_overlaps()
     {
-        var candidates = new (Guid, string)[]
-        {
+        (Guid, string)[] candidates =
+        [
             (Guid.NewGuid(), "Nike Air Max 90"),
             (Guid.NewGuid(), "Levi's 501 Denim Jacket"),
-            (Guid.NewGuid(), "Denim Bag"), // shares only "denim" — must not win
-        };
-        var expected = candidates[1].Item1;
+            (Guid.NewGuid(), "Denim Bag") // shares only "denim" — must not win
+        ];
+        Guid expected = candidates[1].Item1;
 
-        var best = TitleMatch.Best("Vintage Levi's 501 Denim Jacket Men's M", candidates);
+        Guid? best = TitleMatch.Best("Vintage Levi's 501 Denim Jacket Men's M", candidates);
         Assert.Equal(expected, best);
     }
 
     [Fact]
     public void Best_returns_null_when_nothing_clears_the_bar()
     {
-        var candidates = new (Guid, string)[] { (Guid.NewGuid(), "Nike Air Max 90"), (Guid.NewGuid(), "Sony Camera") };
+        (Guid, string)[] candidates = [(Guid.NewGuid(), "Nike Air Max 90"), (Guid.NewGuid(), "Sony Camera")];
         Assert.Null(TitleMatch.Best("Levi's 501 Denim Jacket", candidates));
     }
 }

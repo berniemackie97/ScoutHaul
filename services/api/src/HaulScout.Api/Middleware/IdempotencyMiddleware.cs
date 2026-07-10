@@ -3,6 +3,7 @@ using HaulScout.Api.Services;
 using HaulScout.Domain.Entities;
 using HaulScout.Infrastructure.Persistence;
 using System.Text;
+using Microsoft.Extensions.Primitives;
 
 namespace HaulScout.Api.Middleware;
 
@@ -20,7 +21,7 @@ public sealed class IdempotencyMiddleware(RequestDelegate next)
     {
         if (!SupportedMethods.Contains(context.Request.Method)
             || !context.Request.Path.StartsWithSegments("/api")
-            || !context.Request.Headers.TryGetValue("X-Idempotency-Key", out var values)
+            || !context.Request.Headers.TryGetValue("X-Idempotency-Key", out StringValues values)
             || string.IsNullOrWhiteSpace(values.FirstOrDefault()))
         {
             await next(context);
@@ -56,7 +57,7 @@ public sealed class IdempotencyMiddleware(RequestDelegate next)
         }
 
         Stream originalBody = context.Response.Body;
-        await using var buffer = new MemoryStream();
+        await using MemoryStream buffer = new();
         context.Response.Body = buffer;
 
         await next(context);

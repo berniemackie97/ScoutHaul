@@ -25,7 +25,7 @@ public sealed class SupabaseAdminInviteService(HttpClient httpClient, IConfigura
         }
 
         string url = $"{projectUrl}/auth/v1/invite";
-        using var request = new HttpRequestMessage(HttpMethod.Post, url);
+        using HttpRequestMessage request = new(HttpMethod.Post, url);
         request.Headers.Add("apikey", serviceRoleKey);
         request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", serviceRoleKey);
         request.Content = JsonContent.Create(new

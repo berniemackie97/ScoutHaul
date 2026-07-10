@@ -1,3 +1,4 @@
+using HaulScout.Application.Contracts;
 using HaulScout.Application.Services;
 using HaulScout.Domain;
 using HaulScout.Domain.Entities;
@@ -9,9 +10,9 @@ public sealed class ConfidenceScorerTests
     [Fact]
     public void Score_ActiveListingsOnlyRemainUnavailableConfidence()
     {
-        var scorer = new ConfidenceScorer();
+        ConfidenceScorer scorer = new();
 
-        var result = scorer.Score(
+        ConfidenceScoreResult result = scorer.Score(
             observations:
             [
                 new MarketObservation

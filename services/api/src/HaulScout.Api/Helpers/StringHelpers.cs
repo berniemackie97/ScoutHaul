@@ -14,7 +14,7 @@ internal static class StringHelpers
             return string.Empty;
         }
 
-        var builder = new StringBuilder(value.Length);
+        StringBuilder builder = new(value.Length);
         bool lastWasHyphen = false;
         foreach (char ch in value.Trim().ToLowerInvariant())
         {

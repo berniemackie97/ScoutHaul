@@ -10,9 +10,9 @@ public class BundledSaleAllocatorTests
     [Fact]
     public void Weighted_split_apportions_price_and_fees_and_sums_back_to_the_whole()
     {
-        var a = Item(weight: 30);
-        var b = Item(weight: 10);
-        var lines = BundledSaleAllocator.Allocate([a, b], totalSoldPrice: 100m, shippingCharged: 12m, platformFees: 10m, paymentFees: 0m, shippingCost: 4m, suppliesCost: 0m, otherCosts: 0m, salesTaxCollected: 0m);
+        BundledSaleItemAllocation a = Item(weight: 30);
+        BundledSaleItemAllocation b = Item(weight: 10);
+        IReadOnlyList<AllocatedSaleLine> lines = BundledSaleAllocator.Allocate([a, b], totalSoldPrice: 100m, shippingCharged: 12m, platformFees: 10m, paymentFees: 0m, shippingCost: 4m, suppliesCost: 0m, otherCosts: 0m, salesTaxCollected: 0m);
 
         Assert.Equal(100m, lines.Sum(line => line.Price));
         Assert.Equal(12m, lines.Sum(line => line.ShippingCharged));
@@ -26,9 +26,9 @@ public class BundledSaleAllocatorTests
     [Fact]
     public void Manual_prices_are_honored_and_the_rest_fills_the_remainder()
     {
-        var manual = Item(manual: 60m);
-        var rest = Item(weight: 1);
-        var lines = BundledSaleAllocator.Allocate([manual, rest], totalSoldPrice: 100m, shippingCharged: 0m, platformFees: 0m, paymentFees: 0m, shippingCost: 0m, suppliesCost: 0m, otherCosts: 0m, salesTaxCollected: 0m);
+        BundledSaleItemAllocation manual = Item(manual: 60m);
+        BundledSaleItemAllocation rest = Item(weight: 1);
+        IReadOnlyList<AllocatedSaleLine> lines = BundledSaleAllocator.Allocate([manual, rest], totalSoldPrice: 100m, shippingCharged: 0m, platformFees: 0m, paymentFees: 0m, shippingCost: 0m, suppliesCost: 0m, otherCosts: 0m, salesTaxCollected: 0m);
 
         Assert.Equal(60m, lines.First(line => line.InventoryItemId == manual.InventoryItemId).Price);
         Assert.Equal(40m, lines.First(line => line.InventoryItemId == rest.InventoryItemId).Price);

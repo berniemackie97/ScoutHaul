@@ -39,7 +39,7 @@ public static class BundledSaleAllocator
         decimal manualSum = Round(items.Where(item => item.ManualPrice.HasValue).Sum(item => item.ManualPrice!.Value));
         if (manualSum > total + 0.01m) throw new InvalidOperationException("Per-item prices exceed the order total.");
 
-        var withoutManual = items.Where(item => !item.ManualPrice.HasValue).ToList();
+        List<BundledSaleItemAllocation> withoutManual = items.Where(item => !item.ManualPrice.HasValue).ToList();
         decimal remaining = total - manualSum;
         decimal weightSum = withoutManual.Sum(item => item.Weight);
         if (withoutManual.Count > 0 && weightSum <= 0)
@@ -48,24 +48,24 @@ public static class BundledSaleAllocator
         }
 
         // Resolve each item's price.
-        var prices = new Dictionary<Guid, decimal>();
+        Dictionary<Guid, decimal> prices = new();
         decimal spread = 0;
         for (int index = 0; index < withoutManual.Count; index++)
         {
-            var item = withoutManual[index];
+            BundledSaleItemAllocation item = withoutManual[index];
             decimal weight = weightSum == withoutManual.Count ? 1 : item.Weight;
             decimal price = index == withoutManual.Count - 1 ? remaining - spread : Round(remaining * weight / weightSum);
             prices[item.InventoryItemId] = price;
             spread += price;
         }
-        foreach (var item in items.Where(item => item.ManualPrice.HasValue))
+        foreach (BundledSaleItemAllocation item in items.Where(item => item.ManualPrice.HasValue))
         {
             prices[item.InventoryItemId] = Round(item.ManualPrice!.Value);
         }
 
         // Apportion every shared cost in proportion to price; last line absorbs rounding.
-        var lines = new List<AllocatedSaleLine>();
-        var running = new decimal[7];
+        List<AllocatedSaleLine> lines = [];
+        decimal[] running = new decimal[7];
         for (int index = 0; index < items.Count; index++)
         {
             Guid id = items[index].InventoryItemId;

@@ -1,5 +1,6 @@
 using HaulScout.Application.Contracts;
 using HaulScout.Application.Services;
+using HaulScout.Domain.Entities;
 using HaulScout.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -51,15 +52,15 @@ public sealed class InventoryReferenceDataService(HaulScoutDbContext db, ICurren
         IReadOnlyList<InventoryReferenceOptionDto> options,
         List<HaulScout.Domain.Entities.OrgReferenceOverride> overrides)
     {
-        var forKind = overrides.Where(item => string.Equals(item.Kind, kind, StringComparison.OrdinalIgnoreCase)).ToList();
+        List<OrgReferenceOverride> forKind = overrides.Where(item => string.Equals(item.Kind, kind, StringComparison.OrdinalIgnoreCase)).ToList();
         if (forKind.Count == 0)
         {
             return options as InventoryReferenceOptionDto[] ?? options.ToArray();
         }
 
-        var disabled = forKind.Where(item => item.IsDisabled).Select(item => OverrideKey(item.Value, item.ParentValue)).ToHashSet();
-        var result = options.Where(option => !disabled.Contains(OverrideKey(option.Value, option.ParentValue))).ToList();
-        foreach (var addition in forKind.Where(item => item.IsCustom && !item.IsDisabled))
+        HashSet<string> disabled = forKind.Where(item => item.IsDisabled).Select(item => OverrideKey(item.Value, item.ParentValue)).ToHashSet();
+        List<InventoryReferenceOptionDto> result = options.Where(option => !disabled.Contains(OverrideKey(option.Value, option.ParentValue))).ToList();
+        foreach (OrgReferenceOverride addition in forKind.Where(item => item.IsCustom && !item.IsDisabled))
         {
             if (result.All(option => OverrideKey(option.Value, option.ParentValue) != OverrideKey(addition.Value, addition.ParentValue)))
             {
@@ -85,11 +86,11 @@ public sealed class InventoryReferenceDataService(HaulScoutDbContext db, ICurren
         string? storageLocation = ResolveOrClean(data.StorageLocations, request.StorageLocation);
         string? countryOfOrigin = Resolve(data.Countries, request.CountryOfOrigin);
 
-        var fields = new (string Label, string? Supplied, string? Resolved)[]
-        {
-            ("Country of origin", request.CountryOfOrigin, countryOfOrigin),
-        };
-        var invalid = fields.FirstOrDefault(field => !string.IsNullOrWhiteSpace(field.Supplied) && field.Resolved is null);
+        (string Label, string? Supplied, string? Resolved)[] fields =
+        [
+            ("Country of origin", request.CountryOfOrigin, countryOfOrigin)
+        ];
+        (string Label, string? Supplied, string? Resolved) invalid = fields.FirstOrDefault(field => !string.IsNullOrWhiteSpace(field.Supplied) && field.Resolved is null);
         if (invalid != default)
         {
             return (null, $"{invalid.Label} must be selected from the organization's controlled inventory options.");

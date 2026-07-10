@@ -107,7 +107,7 @@ public static class InventoryReferenceCatalog
 
     private static InventoryReferenceOptionDto[] BuildBrands()
     {
-        var brands = new List<InventoryReferenceOptionDto>();
+        List<InventoryReferenceOptionDto> brands = [];
         B(brands, "Video Games", "Nintendo", "Sony", "Microsoft", "Sega", "Atari", "SNK", "Bandai Namco", "Capcom", "Square Enix", "Ubisoft", "Electronic Arts", "Activision", "Rockstar Games", "Konami", "Valve", "2K", "Bethesda", "Take-Two", "THQ Nordic", "Limited Run Games", "GameStop");
         B(brands, "Clothing", "Nike", "Adidas", "Lululemon", "The North Face", "Patagonia", "Levi's", "Carhartt", "Ralph Lauren", "Polo Ralph Lauren", "Tommy Hilfiger", "Champion", "Under Armour", "Columbia", "Gap", "Old Navy", "Zara", "H&M", "Supreme", "Gymshark", "Vineyard Vines", "Free People", "Anthropologie", "Gucci", "Louis Vuitton", "Burberry", "J.Crew", "Madewell", "American Eagle", "Abercrombie & Fitch", "Hollister", "Aritzia", "Urban Outfitters", "Banana Republic", "Talbots", "Ann Taylor", "Eileen Fisher", "Harley-Davidson", "Disney", "MLB", "NFL", "NBA", "NHL");
         B(brands, "Shoes", "Nike", "Jordan", "Adidas", "New Balance", "Vans", "Converse", "Dr. Martens", "Timberland", "Reebok", "Puma", "ASICS", "Birkenstock", "UGG", "Crocs", "Salomon", "Hoka", "On", "Clarks", "Sperry", "Brooks", "Saucony", "Merrell", "Keen", "Sorel", "Steve Madden", "Cole Haan", "Allen Edmonds");
@@ -162,7 +162,7 @@ public static class InventoryReferenceCatalog
 
     private static InventoryReferenceOptionDto[] BuildModels()
     {
-        var models = new List<InventoryReferenceOptionDto>();
+        List<InventoryReferenceOptionDto> models = [];
         M(models, "Nintendo", "NES", "SNES", "Nintendo 64", "GameCube", "Wii", "Wii U", "Switch", "Switch Lite", "Switch OLED", "Game Boy", "Game Boy Color", "Game Boy Advance", "Nintendo DS", "Nintendo 3DS", "Amiibo");
         M(models, "Sony", "PlayStation", "PlayStation 2", "PlayStation 3", "PlayStation 4", "PlayStation 5", "PSP", "PS Vita", "Walkman", "Alpha", "Cyber-shot", "Bravia");
         M(models, "Microsoft", "Xbox", "Xbox 360", "Xbox One", "Xbox Series S", "Xbox Series X", "Surface", "Zune");
@@ -217,7 +217,7 @@ public static class InventoryReferenceCatalog
 
     private static InventoryReferenceOptionDto[] BuildSizes()
     {
-        var sizes = new List<InventoryReferenceOptionDto>();
+        List<InventoryReferenceOptionDto> sizes = [];
         Add(sizes, "US letter", ["XXS", "XS", "S", "M", "L", "XL", "2XL", "3XL", "4XL", "5XL", "6XL", "7XL", "8XL"]);
         Add(sizes, "US numeric", ["000", "00", .. Enumerable.Range(0, 61).Select(number => number.ToString())]);
         Add(sizes, "US women's numeric", ["000", "00", .. EvenNumbers(0, 40)]);

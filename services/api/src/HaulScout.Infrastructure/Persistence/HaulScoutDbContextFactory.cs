@@ -7,7 +7,7 @@ public sealed class HaulScoutDbContextFactory : IDesignTimeDbContextFactory<Haul
 {
     public HaulScoutDbContext CreateDbContext(string[] args)
     {
-        DbContextOptionsBuilder<HaulScoutDbContext> options = new DbContextOptionsBuilder<HaulScoutDbContext>();
+        DbContextOptionsBuilder<HaulScoutDbContext> options = new();
         string connectionString = Environment.GetEnvironmentVariable("ConnectionStrings__Postgres")
                                   ?? "Host=localhost;Port=5433;Database=scouthaul;Username=scouthaul;Password=scouthaul";
 

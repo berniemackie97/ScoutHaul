@@ -22,14 +22,14 @@ public class ChannelListingTests
 
     private static (HaulScoutDbContext Db, ChannelListingsController Controller, Guid Org, Guid Item, Guid Account) Setup([System.Runtime.CompilerServices.CallerMemberName] string store = "")
     {
-        var org = Guid.NewGuid();
-        var options = new DbContextOptionsBuilder<HaulScoutDbContext>().UseInMemoryDatabase(store).Options;
-        var tenant = new TenantContext();
+        Guid org = Guid.NewGuid();
+        DbContextOptions<HaulScoutDbContext> options = new DbContextOptionsBuilder<HaulScoutDbContext>().UseInMemoryDatabase(store).Options;
+        TenantContext tenant = new();
         tenant.SetOrganization(org);
-        var db = new HaulScoutDbContext(options, tenant);
+        HaulScoutDbContext db = new(options, tenant);
         db.Organizations.Add(new Organization { Id = org, Name = "Overhaul Trading Company" });
-        var item = new InventoryItem { OrganizationId = org, Title = "Camera" };
-        var account = new ChannelAccount { OrganizationId = org, Channel = "eBay", DisplayName = "Main Store" };
+        InventoryItem item = new() { OrganizationId = org, Title = "Camera" };
+        ChannelAccount account = new() { OrganizationId = org, Channel = "eBay", DisplayName = "Main Store" };
         db.InventoryItems.Add(item);
         db.ChannelAccounts.Add(account);
         db.SaveChanges();
@@ -42,14 +42,14 @@ public class ChannelListingTests
     [Fact]
     public async Task Upsert_creates_then_updates_a_single_row_per_account()
     {
-        var (db, controller, _, item, account) = Setup();
+        (HaulScoutDbContext db, ChannelListingsController controller, _, Guid item, Guid account) = Setup();
 
-        var created = (await controller.Upsert(item, Req(account, ChannelListingStatus.Active, 120m, "https://ebay/1"), default)).Value!;
+        ChannelListingDto created = (await controller.Upsert(item, Req(account, ChannelListingStatus.Active, 120m, "https://ebay/1"), default)).Value!;
         Assert.Equal(ChannelListingStatus.Active, created.Status);
         Assert.NotNull(created.ListedAt);
         Assert.Equal(120m, created.ListedPrice);
 
-        var updated = (await controller.Upsert(item, Req(account, ChannelListingStatus.Sold, 130m), default)).Value!;
+        ChannelListingDto updated = (await controller.Upsert(item, Req(account, ChannelListingStatus.Sold, 130m), default)).Value!;
         Assert.Equal(ChannelListingStatus.Sold, updated.Status);
         Assert.NotNull(updated.SoldAt);
 
@@ -60,16 +60,16 @@ public class ChannelListingTests
     [Fact]
     public async Task Upsert_rejects_unknown_account()
     {
-        var (_, controller, _, item, _) = Setup();
-        var result = await controller.Upsert(item, Req(Guid.NewGuid(), ChannelListingStatus.Active), default);
+        (_, ChannelListingsController controller, _, Guid item, _) = Setup();
+        ActionResult<ChannelListingDto> result = await controller.Upsert(item, Req(Guid.NewGuid(), ChannelListingStatus.Active), default);
         Assert.IsType<BadRequestObjectResult>(result.Result);
     }
 
     [Fact]
     public async Task Delete_removes_the_listing()
     {
-        var (db, controller, _, item, account) = Setup();
-        var created = (await controller.Upsert(item, Req(account, ChannelListingStatus.Active), default)).Value!;
+        (HaulScoutDbContext db, ChannelListingsController controller, _, Guid item, Guid account) = Setup();
+        ChannelListingDto created = (await controller.Upsert(item, Req(account, ChannelListingStatus.Active), default)).Value!;
 
         Assert.IsType<NoContentResult>(await controller.Delete(item, created.Id, default));
         Assert.Equal(0, await db.ChannelListings.CountAsync());
@@ -78,8 +78,8 @@ public class ChannelListingTests
     [Fact]
     public async Task Selling_on_one_channel_flags_the_others_for_delist()
     {
-        var (db, controller, org, item, ebay) = Setup();
-        var posh = new ChannelAccount { OrganizationId = org, Channel = "Poshmark", DisplayName = "Closet" };
+        (HaulScoutDbContext db, ChannelListingsController controller, Guid org, Guid item, Guid ebay) = Setup();
+        ChannelAccount posh = new() { OrganizationId = org, Channel = "Poshmark", DisplayName = "Closet" };
         db.ChannelAccounts.Add(posh);
         await db.SaveChangesAsync();
 
@@ -89,12 +89,12 @@ public class ChannelListingTests
         // Sold on eBay → Poshmark's still-live listing must be flagged to come down.
         await controller.Upsert(item, Req(ebay, ChannelListingStatus.Sold), default);
 
-        var poshListing = await db.ChannelListings.SingleAsync(listing => listing.ChannelAccountId == posh.Id);
+        ChannelListing poshListing = await db.ChannelListings.SingleAsync(listing => listing.ChannelAccountId == posh.Id);
         Assert.Equal(ChannelListingStatus.PendingDelist, poshListing.Status);
 
         // The org-wide worklist surfaces it (with the item title) for the delist queue.
-        var worklist = (await controller.Worklist("PendingDelist", default)).Value!;
-        var flagged = Assert.Single(worklist);
+        IReadOnlyList<ChannelListingDto>? worklist = (await controller.Worklist("PendingDelist", default)).Value!;
+        ChannelListingDto flagged = Assert.Single(worklist);
         Assert.Equal(posh.Id, flagged.ChannelAccountId);
         Assert.Equal("Camera", flagged.InventoryItemTitle);
     }

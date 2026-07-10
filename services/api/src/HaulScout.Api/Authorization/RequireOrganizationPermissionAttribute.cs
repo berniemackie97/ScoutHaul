@@ -17,7 +17,7 @@ public sealed class RequireOrganizationPermissionAttribute(string permission) : 
             return;
         }
 
-        var currentUser = context.HttpContext.RequestServices.GetRequiredService<ICurrentUserContext>();
+        ICurrentUserContext currentUser = context.HttpContext.RequestServices.GetRequiredService<ICurrentUserContext>();
         await currentUser.ResolveAsync();
 
         // Org-less users (no membership yet) cannot touch org-scoped endpoints — they must
@@ -28,7 +28,7 @@ public sealed class RequireOrganizationPermissionAttribute(string permission) : 
             return;
         }
 
-        var access = context.HttpContext.RequestServices.GetRequiredService<OrganizationAccessService>();
+        OrganizationAccessService access = context.HttpContext.RequestServices.GetRequiredService<OrganizationAccessService>();
         await access.RequirePermission(organizationId, permission, context.HttpContext.RequestAborted);
     }
 }

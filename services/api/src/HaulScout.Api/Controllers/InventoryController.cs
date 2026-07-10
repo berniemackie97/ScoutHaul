@@ -34,7 +34,7 @@ public sealed class InventoryController(
     [HttpPost]
     public async Task<ActionResult<InventoryItemDto>> Create(UpsertInventoryItemRequest request, CancellationToken cancellationToken)
     {
-        var validation = Validate(request);
+        string? validation = Validate(request);
         if (validation is not null)
         {
             return BadRequest(validation);
@@ -58,7 +58,7 @@ public sealed class InventoryController(
             return BadRequest("A new inventory item must start in a pre-sale intake, prep, or ready-to-list stage.");
         }
 
-        var item = new InventoryItem
+        InventoryItem item = new()
         {
             OrganizationId = currentUser.OrganizationId,
             Title = request.Title.Trim(),
@@ -77,13 +77,13 @@ public sealed class InventoryController(
     [HttpPut("{id:guid}")]
     public async Task<ActionResult<InventoryItemDto>> Update(Guid id, UpsertInventoryItemRequest request, CancellationToken cancellationToken)
     {
-        var item = await FindItem(id, cancellationToken);
+        InventoryItem? item = await FindItem(id, cancellationToken);
         if (item is null)
         {
             return NotFound();
         }
 
-        var validation = Validate(request);
+        string? validation = Validate(request);
         if (validation is not null)
         {
             return BadRequest(validation);
@@ -119,10 +119,10 @@ public sealed class InventoryController(
             return;
         }
 
-        var sales = await db.Sales
+        List<Sale> sales = await db.Sales
             .Where(sale => sale.InventoryItemId == item.Id && sale.OrganizationId == currentUser.OrganizationId)
             .ToListAsync(cancellationToken);
-        foreach (var sale in sales)
+        foreach (Sale sale in sales)
         {
             if (sale.CostOfGoods == newCost)
             {
@@ -172,7 +172,7 @@ public sealed class InventoryController(
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<InventoryItemDto>> Get(Guid id, CancellationToken cancellationToken)
     {
-        var item = await FindItem(id, cancellationToken);
+        InventoryItem? item = await FindItem(id, cancellationToken);
         return item is null ? NotFound() : item.ToDto();
     }
 
@@ -190,7 +190,7 @@ public sealed class InventoryController(
         }
 
         Guid[] componentIds = request.ComponentInventoryItemIds.Distinct().ToArray();
-        var components = await db.InventoryItems
+        List<InventoryItem> components = await db.InventoryItems
             .Include(item => item.Sales)
             .Where(item => componentIds.Contains(item.Id) && item.OrganizationId == currentUser.OrganizationId)
             .ToListAsync(cancellationToken);
@@ -200,7 +200,7 @@ public sealed class InventoryController(
             return NotFound("One or more bundle components were not found.");
         }
 
-        var blocked = components
+        string[] blocked = components
             .Where(item => item.IsArchived
                 || item.IsBundle
                 || item.Status is InventoryStatus.Bundled
@@ -232,7 +232,7 @@ public sealed class InventoryController(
             return BadRequest("A new bundle must start in an unsold listing-prep stage.");
         }
 
-        var bundle = new InventoryItem
+        InventoryItem bundle = new()
         {
             OrganizationId = currentUser.OrganizationId,
             Title = request.Title.Trim(),
@@ -251,7 +251,7 @@ public sealed class InventoryController(
         };
 
         db.InventoryItems.Add(bundle);
-        foreach (var component in components.OrderBy(item => item.Title))
+        foreach (InventoryItem component in components.OrderBy(item => item.Title))
         {
             component.Status = InventoryStatus.Bundled;
             db.InventoryBundleComponents.Add(new InventoryBundleComponent
@@ -291,7 +291,7 @@ public sealed class InventoryController(
         [FromForm] UploadInventoryPhotoForm request,
         CancellationToken cancellationToken)
     {
-        var item = await FindItem(id, cancellationToken);
+        InventoryItem? item = await FindItem(id, cancellationToken);
         if (item is null)
         {
             return NotFound();
@@ -314,13 +314,13 @@ public sealed class InventoryController(
 
         if (request.IsHero || item.Photos.Count == 0)
         {
-            foreach (var existingPhoto in item.Photos)
+            foreach (InventoryPhoto existingPhoto in item.Photos)
             {
                 existingPhoto.IsHero = false;
             }
         }
 
-        var photo = new InventoryPhoto
+        InventoryPhoto photo = new()
         {
             OrganizationId = currentUser.OrganizationId,
             InventoryItemId = item.Id,
@@ -363,7 +363,7 @@ public sealed class InventoryController(
         [FromQuery] string url,
         CancellationToken cancellationToken)
     {
-        var item = await FindItem(id, cancellationToken);
+        InventoryItem? item = await FindItem(id, cancellationToken);
         if (item is null)
         {
             return NotFound();
@@ -424,7 +424,7 @@ public sealed class InventoryController(
         [FromQuery] string url,
         CancellationToken cancellationToken)
     {
-        var item = await FindItem(id, cancellationToken);
+        InventoryItem? item = await FindItem(id, cancellationToken);
         if (item is null)
         {
             return NotFound();
@@ -438,7 +438,7 @@ public sealed class InventoryController(
         InventoryPhoto? photo = ResolvePhotoByUrl(item, url);
         if (photo is not null)
         {
-            foreach (var existingPhoto in item.Photos)
+            foreach (InventoryPhoto existingPhoto in item.Photos)
             {
                 existingPhoto.IsHero = existingPhoto.Id == photo.Id;
             }
@@ -477,7 +477,7 @@ public sealed class InventoryController(
     [ResponseCache(Duration = 86400, Location = ResponseCacheLocation.Client)]
     public async Task<IActionResult> GetPhotoThumbnail(Guid id, Guid photoId, CancellationToken cancellationToken)
     {
-        var photo = await FindPhotoUnscoped(id, photoId, cancellationToken);
+        InventoryPhoto? photo = await FindPhotoUnscoped(id, photoId, cancellationToken);
         return photo is null ? NotFound() : File(photo.ThumbnailBytes, "image/jpeg");
     }
 
@@ -486,7 +486,7 @@ public sealed class InventoryController(
     [ResponseCache(Duration = 86400, Location = ResponseCacheLocation.Client)]
     public async Task<IActionResult> GetPhotoOriginal(Guid id, Guid photoId, CancellationToken cancellationToken)
     {
-        var photo = await FindPhotoUnscoped(id, photoId, cancellationToken);
+        InventoryPhoto? photo = await FindPhotoUnscoped(id, photoId, cancellationToken);
         return photo is null ? NotFound() : File(photo.OriginalBytes, photo.ContentType);
     }
 
@@ -496,13 +496,13 @@ public sealed class InventoryController(
         Guid photoId,
         CancellationToken cancellationToken)
     {
-        var item = await FindItem(id, cancellationToken);
+        InventoryItem? item = await FindItem(id, cancellationToken);
         if (item is null)
         {
             return NotFound();
         }
 
-        var photo = item.Photos.SingleOrDefault(candidate => candidate.Id == photoId);
+        InventoryPhoto? photo = item.Photos.SingleOrDefault(candidate => candidate.Id == photoId);
         if (photo is null)
         {
             return NotFound("Photo was not found on this inventory item.");
@@ -540,7 +540,7 @@ public sealed class InventoryController(
         [FromQuery] bool includeArchived,
         CancellationToken cancellationToken)
     {
-        var query = db.InventoryItems.Where(item => item.OrganizationId == currentUser.OrganizationId);
+        IQueryable<InventoryItem> query = db.InventoryItems.Where(item => item.OrganizationId == currentUser.OrganizationId);
 
         if (!includeArchived)
         {
@@ -556,11 +556,11 @@ public sealed class InventoryController(
         // item never shows up under "not sold".
         if (lifecycle.HasValue)
         {
-            var groupStatuses = InventoryLifecycle.InGroup(lifecycle.Value).ToArray();
+            InventoryStatus[] groupStatuses = InventoryLifecycle.InGroup(lifecycle.Value).ToArray();
             query = query.Where(item => groupStatuses.Contains(item.Status));
         }
 
-        var items = await query
+        List<InventoryItemDto> items = await query
             .Include(item => item.Photos)
             .Include(item => item.AcquisitionLotItems)
                 .ThenInclude(item => item.AcquisitionLot)
@@ -591,7 +591,7 @@ public sealed class InventoryController(
         page = Math.Max(1, page);
         pageSize = Math.Clamp(pageSize, 1, 100);
 
-        var query = db.InventoryItems.Where(item => item.OrganizationId == currentUser.OrganizationId);
+        IQueryable<InventoryItem> query = db.InventoryItems.Where(item => item.OrganizationId == currentUser.OrganizationId);
 
         if (!includeArchived)
         {
@@ -605,7 +605,7 @@ public sealed class InventoryController(
 
         if (lifecycle.HasValue)
         {
-            var groupStatuses = InventoryLifecycle.InGroup(lifecycle.Value).ToArray();
+            InventoryStatus[] groupStatuses = InventoryLifecycle.InGroup(lifecycle.Value).ToArray();
             query = query.Where(item => groupStatuses.Contains(item.Status));
         }
 
@@ -626,7 +626,7 @@ public sealed class InventoryController(
             .Select(item => new { item.Status, item.PurchasePrice, item.EstimatedSalePrice, item.SellerAskingPrice })
             .ToListAsync(cancellationToken);
         int total = scalars.Count;
-        var summary = new InventorySummaryDto(
+        InventorySummaryDto summary = new(
             total,
             scalars.Count(item => InventoryLifecycle.Group(item.Status) == InventoryLifecycleGroup.Active),
             scalars.Count(item => item.Status is InventoryStatus.ReadyToList or InventoryStatus.Listed),
@@ -643,7 +643,7 @@ public sealed class InventoryController(
             _ => desc ? query.OrderByDescending(item => item.UpdatedAt) : query.OrderBy(item => item.UpdatedAt),
         };
 
-        var pageItems = await query
+        List<InventoryItem> pageItems = await query
             .Include(item => item.Photos)
             .Include(item => item.AcquisitionLotItems)
                 .ThenInclude(item => item.AcquisitionLot)
@@ -652,7 +652,7 @@ public sealed class InventoryController(
             .Take(pageSize)
             .ToListAsync(cancellationToken);
 
-        var dtos = pageItems.Select(item => item.ToDto()).ToList();
+        List<InventoryItemDto> dtos = pageItems.Select(item => item.ToDto()).ToList();
         int pageCount = Math.Max(1, (int)Math.Ceiling(total / (double)pageSize));
         return new InventoryListDto(dtos, total, page, pageSize, pageCount, summary);
     }
@@ -665,7 +665,7 @@ public sealed class InventoryController(
             return NotFound();
         }
 
-        var issues = await db.InventoryIssues
+        List<InventoryIssueDto> issues = await db.InventoryIssues
             .Where(item => item.InventoryItemId == id && item.OrganizationId == currentUser.OrganizationId)
             .OrderBy(item => item.IsResolved)
             .ThenBy(item => item.SortOrder)
@@ -682,7 +682,7 @@ public sealed class InventoryController(
         UpsertInventoryIssueRequest request,
         CancellationToken cancellationToken)
     {
-        var item = await FindItem(id, cancellationToken);
+        InventoryItem? item = await FindItem(id, cancellationToken);
         if (item is null)
         {
             return NotFound();
@@ -694,7 +694,7 @@ public sealed class InventoryController(
             return BadRequest(validation);
         }
 
-        var issue = new InventoryIssue
+        InventoryIssue issue = new()
         {
             OrganizationId = currentUser.OrganizationId,
             InventoryItemId = id,
@@ -718,7 +718,7 @@ public sealed class InventoryController(
         UpsertInventoryIssueRequest request,
         CancellationToken cancellationToken)
     {
-        var issue = await db.InventoryIssues.SingleOrDefaultAsync(
+        InventoryIssue? issue = await db.InventoryIssues.SingleOrDefaultAsync(
             item => item.Id == issueId && item.InventoryItemId == id && item.OrganizationId == currentUser.OrganizationId,
             cancellationToken);
         if (issue is null)
@@ -746,7 +746,7 @@ public sealed class InventoryController(
     [HttpDelete("{id:guid}/issues/{issueId:guid}")]
     public async Task<IActionResult> DeleteIssue(Guid id, Guid issueId, CancellationToken cancellationToken)
     {
-        var issue = await db.InventoryIssues.SingleOrDefaultAsync(
+        InventoryIssue? issue = await db.InventoryIssues.SingleOrDefaultAsync(
             item => item.Id == issueId && item.InventoryItemId == id && item.OrganizationId == currentUser.OrganizationId,
             cancellationToken);
         if (issue is null)
@@ -762,7 +762,7 @@ public sealed class InventoryController(
     [HttpPatch("{id:guid}/status")]
     public async Task<ActionResult<InventoryItemDto>> ChangeStatus(Guid id, ChangeInventoryStatusRequest request, CancellationToken cancellationToken)
     {
-        var item = await FindItem(id, cancellationToken);
+        InventoryItem? item = await FindItem(id, cancellationToken);
         if (item is null)
         {
             return NotFound();
@@ -791,7 +791,7 @@ public sealed class InventoryController(
         }
 
         item.Status = request.Status;
-        var now = DateTimeOffset.UtcNow;
+        DateTimeOffset now = DateTimeOffset.UtcNow;
         item.PurchasedAt ??= request.Status == InventoryStatus.Purchased ? now : null;
         item.ListedAt ??= request.Status == InventoryStatus.Listed ? now : null;
 
@@ -805,7 +805,7 @@ public sealed class InventoryController(
         [FromQuery] bool hard = false,
         CancellationToken cancellationToken = default)
     {
-        var item = await FindItem(id, cancellationToken);
+        InventoryItem? item = await FindItem(id, cancellationToken);
         if (item is null)
         {
             return NotFound();
@@ -943,20 +943,20 @@ public sealed class InventoryController(
     {
         ReleaseBundleComponents(item);
 
-        var channelListings = await db.ChannelListings
+        List<ChannelListing> channelListings = await db.ChannelListings
             .Where(listing => listing.InventoryItemId == item.Id && listing.OrganizationId == currentUser.OrganizationId)
             .ToListAsync(cancellationToken);
         db.ChannelListings.RemoveRange(channelListings);
 
-        var expenses = await db.Expenses
+        List<Expense> expenses = await db.Expenses
             .Where(expense => expense.InventoryItemId == item.Id && expense.OrganizationId == currentUser.OrganizationId)
             .ToListAsync(cancellationToken);
         db.Expenses.RemoveRange(expenses);
 
-        var observations = await db.MarketObservations
+        List<MarketObservation> observations = await db.MarketObservations
             .Where(observation => observation.InventoryItemId == item.Id && observation.OrganizationId == currentUser.OrganizationId)
             .ToListAsync(cancellationToken);
-        foreach (var observation in observations)
+        foreach (MarketObservation observation in observations)
         {
             observation.InventoryItemId = null;
         }
@@ -980,7 +980,7 @@ public sealed class InventoryController(
             return;
         }
 
-        foreach (var component in item.BundleComponents)
+        foreach (InventoryBundleComponent component in item.BundleComponents)
         {
             if (component.ComponentInventoryItem is not null && component.ComponentInventoryItem.Status == InventoryStatus.Bundled)
             {
@@ -1031,7 +1031,7 @@ public sealed class InventoryController(
             return;
         }
 
-        var existingExpense = await db.Expenses.SingleOrDefaultAsync(expense =>
+        Expense? existingExpense = await db.Expenses.SingleOrDefaultAsync(expense =>
             expense.OrganizationId == currentUser.OrganizationId
             && expense.InventoryItemId == item.Id
             && expense.Category == ExpenseCategory.InventoryPurchase,
@@ -1086,7 +1086,7 @@ public sealed class InventoryController(
             return;
         }
 
-        var budget = await db.Budgets
+        Budget? budget = await db.Budgets
             .Where(item => item.OrganizationId == currentUser.OrganizationId && item.IsActive)
             .OrderByDescending(item => item.StartsAt)
             .FirstOrDefaultAsync(cancellationToken);

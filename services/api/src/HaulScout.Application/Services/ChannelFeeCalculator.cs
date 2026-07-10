@@ -29,7 +29,7 @@ public static class ChannelFeeCalculator
     {
         if (rules is null || rules.Count == 0) return 0;
         decimal total = 0;
-        foreach (var rule in rules)
+        foreach (ChannelFeeRuleDto rule in rules)
         {
             total += Estimate(rule, soldPrice);
         }

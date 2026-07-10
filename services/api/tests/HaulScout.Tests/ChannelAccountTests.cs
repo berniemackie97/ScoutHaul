@@ -22,11 +22,11 @@ public class ChannelAccountTests
 
     private static (HaulScoutDbContext Db, ChannelAccountsController Controller, Guid Org) NewController([System.Runtime.CompilerServices.CallerMemberName] string store = "")
     {
-        var org = Guid.NewGuid();
-        var options = new DbContextOptionsBuilder<HaulScoutDbContext>().UseInMemoryDatabase(store).Options;
-        var tenant = new TenantContext();
+        Guid org = Guid.NewGuid();
+        DbContextOptions<HaulScoutDbContext> options = new DbContextOptionsBuilder<HaulScoutDbContext>().UseInMemoryDatabase(store).Options;
+        TenantContext tenant = new();
         tenant.SetOrganization(org);
-        var db = new HaulScoutDbContext(options, tenant);
+        HaulScoutDbContext db = new(options, tenant);
         db.Organizations.Add(new Organization { Id = org, Name = "Overhaul Trading Company" });
         db.SaveChanges();
         return (db, new ChannelAccountsController(db, new StubCurrentUser(org, Guid.NewGuid())), org);
@@ -41,10 +41,10 @@ public class ChannelAccountTests
     [Fact]
     public async Task Storefront_is_native_and_marketplace_is_external()
     {
-        var (_, controller, _) = NewController();
+        (_, ChannelAccountsController controller, _) = NewController();
 
-        var storefront = Created(await controller.Create(Request("Storefront", "Own storefront"), default));
-        var ebay = Created(await controller.Create(Request("eBay", "Overhaul eBay Store"), default));
+        ChannelAccountDto storefront = Created(await controller.Create(Request("Storefront", "Own storefront"), default));
+        ChannelAccountDto ebay = Created(await controller.Create(Request("eBay", "Overhaul eBay Store"), default));
 
         Assert.True(storefront.IsNativelySynced);
         Assert.False(ebay.IsNativelySynced);
@@ -54,29 +54,29 @@ public class ChannelAccountTests
     [Fact]
     public async Task Unknown_channel_is_rejected()
     {
-        var (_, controller, _) = NewController();
-        var result = await controller.Create(Request("MySpaceMarket", "Nope"), default);
+        (_, ChannelAccountsController controller, _) = NewController();
+        ActionResult<ChannelAccountDto> result = await controller.Create(Request("MySpaceMarket", "Nope"), default);
         Assert.IsType<BadRequestObjectResult>(result.Result);
     }
 
     [Fact]
     public async Task Duplicate_display_name_conflicts()
     {
-        var (_, controller, _) = NewController();
+        (_, ChannelAccountsController controller, _) = NewController();
         await controller.Create(Request("eBay", "Main Store"), default);
 
-        var duplicate = await controller.Create(Request("Poshmark", "Main Store"), default);
+        ActionResult<ChannelAccountDto> duplicate = await controller.Create(Request("Poshmark", "Main Store"), default);
         Assert.IsType<ConflictObjectResult>(duplicate.Result);
     }
 
     [Fact]
     public async Task Delete_blocks_when_listings_exist_but_allows_when_empty()
     {
-        var (db, controller, org) = NewController();
-        var empty = Created(await controller.Create(Request("eBay", "Empty Store"), default));
-        var used = Created(await controller.Create(Request("Poshmark", "Busy Closet"), default));
+        (HaulScoutDbContext db, ChannelAccountsController controller, Guid org) = NewController();
+        ChannelAccountDto empty = Created(await controller.Create(Request("eBay", "Empty Store"), default));
+        ChannelAccountDto used = Created(await controller.Create(Request("Poshmark", "Busy Closet"), default));
 
-        var item = new InventoryItem { OrganizationId = org, Title = "Denim jacket" };
+        InventoryItem item = new() { OrganizationId = org, Title = "Denim jacket" };
         db.InventoryItems.Add(item);
         db.ChannelListings.Add(new ChannelListing
         {

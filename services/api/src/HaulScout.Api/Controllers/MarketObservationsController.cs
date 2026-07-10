@@ -19,7 +19,7 @@ public sealed class MarketObservationsController(HaulScoutDbContext db, ICurrent
     [HttpPost]
     public async Task<ActionResult<MarketObservationDto>> Add(UpsertMarketObservationRequest request, CancellationToken cancellationToken)
     {
-        var validation = Validate(request);
+        string? validation = Validate(request);
         if (validation is not null)
         {
             return BadRequest(validation);
@@ -30,7 +30,7 @@ public sealed class MarketObservationsController(HaulScoutDbContext db, ICurrent
             return BadRequest("Referenced product identity or inventory item was not found for the current organization.");
         }
 
-        var observation = new MarketObservation
+        MarketObservation observation = new()
         {
             OrganizationId = currentUser.OrganizationId,
             ObservationType = request.ObservationType,
@@ -52,7 +52,7 @@ public sealed class MarketObservationsController(HaulScoutDbContext db, ICurrent
     [HttpPut("{id:guid}")]
     public async Task<ActionResult<MarketObservationDto>> Update(Guid id, UpsertMarketObservationRequest request, CancellationToken cancellationToken)
     {
-        var observation = await db.MarketObservations.SingleOrDefaultAsync(
+        MarketObservation? observation = await db.MarketObservations.SingleOrDefaultAsync(
             item => item.Id == id && item.OrganizationId == currentUser.OrganizationId && !item.IsArchived,
             cancellationToken);
 
@@ -61,7 +61,7 @@ public sealed class MarketObservationsController(HaulScoutDbContext db, ICurrent
             return NotFound();
         }
 
-        var validation = Validate(request);
+        string? validation = Validate(request);
         if (validation is not null)
         {
             return BadRequest(validation);
@@ -81,7 +81,7 @@ public sealed class MarketObservationsController(HaulScoutDbContext db, ICurrent
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
     {
-        var observation = await db.MarketObservations.SingleOrDefaultAsync(
+        MarketObservation? observation = await db.MarketObservations.SingleOrDefaultAsync(
             item => item.Id == id && item.OrganizationId == currentUser.OrganizationId && !item.IsArchived,
             cancellationToken);
 
@@ -103,7 +103,7 @@ public sealed class MarketObservationsController(HaulScoutDbContext db, ICurrent
         [FromQuery] MarketObservationType? type,
         CancellationToken cancellationToken)
     {
-        var query = db.MarketObservations.Where(item => item.OrganizationId == currentUser.OrganizationId && !item.IsArchived);
+        IQueryable<MarketObservation> query = db.MarketObservations.Where(item => item.OrganizationId == currentUser.OrganizationId && !item.IsArchived);
 
         if (productIdentityId.HasValue)
         {
@@ -117,7 +117,7 @@ public sealed class MarketObservationsController(HaulScoutDbContext db, ICurrent
 
         if (!string.IsNullOrWhiteSpace(source))
         {
-            var normalized = source.Trim().ToLowerInvariant();
+            string normalized = source.Trim().ToLowerInvariant();
             query = query.Where(item => item.Source.ToLower() == normalized);
         }
 
@@ -126,7 +126,7 @@ public sealed class MarketObservationsController(HaulScoutDbContext db, ICurrent
             query = query.Where(item => item.ObservationType == type.Value);
         }
 
-        var observations = await query
+        List<MarketObservationDto> observations = await query
             .OrderByDescending(item => item.ObservedAt)
             .Take(200)
             .Select(item => item.ToDto())

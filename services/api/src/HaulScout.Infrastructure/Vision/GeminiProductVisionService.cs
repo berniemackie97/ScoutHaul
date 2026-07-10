@@ -135,7 +135,7 @@ internal sealed class GeminiProductVisionService(
 
         // Dynamic prompt → (optional) user-provided known facts → (optional) image. Facts are ground
         // truth the model trusts to nail the exact variant and refine the valuation.
-        var parts = new List<object> { new { text = BuildSystemPrompt(hasImage, hasFacts) } };
+        List<object> parts = [new { text = BuildSystemPrompt(hasImage, hasFacts) }];
         if (hasFacts)
         {
             parts.Add(new { text = "Known facts provided by the user (treat as ground truth; use to disambiguate the variant and refine valuation):\n" + knownFacts });
@@ -165,7 +165,7 @@ internal sealed class GeminiProductVisionService(
         const int maxAttempts = 4;
         for (int attempt = 1; attempt <= maxAttempts; attempt++)
         {
-            using var content = new StringContent(json, Encoding.UTF8, "application/json");
+            using StringContent content = new(json, Encoding.UTF8, "application/json");
             HttpResponseMessage response;
             try
             {

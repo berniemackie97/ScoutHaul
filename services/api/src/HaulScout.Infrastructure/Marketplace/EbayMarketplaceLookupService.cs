@@ -80,11 +80,11 @@ internal sealed class EbayMarketplaceLookupService : IMarketplacePricingProvider
 
             string url = $"{baseUrl}/buy/browse/v1/item_summary/search?{queryParam}&limit=12&fieldgroups=MATCHING_ITEMS";
 
-            using var request = new HttpRequestMessage(HttpMethod.Get, url);
+            using HttpRequestMessage request = new(HttpMethod.Get, url);
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
             request.Headers.Add("X-EBAY-C-MARKETPLACE-ID", "EBAY_US");
 
-            using var response = await _httpClient.SendAsync(request, cancellationToken);
+            using HttpResponseMessage response = await _httpClient.SendAsync(request, cancellationToken);
 
             if (!response.IsSuccessStatusCode)
             {
@@ -92,7 +92,7 @@ internal sealed class EbayMarketplaceLookupService : IMarketplacePricingProvider
                 return [];
             }
 
-            var result = await response.Content.ReadFromJsonAsync<EbaySearchResponse>(JsonOptions, cancellationToken);
+            EbaySearchResponse? result = await response.Content.ReadFromJsonAsync<EbaySearchResponse>(JsonOptions, cancellationToken);
             if (result?.ItemSummaries is null)
             {
                 return [];
@@ -146,7 +146,7 @@ internal sealed class EbayMarketplaceLookupService : IMarketplacePricingProvider
 
             string credentials = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{clientId}:{clientSecret}"));
 
-            using var request = new HttpRequestMessage(HttpMethod.Post, tokenUrl);
+            using HttpRequestMessage request = new(HttpMethod.Post, tokenUrl);
             request.Headers.Authorization = new AuthenticationHeaderValue("Basic", credentials);
             request.Content = new FormUrlEncodedContent(new Dictionary<string, string>
             {
@@ -154,11 +154,11 @@ internal sealed class EbayMarketplaceLookupService : IMarketplacePricingProvider
                 ["scope"] = "https://api.ebay.com/oauth/api_scope",
             });
 
-            using var response = await _httpClient.SendAsync(request, cancellationToken);
+            using HttpResponseMessage response = await _httpClient.SendAsync(request, cancellationToken);
             response.EnsureSuccessStatusCode();
 
-            var tokenResponse = await response.Content.ReadFromJsonAsync<EbayTokenResponse>(JsonOptions, cancellationToken)
-                ?? throw new InvalidOperationException("eBay token response was null.");
+            EbayTokenResponse tokenResponse = await response.Content.ReadFromJsonAsync<EbayTokenResponse>(JsonOptions, cancellationToken)
+                                              ?? throw new InvalidOperationException("eBay token response was null.");
 
             _accessToken = tokenResponse.AccessToken;
             _tokenExpiry = DateTimeOffset.UtcNow.AddSeconds(tokenResponse.ExpiresIn - 60); // 60s buffer

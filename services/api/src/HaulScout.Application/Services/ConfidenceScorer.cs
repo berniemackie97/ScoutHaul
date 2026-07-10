@@ -17,8 +17,8 @@ public sealed class ConfidenceScorer : IConfidenceScorer
         List<MarketObservation> activeObservations = observations.Where(observation => !observation.IsArchived).ToList();
         List<MarketObservation> soldComps = activeObservations.Where(IsSoldLike).ToList();
         List<MarketObservation> activeListings = activeObservations.Where(IsActiveLike).ToList();
-        List<string> reasons = new List<string>();
-        List<string> warnings = new List<string>();
+        List<string> reasons = [];
+        List<string> warnings = [];
         int score = 0;
 
         if (soldComps.Count == 0)

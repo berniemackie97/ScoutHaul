@@ -33,7 +33,7 @@ internal sealed class GoUpcBarcodeLookupProvider(
         {
             string url = $"https://go-upc.com/api/v1/code/{Uri.EscapeDataString(barcode.Trim())}";
 
-            using var request = new HttpRequestMessage(HttpMethod.Get, url);
+            using HttpRequestMessage request = new(HttpMethod.Get, url);
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
 
             using HttpResponseMessage response = await httpClient.SendAsync(request, cancellationToken);

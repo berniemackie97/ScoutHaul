@@ -26,7 +26,7 @@ public sealed partial class StoreSettingsController(
     [HttpGet]
     public async Task<ActionResult<StoreSettingsDto>> Get(CancellationToken cancellationToken)
     {
-        var org = await db.Organizations
+        Organization? org = await db.Organizations
             .FirstOrDefaultAsync(o => o.Id == currentUser.OrganizationId, cancellationToken);
         return org is null ? NotFound() : ToDto(org);
     }
@@ -36,7 +36,7 @@ public sealed partial class StoreSettingsController(
         UpdateStoreSettingsRequest request,
         CancellationToken cancellationToken)
     {
-        var name = TrimToNull(request.Name);
+        string? name = TrimToNull(request.Name);
         if (name is null)
         {
             return BadRequest("Store name is required.");
@@ -53,7 +53,7 @@ public sealed partial class StoreSettingsController(
 
             // The domain is the storefront's resolution key, so it must be unique across ALL
             // organizations, not just this one. Bypass the tenant filter for the check.
-            var alreadyConnected = await db.Organizations
+            bool alreadyConnected = await db.Organizations
                 .IgnoreQueryFilters()
                 .AnyAsync(o => o.StoreDomain == domain && o.Id != currentUser.OrganizationId, cancellationToken);
             if (alreadyConnected)
@@ -62,7 +62,7 @@ public sealed partial class StoreSettingsController(
             }
         }
 
-        var org = await db.Organizations
+        Organization? org = await db.Organizations
             .FirstOrDefaultAsync(o => o.Id == currentUser.OrganizationId, cancellationToken);
         if (org is null)
         {
@@ -85,7 +85,7 @@ public sealed partial class StoreSettingsController(
     /// </summary>
     private static string? NormalizeStoreDomain(string input)
     {
-        var value = input.Trim().ToLowerInvariant();
+        string value = input.Trim().ToLowerInvariant();
         value = SchemePrefix().Replace(value, "");   // strip http(s)://
         value = value.Split('/')[0];                  // drop any path
         value = value.Split('?')[0].Split('#')[0];    // drop query / fragment

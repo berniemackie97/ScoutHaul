@@ -52,12 +52,12 @@ public sealed class StorefrontController(HaulScoutDbContext db, ITenantContext t
         page = Math.Max(page, 1);
         pageSize = Math.Clamp(pageSize, 1, 60);
 
-        var query = SellableItems();
+        IQueryable<InventoryItem> query = SellableItems();
 
         if (!string.IsNullOrWhiteSpace(category))
         {
-            var slug = category.Trim();
-            var name = (await query
+            string slug = category.Trim();
+            string? name = (await query
                     .Where(i => i.Category != null && i.Category != "")
                     .Select(i => i.Category!)
                     .Distinct()
@@ -68,13 +68,13 @@ public sealed class StorefrontController(HaulScoutDbContext db, ITenantContext t
 
         if (!string.IsNullOrWhiteSpace(search))
         {
-            var term = $"%{search.Trim()}%";
+            string term = $"%{search.Trim()}%";
             query = query.Where(i =>
                 EF.Functions.ILike(i.Title, term)
                 || (i.Brand != null && EF.Functions.ILike(i.Brand, term)));
         }
 
-        var total = await query.CountAsync(cancellationToken);
+        int total = await query.CountAsync(cancellationToken);
 
         var rows = await query
             .OrderByDescending(i => i.ListedAt ?? i.CreatedAt)
@@ -96,7 +96,7 @@ public sealed class StorefrontController(HaulScoutDbContext db, ITenantContext t
             })
             .ToListAsync(cancellationToken);
 
-        var items = rows
+        List<StorefrontListingDto> items = rows
             .Select(r => new StorefrontListingDto(
                 r.Id, BuildSlug(r.Title, r.Id), r.Title, null, r.ListPrice, null,
                 false, null, r.Condition, r.Brand, PhotoUrl(r.HeroPhotoId), r.Category))
@@ -113,7 +113,7 @@ public sealed class StorefrontController(HaulScoutDbContext db, ITenantContext t
             return BadRequest("Unknown store.");
         }
 
-        if (!TryGetSlugId(slug, out var itemId))
+        if (!TryGetSlugId(slug, out Guid itemId))
         {
             return NotFound();
         }
@@ -157,7 +157,7 @@ public sealed class StorefrontController(HaulScoutDbContext db, ITenantContext t
             return NotFound();
         }
 
-        var gallery = row.PhotoIds
+        List<string> gallery = row.PhotoIds
             .Select(id => PhotoUrl(id))
             .Where(url => url is not null)
             .Select(url => url!)
@@ -187,7 +187,7 @@ public sealed class StorefrontController(HaulScoutDbContext db, ITenantContext t
             .OrderByDescending(g => g.Count)
             .ToListAsync(cancellationToken);
 
-        var categories = groups
+        List<StoreCategoryDto> categories = groups
             .Select((c, idx) => new StoreCategoryDto(Guid.Empty, c.Name, Slugify(c.Name), null, null, idx, true))
             .ToList();
 
@@ -200,7 +200,7 @@ public sealed class StorefrontController(HaulScoutDbContext db, ITenantContext t
         // Public image: addressed by an unguessable photo id and served WITHOUT the store
         // header — Next/Image and browsers fetch it directly. Safe-gated to photos of a
         // sellable item belonging to a store with a public domain; tenant filter bypassed.
-        var full = string.Equals(size, "full", StringComparison.OrdinalIgnoreCase);
+        bool full = string.Equals(size, "full", StringComparison.OrdinalIgnoreCase);
         var photo = await db.InventoryPhotos
             .IgnoreQueryFilters()
             .Where(p => p.Id == photoId
@@ -226,7 +226,7 @@ public sealed class StorefrontController(HaulScoutDbContext db, ITenantContext t
 
     private async Task<bool> TryResolveStoreAsync(CancellationToken cancellationToken)
     {
-        var raw = Request.Headers[StoreHeader].FirstOrDefault()?.Trim();
+        string? raw = Request.Headers[StoreHeader].FirstOrDefault()?.Trim();
         if (string.IsNullOrEmpty(raw))
         {
             return false;
@@ -236,7 +236,7 @@ public sealed class StorefrontController(HaulScoutDbContext db, ITenantContext t
         // is hardcoded in the storefront. A raw org id is still accepted for tooling/back-compat.
         // Organizations is not org-scoped, so these lookups are allowed anonymously.
         Guid organizationId;
-        if (Guid.TryParse(raw, out var id))
+        if (Guid.TryParse(raw, out Guid id))
         {
             organizationId = await db.Organizations
                 .Where(org => org.Id == id)
@@ -245,7 +245,7 @@ public sealed class StorefrontController(HaulScoutDbContext db, ITenantContext t
         }
         else
         {
-            var domain = NormalizeDomain(raw);
+            string domain = NormalizeDomain(raw);
             organizationId = await db.Organizations
                 .Where(org => org.StoreDomain != null && org.StoreDomain.ToLower() == domain)
                 .Select(org => org.Id)
@@ -264,13 +264,13 @@ public sealed class StorefrontController(HaulScoutDbContext db, ITenantContext t
 
     private static string NormalizeDomain(string value)
     {
-        var domain = value.ToLowerInvariant();
+        string domain = value.ToLowerInvariant();
         if (domain.StartsWith("www.", StringComparison.Ordinal))
         {
             domain = domain[4..];
         }
 
-        var colon = domain.IndexOf(':');
+        int colon = domain.IndexOf(':');
         return colon >= 0 ? domain[..colon] : domain;
     }
 
@@ -279,13 +279,13 @@ public sealed class StorefrontController(HaulScoutDbContext db, ITenantContext t
 
     private static string Slugify(string value)
     {
-        var sb = new StringBuilder(value.Length);
-        foreach (var ch in value.ToLowerInvariant())
+        StringBuilder sb = new(value.Length);
+        foreach (char ch in value.ToLowerInvariant())
         {
             sb.Append(char.IsLetterOrDigit(ch) ? ch : '-');
         }
 
-        var slug = sb.ToString();
+        string slug = sb.ToString();
         while (slug.Contains("--", StringComparison.Ordinal))
         {
             slug = slug.Replace("--", "-");
