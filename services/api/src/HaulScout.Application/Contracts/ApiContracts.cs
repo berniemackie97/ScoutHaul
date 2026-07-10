@@ -670,7 +670,26 @@ public sealed record ListingDto(
     DateTimeOffset? ListedAt,
     DateTimeOffset? EndedAt,
     string? Notes);
-public sealed record RecordSaleRequest(Guid InventoryItemId, Guid? ListingId, string Platform, decimal SoldPrice, decimal PlatformFees, decimal PaymentFees, decimal ShippingCost, decimal SuppliesCost, decimal OtherCosts, DateTimeOffset? SoldAt, string? Notes, decimal SalesTaxCollected = 0, bool TaxRemittedByPlatform = true, decimal ShippingCharged = 0);
+public sealed record RecordSaleRequest(
+    Guid InventoryItemId,
+    Guid? ListingId,
+    string Platform,
+    decimal SoldPrice,
+    decimal PlatformFees,
+    decimal PaymentFees,
+    decimal ShippingCost,
+    decimal SuppliesCost,
+    decimal OtherCosts,
+    DateTimeOffset? SoldAt,
+    string? Notes,
+    decimal SalesTaxCollected = 0,
+    bool TaxRemittedByPlatform = true,
+    decimal ShippingCharged = 0,
+    string? ExternalOrderId = null,
+    string? BuyerReference = null,
+    string? BuyerName = null,
+    string? ShippingCarrier = null,
+    string? TrackingNumber = null);
 /// <summary>Edits an existing sale. <c>Reason</c> is required and recorded with a before/after audit snapshot.</summary>
 public sealed record UpdateSaleRequest(string Platform, decimal SoldPrice, decimal ShippingCharged, decimal PlatformFees, decimal PaymentFees, decimal ShippingCost, decimal SuppliesCost, decimal OtherCosts, decimal SalesTaxCollected, bool TaxRemittedByPlatform, DateTimeOffset SoldAt, string? Notes, string Reason);
 public sealed record SaleStatusTransitionRequest(SaleStatus Status, DateTimeOffset? OccurredAt, string? Reason, string? Carrier, string? TrackingNumber);
@@ -785,9 +804,9 @@ public sealed record SaleGroupResultDto(Guid SaleGroupId, string? OrderReference
 public sealed record SaleCorrectionDto(Guid Id, Guid SaleId, int Version, string Reason, string CorrectedBy, DateTimeOffset CorrectedAt, string BeforeJson, string AfterJson);
 public sealed record RealizedProfitDto(Guid SaleId, decimal SoldPrice, decimal ShippingCharged, decimal SalesRevenue, decimal PurchaseCost, decimal SellingCosts, decimal TotalFeesAndCosts, decimal MarketplaceNetBeforeCogs, decimal SalesTaxOwed, decimal NetProfit, decimal RoiPercent, decimal MarginPercent);
 
-// --- Platform order ingestion (extension-scraped marketplace orders → reconciled into Sales) ---
+// --- Platform order ingestion (marketplace reports / manual imports → reconciled into Sales) ---
 
-/// <summary>One scraped line of a marketplace order, exactly as the platform reports it.</summary>
+/// <summary>One line of an imported marketplace order, exactly as the platform reports it.</summary>
 public sealed record IngestPlatformOrderLineInput(
     string Title,
     decimal UnitPrice,
@@ -795,7 +814,7 @@ public sealed record IngestPlatformOrderLineInput(
     string? ExternalItemId = null,
     string? Sku = null);
 
-/// <summary>One scraped marketplace order with the platform's own money figures. <see cref="ExternalOrderId"/>
+/// <summary>One imported marketplace order with the platform's own money figures. <see cref="ExternalOrderId"/>
 /// is the idempotency key: re-ingesting the same order updates it in place (until it is reconciled).</summary>
 public sealed record IngestPlatformOrderInput(
     string ExternalOrderId,
@@ -817,7 +836,7 @@ public sealed record IngestPlatformOrderInput(
     string? FeeBreakdownJson = null,
     string? RawJson = null);
 
-/// <summary>A batch of scraped orders pushed by the extension. <see cref="Platform"/> is the default channel for
+/// <summary>A batch of imported orders. <see cref="Platform"/> is the default channel for
 /// orders that do not carry their own.</summary>
 public sealed record IngestPlatformOrdersRequest(
     string Platform,
@@ -867,22 +886,22 @@ public sealed record PlatformOrderDto(
 public sealed record IngestPlatformOrdersResultDto(int Created, int Updated, int Skipped, IReadOnlyList<PlatformOrderDto> Orders);
 
 /// <summary>Import a marketplace's own CSV export (e.g. eBay Seller Hub → Performance → Sales report) — the
-/// authoritative fee source. Parsed server-side into the same idempotent ingest as the extension push.</summary>
+/// authoritative fee source. Parsed server-side into the same idempotent ingest path as manual JSON.</summary>
 public sealed record ImportPlatformOrdersCsvRequest(string Platform, string Csv);
 
-/// <summary>Maps one scraped order line to the ScoutHaul inventory item it represents, for reconciliation.</summary>
+/// <summary>Maps one imported order line to the ScoutHaul inventory item it represents, for reconciliation.</summary>
 public sealed record ReconcilePlatformOrderLineMap(Guid PlatformOrderLineId, Guid InventoryItemId);
 
-/// <summary>Turns a scraped order into ScoutHaul <see cref="SaleDto"/>(s) using the platform's exact money figures.</summary>
+/// <summary>Turns an imported order into ScoutHaul <see cref="SaleDto"/>(s) using the platform's exact money figures.</summary>
 public sealed record ReconcilePlatformOrderRequest(
     IReadOnlyList<ReconcilePlatformOrderLineMap> Lines,
     string? Notes = null);
 
 public sealed record PlatformOrderReconcileResultDto(Guid PlatformOrderId, Guid SaleGroupId, int CreatedSaleCount, int CorrectedSaleCount, IReadOnlyList<SaleDto> Sales);
 
-// --- Platform listing ingestion (extension-scraped marketplace listings → seed/link inventory) ---
+// --- Platform listing ingestion (captured/imported marketplace listings → seed/link inventory) ---
 
-/// <summary>One scraped marketplace listing in any state. <see cref="ExternalListingId"/> is the idempotency key.</summary>
+/// <summary>One captured or imported marketplace listing in any state. <see cref="ExternalListingId"/> is the idempotency key.</summary>
 public sealed record IngestPlatformListingInput(
     string ExternalListingId,
     string Title,
@@ -935,7 +954,7 @@ public sealed record PlatformListingDto(
 
 public sealed record IngestPlatformListingsResultDto(int Created, int Updated, int Skipped, IReadOnlyList<PlatformListingDto> Listings);
 
-/// <summary>Turn a scraped listing into ScoutHaul inventory: link it to an existing item, or create a new draft
+/// <summary>Turn an imported listing into ScoutHaul inventory: link it to an existing item, or create a new draft
 /// item seeded from the listing. Either way a <c>ChannelListing</c> is created/updated so the item shows on eBay.</summary>
 public sealed record ReconcilePlatformListingRequest(Guid? InventoryItemId = null, bool CreateNewItem = false);
 
@@ -1205,7 +1224,7 @@ public sealed record CustomerDetailDto(
     IReadOnlyList<OrderSummaryDto> Orders,
     IReadOnlyList<CustomerChannelIdentityDto>? ChannelIdentities = null);
 
-// ── Channel accounts (cross-listing foundation) ────────────────────────────
+// ── Channel accounts (marketplace presence foundation) ─────────────────────
 public sealed record ChannelAccountDto(
     Guid Id,
     string Channel,
@@ -1244,7 +1263,7 @@ public sealed record ChannelListingDto(
     DateTimeOffset? LastSyncedAt,
     string? LastError);
 
-/// <summary>Create or update the state of one item on one channel account (the cross-list panel writes this).</summary>
+/// <summary>Create or update the state of one item on one channel account (the channel-presence panel writes this).</summary>
 public sealed record UpsertChannelListingRequest(
     Guid ChannelAccountId,
     ChannelListingStatus Status,

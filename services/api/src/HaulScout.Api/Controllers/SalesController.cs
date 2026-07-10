@@ -16,9 +16,10 @@ namespace HaulScout.Api.Controllers;
 [ApiController]
 [Route("api/sales")]
 [RequireOrganizationPermission(HaulScoutPermissions.ManageListings)]
-public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext currentUser) : ControllerBase
+public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext currentUser, OrderAssembler? orderAssembler = null) : ControllerBase
 {
     private static readonly SaleStatus[] ReleasedInventoryStatuses = [SaleStatus.Returned, SaleStatus.Refunded, SaleStatus.Cancelled];
+    private OrderAssembler OrderWriter => orderAssembler ?? new OrderAssembler(db, currentUser);
 
     [HttpGet("reference-data")]
     public async Task<ActionResult<SalesReferenceDataDto>> ReferenceData(CancellationToken cancellationToken)
@@ -106,6 +107,7 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
 
         List<Sale> sales = await db.Sales
             .Include(sale => sale.InventoryItem)
+            .Include(sale => sale.Order)
             .Where(sale => ids.Contains(sale.Id) && sale.OrganizationId == currentUser.OrganizationId)
             .ToListAsync(cancellationToken);
         if (sales.Count != ids.Length)
@@ -113,24 +115,50 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
             return NotFound("One or more sales were not found.");
         }
 
-        // Reuse an existing group id if any selected sale already belongs to one, so re-grouping merges cleanly.
-        Guid groupId = sales.Select(sale => sale.SaleGroupId).FirstOrDefault(group => group.HasValue) ?? Guid.NewGuid();
         string? reference = TrimToNull(request.OrderReference)
-            ?? sales.Select(sale => sale.GroupOrderReference).FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
+            ?? sales.Select(sale => sale.Order?.ExternalOrderId ?? sale.GroupOrderReference).FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
+        List<string> selectedChannels = sales.Select(sale => sale.Platform).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        if (selectedChannels.Count > 1)
+        {
+            return BadRequest("Sales from different channels cannot be combined into one marketplace order.");
+        }
+        string channel = selectedChannels[0];
+
+        Order? order = sales.Select(sale => sale.Order).FirstOrDefault(existing => existing is not null);
+        if (order is null)
+        {
+            DateTimeOffset orderedAt = sales.Min(sale => sale.SoldAt);
+            order = await OrderWriter.GetOrCreateAsync(
+                channel,
+                reference,
+                externalOrderUrl: null,
+                buyerReference: null,
+                buyerName: null,
+                orderedAt,
+                channelAccountId: null,
+                itemsSubtotal: sales.Sum(sale => sale.SoldPrice),
+                shippingTotal: sales.Sum(sale => sale.ShippingCharged),
+                taxTotal: sales.Sum(sale => sale.SalesTaxCollected),
+                cancellationToken);
+        }
+        Guid groupId = order.Id;
 
         foreach (Sale sale in sales)
         {
             sale.SaleGroupId = groupId;
             sale.GroupOrderReference = reference;
+            sale.OrderId = order.Id;
+            sale.Order = order;
         }
 
+        await OrderWriter.SyncSalesOrderAsync(order, sales, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         List<SaleDto> dtos = sales.OrderByDescending(sale => sale.SoldAt).Select(sale => sale.ToDto()).ToList();
         return new SaleGroupResultDto(groupId, reference, dtos);
     }
 
-    /// <summary>Remove sales from their order. A group left with a single sale is dissolved — a one-item group is
-    /// not an order.</summary>
+    /// <summary>Split selected sale lines out of a combined order. Every sale still keeps a real Order header so
+    /// Orders/Customers remain complete; only the shared-order relationship is split.</summary>
     [HttpPost("ungroup")]
     [RequireOrganizationPermission(HaulScoutPermissions.ManageFinance)]
     public async Task<ActionResult<IReadOnlyList<SaleDto>>> RemoveFromOrder(UngroupSalesRequest request, CancellationToken cancellationToken)
@@ -143,6 +171,7 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
 
         List<Sale> selected = await db.Sales
             .Include(sale => sale.InventoryItem)
+            .Include(sale => sale.Order)
             .Where(sale => ids.Contains(sale.Id) && sale.OrganizationId == currentUser.OrganizationId)
             .ToListAsync(cancellationToken);
         if (selected.Count == 0)
@@ -150,29 +179,76 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
             return NotFound();
         }
 
-        List<Guid> affectedGroups = selected.Where(sale => sale.SaleGroupId.HasValue).Select(sale => sale.SaleGroupId!.Value).Distinct().ToList();
-        List<Sale> groupSales = affectedGroups.Count == 0
+        List<Guid> affectedOrders = selected.Where(sale => sale.OrderId.HasValue).Select(sale => sale.OrderId!.Value).Distinct().ToList();
+        List<Sale> orderSales = affectedOrders.Count == 0
             ? []
             : await db.Sales
-                .Where(sale => sale.SaleGroupId != null && affectedGroups.Contains(sale.SaleGroupId.Value) && sale.OrganizationId == currentUser.OrganizationId)
+                .Include(sale => sale.InventoryItem)
+                .Include(sale => sale.Order)
+                .Where(sale => sale.OrderId != null && affectedOrders.Contains(sale.OrderId.Value) && sale.OrganizationId == currentUser.OrganizationId)
                 .ToListAsync(cancellationToken);
 
         HashSet<Guid> selectedIds = ids.ToHashSet();
-        foreach (Guid group in affectedGroups)
+        foreach (Guid orderId in affectedOrders)
         {
-            List<Sale> members = groupSales.Where(sale => sale.SaleGroupId == group).ToList();
-            foreach (Sale member in members.Where(sale => selectedIds.Contains(sale.Id)))
+            List<Sale> members = orderSales.Where(sale => sale.OrderId == orderId).OrderBy(sale => sale.SoldAt).ToList();
+            if (members.Count <= 1)
             {
-                member.SaleGroupId = null;
-                member.GroupOrderReference = null;
+                continue;
             }
 
-            List<Sale> remaining = members.Where(sale => !selectedIds.Contains(sale.Id)).ToList();
+            Order? originalOrder = members.Select(sale => sale.Order).FirstOrDefault(order => order is not null);
+            if (originalOrder is null)
+            {
+                continue;
+            }
+
+            List<Sale> selectedMembers = members.Where(sale => selectedIds.Contains(sale.Id)).ToList();
+            if (selectedMembers.Count == 0)
+            {
+                continue;
+            }
+
+            // If the operator selects the whole order, keep one sale on the original header and split the rest.
+            // This avoids creating an orphaned empty order while still dissolving the bundle presentation.
+            List<Sale> toSplit = selectedMembers.Count == members.Count ? selectedMembers.Skip(1).ToList() : selectedMembers;
+            foreach (Sale sale in toSplit)
+            {
+                sale.SaleGroupId = null;
+                sale.GroupOrderReference = null;
+                Order splitOrder = await OrderWriter.GetOrCreateAsync(
+                    sale.Platform,
+                    externalOrderId: null,
+                    externalOrderUrl: null,
+                    buyerReference: null,
+                    buyerName: null,
+                    sale.SoldAt,
+                    channelAccountId: null,
+                    itemsSubtotal: sale.SoldPrice,
+                    shippingTotal: sale.ShippingCharged,
+                    taxTotal: sale.SalesTaxCollected,
+                    cancellationToken);
+                sale.OrderId = splitOrder.Id;
+                sale.Order = splitOrder;
+                await OrderWriter.SyncSalesOrderAsync(splitOrder, [sale], cancellationToken);
+            }
+
+            List<Sale> remaining = members.Where(sale => !toSplit.Any(split => split.Id == sale.Id)).ToList();
             if (remaining.Count == 1)
             {
                 remaining[0].SaleGroupId = null;
                 remaining[0].GroupOrderReference = null;
             }
+            else
+            {
+                foreach (Sale member in remaining)
+                {
+                    member.SaleGroupId = originalOrder.Id;
+                    member.GroupOrderReference = originalOrder.ExternalOrderId ?? originalOrder.OrderNumber;
+                }
+            }
+
+            await OrderWriter.SyncSalesOrderAsync(originalOrder, remaining, cancellationToken, toSplit.Select(sale => sale.Id).ToList());
         }
 
         await db.SaveChangesAsync(cancellationToken);
@@ -186,6 +262,7 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
     {
         IQueryable<Sale> query = db.Sales
             .Include(item => item.InventoryItem)
+            .Include(item => item.Order)
             .Include(item => item.Refunds)
             .Where(item => item.OrganizationId == currentUser.OrganizationId);
 
@@ -220,6 +297,7 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
 
         IQueryable<Sale> query = db.Sales
             .Include(item => item.InventoryItem)
+            .Include(item => item.Order)
             .Include(item => item.Refunds)
             .Where(item => item.OrganizationId == currentUser.OrganizationId);
 
@@ -234,6 +312,8 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
             query = query.Where(item =>
                 (item.InventoryItem != null && item.InventoryItem.Title.ToLower().Contains(term))
                 || item.Platform.ToLower().Contains(term)
+                || (item.Order != null && item.Order.ExternalOrderId != null && item.Order.ExternalOrderId.ToLower().Contains(term))
+                || (item.Order != null && item.Order.TrackingNumber != null && item.Order.TrackingNumber.ToLower().Contains(term))
                 || (item.GroupOrderReference != null && item.GroupOrderReference.ToLower().Contains(term)));
         }
 
@@ -283,6 +363,7 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
     {
         Sale? sale = await db.Sales
             .Include(item => item.InventoryItem)
+            .Include(item => item.Order)
             .Include(item => item.Refunds)
             .SingleOrDefaultAsync(item => item.Id == id && item.OrganizationId == currentUser.OrganizationId, cancellationToken);
 
@@ -301,6 +382,7 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
                 .ThenInclude(item => item!.BundleComponents)
                     .ThenInclude(item => item.ComponentInventoryItem)
             .Include(item => item.Listing)
+            .Include(item => item.Order)
             .SingleOrDefaultAsync(item => item.Id == id && item.OrganizationId == currentUser.OrganizationId, cancellationToken);
 
         if (sale is null)
@@ -356,6 +438,10 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
         }
 
         db.Sales.Remove(sale);
+        if (sale.Order is not null)
+        {
+            await OrderWriter.SyncSalesOrderAsync(sale.Order, [], cancellationToken, [sale.Id]);
+        }
         await db.SaveChangesAsync(cancellationToken);
         return NoContent();
     }
@@ -452,6 +538,23 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
             Notes = TrimToNull(request.Notes)
         };
 
+        Order salesOrder = await OrderWriter.GetOrCreateAsync(
+            channel,
+            request.ExternalOrderId,
+            externalOrderUrl: null,
+            request.BuyerReference,
+            request.BuyerName,
+            sale.SoldAt,
+            channelAccountId: null,
+            itemsSubtotal: sale.SoldPrice,
+            shippingTotal: sale.ShippingCharged,
+            taxTotal: sale.SalesTaxCollected,
+            cancellationToken,
+            request.ShippingCarrier,
+            request.TrackingNumber);
+        sale.OrderId = salesOrder.Id;
+        sale.Order = salesOrder;
+
         item.Status = InventoryStatus.Sold;
         item.SoldAt = sale.SoldAt;
         ApplyBundleComponentInventoryStatus(item, InventoryStatus.Sold, sale.SoldAt);
@@ -487,6 +590,7 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
             .ToListAsync(cancellationToken);
         ChannelListingSync.ApplySale(channelListings, channel, DateTimeOffset.UtcNow);
 
+        await OrderWriter.SyncSalesOrderAsync(salesOrder, [sale], cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         return CreatedAtAction(nameof(GetProfit), new { id = sale.Id }, sale.ToDto());
     }
@@ -551,9 +655,21 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
             return BadRequest(exception.Message);
         }
 
-        Guid groupId = Guid.NewGuid();
         string? orderReference = TrimToNull(request.OrderReference);
         DateTimeOffset soldAt = request.SoldAt ?? DateTimeOffset.UtcNow;
+        Order salesOrder = await OrderWriter.GetOrCreateAsync(
+            channel,
+            orderReference,
+            externalOrderUrl: null,
+            buyerReference: null,
+            buyerName: null,
+            soldAt,
+            channelAccountId: null,
+            itemsSubtotal: request.TotalSoldPrice,
+            shippingTotal: request.ShippingCharged,
+            taxTotal: request.SalesTaxCollected,
+            cancellationToken);
+        Guid groupId = salesOrder.Id;
         Dictionary<Guid, InventoryItem> byId = items.ToDictionary(item => item.Id);
         List<Sale> created = [];
 
@@ -583,6 +699,8 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
                 Notes = TrimToNull(request.Notes),
                 SaleGroupId = groupId,
                 GroupOrderReference = orderReference,
+                OrderId = salesOrder.Id,
+                Order = salesOrder,
                 InventoryItem = item,
             };
             db.Sales.Add(sale);
@@ -599,6 +717,7 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
             ChannelListingSync.ApplySale(channelListings, channel, DateTimeOffset.UtcNow);
         }
 
+        await OrderWriter.SyncSalesOrderAsync(salesOrder, created, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
 
         List<SaleDto> dtos = created.Select(sale => sale.ToDto()).ToList();
@@ -679,6 +798,7 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
                 .ThenInclude(item => item!.BundleComponents)
                     .ThenInclude(item => item.ComponentInventoryItem)
             .Include(item => item.Listing)
+            .Include(item => item.Order)
             .SingleOrDefaultAsync(item => item.Id == id && item.OrganizationId == currentUser.OrganizationId, cancellationToken);
 
         if (sale is null)
@@ -795,6 +915,15 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
             if (observation is not null) db.MarketObservations.Remove(observation);
         }
 
+        if (sale.Order is not null)
+        {
+            if (carrier is not null) sale.Order.ShippingCarrier = carrier;
+            if (trackingNumber is not null) sale.Order.TrackingNumber = trackingNumber;
+            if (request.Status == SaleStatus.Shipped) sale.Order.ShippedAt ??= occurredAt;
+            if (request.Status == SaleStatus.Delivered) sale.Order.DeliveredAt ??= occurredAt;
+            await OrderWriter.SyncSalesOrderAsync(sale.Order, [sale], cancellationToken);
+        }
+
         await AddCorrection(
             sale,
             before,
@@ -835,6 +964,7 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
                 .ThenInclude(item => item!.BundleComponents)
                     .ThenInclude(item => item.ComponentInventoryItem)
             .Include(item => item.Listing)
+            .Include(item => item.Order)
             .SingleOrDefaultAsync(item => item.Id == id && item.OrganizationId == currentUser.OrganizationId, cancellationToken);
 
         if (sale is null)
@@ -889,6 +1019,10 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
         sale.NetProfit = financials.NetProfit;
 
         await AddCorrection(sale, before, request.Reason.Trim(), cancellationToken);
+        if (sale.Order is not null)
+        {
+            await OrderWriter.SyncSalesOrderAsync(sale.Order, [sale], cancellationToken);
+        }
 
         await db.SaveChangesAsync(cancellationToken);
         return sale.ToDto();

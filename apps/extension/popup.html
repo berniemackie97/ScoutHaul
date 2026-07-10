@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>HaulScout Cross-Lister</title>
+    <title>HaulScout Listing Helper</title>
     <style>
       :root { color-scheme: light dark; }
       body { width: 380px; margin: 0; font: 13px/1.4 system-ui, sans-serif; padding: 12px; }
@@ -27,8 +27,8 @@
     </style>
   </head>
   <body>
-    <h1>HaulScout Cross-Lister</h1>
-    <p class="muted">Human-led. It prefills your listings — you review and submit.</p>
+    <h1>HaulScout Listing Helper</h1>
+    <p class="muted">Prefill listing forms and save the listing page you are viewing. No auto-submit, no bulk scraping.</p>
 
     <details id="settings">
       <summary class="muted">Settings / connection</summary>
@@ -42,22 +42,16 @@
 
     <div id="ebayCard" class="card hidden">
       <div class="row" style="justify-content: space-between;">
-        <strong>Active eBay tab</strong>
-        <button id="readTab">Read listing</button>
+        <strong>Current eBay page</strong>
+        <button id="readTab">Capture page</button>
       </div>
-      <div id="ebayRead" class="muted">Open an eBay listing or sell page, then Read.</div>
+      <div id="ebayRead" class="muted">Open an eBay listing page, then Capture.</div>
       <div id="ebayMatch" class="col hidden" style="margin-top: 8px;">
         <select id="matchItem"></select>
         <select id="matchAccount"></select>
-        <button id="saveListed" class="primary">Save as listed on eBay</button>
+        <button id="saveListed" class="primary">Save listing link</button>
         <span id="ebayMsg" class="muted"></span>
       </div>
-    </div>
-
-    <div id="delistCard" class="card hidden">
-      <strong>Needs delist</strong>
-      <p class="muted">Sold elsewhere — take these down on their channel, then mark delisted.</p>
-      <div id="delistList" class="list"></div>
     </div>
 
     <div class="card">

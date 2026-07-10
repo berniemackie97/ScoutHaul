@@ -183,7 +183,7 @@ export function BundleCreator({ candidates }: { candidates: InventoryItem[] }) {
 
         <Card>
           <CardHeader><CardTitle className="text-lg">Internal notes</CardTitle></CardHeader>
-          <CardContent><Textarea key={`notes:${formKey}`} name="notes" rows={3} placeholder="Why these items were bundled, cross-listing notes, exceptions…" value={notes} onChange={(event) => setNotes(event.target.value)} /></CardContent>
+          <CardContent><Textarea key={`notes:${formKey}`} name="notes" rows={3} placeholder="Why these items were bundled, channel notes, exceptions…" value={notes} onChange={(event) => setNotes(event.target.value)} /></CardContent>
         </Card>
       </div>
 

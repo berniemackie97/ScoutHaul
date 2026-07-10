@@ -13,7 +13,7 @@ import { InventoryEditor } from "./inventory-editor";
 import { PhotoManager, type ManagedPhoto } from "./photo-manager";
 import { StatusControl } from "./status-control";
 import { ListingGenerator } from "./listing-generator";
-import { CrossListPanel } from "./cross-list-panel";
+import { ChannelPresencePanel } from "./cross-list-panel";
 import { RecordSaleCard } from "./record-sale-card";
 import { DeleteInventoryCard } from "./delete-inventory-card";
 
@@ -80,7 +80,7 @@ export default async function InventoryDetailPage({ params }: { params: Promise<
           {!inventoryItem.isSold && (
             <RecordSaleCard itemId={inventoryItem.id} cost={cost ?? 0} channels={salesReference?.channels ?? []} />
           )}
-          <CrossListPanel
+          <ChannelPresencePanel
             itemId={inventoryItem.id}
             accounts={(channelAccounts ?? []).filter((account) => account.isActive)}
             listings={channelListings ?? []}

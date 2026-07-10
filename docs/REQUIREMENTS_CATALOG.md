@@ -84,10 +84,10 @@ You told me: *"figure this all out so perfectly I will never have to worry about
 
 ### 2.1 Inventory management — `MUST` (P5) — *the shared brain*
 - The **one inventory** (your existing `InventoryItem`): create/edit/bulk-edit, full **lifecycle status**, photos, **condition & defects**, **storage location/bins**, barcodes/SKU, quantity, **per-item acquisition cost**.
-- **Publish to channels** with a toggle: own storefront + eBay (+ future channels) from the same record — no re-entry.
-- **Cross-channel oversell prevention (`MUST`):** a sale on any channel instantly delists/decrements every other channel; availability derives from `InventoryStatus`, never duplicated. Add a `Quantity` field (default 1) so qty>1 supplies decrement instead of hard-sell.
+- **Publish/track channels** from the same record: own storefront publishes natively; external marketplaces are manually tracked, helper-prefilled, and reconciled through exports/imports.
+- **Cross-channel oversell prevention (`MUST`):** a sale on any channel marks the item unavailable everywhere in ScoutHaul, updates the native storefront automatically, and flags external marketplace listings for manual removal. Availability derives from `InventoryStatus`, never duplicated. Add a `Quantity` field (default 1) so qty>1 supplies decrement instead of hard-sell.
 - Valuation, **aging**, dead-stock flags; import/export (CSV); print labels/barcodes.
-- **Done when:** editing an item once updates everywhere it's published; selling it on eBay marks it sold on the storefront within seconds (no oversell); a published item appears on the storefront with no duplicate data entry.
+- **Done when:** editing an item once updates ScoutHaul/native storefront projections; selling it on eBay marks it sold on the storefront within seconds (no oversell) and creates manual external-channel removal actions; a native storefront item appears without duplicate data entry.
 
 ### 2.2 Sourcing & purchasing — `MUST` (exists, P5)
 - Sourcing trips, sources/suppliers, **purchase/cost capture**, **budgets**, deal analysis (ROI/margin/break-even already computed), receiving into inventory.

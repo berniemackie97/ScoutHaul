@@ -14,8 +14,8 @@ using HaulScout.Infrastructure.Persistence;
 namespace HaulScout.Api.Controllers;
 
 /// <summary>
-/// The landing zone for marketplace orders the browser extension scrapes from the operator's logged-in sessions.
-/// Ingest is idempotent (keyed on platform + external order id); reconciliation turns a scraped order into
+/// The landing zone for marketplace orders imported from platform reports or manually supplied normalized data.
+/// Ingest is idempotent (keyed on platform + external order id); reconciliation turns an imported order into
 /// ScoutHaul <see cref="Sale"/>(s) using the platform's OWN money figures — item prices, buyer shipping, tax, and
 /// the exact fee total — so our finances match the marketplace's report by definition. No marketplace API is used.
 /// </summary>
@@ -65,7 +65,7 @@ public sealed class PlatformOrdersController(HaulScoutDbContext db, ICurrentUser
         return order.ToDto(suggestions);
     }
 
-    /// <summary>Idempotent batch upsert of scraped orders. Re-ingesting an order that is still <c>Imported</c>
+    /// <summary>Idempotent batch upsert of imported orders. Re-ingesting an order that is still <c>Imported</c>
     /// refreshes its figures and lines; an order already <c>Reconciled</c> is left untouched (its sales are posted).</summary>
     [HttpPost("ingest")]
     public async Task<ActionResult<IngestPlatformOrdersResultDto>> Ingest(IngestPlatformOrdersRequest request, CancellationToken cancellationToken)
@@ -93,7 +93,7 @@ public sealed class PlatformOrdersController(HaulScoutDbContext db, ICurrentUser
     }
 
     /// <summary>Import a marketplace's own CSV export (eBay Seller Hub → Performance → Sales report today) — the
-    /// authoritative fee source — parsed server-side into the same idempotent ingest as the extension push.</summary>
+    /// authoritative fee source — parsed server-side into the same idempotent ingest path as manual JSON.</summary>
     [HttpPost("import/ebay-csv")]
     public async Task<ActionResult<IngestPlatformOrdersResultDto>> ImportEbayCsv(ImportPlatformOrdersCsvRequest request, CancellationToken cancellationToken)
     {
@@ -112,7 +112,7 @@ public sealed class PlatformOrdersController(HaulScoutDbContext db, ICurrentUser
         return error is not null ? BadRequest(error) : result!;
     }
 
-    // Shared idempotent upsert for both the extension push and CSV import. Validates the whole batch first so a
+    // Shared idempotent upsert for report CSVs and manual normalized JSON. Validates the whole batch first so a
     // bad row fails atomically rather than half-importing; Reconciled/Ignored orders are never overwritten.
     private async Task<(IngestPlatformOrdersResultDto? Result, string? Error)> IngestOrders(
         string? defaultPlatform, IReadOnlyList<IngestPlatformOrderInput> orders, Guid? channelAccountId, CancellationToken cancellationToken)
@@ -176,13 +176,13 @@ public sealed class PlatformOrdersController(HaulScoutDbContext db, ICurrentUser
                 };
                 db.PlatformOrders.Add(order);
                 existing.Add(order);
-                ApplyScrapedFields(order, input, channelAccountId);
+                ApplyImportedFields(order, input, channelAccountId);
                 AddLines(order, input);
                 created++;
             }
             else if (order.Status == PlatformOrderStatus.Imported)
             {
-                ApplyScrapedFields(order, input, channelAccountId);
+                ApplyImportedFields(order, input, channelAccountId);
                 db.PlatformOrderLines.RemoveRange(order.Lines);
                 AddLines(order, input);
                 updated++;
@@ -208,7 +208,7 @@ public sealed class PlatformOrdersController(HaulScoutDbContext db, ICurrentUser
         return (new IngestPlatformOrdersResultDto(created, updated, skipped, dtos), null);
     }
 
-    /// <summary>Turn a scraped order into ScoutHaul sales. Each mapped line becomes a linked sale carrying the
+    /// <summary>Turn an imported order into ScoutHaul sales. Each mapped line becomes a linked sale carrying the
     /// platform's exact price, with the order's shipping, tax, and fee total apportioned across the items — so the
     /// item nets and the order total reconcile to the marketplace's own figures.</summary>
     [HttpPost("{id:guid}/reconcile")]
@@ -284,7 +284,7 @@ public sealed class PlatformOrdersController(HaulScoutDbContext db, ICurrentUser
         Order salesOrder = await orderAssembler.GetOrCreateAsync(
             order.Platform, order.ExternalOrderId, null, order.BuyerReference, order.BuyerName,
             order.OrderedAt, order.ChannelAccountId, order.ItemsSubtotal, order.ShippingCharged, order.TaxCollected,
-            cancellationToken);
+            cancellationToken, order.Carrier, order.TrackingNumber);
 
         DateTimeOffset soldAt = order.OrderedAt;
         Dictionary<Guid, InventoryItem> byId = items.ToDictionary(item => item.Id);
@@ -315,6 +315,7 @@ public sealed class PlatformOrdersController(HaulScoutDbContext db, ICurrentUser
                 {
                     existing.ShippingCost = allocated.ShippingCost;
                 }
+                existing.OrderId = salesOrder.Id;
                 existing.Order = salesOrder;
 
                 RealizedSaleFinancials corrected = ResaleFinancialCalculator.CalculateRealizedSale(
@@ -351,6 +352,7 @@ public sealed class PlatformOrdersController(HaulScoutDbContext db, ICurrentUser
                     NetProfit = financials.NetProfit,
                     SoldAt = soldAt,
                     Notes = TrimToNull(request.Notes),
+                    OrderId = salesOrder.Id,
                     Order = salesOrder,
                     InventoryItem = item,
                 };
@@ -386,6 +388,8 @@ public sealed class PlatformOrdersController(HaulScoutDbContext db, ICurrentUser
             ChannelListingSync.ApplySale(channelListings, order.Platform, DateTimeOffset.UtcNow);
         }
 
+        await orderAssembler.SyncSalesOrderAsync(salesOrder, resultSales, cancellationToken);
+
         order.Status = PlatformOrderStatus.Reconciled;
         // Records which Order this imported row reconciled into (the column name predates the Order unification).
         order.ReconciledSaleGroupId = salesOrder.Id;
@@ -419,7 +423,7 @@ public sealed class PlatformOrdersController(HaulScoutDbContext db, ICurrentUser
         return order.ToDto();
     }
 
-    private static void ApplyScrapedFields(PlatformOrder order, IngestPlatformOrderInput input, Guid? channelAccountId)
+    private static void ApplyImportedFields(PlatformOrder order, IngestPlatformOrderInput input, Guid? channelAccountId)
     {
         if (channelAccountId.HasValue)
         {

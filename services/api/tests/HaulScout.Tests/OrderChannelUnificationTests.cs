@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using HaulScout.Api.Controllers;
 using HaulScout.Api.Services;
@@ -41,6 +42,20 @@ public class OrderChannelUnificationTests
     {
         var currentUser = new StubCurrentUser(org, user);
         return new PlatformOrdersController(db, currentUser, new OrderAssembler(db, currentUser));
+    }
+
+    private static SalesController NewSales(HaulScoutDbContext db, Guid org, Guid user)
+    {
+        var currentUser = new StubCurrentUser(org, user);
+        return new SalesController(db, currentUser, new OrderAssembler(db, currentUser));
+    }
+
+    private static async Task<InventoryItem> SeedItem(HaulScoutDbContext db, Guid org, string title)
+    {
+        var item = new InventoryItem { OrganizationId = org, Title = title, PurchasePrice = 10m, Status = InventoryStatus.Listed };
+        db.InventoryItems.Add(item);
+        await db.SaveChangesAsync();
+        return item;
     }
 
     private static async Task<(Guid ItemId, Guid PlatformOrderId, Guid LineId)> SeedEbayOrder(
@@ -165,5 +180,74 @@ public class OrderChannelUnificationTests
         var order = await db.Orders.SingleAsync();
         Assert.Equal("Storefront", order.Channel);
         Assert.Null(order.ExternalOrderId);
+    }
+
+    [Fact]
+    public async Task Manually_recorded_sale_creates_a_real_order_with_order_line()
+    {
+        var (db, org, user) = NewContext(nameof(Manually_recorded_sale_creates_a_real_order_with_order_line));
+        await using var _ = db;
+        InventoryItem item = await SeedItem(db, org, "Wii Sports");
+
+        ActionResult<SaleDto> recorded = await NewSales(db, org, user).Record(new RecordSaleRequest(
+            item.Id, null, "eBay", 28m, 3m, 1m, 4m, 0m, 0m,
+            DateTimeOffset.UtcNow.AddDays(-1), null,
+            SalesTaxCollected: 2m,
+            ShippingCharged: 5m,
+            ExternalOrderId: "EB-MANUAL-1",
+            BuyerReference: "buyer_bob",
+            BuyerName: "Bob Buyer",
+            ShippingCarrier: "USPS",
+            TrackingNumber: "9400TRACK"), CancellationToken.None);
+
+        SaleDto recordedSale = Assert.IsType<CreatedAtActionResult>(recorded.Result).Value as SaleDto
+            ?? throw new InvalidOperationException("Expected sale DTO.");
+        Order order = Assert.Single(await db.Orders.Include(order => order.Lines).ToListAsync());
+        Assert.Equal("eBay", order.Channel);
+        Assert.Equal("EB-MANUAL-1", order.ExternalOrderId);
+        Assert.Equal("9400TRACK", order.TrackingNumber);
+        Assert.Equal(35m, order.GrandTotal); // 28 item + 5 shipping + 2 tax
+        Assert.Equal(order.Id, recordedSale.SaleGroupId);
+        Assert.Single(order.Lines);
+    }
+
+    [Fact]
+    public async Task Manual_sales_with_same_external_order_number_reuse_one_order()
+    {
+        var (db, org, user) = NewContext(nameof(Manual_sales_with_same_external_order_number_reuse_one_order));
+        await using var _ = db;
+        InventoryItem first = await SeedItem(db, org, "Game A");
+        InventoryItem second = await SeedItem(db, org, "Game B");
+        SalesController sales = NewSales(db, org, user);
+
+        await sales.Record(new RecordSaleRequest(first.Id, null, "eBay", 20m, 2m, 0m, 3m, 0m, 0m,
+            DateTimeOffset.UtcNow.AddDays(-2), null, ShippingCharged: 4m, ExternalOrderId: "EB-BUNDLE-1"), CancellationToken.None);
+        await sales.Record(new RecordSaleRequest(second.Id, null, "eBay", 30m, 3m, 0m, 0m, 0m, 0m,
+            DateTimeOffset.UtcNow.AddDays(-2), null, ShippingCharged: 0m, ExternalOrderId: "EB-BUNDLE-1"), CancellationToken.None);
+
+        Order order = Assert.Single(await db.Orders.Include(order => order.Lines).ToListAsync());
+        Assert.Equal(2, order.Lines.Count);
+        Assert.Equal(54m, order.GrandTotal);
+        Assert.Equal(2, await db.Sales.CountAsync(sale => sale.OrderId == order.Id));
+    }
+
+    [Fact]
+    public async Task Manual_sales_with_same_tracking_number_reuse_one_order_when_order_number_is_missing()
+    {
+        var (db, org, user) = NewContext(nameof(Manual_sales_with_same_tracking_number_reuse_one_order_when_order_number_is_missing));
+        await using var _ = db;
+        InventoryItem first = await SeedItem(db, org, "Card A");
+        InventoryItem second = await SeedItem(db, org, "Card B");
+        SalesController sales = NewSales(db, org, user);
+
+        await sales.Record(new RecordSaleRequest(first.Id, null, "eBay", 12m, 1m, 0m, 0m, 0m, 0m,
+            DateTimeOffset.UtcNow.AddDays(-1), null, TrackingNumber: "TRACK-SAME"), CancellationToken.None);
+        await sales.Record(new RecordSaleRequest(second.Id, null, "eBay", 18m, 1m, 0m, 0m, 0m, 0m,
+            DateTimeOffset.UtcNow.AddDays(-1), null, TrackingNumber: "TRACK-SAME"), CancellationToken.None);
+
+        Order order = Assert.Single(await db.Orders.Include(order => order.Lines).ToListAsync());
+        Assert.Equal("TRACK-SAME", order.TrackingNumber);
+        Assert.Equal(2, order.Lines.Count);
+        Assert.Equal(30m, order.GrandTotal);
     }
 }

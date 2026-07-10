@@ -75,8 +75,8 @@ public sealed class ChannelListingsController(HaulScoutDbContext db, ICurrentUse
         if (request.Status == ChannelListingStatus.Sold)
         {
             listing.SoldAt ??= DateTimeOffset.UtcNow;
-            // Sold here → every other channel still live needs to come down. Flag them so the
-            // extension surfaces one-click delists; the operator (not a bot) actually removes them.
+            // Sold here → every other channel still live needs manual review/removal. Flag those rows
+            // for the admin action queue; nothing is auto-delisted from external marketplaces.
             List<ChannelListing> siblings = await db.ChannelListings
                 .Where(item => item.InventoryItemId == itemId
                     && item.OrganizationId == currentUser.OrganizationId
@@ -112,7 +112,7 @@ public sealed class ChannelListingsController(HaulScoutDbContext db, ICurrentUse
         return NoContent();
     }
 
-    /// <summary>Org-wide listing worklist across all items — used for the delist queue (status=PendingDelist).</summary>
+    /// <summary>Org-wide channel-listing worklist across all items (for example status=PendingDelist).</summary>
     [HttpGet("~/api/channel-listings")]
     public async Task<ActionResult<IReadOnlyList<ChannelListingDto>>> Worklist([FromQuery] string? status, CancellationToken cancellationToken)
     {

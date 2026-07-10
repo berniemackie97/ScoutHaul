@@ -63,6 +63,11 @@ export async function recordSaleForItem(itemId: string, _previous: SellResult, f
     taxRemittedByPlatform: formData.get("taxRemittedByPlatform") === "on",
     soldAt: soldAt.toISOString(),
     notes: text(formData, "notes"),
+    externalOrderId: text(formData, "externalOrderId"),
+    buyerReference: text(formData, "buyerReference"),
+    buyerName: text(formData, "buyerName"),
+    shippingCarrier: text(formData, "shippingCarrier"),
+    trackingNumber: text(formData, "trackingNumber"),
   };
 
   const api = await getApiClient();

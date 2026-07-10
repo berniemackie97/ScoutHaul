@@ -11,6 +11,15 @@ type Account = components["schemas"]["ChannelAccountDto"];
 type Listing = components["schemas"]["ChannelListingDto"];
 
 const STATUSES = ["NotListed", "Draft", "Active", "Sold", "PendingDelist", "Delisted", "Error"] as const;
+const STATUS_LABELS: Record<(typeof STATUSES)[number], string> = {
+  NotListed: "Not listed",
+  Draft: "Draft",
+  Active: "Active",
+  Sold: "Sold",
+  PendingDelist: "Manual delist needed",
+  Delisted: "Delisted",
+  Error: "Needs review",
+};
 const selectClass = "h-9 rounded-lg border border-input bg-background px-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring";
 const money = (value: number | null | undefined) =>
   typeof value === "number" ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value) : "";
@@ -23,6 +32,10 @@ const statusVariant = (status: string | undefined) => {
   if (status === "Delisted") return "outline" as const;
   return "secondary" as const;
 };
+
+function statusLabel(status: string | undefined) {
+  return STATUSES.includes(status as (typeof STATUSES)[number]) ? STATUS_LABELS[status as (typeof STATUSES)[number]] : (status ?? "Unknown");
+}
 
 function Row({ itemId, account, listing }: { itemId: string; account: Account; listing?: Listing }) {
   const router = useRouter();
@@ -58,14 +71,14 @@ function Row({ itemId, account, listing }: { itemId: string; account: Account; l
           {account.isNativelySynced && <Badge variant="success">Native</Badge>}
         </div>
         <div className="flex items-center gap-2">
-          {listing && <Badge variant={statusVariant(listing.status)}>{listing.status}</Badge>}
+          {listing && <Badge variant={statusVariant(listing.status)}>{statusLabel(listing.status)}</Badge>}
           {listing?.externalUrl && (
             <a href={listing.externalUrl} target="_blank" rel="noreferrer" className="text-muted-foreground hover:text-foreground" title="Open listing">
               <ExternalLink className="h-4 w-4" />
             </a>
           )}
           {listing && (
-            <button type="button" onClick={remove} disabled={pending} className="text-muted-foreground hover:text-destructive disabled:opacity-40" title="Remove" aria-label="Remove">
+            <button type="button" onClick={remove} disabled={pending} className="text-muted-foreground hover:text-destructive disabled:opacity-40" title="Remove tracking row" aria-label="Remove tracking row">
               <Trash2 className="h-4 w-4" />
             </button>
           )}
@@ -76,7 +89,7 @@ function Row({ itemId, account, listing }: { itemId: string; account: Account; l
           <select value={status} onChange={(event) => setStatus(event.target.value)} className={selectClass} aria-label="Status">
             {STATUSES.map((option) => (
               <option key={option} value={option}>
-                {option}
+                {STATUS_LABELS[option]}
               </option>
             ))}
           </select>
@@ -93,21 +106,21 @@ function Row({ itemId, account, listing }: { itemId: string; account: Account; l
   );
 }
 
-export function CrossListPanel({ itemId, accounts, listings }: { itemId: string; accounts: Account[]; listings: Listing[] }) {
+export function ChannelPresencePanel({ itemId, accounts, listings }: { itemId: string; accounts: Account[]; listings: Listing[] }) {
   const byAccount = new Map(listings.map((listing) => [listing.channelAccountId, listing]));
-  const liveCount = listings.filter((listing) => listing.status === "Active").length;
+  const activeCount = listings.filter((listing) => listing.status === "Active").length;
 
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-lg">
-          <Radio className="h-4 w-4" /> Cross-listing
+          <Radio className="h-4 w-4" /> Channel presence
         </CardTitle>
         <CardDescription>
           {accounts.length === 0 ? (
             <>No channels connected. Add accounts on the <a href="/channels" className="text-brand-700 hover:underline">Channels</a> page first.</>
           ) : (
-            <>Live on {liveCount} of {accounts.length} connected channel{accounts.length === 1 ? "" : "s"}. Update state as you list, sell, or delist.</>
+            <>Tracked as active on {activeCount} of {accounts.length} connected channel{accounts.length === 1 ? "" : "s"}. Record where this item is listed or sold; marketplace actions remain manual.</>
           )}
         </CardDescription>
       </CardHeader>

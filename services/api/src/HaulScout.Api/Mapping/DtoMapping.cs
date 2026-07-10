@@ -353,7 +353,7 @@ public static class DtoMapping
         SaleWorkflow.Next(item.Status),
         // Prefer the real Order; fall back to the legacy group columns for rows written before the unification.
         item.OrderId ?? item.SaleGroupId,
-        item.Order?.ExternalOrderId ?? item.GroupOrderReference,
+        item.Order?.ExternalOrderId ?? item.Order?.OrderNumber ?? item.GroupOrderReference,
         item.Refunds.Sum(refund => refund.ItemAmount + refund.ShippingRefunded),
         item.Refunds.Sum(refund => refund.FeeCredit),
         item.Refunds.Count);
@@ -393,7 +393,7 @@ public static class DtoMapping
         item.AfterJson);
 
     /// <summary>The payout a marketplace should deposit: item + buyer shipping − fees, plus any tax the seller
-    /// keeps (when the platform does not remit it). Compared to the scraped payout to surface scrape/fee drift.</summary>
+    /// keeps (when the platform does not remit it). Compared to the imported payout to surface fee/import drift.</summary>
     public static decimal ExpectedPayout(this PlatformOrder order) =>
         order.ItemsSubtotal + order.ShippingCharged - order.FeeTotal + (order.TaxRemittedByPlatform ? 0 : order.TaxCollected);
 

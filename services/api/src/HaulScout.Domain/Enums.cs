@@ -164,7 +164,7 @@ public enum WorkTaskStatus
     Cancelled
 }
 
-/// <summary>State of a scraped marketplace order captured by the extension.</summary>
+/// <summary>State of a marketplace order imported from a platform report or supplied as normalized operator data.</summary>
 public enum PlatformOrderStatus
 {
     /// <summary>Imported from the platform, not yet turned into sales.</summary>
@@ -175,7 +175,7 @@ public enum PlatformOrderStatus
     Ignored
 }
 
-/// <summary>The marketplace's own state for a scraped listing — every state the extension can pull, not just live ones.</summary>
+/// <summary>The marketplace's own state for an imported or helper-captured listing, not just live ones.</summary>
 public enum PlatformListingStatus
 {
     Active,
@@ -187,10 +187,10 @@ public enum PlatformListingStatus
     OutOfStock
 }
 
-/// <summary>Whether a scraped listing has been tied into ScoutHaul inventory yet.</summary>
+/// <summary>Whether an imported or helper-captured listing has been tied into ScoutHaul inventory yet.</summary>
 public enum PlatformListingReconcileStatus
 {
-    /// <summary>Scraped, not yet linked to an inventory item.</summary>
+    /// <summary>Imported or captured, not yet linked to an inventory item.</summary>
     Pending,
     /// <summary>Linked to an inventory item + ChannelListing.</summary>
     Linked,
@@ -323,14 +323,14 @@ public enum ReviewStatus
     Rejected
 }
 
-/// <summary>State of an inventory item on a single channel account (the cross-listing sync ledger).</summary>
+/// <summary>State of an inventory item on a single channel account (the manual channel-presence ledger).</summary>
 public enum ChannelListingStatus
 {
     NotListed,
     Draft,
     Active,
     Sold,
-    /// <summary>Sold on another channel — needs to be taken down here. The extension surfaces these to delist.</summary>
+    /// <summary>Sold on another channel — needs manual review/removal on this channel.</summary>
     PendingDelist,
     Delisted,
     Error

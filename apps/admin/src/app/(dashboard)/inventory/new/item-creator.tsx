@@ -346,7 +346,7 @@ export function ItemCreator({ referenceData }: { referenceData: ReferenceData })
       <aside className="space-y-4 xl:sticky xl:top-6 xl:self-start">
         <Card className="p-6 text-sm">
           <p className="font-medium">Add a single item</p>
-          <p className="text-muted-foreground mt-2">Choose the starting stage now. The record opens next so photos, listing generation, cross-listing, and sale workflow stay attached to the same canonical item.</p>
+          <p className="text-muted-foreground mt-2">Choose the starting stage now. The record opens next so photos, listing generation, channel tracking, and sale workflow stay attached to the same canonical item.</p>
         </Card>
         <ReadinessChecklist targetStatus={status} facts={readinessFacts} compact />
         {disabledReason && <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">{disabledReason}</div>}

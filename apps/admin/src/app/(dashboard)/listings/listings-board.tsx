@@ -81,7 +81,7 @@ export function ListingsBoard({ listings }: { listings: PlatformListing[] }) {
   if (listings.length === 0) {
     return (
       <div className="bg-muted/20 text-muted-foreground rounded-xl border border-dashed p-12 text-center text-sm">
-        No scraped listings yet. Sync from an eBay tab with the extension, or import below.
+        No imported listings yet. Capture one listing page with the helper or import listing JSON below.
       </div>
     );
   }

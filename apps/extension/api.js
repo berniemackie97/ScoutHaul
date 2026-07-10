@@ -1,5 +1,5 @@
 // Thin client to the HaulScout API. The extension never contains business logic or AI —
-// it reads inventory + channel state and reports listing state back. Auth is the operator's
+// it reads inventory + channel state and records listing links back. Auth is the operator's
 // own API session token, stored locally and sent as a Bearer header.
 
 const DEFAULT_BASE = "https://scouthaul-production.up.railway.app";
@@ -35,5 +35,4 @@ export const api = {
   listingsForItem: (itemId) => apiFetch(`/api/inventory/${itemId}/channel-listings`),
   upsertListing: (itemId, body) =>
     apiFetch(`/api/inventory/${itemId}/channel-listings`, { method: "PUT", body }),
-  worklist: (status) => apiFetch(`/api/channel-listings${status ? `?status=${encodeURIComponent(status)}` : ""}`),
 };

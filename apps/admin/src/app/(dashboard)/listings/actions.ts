@@ -35,10 +35,10 @@ export async function ignoreListing(listingId: string): Promise<void> {
   revalidatePath("/listings");
 }
 
-/** Manual fallback for importing scraped listings before the extension is connected: paste the listing JSON. */
+/** Manual fallback for importing intentionally captured or normalized listing records. */
 export async function importListings(_previous: ListingActionResult, formData: FormData): Promise<ListingActionResult> {
   const raw = (formData.get("listingsJson") as string)?.trim();
-  if (!raw) return { ok: false, message: "Paste the scraped listing JSON." };
+  if (!raw) return { ok: false, message: "Paste the listing JSON." };
 
   let listings: unknown;
   try {

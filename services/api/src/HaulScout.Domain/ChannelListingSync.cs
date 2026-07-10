@@ -3,9 +3,9 @@ using HaulScout.Domain.Entities;
 namespace HaulScout.Domain;
 
 /// <summary>
-/// Cross-channel effect of a sale: the channel it sold on is marked Sold; every other channel where it is
-/// still live is flagged PendingDelist so the operator takes it down. Pure mutation over loaded entities —
-/// callers persist. Human-led: this only records intent; nothing is auto-removed from any marketplace.
+/// Channel-presence effect of a sale: the channel it sold on is marked Sold; every other channel where it is
+/// still live is flagged PendingDelist so the operator reviews and removes it manually. Pure mutation over
+/// loaded entities — callers persist. Human-led: this only records intent; nothing is auto-removed from any marketplace.
 /// </summary>
 public static class ChannelListingSync
 {
