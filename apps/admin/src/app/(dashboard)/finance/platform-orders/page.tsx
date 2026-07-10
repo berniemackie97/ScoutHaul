@@ -1,9 +1,8 @@
 import Link from "next/link";
-import { ArrowLeft, PlugZap, ScanLine, Wallet } from "lucide-react";
+import { ArrowLeft, FileSpreadsheet, PlugZap, ScanLine, Wallet } from "lucide-react";
 import { Badge, Card } from "@overhaul/ui";
 import { getApiClient } from "@/lib/api";
 import { PlatformOrderReconciler } from "./reconciler";
-import { ManualImporter } from "./importer";
 
 export const dynamic = "force-dynamic";
 
@@ -16,16 +15,14 @@ const date = (value: string | null | undefined) =>
 
 export default async function PlatformOrdersPage() {
   const api = await getApiClient();
-  const [openResult, reconciledResult, inventoryResult, referenceResult] = await Promise.all([
+  const [openResult, reconciledResult, inventoryResult] = await Promise.all([
     api.GET("/api/platform-orders", { params: { query: { status: "Imported" } } }),
     api.GET("/api/platform-orders", { params: { query: { status: "Reconciled" } } }),
     api.GET("/api/inventory", { params: { query: { includeArchived: false } } }),
-    api.GET("/api/sales/reference-data", {}),
   ]);
 
   const openOrders = openResult.data ?? [];
   const reconciled = reconciledResult.data ?? [];
-  const channels = referenceResult.data?.channels ?? [];
   // Match against ALL inventory (sold + unsold): unsold → new sale, already-recorded → correct that sale.
   const targets = (inventoryResult.data ?? [])
     .filter((item) => item.id && (!item.isBundle || item.bundleComponentCount === 0))
@@ -69,17 +66,25 @@ export default async function PlatformOrdersPage() {
         >
           <ArrowLeft className="h-4 w-4" /> Finance
         </Link>
-        <div>
-          <p className="text-muted-foreground text-sm">Finance</p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight">
-            Platform orders &amp; reconciliation
-          </h1>
-          <p className="text-muted-foreground mt-1 max-w-3xl text-sm">
-            Marketplace orders imported from platform reports and normalized manual data.
-            Reconciling one posts the platform&apos;s own order number, buyer, item price, buyer
-            shipping, sales tax, tracking, and fee details onto ScoutHaul sales — so customers,
-            orders, sales, and payouts resolve against the same source data.
-          </p>
+        <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+          <div>
+            <p className="text-muted-foreground text-sm">Finance</p>
+            <h1 className="mt-1 text-2xl font-semibold tracking-tight">
+              Platform orders &amp; reconciliation
+            </h1>
+            <p className="text-muted-foreground mt-1 max-w-3xl text-sm">
+              Marketplace orders imported from platform reports and normalized manual data.
+              Reconciling one posts the platform&apos;s own order number, buyer, item price, buyer
+              shipping, sales tax, tracking, and fee details onto ScoutHaul sales — so customers,
+              orders, sales, and payouts resolve against the same source data.
+            </p>
+          </div>
+          <Link
+            href="/imports"
+            className="hover:bg-muted inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg border px-4 text-sm font-medium"
+          >
+            <FileSpreadsheet className="h-4 w-4" /> Import reports
+          </Link>
         </div>
       </header>
 
@@ -100,8 +105,6 @@ export default async function PlatformOrdersPage() {
         <h2 className="text-sm font-semibold">Reconcile queue</h2>
         <PlatformOrderReconciler orders={openOrders} targets={targets} />
       </section>
-
-      <ManualImporter channels={channels} />
 
       {reconciled.length > 0 && (
         <section className="space-y-3">

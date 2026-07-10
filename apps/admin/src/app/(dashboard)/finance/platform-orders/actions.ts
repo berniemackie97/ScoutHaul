@@ -1,10 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import type { components } from "@overhaul/api-client";
 import { getApiClient } from "@/lib/api";
-
-type IngestPlatformOrdersRequest = components["schemas"]["IngestPlatformOrdersRequest"];
 
 export type ActionResult = { ok: boolean; message: string };
 
@@ -89,74 +86,4 @@ export async function ignorePlatformOrder(
 
   revalidatePath("/finance/platform-orders");
   return { ok: true, message: "Order set aside." };
-}
-
-/**
- * Import eBay seller CSVs. All orders is the authoritative order/customer/tracking source; Listing sales enriches
- * previously imported order lines with exact fees, shipping-label costs, and net sales.
- */
-export async function importEbayCsv(
-  _previous: ActionResult,
-  formData: FormData
-): Promise<ActionResult> {
-  const file = formData.get("csvFile");
-  const pasted = (formData.get("csvText") as string)?.trim();
-  let csv = "";
-  if (file instanceof File && file.size > 0) {
-    csv = await file.text();
-  } else if (pasted) {
-    csv = pasted;
-  }
-  if (!csv)
-    return { ok: false, message: "Choose the eBay report CSV file (or paste its contents)." };
-
-  const api = await getApiClient();
-  const result = await api.POST("/api/platform-orders/import/ebay-csv", {
-    body: { platform: "eBay", csv },
-  });
-  if (!result.data)
-    return {
-      ok: false,
-      message: errorMessage(result.error, "The eBay report could not be imported."),
-    };
-
-  revalidatePath("/finance/platform-orders");
-  const { created, updated, skipped } = result.data;
-  return {
-    ok: true,
-    message: `Imported ${created} new, updated ${updated}, skipped ${skipped}. Reconcile or re-reconcile them below.`,
-  };
-}
-
-/**
- * Manual fallback for importing normalized orders when a platform-specific parser is not available yet.
- */
-export async function importPlatformOrders(
-  _previous: ActionResult,
-  formData: FormData
-): Promise<ActionResult> {
-  const platform = (formData.get("platform") as string)?.trim();
-  const raw = (formData.get("ordersJson") as string)?.trim();
-  if (!platform) return { ok: false, message: "Choose the platform these orders came from." };
-  if (!raw) return { ok: false, message: "Paste the normalized order JSON." };
-
-  let orders: unknown;
-  try {
-    const parsed = JSON.parse(raw);
-    orders = Array.isArray(parsed) ? parsed : (parsed as { orders?: unknown })?.orders;
-  } catch {
-    return { ok: false, message: "That is not valid JSON. Copy the whole export and try again." };
-  }
-  if (!Array.isArray(orders) || orders.length === 0)
-    return { ok: false, message: "No orders found in the pasted JSON." };
-
-  const body = { platform, orders } as unknown as IngestPlatformOrdersRequest;
-  const api = await getApiClient();
-  const result = await api.POST("/api/platform-orders/ingest", { body });
-  if (!result.data)
-    return { ok: false, message: errorMessage(result.error, "The orders could not be imported.") };
-
-  revalidatePath("/finance/platform-orders");
-  const { created, updated, skipped } = result.data;
-  return { ok: true, message: `Imported ${created} new, updated ${updated}, skipped ${skipped}.` };
 }
