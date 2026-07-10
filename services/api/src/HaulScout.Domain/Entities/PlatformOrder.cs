@@ -25,8 +25,21 @@ public sealed class PlatformOrder : EntityBase, IOrganizationScoped
 
     public string? BuyerName { get; set; }
     public string? BuyerReference { get; set; }
+    public string? BuyerEmail { get; set; }
+    public string? BuyerNote { get; set; }
+
+    public string? ShipToName { get; set; }
+    public string? ShipToPhone { get; set; }
+    public string? ShipToLine1 { get; set; }
+    public string? ShipToLine2 { get; set; }
+    public string? ShipToCity { get; set; }
+    public string? ShipToRegion { get; set; }
+    public string? ShipToPostalCode { get; set; }
+    public string? ShipToCountry { get; set; }
 
     public DateTimeOffset OrderedAt { get; set; }
+    public DateTimeOffset? PaidAt { get; set; }
+    public DateTimeOffset? ShippedAt { get; set; }
 
     // Exactly as the platform reports them.
     public decimal ItemsSubtotal { get; set; }
@@ -78,6 +91,14 @@ public sealed class PlatformOrderLine : EntityBase, IOrganizationScoped
 
     public int Quantity { get; set; } = 1;
     public decimal UnitPrice { get; set; }
+    public decimal? ShippingCharged { get; set; }
+    public decimal? TaxCollected { get; set; }
+    public decimal? PlatformFees { get; set; }
+    public decimal? SellerShippingCost { get; set; }
+    public decimal? NetSales { get; set; }
+    public decimal? TotalSales { get; set; }
+    public string? FeeBreakdownJson { get; set; }
+    public string? RawJson { get; set; }
 
     /// <summary>The ScoutHaul inventory item this line maps to (null until matched during reconcile).</summary>
     public Guid? InventoryItemId { get; set; }

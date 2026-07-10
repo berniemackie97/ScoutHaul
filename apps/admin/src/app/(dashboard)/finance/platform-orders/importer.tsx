@@ -3,13 +3,23 @@
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
 import type { components } from "@overhaul/api-client";
-import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Label, Textarea } from "@overhaul/ui";
+import {
+  Button,
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+  Label,
+  Textarea,
+} from "@overhaul/ui";
 import { importEbayCsv, importPlatformOrders, type ActionResult } from "./actions";
 
 type Channel = components["schemas"]["SaleChannelOptionDto"];
 
 const initial: ActionResult = { ok: false, message: "" };
-const selectClass = "h-10 w-full rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring";
+const selectClass =
+  "h-10 w-full rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring";
 
 const jsonSample = `[
   {
@@ -26,12 +36,20 @@ const jsonSample = `[
 
 function SubmitButton({ idle, busy }: { idle: string; busy: string }) {
   const { pending } = useFormStatus();
-  return <Button type="submit" disabled={pending}>{pending ? busy : idle}</Button>;
+  return (
+    <Button type="submit" disabled={pending}>
+      {pending ? busy : idle}
+    </Button>
+  );
 }
 
 function Result({ state }: { state: ActionResult }) {
   if (!state.message) return null;
-  return <p className={`text-sm ${state.ok ? "text-emerald-700" : "text-destructive"}`}>{state.message}</p>;
+  return (
+    <p className={`text-sm ${state.ok ? "text-emerald-700" : "text-destructive"}`}>
+      {state.message}
+    </p>
+  );
 }
 
 export function ManualImporter({ channels }: { channels: Channel[] }) {
@@ -41,16 +59,18 @@ export function ManualImporter({ channels }: { channels: Channel[] }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">Import from an eBay report</CardTitle>
+        <CardTitle className="text-base">Import eBay order and fee reports</CardTitle>
         <CardDescription>
-          In eBay: Seller Hub → Performance → Sales → <strong>Download</strong>. Upload that CSV here — it carries
-          eBay&apos;s reported fees per item. Re-uploading updates imported, unreconciled rows in place and never duplicates them.
+          Upload the eBay <strong>All orders</strong> CSV first — it creates the real order groups,
+          buyer identity, ship-to details, tracking, and item lines. Then upload the{" "}
+          <strong>Listing sales</strong> CSV to enrich those lines with eBay&apos;s exact fees,
+          labels, and net sales. Re-uploading updates in place and never duplicates.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
         <form action={csvAction} className="space-y-3">
           <div className="grid gap-2">
-            <Label htmlFor="csvFile">eBay sales report (.csv)</Label>
+            <Label htmlFor="csvFile">eBay report (.csv)</Label>
             <input
               id="csvFile"
               name="csvFile"
@@ -63,14 +83,27 @@ export function ManualImporter({ channels }: { channels: Channel[] }) {
             <Result state={csvState} />
             <SubmitButton idle="Import eBay report" busy="Importing…" />
           </div>
+          <p className="text-muted-foreground text-xs">
+            Supported now: eBay All orders and Listing sales CSVs. All orders is the source of truth
+            for customers, order grouping, and tracking; Listing sales is fee/net-sales enrichment
+            only.
+          </p>
         </form>
 
         <details className="border-t pt-3">
-          <summary className="text-muted-foreground cursor-pointer text-xs">Advanced: paste normalized order JSON</summary>
+          <summary className="text-muted-foreground cursor-pointer text-xs">
+            Advanced: paste normalized order JSON
+          </summary>
           <form action={jsonAction} className="mt-3 space-y-3">
             <div className="grid gap-2 sm:max-w-xs">
               <Label htmlFor="platform">Platform</Label>
-              <select id="platform" name="platform" required className={selectClass} defaultValue="eBay">
+              <select
+                id="platform"
+                name="platform"
+                required
+                className={selectClass}
+                defaultValue="eBay"
+              >
                 {channels
                   .filter((channel) => channel.value)
                   .map((channel) => (
@@ -82,7 +115,13 @@ export function ManualImporter({ channels }: { channels: Channel[] }) {
             </div>
             <div className="grid gap-2">
               <Label htmlFor="ordersJson">Order JSON</Label>
-              <Textarea id="ordersJson" name="ordersJson" rows={7} placeholder={jsonSample} className="font-mono text-xs" />
+              <Textarea
+                id="ordersJson"
+                name="ordersJson"
+                rows={7}
+                placeholder={jsonSample}
+                className="font-mono text-xs"
+              />
             </div>
             <div className="flex items-center justify-between gap-3">
               <Result state={jsonState} />

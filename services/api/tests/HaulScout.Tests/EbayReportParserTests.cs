@@ -19,48 +19,68 @@ The Pokémon Company Charizard EX XY121 XY Promo Holo Eng 2016,377251374220,-,-,
 "Nintendo Mario Kart Wii - Nintendo Wii, Disc w/ Case & Manual, E, NTSC 2008",377272846397,-,-,1,$32.97,$27.00,$0.00,$0.00,$5.97,$10.85,$0.00,$0.00,$4.88,$0.00,$0.00,$0.00,$0.00,$0.00,$0.00,$0.00,$0.00,$5.97,$22.12,$32.97,0,1,0
 """;
 
+    private const string AllOrdersSample = """
+Order Number,Buyer Username,Buyer Name,Buyer Email,Buyer Note,Ship To Name,Ship To Phone,Ship To Address 1,Ship To Address 2,Ship To City,Ship To State,Ship To Zip,Ship To Country,Sale Date,Paid On Date,Shipped On Date,Shipping Service,Tracking Number,Item Number,Item Title,Custom Label,Quantity,Sold For,Shipping And Handling,Seller Collected Tax,eBay Collected Tax,Total Price
+12-34567-89012,lampbuyer,Brass Buyer,buyer@example.com,Please pack well,Brass Buyer,555-1212,1 Main St,Apt 2,Scranton,PA,18503,United States,Jun-30-26,Jun-30-26,Jul-1-26,USPS Ground Advantage,9400111100000000000000,,,,,$125.00,$8.50,$0.00,$10.25,$143.75
+12-34567-89012,lampbuyer,Brass Buyer,buyer@example.com,,Brass Buyer,555-1212,1 Main St,Apt 2,Scranton,PA,18503,United States,Jun-30-26,Jun-30-26,Jul-1-26,USPS Ground Advantage,9400111100000000000000,377251318593,Brass Lamp,SKU-LAMP,1,$77.28,$0.00,$0.00,$0.00,$77.28
+12-34567-89012,lampbuyer,Brass Buyer,buyer@example.com,,Brass Buyer,555-1212,1 Main St,Apt 2,Scranton,PA,18503,United States,Jun-30-26,Jun-30-26,Jul-1-26,USPS Ground Advantage,9400111100000000000000,377272846397,"Nintendo Mario Kart Wii - Nintendo Wii, Disc w/ Case & Manual, E, NTSC 2008",SKU-WII,1,$47.72,$0.00,$0.00,$0.00,$47.72
+""";
+
     [Fact]
-    public void Parses_rows_skips_the_preamble_and_the_zero_value_artifact()
+    public void Listing_sales_rows_are_fee_metrics_not_orders()
     {
         EbayReportParser.ParseResult result = EbayReportParser.ParseSalesReport(Sample);
 
-        Assert.Equal(2, result.Orders.Count); // 3 data rows, the $0.00 Charizard row is skipped
+        Assert.Equal(EbayReportParser.EbayReportKind.ListingSales, result.Kind);
+        Assert.Empty(result.Orders);
+        Assert.Equal(2, result.ListingSales.Count); // 3 data rows, the $0.00 Charizard artifact is skipped
         Assert.Equal(1, result.RowsSkipped);
-        Assert.All(result.Orders, order => Assert.Equal("eBay", order.Platform));
     }
 
     [Fact]
     public void Maps_the_exact_fee_stack_and_shipping_label_for_a_row()
     {
-        IngestPlatformOrderInput order = EbayReportParser.ParseSalesReport(Sample).Orders.Single(o => o.ExternalOrderId == "377251318593");
+        EbayReportParser.EbayListingSalesMetric metric = EbayReportParser.ParseSalesReport(Sample).ListingSales.Single(o => o.ExternalItemId == "377251318593");
 
-        Assert.Equal(77.28m, order.ItemsSubtotal);
-        Assert.Equal(3.69m, order.ShippingCharged);
-        Assert.Equal(7.15m, order.TaxCollected);         // buyer→eBay tax (remitted)
-        Assert.True(order.TaxRemittedByPlatform);         // nothing was collected "to you"
-        Assert.Equal(12.08m, order.FeeTotal);            // total selling costs 18.05 − shipping label 5.97
-        Assert.Equal(5.97m, order.ShippingCost);         // seller's eBay label cost
-        IngestPlatformOrderLineInput line = Assert.Single(order.Lines);
-        Assert.Equal("377251318593", line.ExternalItemId);
-        Assert.Equal(77.28m, line.UnitPrice);
+        Assert.Equal(77.28m, metric.ItemSales);
+        Assert.Equal(3.69m, metric.ShippingCharged);
+        Assert.Equal(7.15m, metric.TaxCollected);
+        Assert.Equal(12.08m, metric.PlatformFees);       // total selling costs 18.05 − shipping label 5.97
+        Assert.Equal(5.97m, metric.SellerShippingCost);  // seller's eBay label cost
+        Assert.Equal(62.92m, metric.NetSales);
     }
 
     [Fact]
     public void Handles_quoted_titles_that_contain_commas()
     {
-        IngestPlatformOrderInput order = EbayReportParser.ParseSalesReport(Sample).Orders.Single(o => o.ExternalOrderId == "377272846397");
-        Assert.Equal("Nintendo Mario Kart Wii - Nintendo Wii, Disc w/ Case & Manual, E, NTSC 2008", order.Lines.Single().Title);
-        Assert.Equal(27.00m, order.ItemsSubtotal);
-        Assert.Equal(4.88m, order.FeeTotal); // 10.85 selling costs − 5.97 label
+        EbayReportParser.EbayListingSalesMetric metric = EbayReportParser.ParseSalesReport(Sample).ListingSales.Single(o => o.ExternalItemId == "377272846397");
+        Assert.Equal("Nintendo Mario Kart Wii - Nintendo Wii, Disc w/ Case & Manual, E, NTSC 2008", metric.Title);
+        Assert.Equal(27.00m, metric.ItemSales);
+        Assert.Equal(4.88m, metric.PlatformFees); // 10.85 selling costs − 5.97 label
     }
 
     [Fact]
-    public void Dates_rows_to_the_reports_end_date()
+    public void All_orders_report_creates_one_real_order_with_multiple_lines()
     {
-        IngestPlatformOrderInput order = EbayReportParser.ParseSalesReport(Sample).Orders.First();
+        EbayReportParser.ParseResult result = EbayReportParser.ParseSalesReport(AllOrdersSample);
+
+        Assert.Equal(EbayReportParser.EbayReportKind.AllOrders, result.Kind);
+        IngestPlatformOrderInput order = Assert.Single(result.Orders);
+        Assert.Equal("12-34567-89012", order.ExternalOrderId);
+        Assert.Equal("lampbuyer", order.BuyerReference);
+        Assert.Equal("buyer@example.com", order.BuyerEmail);
+        Assert.Equal("9400111100000000000000", order.TrackingNumber);
+        Assert.Equal("USPS Ground Advantage", order.Carrier);
         Assert.Equal(2026, order.OrderedAt.Year);
-        Assert.Equal(7, order.OrderedAt.Month);
-        Assert.Equal(7, order.OrderedAt.Day);
+        Assert.Equal(6, order.OrderedAt.Month);
+        Assert.Equal(30, order.OrderedAt.Day);
+        Assert.Equal(125.00m, order.ItemsSubtotal);
+        Assert.Equal(8.50m, order.ShippingCharged);
+        Assert.Equal(10.25m, order.TaxCollected);
+        Assert.True(order.TaxRemittedByPlatform);
+        Assert.Equal(2, order.Lines.Count);
+        Assert.Contains(order.Lines, line => line.ExternalItemId == "377251318593" && line.Title == "Brass Lamp");
+        Assert.Contains(order.Lines, line => line.ExternalItemId == "377272846397" && line.Title.Contains("Disc w/ Case"));
     }
 
     [Fact]
