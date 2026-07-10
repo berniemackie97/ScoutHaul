@@ -212,9 +212,10 @@ public sealed class OrderAssembler(HaulScoutDbContext db, ICurrentUserContext cu
         order.GrandTotal = order.Subtotal + order.ShippingTotal + order.TaxTotal;
         order.PaidAt = allSales.Count > 0 ? allSales.Min(sale => sale.SoldAt) : order.PaidAt;
         order.CreatedAt = order.PaidAt ?? order.CreatedAt;
-        order.Status = ResolveOrderStatus(allSales);
+        // Money syncs from the sale lines; FULFILLMENT is owned by the Order and set only by its fulfillment
+        // actions. Deriving it here would overwrite an operator's "delivered" the next time a sale is edited.
+        order.Status = ResolveMoneyStatus(allSales, order.Status);
         order.PaymentStatus = ResolvePaymentStatus(allSales);
-        order.FulfillmentStatus = ResolveFulfillmentStatus(allSales);
     }
 
     /// <summary>Deletes a non-storefront order that no longer has sale lines. Used when a corrected import moves
@@ -345,14 +346,15 @@ public sealed class OrderAssembler(HaulScoutDbContext db, ICurrentUserContext cu
         _ = shipToPhone; // Phone is retained on PlatformOrder for audit; Order currently has no ship-to phone field.
     }
 
-    private static OrderStatus ResolveOrderStatus(IReadOnlyCollection<Sale> sales)
+    // Resolves only the money-and-lifecycle part of OrderStatus from the sale lines. A fulfillment state the
+    // order already carries (set by its own fulfillment action) is preserved — never downgraded back to Paid.
+    private static OrderStatus ResolveMoneyStatus(IReadOnlyCollection<Sale> sales, OrderStatus current)
     {
-        if (sales.Count == 0) return OrderStatus.Paid;
+        if (sales.Count == 0) return current;
         if (sales.All(sale => sale.Status == SaleStatus.Cancelled)) return OrderStatus.Cancelled;
         if (sales.All(sale => sale.Status == SaleStatus.Refunded)) return OrderStatus.Refunded;
-        if (sales.All(sale => sale.Status == SaleStatus.Delivered)) return OrderStatus.Delivered;
-        if (sales.Any(sale => sale.Status is SaleStatus.Shipped or SaleStatus.Delivered)) return OrderStatus.Shipped;
-        if (sales.Any(sale => sale.Status == SaleStatus.Packed)) return OrderStatus.Fulfilling;
+        // Keep the operator's fulfillment progress; only lift a pending/paid order to Paid.
+        if (current is OrderStatus.Fulfilling or OrderStatus.Shipped or OrderStatus.Delivered) return current;
         return OrderStatus.Paid;
     }
 
@@ -362,15 +364,5 @@ public sealed class OrderAssembler(HaulScoutDbContext db, ICurrentUserContext cu
         if (sales.All(sale => sale.Status == SaleStatus.Refunded)) return PaymentStatus.Refunded;
         if (sales.Any(sale => sale.Status == SaleStatus.PartiallyRefunded)) return PaymentStatus.PartiallyRefunded;
         return PaymentStatus.Paid;
-    }
-
-    private static FulfillmentStatus ResolveFulfillmentStatus(IReadOnlyCollection<Sale> sales)
-    {
-        if (sales.Count == 0) return FulfillmentStatus.Unfulfilled;
-        return sales.All(sale => sale.Status is SaleStatus.Shipped or SaleStatus.Delivered)
-            ? FulfillmentStatus.Fulfilled
-            : sales.Any(sale => sale.Status is SaleStatus.Packed or SaleStatus.Shipped or SaleStatus.Delivered)
-                ? FulfillmentStatus.Partial
-                : FulfillmentStatus.Unfulfilled;
     }
 }
