@@ -7421,6 +7421,7 @@ export interface components {
             lineTotal?: number;
             /** Format: double */
             unitCostSnapshot?: number | null;
+            sale?: components["schemas"]["SaleDto"] | null;
         };
         /** @enum {string} */
         OrderStatus: "Pending" | "Paid" | "Fulfilling" | "Shipped" | "Delivered" | "Cancelled" | "Refunded";

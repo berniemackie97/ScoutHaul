@@ -69,7 +69,13 @@ public sealed class OrdersController(HaulScoutDbContext db, ICurrentUserContext 
             .Include(item => item.Lines)
             .SingleOrDefaultAsync(item => item.Id == id && item.OrganizationId == currentUser.OrganizationId, cancellationToken);
 
-        return order is null ? NotFound() : order.ToDetailDto();
+        if (order is null)
+        {
+            return NotFound();
+        }
+
+        IReadOnlyDictionary<Guid, Sale> salesByInventoryItem = await SalesByInventoryItemAsync(order.Id, cancellationToken);
+        return order.ToDetailDto(salesByInventoryItem);
     }
 
     /// <summary>
@@ -150,7 +156,8 @@ public sealed class OrdersController(HaulScoutDbContext db, ICurrentUserContext 
         });
 
         await db.SaveChangesAsync(cancellationToken);
-        return order.ToDetailDto();
+        IReadOnlyDictionary<Guid, Sale> salesByInventoryItem = await SalesByInventoryItemAsync(order.Id, cancellationToken);
+        return order.ToDetailDto(salesByInventoryItem);
     }
 
     [HttpPatch("{id:guid}/tracking")]
@@ -271,7 +278,8 @@ public sealed class OrdersController(HaulScoutDbContext db, ICurrentUserContext 
         });
 
         await db.SaveChangesAsync(cancellationToken);
-        return order.ToDetailDto();
+        IReadOnlyDictionary<Guid, Sale> salesByInventoryItem = await SalesByInventoryItemAsync(order.Id, cancellationToken);
+        return order.ToDetailDto(salesByInventoryItem);
     }
 
     // Financial states are never overwritten by fulfillment — a refunded/returned/cancelled line stays that way.
@@ -291,5 +299,20 @@ public sealed class OrdersController(HaulScoutDbContext db, ICurrentUserContext 
         {
             sale.Status = target;
         }
+    }
+
+    private async Task<IReadOnlyDictionary<Guid, Sale>> SalesByInventoryItemAsync(Guid orderId, CancellationToken cancellationToken)
+    {
+        List<Sale> sales = await db.Sales
+            .Include(sale => sale.InventoryItem)
+            .Include(sale => sale.Order)
+            .Include(sale => sale.Refunds)
+            .Where(sale => sale.OrganizationId == currentUser.OrganizationId && sale.OrderId == orderId)
+            .OrderBy(sale => sale.SoldAt)
+            .ToListAsync(cancellationToken);
+
+        return sales
+            .GroupBy(sale => sale.InventoryItemId)
+            .ToDictionary(group => group.Key, group => group.Last());
     }
 }

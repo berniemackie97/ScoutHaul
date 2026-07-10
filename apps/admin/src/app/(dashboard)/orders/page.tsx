@@ -7,7 +7,9 @@ import { getApiClient } from "@/lib/api";
 export const dynamic = "force-dynamic";
 
 const money = (value: number | null | undefined) =>
-  typeof value === "number" ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value) : "—";
+  typeof value === "number"
+    ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value)
+    : "—";
 const date = (value: string | null | undefined) =>
   value ? new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(new Date(value)) : "—";
 
@@ -19,7 +21,16 @@ const orderStatusVariant = (status: string | undefined) => {
   return "secondary" as const;
 };
 
-const FILTERS = ["All", "Pending", "Paid", "Fulfilling", "Shipped", "Delivered", "Cancelled", "Refunded"] as const;
+const FILTERS = [
+  "All",
+  "Pending",
+  "Paid",
+  "Fulfilling",
+  "Shipped",
+  "Delivered",
+  "Cancelled",
+  "Refunded",
+] as const;
 
 type OrderSummaryWithTracking = components["schemas"]["OrderSummaryDto"] & {
   shippingCarrier?: string | null;
@@ -28,9 +39,15 @@ type OrderSummaryWithTracking = components["schemas"]["OrderSummaryDto"] & {
   deliveredAt?: string | null;
 };
 
-export default async function OrdersPage({ searchParams }: { searchParams: Promise<{ status?: string }> }) {
+export default async function OrdersPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ status?: string }>;
+}) {
   const { status } = await searchParams;
-  const active = FILTERS.includes((status ?? "All") as (typeof FILTERS)[number]) ? status ?? "All" : "All";
+  const active = FILTERS.includes((status ?? "All") as (typeof FILTERS)[number])
+    ? (status ?? "All")
+    : "All";
 
   const api = await getApiClient();
   const { data } = await api.GET("/api/orders", {
@@ -38,27 +55,46 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
   });
   const orders = (data ?? []) as OrderSummaryWithTracking[];
 
-  const openOrders = orders.filter((order) => !["Delivered", "Cancelled", "Refunded"].includes(order.status ?? ""));
+  const openOrders = orders.filter(
+    (order) => !["Delivered", "Cancelled", "Refunded"].includes(order.status ?? "")
+  );
   const revenue = orders
     .filter((order) => order.paymentStatus === "Paid")
     .reduce((sum, order) => sum + (order.grandTotal ?? 0), 0);
   const awaitingFulfillment = orders.filter(
-    (order) => order.fulfillmentStatus !== "Fulfilled" && ["Paid", "Fulfilling"].includes(order.status ?? "")
+    (order) =>
+      order.fulfillmentStatus !== "Fulfilled" && ["Paid", "Fulfilling"].includes(order.status ?? "")
   ).length;
 
   const kpis = [
-    { label: "Open orders", value: String(openOrders.length), detail: "Not delivered, cancelled, or refunded", icon: ShoppingBag },
-    { label: "Captured revenue", value: money(revenue), detail: "Paid orders in view", icon: PackageCheck },
-    { label: "Awaiting fulfillment", value: String(awaitingFulfillment), detail: "Paid, not yet shipped", icon: Truck },
+    {
+      label: "Open orders",
+      value: String(openOrders.length),
+      detail: "Not delivered, cancelled, or refunded",
+      icon: ShoppingBag,
+    },
+    {
+      label: "Captured revenue",
+      value: money(revenue),
+      detail: "Paid orders in view",
+      icon: PackageCheck,
+    },
+    {
+      label: "Awaiting fulfillment",
+      value: String(awaitingFulfillment),
+      detail: "Paid, not yet shipped",
+      icon: Truck,
+    },
   ];
 
   return (
     <div className="space-y-6">
       <header>
-        <p className="text-muted-foreground text-sm">Storefront</p>
+        <p className="text-muted-foreground text-sm">Commerce</p>
         <h1 className="mt-1 text-2xl font-semibold tracking-tight">Orders</h1>
         <p className="text-muted-foreground mt-1 max-w-3xl text-sm">
-          Every storefront order with payment and fulfillment state. Open one to advance it through fulfillment.
+          Every channel order with payment and fulfillment state. Open one to inspect the lines,
+          tracking, buyer, and reconciled sale financials.
         </p>
       </header>
 
@@ -81,7 +117,9 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
             key={filter}
             href={filter === "All" ? "/orders" : `/orders?status=${filter}`}
             className={`rounded-full border px-3 py-1 text-sm transition ${
-              active === filter ? "bg-foreground text-background border-foreground" : "text-muted-foreground hover:bg-muted"
+              active === filter
+                ? "bg-foreground text-background border-foreground"
+                : "text-muted-foreground hover:bg-muted"
             }`}
           >
             {filter}
@@ -113,26 +151,41 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
               {orders.map((order) => (
                 <tr key={order.id} className="hover:bg-muted/30 transition-colors">
                   <td className="p-0">
-                    <Link href={`/orders/${order.id}`} className="text-foreground block px-4 py-3 font-medium">
+                    <Link
+                      href={`/orders/${order.id}`}
+                      className="text-foreground block px-4 py-3 font-medium"
+                    >
                       {order.orderNumber}
-                      {order.isLocalPickup && <span className="text-muted-foreground ml-2 text-xs">· pickup</span>}
+                      {order.isLocalPickup && (
+                        <span className="text-muted-foreground ml-2 text-xs">· pickup</span>
+                      )}
                     </Link>
                   </td>
                   <td className="px-4 py-3">
-                    <span className="bg-muted rounded-md px-2 py-0.5 text-xs font-medium">{order.channel ?? "Storefront"}</span>
+                    <span className="bg-muted rounded-md px-2 py-0.5 text-xs font-medium">
+                      {order.channel ?? "Storefront"}
+                    </span>
                   </td>
                   {/* Marketplace buyers have a username, not an email. */}
-                  <td className="text-muted-foreground px-4 py-3">{order.customerName || order.buyerReference || order.email || "—"}</td>
+                  <td className="text-muted-foreground px-4 py-3">
+                    {order.customerName || order.buyerReference || order.email || "—"}
+                  </td>
                   <td className="text-muted-foreground px-4 py-3">{date(order.createdAt)}</td>
                   <td className="px-4 py-3 text-right tabular-nums">{order.itemCount}</td>
-                  <td className="px-4 py-3 text-right font-medium tabular-nums">{money(order.grandTotal)}</td>
+                  <td className="px-4 py-3 text-right font-medium tabular-nums">
+                    {money(order.grandTotal)}
+                  </td>
                   <td className="text-muted-foreground px-4 py-3">
                     {order.isLocalPickup ? (
                       "Pickup"
                     ) : order.trackingNumber ? (
                       <span>
-                        <span className="text-foreground font-medium">{order.shippingCarrier ?? "Carrier"}</span>
-                        <span className="block max-w-[180px] truncate text-xs">{order.trackingNumber}</span>
+                        <span className="text-foreground font-medium">
+                          {order.shippingCarrier ?? "Carrier"}
+                        </span>
+                        <span className="block max-w-[180px] truncate text-xs">
+                          {order.trackingNumber}
+                        </span>
                       </span>
                     ) : order.shippedAt ? (
                       <span>Shipped {date(order.shippedAt)}</span>
@@ -141,7 +194,15 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
                     )}
                   </td>
                   <td className="px-4 py-3">
-                    <Badge variant={order.paymentStatus === "Paid" ? "success" : order.paymentStatus === "Refunded" ? "destructive" : "secondary"}>
+                    <Badge
+                      variant={
+                        order.paymentStatus === "Paid"
+                          ? "success"
+                          : order.paymentStatus === "Refunded"
+                            ? "destructive"
+                            : "secondary"
+                      }
+                    >
                       {order.paymentStatus}
                     </Badge>
                   </td>
