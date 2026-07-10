@@ -279,6 +279,37 @@ export function SaleCreator({ candidates, channels }: { candidates: Candidate[];
         </Card>
         <Card>
           <CardHeader>
+            <CardTitle className="text-lg">Order identity and buyer</CardTitle>
+            <CardDescription>
+              Optional, but important. If multiple recorded sales share the same external order number or tracking number,
+              ScoutHaul attaches them to the same order automatically.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="externalOrderId">Marketplace order number</Label>
+              <Input key={`externalOrderId:${formKey}`} id="externalOrderId" name="externalOrderId" defaultValue={values.externalOrderId ?? ""} placeholder="e.g. 12-34567-89012" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="buyerReference">Buyer username / handle</Label>
+              <Input key={`buyerReference:${formKey}`} id="buyerReference" name="buyerReference" defaultValue={values.buyerReference ?? ""} placeholder="eBay username, Depop handle…" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="buyerName">Buyer display name</Label>
+              <Input key={`buyerName:${formKey}`} id="buyerName" name="buyerName" defaultValue={values.buyerName ?? ""} placeholder="Optional display name" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="shippingCarrier">Carrier</Label>
+              <Input key={`shippingCarrier:${formKey}`} id="shippingCarrier" name="shippingCarrier" defaultValue={values.shippingCarrier ?? ""} placeholder="USPS, UPS, FedEx…" />
+            </div>
+            <div className="space-y-2 sm:col-span-2">
+              <Label htmlFor="trackingNumber">Tracking number</Label>
+              <Input key={`trackingNumber:${formKey}`} id="trackingNumber" name="trackingNumber" defaultValue={values.trackingNumber ?? ""} placeholder="Used as a fallback grouping key when order number is unavailable" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
             <CardTitle className="text-lg">Actual fees and costs</CardTitle>
             <CardDescription>
               Use assessed amounts when known. These values determine true realized profit and remain correctable with an audit reason.

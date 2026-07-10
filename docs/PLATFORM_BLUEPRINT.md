@@ -197,7 +197,7 @@ A unique item (qty 1) can be published to the **own storefront** *and* **eBay** 
 
 - **Single source of truth:** channel listings are projections of one `InventoryItem`; availability derives from `InventoryStatus`, never duplicated.
 - **Reserve on checkout:** entering checkout places a short-lived reservation on the item; a second buyer (any channel) sees it unavailable. Reservation expires if checkout is abandoned.
-- **Sell = global delist:** payment capture flips status to `Sold` and triggers **delist/decrement on every other channel** (eBay end-listing via integration; storefront marks sold instantly via cache/tag revalidation).
+- **Sell = global unavailable:** payment capture flips status to `Sold`, updates/decrements the native storefront instantly, and creates manual removal actions for external marketplace channels unless a real platform API exists.
 - **`Quantity` support:** add a `Quantity` field to `InventoryItem` (default 1) so qty>1 supplies/multipacks decrement instead of hard-sold — decided in Phase 3 so it's never retrofitted.
 - **Concurrency:** reservation + status transitions are guarded against race conditions (row-level lock / optimistic concurrency on the item).
 

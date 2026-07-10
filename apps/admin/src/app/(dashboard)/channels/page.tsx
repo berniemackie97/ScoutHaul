@@ -22,7 +22,7 @@ export default async function ChannelsPage() {
   const kpis = [
     { label: "Active channels", value: String(list.filter((a) => a.isActive).length), detail: "Connected and in use", icon: Radio },
     { label: "Native", value: String(nativeCount), detail: "Storefront — synced by the app", icon: Store },
-    { label: "External", value: String(externalCount), detail: "Marketplaces — extension-bridged", icon: Globe },
+    { label: "External", value: String(externalCount), detail: "Marketplaces — manually tracked", icon: Globe },
   ];
 
   return (
@@ -31,8 +31,8 @@ export default async function ChannelsPage() {
         <p className="text-muted-foreground text-sm">Commerce</p>
         <h1 className="mt-1 text-2xl font-semibold tracking-tight">Channels</h1>
         <p className="text-muted-foreground mt-1 max-w-3xl text-sm">
-          The accounts your inventory lists on. Your storefront syncs natively; external marketplaces (eBay, Poshmark, Depop, Vinted…) are
-          bridged by the human-led cross-listing extension. Connect an account here so items can be cross-listed and kept in sync.
+          The accounts your inventory can be tracked against. Your storefront is native; external marketplaces are recorded manually from
+          reports, admin actions, and the listing helper while you work in your own browser.
         </p>
       </header>
 
@@ -52,9 +52,9 @@ export default async function ChannelsPage() {
       {pendingDelist.length > 0 && (
         <Card className="border-amber-300 p-5">
           <div className="flex items-center gap-2 text-sm font-semibold text-amber-700">
-            <AlertTriangle className="h-4 w-4" /> Needs delist ({pendingDelist.length})
+            <AlertTriangle className="h-4 w-4" /> Manual channel action needed ({pendingDelist.length})
           </div>
-          <p className="text-muted-foreground mt-1 text-xs">Sold on another channel — take these down where they&rsquo;re still live.</p>
+          <p className="text-muted-foreground mt-1 text-xs">Sold on another channel — review and remove these listings manually where they&rsquo;re still live.</p>
           <div className="mt-3 divide-y">
             {pendingDelist.map((listing) => (
               <div key={listing.id} className="flex items-center justify-between gap-3 py-2 text-sm">

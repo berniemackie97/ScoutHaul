@@ -26,10 +26,10 @@ Without an API there is no unattended sync. This is physics, not a missing featu
 |---|---|
 | Post / delist on **our storefront** | Fully automatic — it is our code |
 | Post to a **marketplace** | One click, operator present: we prefill the form, the human submits |
-| Delist-on-sale elsewhere | Worklist computed instantly; each listing ends on a click |
+| Delist-on-sale elsewhere | Worklist computed instantly; external marketplace removal is manual unless the platform gives us a real API |
 | "Mark as sold" | Known when a report is imported or the operator records it — not real-time |
 
-What this buys: twenty minutes of retyping across six platforms becomes one click, and hand-typed fee guesses
+What this buys: twenty minutes of retyping across six platforms becomes guided prefill/capture, and hand-typed fee guesses
 become exact imported numbers.
 
 ## 3. Data in — platform report exports, not scraping
@@ -85,8 +85,9 @@ InventoryItem ──< ChannelListing >── ChannelAccount        (where an ite
   email. **`CustomerChannelIdentity`** `(Channel, ExternalUserId)` is the durable key, and is what lets the same
   human be recognised across platforms and merged.
 - **`Sale`** is the money-bearing line of an `Order` (fees, COGS, refunds, true net).
-- **`PlatformOrder` / `PlatformListing`** are *ingest landing zones* — raw imported rows, reconciled into the
-  domain above. They are source-agnostic: a CSV parser or the extension can fill them.
+- **`PlatformOrder` / `PlatformListing`** are *ingest landing zones* — raw imported or helper-captured rows,
+  reconciled into the domain above. They are source-agnostic: report parsers, normalized JSON imports, or
+  explicit page captures can fill them.
 
 ### Retired
 `Sale.SaleGroupId` and `Sale.GroupOrderReference` were an order header smuggled onto sale rows, invented only
@@ -100,12 +101,12 @@ back. They are dropped in the contract migration once backfill is verified.
    column cannot silently corrupt money.
 2. **`IListingFormAdapter`** *(data out, extension)* — `fillCreateForm(item, template)`, `captureListing()`.
 
-Everything else — items, orders, customers, refunds, fees, payouts, the delist cascade — is shared. A new engineer
+Everything else — items, orders, customers, refunds, fees, payouts, and manual channel action queues — is shared. A new engineer
 learns one domain and two interfaces.
 
 ## 7. What the server cron can and cannot do
 
-- **Can:** reconcile, compute the delist worklist, sell-through and aging reports, nudge ("no Poshmark report
+- **Can:** reconcile, compute manual channel action worklists, sell-through and aging reports, nudge ("no Poshmark report
   imported in 21 days").
 - **Cannot:** fetch marketplace data. There is no credentialed server-side path without an API, and logging in
   from a server is precisely the brittle hack this document exists to prevent.
@@ -116,5 +117,5 @@ learns one domain and two interfaces.
 2. **Clean the extension** — delete scrapers; scope to prefill + capture. *(done)*
 3. **Extension hardening** — scoped, revocable API key (no token paste); Chrome **and** Firefox.
 4. **Report parsers** — eBay Transaction/Payout, Poshmark, Mercari, Depop — each written against a real file.
-5. **Cross-list push** — `ListingTemplate` + per-platform field mapping + photo push; the operator submits.
-6. **Delist-on-sale worklist** end to end.
+5. **Listing helper improvements** — `ListingTemplate` + per-platform field mapping + optional photo prefill; the operator submits.
+6. **Manual channel action queue** end to end.

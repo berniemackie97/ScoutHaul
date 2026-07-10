@@ -20,10 +20,10 @@ export function ListingImporter() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">Import listings</CardTitle>
+        <CardTitle className="text-base">Import listing records</CardTitle>
         <CardDescription>
-          Until the extension is connected, paste scraped listing JSON here. Re-importing the same listing id updates
-          it in place, never duplicates.
+          Paste a captured listing payload or a normalized listing export here. Re-importing the same listing id updates
+          it in place and never duplicates it.
         </CardDescription>
       </CardHeader>
       <CardContent>

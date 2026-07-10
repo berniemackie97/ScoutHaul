@@ -7778,6 +7778,11 @@ export interface components {
             taxRemittedByPlatform?: boolean;
             /** Format: double */
             shippingCharged?: number;
+            externalOrderId?: string | null;
+            buyerReference?: string | null;
+            buyerName?: string | null;
+            shippingCarrier?: string | null;
+            trackingNumber?: string | null;
         };
         RedeemOrganizationInviteCodeRequest: {
             code?: string | null;

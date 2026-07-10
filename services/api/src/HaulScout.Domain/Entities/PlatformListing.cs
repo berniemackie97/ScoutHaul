@@ -3,11 +3,11 @@ using HaulScout.Domain.Common;
 namespace HaulScout.Domain.Entities;
 
 /// <summary>
-/// A marketplace listing captured by the browser extension from the operator's logged-in session — in ANY state
-/// (active, draft, scheduled, ended, sold, unsold, out of stock), not just live ones. This is the idempotent
-/// landing zone for "pull all my eBay listings": re-ingesting the same listing id updates it in place. Reconciling
-/// a listing seeds/links a ScoutHaul <see cref="InventoryItem"/> and its <see cref="ChannelListing"/> so existing
-/// listings populate inventory without re-entry. No marketplace API is used; everything is scraped from the pages.
+/// A marketplace listing captured from the page the operator is viewing or imported from a platform export — in
+/// any state (active, draft, scheduled, ended, sold, unsold, out of stock), not just live ones. This is the
+/// idempotent landing zone for intentional listing imports: re-ingesting the same listing id updates it in place.
+/// Reconciling a listing seeds/links a ScoutHaul <see cref="InventoryItem"/> and its <see cref="ChannelListing"/>
+/// so existing listings populate inventory without re-entry. No marketplace API or unattended scraping is used.
 /// </summary>
 public sealed class PlatformListing : EntityBase, IOrganizationScoped
 {
@@ -50,6 +50,6 @@ public sealed class PlatformListing : EntityBase, IOrganizationScoped
 
     public DateTimeOffset ScrapedAt { get; set; } = DateTimeOffset.UtcNow;
 
-    /// <summary>Full scraped payload for audit and re-processing if mapping logic improves later.</summary>
+    /// <summary>Full imported/captured payload for audit and re-processing if mapping logic improves later.</summary>
     public string? RawJson { get; set; }
 }

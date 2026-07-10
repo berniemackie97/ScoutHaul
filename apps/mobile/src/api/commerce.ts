@@ -29,8 +29,14 @@ export type RecordSaleRequest = {
   otherCosts: number;
   salesTaxCollected: number;
   taxRemittedByPlatform: boolean;
+  shippingCharged?: number;
   soldAt: string;
   notes?: string | null;
+  externalOrderId?: string | null;
+  buyerReference?: string | null;
+  buyerName?: string | null;
+  shippingCarrier?: string | null;
+  trackingNumber?: string | null;
 };
 
 export type SaleChannelOption = { value: string; label: string; group: string; isLegacy?: boolean };

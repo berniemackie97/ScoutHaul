@@ -4,9 +4,9 @@ namespace HaulScout.Domain.Entities;
 
 /// <summary>
 /// A per-organization connection to a sales channel. The own storefront is a <see cref="IsNativelySynced"/>
-/// channel kept in step by the API; external marketplaces (eBay, Poshmark, Depop, Vinted…) are bridged by the
-/// human-led browser extension. <see cref="Channel"/> is a <c>SalesChannelCatalog</c> value so fee profiles and
-/// channel accounts share one taxonomy.
+/// channel kept in step by the API; external marketplaces (eBay, Poshmark, Depop, Vinted…) are manually tracked
+/// from admin actions, report imports, and optional listing-helper captures. <see cref="Channel"/> is a
+/// <c>SalesChannelCatalog</c> value so fee profiles and channel accounts share one taxonomy.
 /// </summary>
 public sealed class ChannelAccount : EntityBase, IOrganizationScoped
 {
@@ -25,7 +25,7 @@ public sealed class ChannelAccount : EntityBase, IOrganizationScoped
     /// <summary>Default fee profile id from SalesChannelCatalog for this account (e.g. eBay "store-subscriber").</summary>
     public string? DefaultFeeProfileId { get; set; }
 
-    /// <summary>True for the own storefront (kept in sync natively by the API); false for extension-bridged marketplaces.</summary>
+    /// <summary>True for the own storefront (kept in step natively by the API); false for manually tracked marketplaces.</summary>
     public bool IsNativelySynced { get; set; }
 
     public bool IsActive { get; set; } = true;
@@ -36,9 +36,9 @@ public sealed class ChannelAccount : EntityBase, IOrganizationScoped
 }
 
 /// <summary>
-/// The state of one inventory item on one channel account — the sync ledger the extension reconciles against.
-/// "Sold on eBay" flips this row to Sold and drives delist prompts on every other channel; the API mirrors the
-/// storefront's native state here so a single view shows every channel an item lives on.
+/// The state of one inventory item on one channel account — the channel-presence ledger. "Sold on eBay" flips
+/// that row to Sold and flags other active marketplace rows for manual review; the API mirrors the storefront's
+/// native state here so a single view shows every channel an item lives on.
 /// </summary>
 public sealed class ChannelListing : EntityBase, IOrganizationScoped
 {
@@ -60,14 +60,13 @@ public sealed class ChannelListing : EntityBase, IOrganizationScoped
     public decimal? ListedPrice { get; set; }
     public int? Quantity { get; set; }
 
-    /// <summary>Hash of the images actually published on the channel — used to detect drift from the ScoutHaul
-    /// photos. Published/listed images win: on conflict the channel images overwrite the inventory photos.</summary>
+    /// <summary>Optional hash of the images actually published on the channel, if a capture/import can provide it.</summary>
     public string? ImageHash { get; set; }
 
     public DateTimeOffset? ListedAt { get; set; }
     public DateTimeOffset? SoldAt { get; set; }
     public DateTimeOffset? LastSyncedAt { get; set; }
 
-    /// <summary>Last sync/publish error surfaced to the operator (never silently swallowed).</summary>
+    /// <summary>Last channel tracking error surfaced to the operator (never silently swallowed).</summary>
     public string? LastError { get; set; }
 }

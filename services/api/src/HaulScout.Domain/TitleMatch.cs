@@ -1,7 +1,7 @@
 namespace HaulScout.Domain;
 
 /// <summary>
-/// Deterministic (no AI) title similarity used to SUGGEST which inventory item a scraped marketplace order line
+/// Deterministic (no AI) title similarity used to SUGGEST which inventory item an imported marketplace order line
 /// refers to when there is no platform listing id to key on. Marketplace titles are long and keyword-stuffed
 /// ("Vintage Levi's 501 Denim Jacket Men's M Distressed USA") while inventory titles are short ("Levi's 501
 /// Jacket"), so the score is token containment against the shorter title — never a wrong-confident match, always

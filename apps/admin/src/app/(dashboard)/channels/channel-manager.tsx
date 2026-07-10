@@ -65,7 +65,7 @@ export function ChannelManager({ accounts, channels }: { accounts: Account[]; ch
           <CardTitle className="text-lg">{editing ? `Edit ${editing.displayName}` : "Connect a channel"}</CardTitle>
           <CardDescription>
             A channel account represents one marketplace login (or your own storefront). Its default fee profile feeds accurate net-profit
-            math, and it&rsquo;s where cross-listings for each item are tracked.
+            math, and it&rsquo;s where per-item marketplace presence is tracked.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -115,7 +115,7 @@ export function ChannelManager({ accounts, channels }: { accounts: Account[]; ch
             </div>
             <label className="flex items-center gap-2 text-sm sm:col-span-2">
               <input type="checkbox" name="isActive" value="true" defaultChecked={editing ? editing.isActive : true} />
-              <span>Active — include in cross-listing and reporting</span>
+              <span>Active — include in listing tracking and reporting</span>
             </label>
             <div className="space-y-2 sm:col-span-2">
               <Label htmlFor="notes">Notes</Label>
@@ -153,9 +153,9 @@ export function ChannelManager({ accounts, channels }: { accounts: Account[]; ch
                       <span className="font-medium">{account.displayName}</span>
                       <Badge variant="secondary">{account.channel}</Badge>
                       {account.isNativelySynced ? (
-                        <Badge variant="success">Native sync</Badge>
+                        <Badge variant="success">Native</Badge>
                       ) : (
-                        <Badge variant="info">Extension</Badge>
+                        <Badge variant="info">Manual</Badge>
                       )}
                       {!account.isActive && <Badge variant="outline">Inactive</Badge>}
                     </div>

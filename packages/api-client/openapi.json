@@ -12278,6 +12278,26 @@
           "shippingCharged": {
             "type": "number",
             "format": "double"
+          },
+          "externalOrderId": {
+            "type": "string",
+            "nullable": true
+          },
+          "buyerReference": {
+            "type": "string",
+            "nullable": true
+          },
+          "buyerName": {
+            "type": "string",
+            "nullable": true
+          },
+          "shippingCarrier": {
+            "type": "string",
+            "nullable": true
+          },
+          "trackingNumber": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false

@@ -69,7 +69,8 @@ export async function ignorePlatformOrder(_previous: ActionResult, formData: For
 
 /**
  * Import eBay's own Sales report CSV (Seller Hub → Performance → Sales → Download) — the authoritative fee
- * source. Parsed server-side; same idempotent ingest as the extension. This is the primary, zero-setup path.
+ * source. Parsed server-side through the same idempotent ingest path as normalized JSON. This is the primary,
+ * zero-setup path.
  */
 export async function importEbayCsv(_previous: ActionResult, formData: FormData): Promise<ActionResult> {
   const file = formData.get("csvFile");
@@ -92,14 +93,13 @@ export async function importEbayCsv(_previous: ActionResult, formData: FormData)
 }
 
 /**
- * Manual fallback for importing scraped orders when the browser extension is not yet connected: the operator
- * pastes the order JSON exactly as the extension would push it. Same idempotent ingest endpoint either way.
+ * Manual fallback for importing normalized orders when a platform-specific parser is not available yet.
  */
 export async function importPlatformOrders(_previous: ActionResult, formData: FormData): Promise<ActionResult> {
   const platform = (formData.get("platform") as string)?.trim();
   const raw = (formData.get("ordersJson") as string)?.trim();
   if (!platform) return { ok: false, message: "Choose the platform these orders came from." };
-  if (!raw) return { ok: false, message: "Paste the scraped order JSON." };
+  if (!raw) return { ok: false, message: "Paste the normalized order JSON." };
 
   let orders: unknown;
   try {

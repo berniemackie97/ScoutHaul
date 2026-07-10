@@ -95,6 +95,24 @@ export function RecordSaleCard({ itemId, cost, channels }: { itemId: string; cos
             <Money label="Shipping label cost" name="shippingCost" value={shipping} onChange={setShipping} />
             <Money label="Sales tax" name="salesTaxCollected" value={tax} onChange={setTax} />
           </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1">
+              <Label htmlFor="externalOrderId" className="text-xs">Order number</Label>
+              <Input id="externalOrderId" name="externalOrderId" className="h-9" placeholder="Marketplace order #" />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="buyerReference" className="text-xs">Buyer username</Label>
+              <Input id="buyerReference" name="buyerReference" className="h-9" placeholder="Buyer handle" />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="shippingCarrier" className="text-xs">Carrier</Label>
+              <Input id="shippingCarrier" name="shippingCarrier" className="h-9" placeholder="USPS" />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="trackingNumber" className="text-xs">Tracking number</Label>
+              <Input id="trackingNumber" name="trackingNumber" className="h-9" placeholder="Groups same-package sales" />
+            </div>
+          </div>
           <input type="hidden" name="suppliesCost" value="0" />
           <input type="hidden" name="otherCosts" value="0" />
           <label className="flex items-center gap-2 text-xs">

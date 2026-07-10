@@ -44,7 +44,7 @@ export function ManualImporter({ channels }: { channels: Channel[] }) {
         <CardTitle className="text-base">Import from an eBay report</CardTitle>
         <CardDescription>
           In eBay: Seller Hub → Performance → Sales → <strong>Download</strong>. Upload that CSV here — it carries
-          eBay&apos;s exact fees per item. Re-uploading updates in place, never duplicates.
+          eBay&apos;s reported fees per item. Re-uploading updates imported, unreconciled rows in place and never duplicates them.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
@@ -66,7 +66,7 @@ export function ManualImporter({ channels }: { channels: Channel[] }) {
         </form>
 
         <details className="border-t pt-3">
-          <summary className="text-muted-foreground cursor-pointer text-xs">Advanced: paste order JSON (for the extension format)</summary>
+          <summary className="text-muted-foreground cursor-pointer text-xs">Advanced: paste normalized order JSON</summary>
           <form action={jsonAction} className="mt-3 space-y-3">
             <div className="grid gap-2 sm:max-w-xs">
               <Label htmlFor="platform">Platform</Label>

@@ -13,10 +13,11 @@ using HaulScout.Infrastructure.Persistence;
 namespace HaulScout.Api.Controllers;
 
 /// <summary>
-/// The landing zone for marketplace listings the browser extension scrapes from the operator's logged-in session —
-/// active, draft, scheduled, ended, sold, unsold. Ingest is idempotent (keyed on platform + external listing id);
-/// reconciling a listing seeds or links a ScoutHaul <see cref="InventoryItem"/> and its <see cref="ChannelListing"/>
-/// so existing listings populate inventory without re-entry. No marketplace API is used.
+/// The landing zone for marketplace listings captured from the page the operator is viewing or imported from a
+/// platform export — active, draft, scheduled, ended, sold, unsold. Ingest is idempotent (keyed on platform +
+/// external listing id); reconciling a listing seeds or links a ScoutHaul <see cref="InventoryItem"/> and its
+/// <see cref="ChannelListing"/> so existing listings populate inventory without re-entry. No marketplace API or
+/// unattended scraping is used.
 /// </summary>
 [ApiController]
 [Route("api/platform-listings")]
@@ -51,8 +52,8 @@ public sealed class PlatformListingsController(HaulScoutDbContext db, ICurrentUs
         return listings.Select(listing => listing.ToDto(Suggestion(suggestions, listing))).ToList();
     }
 
-    /// <summary>Idempotent batch upsert of scraped listings. Re-ingesting a listing that is not yet linked refreshes
-    /// it; a listing already linked to inventory keeps its link but still refreshes its scraped fields.</summary>
+    /// <summary>Idempotent batch upsert of imported/captured listings. Re-ingesting a listing that is not yet linked
+    /// refreshes it; a listing already linked to inventory keeps its link but still refreshes its imported fields.</summary>
     [HttpPost("ingest")]
     public async Task<ActionResult<IngestPlatformListingsResultDto>> Ingest(IngestPlatformListingsRequest request, CancellationToken cancellationToken)
     {
@@ -123,13 +124,13 @@ public sealed class PlatformListingsController(HaulScoutDbContext db, ICurrentUs
                 };
                 db.PlatformListings.Add(listing);
                 existing.Add(listing);
-                ApplyScrapedFields(listing, input, channelAccountId);
+                ApplyImportedFields(listing, input, channelAccountId);
                 created++;
             }
             else if (listing.ReconcileStatus != PlatformListingReconcileStatus.Ignored)
             {
-                // Refresh scraped fields in place (keeps the inventory link if already reconciled).
-                ApplyScrapedFields(listing, input, channelAccountId);
+                // Refresh imported fields in place (keeps the inventory link if already reconciled).
+                ApplyImportedFields(listing, input, channelAccountId);
                 updated++;
             }
             else
@@ -151,7 +152,7 @@ public sealed class PlatformListingsController(HaulScoutDbContext db, ICurrentUs
         return new IngestPlatformListingsResultDto(created, updated, skipped, dtos);
     }
 
-    /// <summary>Seed or link inventory from a scraped listing. Provide an <c>InventoryItemId</c> to link an existing
+    /// <summary>Seed or link inventory from an imported listing. Provide an <c>InventoryItemId</c> to link an existing
     /// item, or set <c>CreateNewItem</c> to create a draft item from the listing. A <see cref="ChannelListing"/> is
     /// created/updated either way so the item is tracked on the channel.</summary>
     [HttpPost("{id:guid}/reconcile")]
@@ -283,7 +284,7 @@ public sealed class PlatformListingsController(HaulScoutDbContext db, ICurrentUs
         return account.Id;
     }
 
-    private static void ApplyScrapedFields(PlatformListing listing, IngestPlatformListingInput input, Guid? channelAccountId)
+    private static void ApplyImportedFields(PlatformListing listing, IngestPlatformListingInput input, Guid? channelAccountId)
     {
         if (channelAccountId.HasValue)
         {

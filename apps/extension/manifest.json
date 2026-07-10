@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "HaulScout Cross-Lister",
+  "name": "HaulScout Listing Helper",
   "version": "0.1.0",
-  "description": "Human-led cross-listing and inventory sync for HaulScout. Prefills your listings in your own logged-in marketplace tabs — you review and submit.",
+  "description": "Human-led listing helper for HaulScout. Prefills marketplace forms and captures listing links from pages you open — no bulk automation.",
   "permissions": ["storage", "activeTab", "scripting"],
   "host_permissions": [
     "https://scouthaul-production.up.railway.app/*",
@@ -14,7 +14,7 @@
     "type": "module"
   },
   "action": {
-    "default_title": "HaulScout Cross-Lister",
+    "default_title": "HaulScout Listing Helper",
     "default_popup": "popup.html"
   },
   "content_scripts": [

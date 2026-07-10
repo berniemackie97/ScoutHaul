@@ -3,11 +3,11 @@ using HaulScout.Domain.Common;
 namespace HaulScout.Domain.Entities;
 
 /// <summary>
-/// A marketplace order captured by the browser extension from the operator's logged-in session (eBay,
-/// Mercari, etc.). This is the idempotent landing zone for the platform's OWN numbers — exact item prices,
+/// A marketplace order imported from platform reports or manually supplied normalized data. This is the
+/// idempotent landing zone for the platform's OWN numbers — exact item prices,
 /// shipping, tax, fees, and payout as the marketplace reports them — so ScoutHaul's finances match the
 /// platform by definition. Reconciling an order creates the ScoutHaul <see cref="Sale"/>(s) it represents.
-/// No marketplace API is involved; everything here is scraped from the logged-in pages.
+/// No marketplace API or unattended marketplace scraping is involved.
 /// </summary>
 public sealed class PlatformOrder : EntityBase, IOrganizationScoped
 {
@@ -44,7 +44,7 @@ public sealed class PlatformOrder : EntityBase, IOrganizationScoped
     /// <summary>Whether the marketplace remitted the collected tax (pass-through) vs the seller owing it.</summary>
     public bool TaxRemittedByPlatform { get; set; } = true;
 
-    /// <summary>Exact fee lines as scraped (final value, per-order, ad, international…), for audit + display.</summary>
+    /// <summary>Exact fee lines as reported/imported (final value, per-order, ad, international…), for audit + display.</summary>
     public string? FeeBreakdownJson { get; set; }
 
     public string? Carrier { get; set; }
@@ -58,7 +58,7 @@ public sealed class PlatformOrder : EntityBase, IOrganizationScoped
 
     public DateTimeOffset ScrapedAt { get; set; } = DateTimeOffset.UtcNow;
 
-    /// <summary>Full scraped payload for audit and re-processing if mapping logic improves later.</summary>
+    /// <summary>Full imported payload for audit and re-processing if mapping logic improves later.</summary>
     public string? RawJson { get; set; }
 
     public ICollection<PlatformOrderLine> Lines { get; set; } = [];
