@@ -43,7 +43,7 @@ public sealed class OrderAssembler(HaulScoutDbContext db, ICurrentUserContext cu
             return existing;
         }
 
-        Order order = new()
+        var order = new Order
         {
             OrganizationId = currentUser.OrganizationId,
             Channel = channel,
@@ -80,7 +80,7 @@ public sealed class OrderAssembler(HaulScoutDbContext db, ICurrentUserContext cu
         }
 
         string handle = buyerReference.Trim();
-        CustomerChannelIdentity? identity = await db.CustomerChannelIdentities
+        var identity = await db.CustomerChannelIdentities
             .Include(item => item.Customer)
             .SingleOrDefaultAsync(
                 item => item.OrganizationId == currentUser.OrganizationId && item.Channel == channel && item.ExternalUserId == handle,
@@ -92,7 +92,7 @@ public sealed class OrderAssembler(HaulScoutDbContext db, ICurrentUserContext cu
             return identity.Customer;
         }
 
-        Customer customer = new()
+        var customer = new Customer
         {
             OrganizationId = currentUser.OrganizationId,
             Email = null,

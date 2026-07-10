@@ -37,7 +37,7 @@ public class PlatformOrderIngestionTests
 
     private static PlatformOrdersController NewController(HaulScoutDbContext db, Guid org, Guid user)
     {
-        StubCurrentUser currentUser = new(org, user);
+        var currentUser = new StubCurrentUser(org, user);
         return new PlatformOrdersController(db, currentUser, new OrderAssembler(db, currentUser));
     }
 
@@ -76,9 +76,9 @@ public class PlatformOrderIngestionTests
     [Fact]
     public async Task Ingest_creates_orders_then_reingest_updates_in_place()
     {
-        (HaulScoutDbContext db, Guid org, Guid user) = NewContext(nameof(Ingest_creates_orders_then_reingest_updates_in_place));
-        await using HaulScoutDbContext _ = db;
-        PlatformOrdersController controller = NewController(db, org, user);
+        var (db, org, user) = NewContext(nameof(Ingest_creates_orders_then_reingest_updates_in_place));
+        await using var _ = db;
+        var controller = NewController(db, org, user);
 
         IngestPlatformOrderLineInput[] lines = [new("Vintage Denim Jacket", 80m)];
         ActionResult<IngestPlatformOrdersResultDto> first = await controller.Ingest(new IngestPlatformOrdersRequest("eBay", [Order("ORD-1", lines, fee: 10m)]), CancellationToken.None);
@@ -98,10 +98,10 @@ public class PlatformOrderIngestionTests
     [Fact]
     public async Task Reingesting_a_reconciled_order_is_skipped()
     {
-        (HaulScoutDbContext db, Guid org, Guid user) = NewContext(nameof(Reingesting_a_reconciled_order_is_skipped));
-        await using HaulScoutDbContext _ = db;
-        PlatformOrdersController controller = NewController(db, org, user);
-        InventoryItem item = SeedItem(db, org, "Leather Boots", 30m);
+        var (db, org, user) = NewContext(nameof(Reingesting_a_reconciled_order_is_skipped));
+        await using var _ = db;
+        var controller = NewController(db, org, user);
+        var item = SeedItem(db, org, "Leather Boots", 30m);
 
         IngestPlatformOrderLineInput[] lines = [new("Leather Boots", 90m)];
         await controller.Ingest(new IngestPlatformOrdersRequest("eBay", [Order("ORD-9", lines, fee: 12m)]), CancellationToken.None);
@@ -119,10 +119,10 @@ public class PlatformOrderIngestionTests
     [Fact]
     public async Task Reconcile_single_line_pushes_exact_platform_figures_into_the_sale()
     {
-        (HaulScoutDbContext db, Guid org, Guid user) = NewContext(nameof(Reconcile_single_line_pushes_exact_platform_figures_into_the_sale));
-        await using HaulScoutDbContext _ = db;
-        PlatformOrdersController controller = NewController(db, org, user);
-        InventoryItem item = SeedItem(db, org, "Brass Lamp", 40m);
+        var (db, org, user) = NewContext(nameof(Reconcile_single_line_pushes_exact_platform_figures_into_the_sale));
+        await using var _ = db;
+        var controller = NewController(db, org, user);
+        var item = SeedItem(db, org, "Brass Lamp", 40m);
 
         IngestPlatformOrderLineInput[] lines = [new("Brass Lamp", 120m)];
         await controller.Ingest(new IngestPlatformOrdersRequest("eBay", [Order("ORD-2", lines, shipping: 12m, tax: 9.90m, fee: 19.40m)]), CancellationToken.None);
@@ -153,11 +153,11 @@ public class PlatformOrderIngestionTests
     [Fact]
     public async Task Reconcile_multi_line_allocates_shared_costs_and_sums_back_to_the_order()
     {
-        (HaulScoutDbContext db, Guid org, Guid user) = NewContext(nameof(Reconcile_multi_line_allocates_shared_costs_and_sums_back_to_the_order));
-        await using HaulScoutDbContext _ = db;
-        PlatformOrdersController controller = NewController(db, org, user);
-        InventoryItem a = SeedItem(db, org, "Item A", 10m);
-        InventoryItem b = SeedItem(db, org, "Item B", 20m);
+        var (db, org, user) = NewContext(nameof(Reconcile_multi_line_allocates_shared_costs_and_sums_back_to_the_order));
+        await using var _ = db;
+        var controller = NewController(db, org, user);
+        var a = SeedItem(db, org, "Item A", 10m);
+        var b = SeedItem(db, org, "Item B", 20m);
 
         IngestPlatformOrderLineInput[] lines =
         [
@@ -191,10 +191,10 @@ public class PlatformOrderIngestionTests
     [Fact]
     public async Task Reconcile_requires_every_line_to_be_mapped()
     {
-        (HaulScoutDbContext db, Guid org, Guid user) = NewContext(nameof(Reconcile_requires_every_line_to_be_mapped));
-        await using HaulScoutDbContext _ = db;
-        PlatformOrdersController controller = NewController(db, org, user);
-        InventoryItem a = SeedItem(db, org, "Item A", 10m);
+        var (db, org, user) = NewContext(nameof(Reconcile_requires_every_line_to_be_mapped));
+        await using var _ = db;
+        var controller = NewController(db, org, user);
+        var a = SeedItem(db, org, "Item A", 10m);
 
         IngestPlatformOrderLineInput[] lines =
         [
@@ -216,10 +216,10 @@ public class PlatformOrderIngestionTests
     [Fact]
     public async Task Reconcile_corrects_a_hand_recorded_sale_in_place_with_exact_fees()
     {
-        (HaulScoutDbContext db, Guid org, Guid user) = NewContext(nameof(Reconcile_corrects_a_hand_recorded_sale_in_place_with_exact_fees));
-        await using HaulScoutDbContext _ = db;
-        PlatformOrdersController controller = NewController(db, org, user);
-        InventoryItem item = SeedItem(db, org, "Brass Lamp", 40m);
+        var (db, org, user) = NewContext(nameof(Reconcile_corrects_a_hand_recorded_sale_in_place_with_exact_fees));
+        await using var _ = db;
+        var controller = NewController(db, org, user);
+        var item = SeedItem(db, org, "Brass Lamp", 40m);
         item.Status = InventoryStatus.Sold;
         // A sale the operator hand-entered earlier with guessed fees + their own $8 shipping label cost.
         db.Sales.Add(new Sale
@@ -265,11 +265,11 @@ public class PlatformOrderIngestionTests
     [Fact]
     public async Task Reconcile_mixes_a_new_sale_and_a_correction_in_one_order()
     {
-        (HaulScoutDbContext db, Guid org, Guid user) = NewContext(nameof(Reconcile_mixes_a_new_sale_and_a_correction_in_one_order));
-        await using HaulScoutDbContext _ = db;
-        PlatformOrdersController controller = NewController(db, org, user);
-        InventoryItem fresh = SeedItem(db, org, "Fresh Item", 10m);
-        InventoryItem recorded = SeedItem(db, org, "Recorded Item", 15m);
+        var (db, org, user) = NewContext(nameof(Reconcile_mixes_a_new_sale_and_a_correction_in_one_order));
+        await using var _ = db;
+        var controller = NewController(db, org, user);
+        var fresh = SeedItem(db, org, "Fresh Item", 10m);
+        var recorded = SeedItem(db, org, "Recorded Item", 15m);
         recorded.Status = InventoryStatus.Sold;
         db.Sales.Add(new Sale
         {
@@ -317,9 +317,9 @@ Brass Lamp,377251318593,-,-,1,$88.12,$77.28,$0.00,$7.15,$3.69,$18.05,$0.00,$0.00
     [Fact]
     public async Task Import_ebay_csv_ingests_then_reimports_idempotently()
     {
-        (HaulScoutDbContext db, Guid org, Guid user) = NewContext(nameof(Import_ebay_csv_ingests_then_reimports_idempotently));
-        await using HaulScoutDbContext _ = db;
-        PlatformOrdersController controller = NewController(db, org, user);
+        var (db, org, user) = NewContext(nameof(Import_ebay_csv_ingests_then_reimports_idempotently));
+        await using var _ = db;
+        var controller = NewController(db, org, user);
 
         ActionResult<IngestPlatformOrdersResultDto> first = await controller.ImportEbayCsv(new ImportPlatformOrdersCsvRequest("eBay", EbayCsv), CancellationToken.None);
         Assert.Equal(1, first.Value!.Created);
@@ -338,10 +338,10 @@ Brass Lamp,377251318593,-,-,1,$88.12,$77.28,$0.00,$7.15,$3.69,$18.05,$0.00,$0.00
     [Fact]
     public async Task Reconcile_new_sale_from_csv_carries_the_shipping_label_cost()
     {
-        (HaulScoutDbContext db, Guid org, Guid user) = NewContext(nameof(Reconcile_new_sale_from_csv_carries_the_shipping_label_cost));
-        await using HaulScoutDbContext _ = db;
-        PlatformOrdersController controller = NewController(db, org, user);
-        InventoryItem item = SeedItem(db, org, "Brass Lamp", 40m);
+        var (db, org, user) = NewContext(nameof(Reconcile_new_sale_from_csv_carries_the_shipping_label_cost));
+        await using var _ = db;
+        var controller = NewController(db, org, user);
+        var item = SeedItem(db, org, "Brass Lamp", 40m);
 
         await controller.ImportEbayCsv(new ImportPlatformOrdersCsvRequest("eBay", EbayCsv), CancellationToken.None);
         PlatformOrder order = await db.PlatformOrders.Include(o => o.Lines).SingleAsync();
@@ -359,10 +359,10 @@ Brass Lamp,377251318593,-,-,1,$88.12,$77.28,$0.00,$7.15,$3.69,$18.05,$0.00,$0.00
     [Fact]
     public async Task Reconcile_correction_preserves_the_recorded_sale_date()
     {
-        (HaulScoutDbContext db, Guid org, Guid user) = NewContext(nameof(Reconcile_correction_preserves_the_recorded_sale_date));
-        await using HaulScoutDbContext _ = db;
-        PlatformOrdersController controller = NewController(db, org, user);
-        InventoryItem item = SeedItem(db, org, "Brass Lamp", 40m);
+        var (db, org, user) = NewContext(nameof(Reconcile_correction_preserves_the_recorded_sale_date));
+        await using var _ = db;
+        var controller = NewController(db, org, user);
+        var item = SeedItem(db, org, "Brass Lamp", 40m);
         item.Status = InventoryStatus.Sold;
         DateTimeOffset recordedDate = new(2026, 5, 1, 12, 0, 0, TimeSpan.Zero);
         db.Sales.Add(new Sale
@@ -392,9 +392,9 @@ Brass Lamp,377251318593,-,-,1,$88.12,$77.28,$0.00,$7.15,$3.69,$18.05,$0.00,$0.00
     [Fact]
     public async Task Ingest_rejects_negative_money()
     {
-        (HaulScoutDbContext db, Guid org, Guid user) = NewContext(nameof(Ingest_rejects_negative_money));
-        await using HaulScoutDbContext _ = db;
-        PlatformOrdersController controller = NewController(db, org, user);
+        var (db, org, user) = NewContext(nameof(Ingest_rejects_negative_money));
+        await using var _ = db;
+        var controller = NewController(db, org, user);
 
         IngestPlatformOrderLineInput[] lines = [new("Item", 10m)];
         ActionResult<IngestPlatformOrdersResultDto> result = await controller.Ingest(new IngestPlatformOrdersRequest("eBay", [Order("ORD-6", lines, fee: -1m)]), CancellationToken.None);
@@ -406,11 +406,11 @@ Brass Lamp,377251318593,-,-,1,$88.12,$77.28,$0.00,$7.15,$3.69,$18.05,$0.00,$0.00
     [Fact]
     public async Task Get_suggests_an_inventory_match_from_the_channel_listing_external_id()
     {
-        (HaulScoutDbContext db, Guid org, Guid user) = NewContext(nameof(Get_suggests_an_inventory_match_from_the_channel_listing_external_id));
-        await using HaulScoutDbContext _ = db;
-        PlatformOrdersController controller = NewController(db, org, user);
-        InventoryItem item = SeedItem(db, org, "Signed Poster", 15m);
-        ChannelAccount account = new() { OrganizationId = org, Channel = "eBay", DisplayName = "eBay" };
+        var (db, org, user) = NewContext(nameof(Get_suggests_an_inventory_match_from_the_channel_listing_external_id));
+        await using var _ = db;
+        var controller = NewController(db, org, user);
+        var item = SeedItem(db, org, "Signed Poster", 15m);
+        var account = new ChannelAccount { OrganizationId = org, Channel = "eBay", DisplayName = "eBay" };
         db.ChannelAccounts.Add(account);
         db.ChannelListings.Add(new ChannelListing
         {
@@ -436,9 +436,9 @@ Brass Lamp,377251318593,-,-,1,$88.12,$77.28,$0.00,$7.15,$3.69,$18.05,$0.00,$0.00
     [Fact]
     public async Task Get_suggests_a_match_by_title_when_there_is_no_link_and_flags_already_sold()
     {
-        (HaulScoutDbContext db, Guid org, Guid user) = NewContext(nameof(Get_suggests_a_match_by_title_when_there_is_no_link_and_flags_already_sold));
-        await using HaulScoutDbContext _ = db;
-        PlatformOrdersController controller = NewController(db, org, user);
+        var (db, org, user) = NewContext(nameof(Get_suggests_a_match_by_title_when_there_is_no_link_and_flags_already_sold));
+        await using var _ = db;
+        var controller = NewController(db, org, user);
         // No ChannelListing link at all — matching must fall back to the title. Item is already sold.
         InventoryItem item = SeedItem(db, org, "Levi's 501 Denim Jacket", 20m);
         item.Status = InventoryStatus.Sold;
@@ -458,9 +458,9 @@ Brass Lamp,377251318593,-,-,1,$88.12,$77.28,$0.00,$7.15,$3.69,$18.05,$0.00,$0.00
     [Fact]
     public async Task Payout_variance_flags_a_mismatch_between_expected_and_scraped_payout()
     {
-        (HaulScoutDbContext db, Guid org, Guid user) = NewContext(nameof(Payout_variance_flags_a_mismatch_between_expected_and_scraped_payout));
-        await using HaulScoutDbContext _ = db;
-        PlatformOrdersController controller = NewController(db, org, user);
+        var (db, org, user) = NewContext(nameof(Payout_variance_flags_a_mismatch_between_expected_and_scraped_payout));
+        await using var _ = db;
+        var controller = NewController(db, org, user);
 
         // Expected payout = 100 + 10 shipping - 18 fee = 92; platform actually deposited 90 → variance -2.
         IngestPlatformOrderLineInput[] lines = [new("Item", 100m)];

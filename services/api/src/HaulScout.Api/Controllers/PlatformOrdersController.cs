@@ -393,7 +393,7 @@ public sealed class PlatformOrdersController(HaulScoutDbContext db, ICurrentUser
 
         await db.SaveChangesAsync(cancellationToken);
 
-        List<SaleDto> dtos = resultSales.Select(sale => sale.ToDto()).ToList();
+        var dtos = resultSales.Select(sale => sale.ToDto()).ToList();
         return new PlatformOrderReconcileResultDto(order.Id, salesOrder.Id, createdCount, correctedCount, dtos);
     }
 
