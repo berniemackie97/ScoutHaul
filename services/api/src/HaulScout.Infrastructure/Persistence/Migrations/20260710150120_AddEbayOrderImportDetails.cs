@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -6,7 +6,6 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace HaulScout.Infrastructure.Persistence.Migrations
 {
     /// <inheritdoc />
-    [Migration("20260710183000_AddEbayOrderImportDetails")]
     public partial class AddEbayOrderImportDetails : Migration
     {
         /// <inheritdoc />
@@ -28,12 +27,6 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
 
             migrationBuilder.AddColumn<DateTimeOffset>(
                 name: "PaidAt",
-                table: "PlatformOrders",
-                type: "timestamp with time zone",
-                nullable: true);
-
-            migrationBuilder.AddColumn<DateTimeOffset>(
-                name: "ShippedAt",
                 table: "PlatformOrders",
                 type: "timestamp with time zone",
                 nullable: true);
@@ -94,6 +87,12 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                 maxLength: 120,
                 nullable: true);
 
+            migrationBuilder.AddColumn<DateTimeOffset>(
+                name: "ShippedAt",
+                table: "PlatformOrders",
+                type: "timestamp with time zone",
+                nullable: true);
+
             migrationBuilder.AddColumn<string>(
                 name: "FeeBreakdownJson",
                 table: "PlatformOrderLines",
@@ -103,16 +102,16 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
             migrationBuilder.AddColumn<decimal>(
                 name: "NetSales",
                 table: "PlatformOrderLines",
-                type: "numeric(18,2)",
-                precision: 18,
+                type: "numeric(12,2)",
+                precision: 12,
                 scale: 2,
                 nullable: true);
 
             migrationBuilder.AddColumn<decimal>(
                 name: "PlatformFees",
                 table: "PlatformOrderLines",
-                type: "numeric(18,2)",
-                precision: 18,
+                type: "numeric(12,2)",
+                precision: 12,
                 scale: 2,
                 nullable: true);
 
@@ -125,32 +124,32 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
             migrationBuilder.AddColumn<decimal>(
                 name: "SellerShippingCost",
                 table: "PlatformOrderLines",
-                type: "numeric(18,2)",
-                precision: 18,
+                type: "numeric(12,2)",
+                precision: 12,
                 scale: 2,
                 nullable: true);
 
             migrationBuilder.AddColumn<decimal>(
                 name: "ShippingCharged",
                 table: "PlatformOrderLines",
-                type: "numeric(18,2)",
-                precision: 18,
+                type: "numeric(12,2)",
+                precision: 12,
                 scale: 2,
                 nullable: true);
 
             migrationBuilder.AddColumn<decimal>(
                 name: "TaxCollected",
                 table: "PlatformOrderLines",
-                type: "numeric(18,2)",
-                precision: 18,
+                type: "numeric(12,2)",
+                precision: 12,
                 scale: 2,
                 nullable: true);
 
             migrationBuilder.AddColumn<decimal>(
                 name: "TotalSales",
                 table: "PlatformOrderLines",
-                type: "numeric(18,2)",
-                precision: 18,
+                type: "numeric(12,2)",
+                precision: 12,
                 scale: 2,
                 nullable: true);
 
@@ -176,26 +175,85 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropColumn(name: "BuyerEmail", table: "PlatformOrders");
-            migrationBuilder.DropColumn(name: "BuyerNote", table: "PlatformOrders");
-            migrationBuilder.DropColumn(name: "PaidAt", table: "PlatformOrders");
-            migrationBuilder.DropColumn(name: "ShippedAt", table: "PlatformOrders");
-            migrationBuilder.DropColumn(name: "ShipToCity", table: "PlatformOrders");
-            migrationBuilder.DropColumn(name: "ShipToCountry", table: "PlatformOrders");
-            migrationBuilder.DropColumn(name: "ShipToLine1", table: "PlatformOrders");
-            migrationBuilder.DropColumn(name: "ShipToLine2", table: "PlatformOrders");
-            migrationBuilder.DropColumn(name: "ShipToName", table: "PlatformOrders");
-            migrationBuilder.DropColumn(name: "ShipToPhone", table: "PlatformOrders");
-            migrationBuilder.DropColumn(name: "ShipToPostalCode", table: "PlatformOrders");
-            migrationBuilder.DropColumn(name: "ShipToRegion", table: "PlatformOrders");
-            migrationBuilder.DropColumn(name: "FeeBreakdownJson", table: "PlatformOrderLines");
-            migrationBuilder.DropColumn(name: "NetSales", table: "PlatformOrderLines");
-            migrationBuilder.DropColumn(name: "PlatformFees", table: "PlatformOrderLines");
-            migrationBuilder.DropColumn(name: "RawJson", table: "PlatformOrderLines");
-            migrationBuilder.DropColumn(name: "SellerShippingCost", table: "PlatformOrderLines");
-            migrationBuilder.DropColumn(name: "ShippingCharged", table: "PlatformOrderLines");
-            migrationBuilder.DropColumn(name: "TaxCollected", table: "PlatformOrderLines");
-            migrationBuilder.DropColumn(name: "TotalSales", table: "PlatformOrderLines");
+            migrationBuilder.DropColumn(
+                name: "BuyerEmail",
+                table: "PlatformOrders");
+
+            migrationBuilder.DropColumn(
+                name: "BuyerNote",
+                table: "PlatformOrders");
+
+            migrationBuilder.DropColumn(
+                name: "PaidAt",
+                table: "PlatformOrders");
+
+            migrationBuilder.DropColumn(
+                name: "ShipToCity",
+                table: "PlatformOrders");
+
+            migrationBuilder.DropColumn(
+                name: "ShipToCountry",
+                table: "PlatformOrders");
+
+            migrationBuilder.DropColumn(
+                name: "ShipToLine1",
+                table: "PlatformOrders");
+
+            migrationBuilder.DropColumn(
+                name: "ShipToLine2",
+                table: "PlatformOrders");
+
+            migrationBuilder.DropColumn(
+                name: "ShipToName",
+                table: "PlatformOrders");
+
+            migrationBuilder.DropColumn(
+                name: "ShipToPhone",
+                table: "PlatformOrders");
+
+            migrationBuilder.DropColumn(
+                name: "ShipToPostalCode",
+                table: "PlatformOrders");
+
+            migrationBuilder.DropColumn(
+                name: "ShipToRegion",
+                table: "PlatformOrders");
+
+            migrationBuilder.DropColumn(
+                name: "ShippedAt",
+                table: "PlatformOrders");
+
+            migrationBuilder.DropColumn(
+                name: "FeeBreakdownJson",
+                table: "PlatformOrderLines");
+
+            migrationBuilder.DropColumn(
+                name: "NetSales",
+                table: "PlatformOrderLines");
+
+            migrationBuilder.DropColumn(
+                name: "PlatformFees",
+                table: "PlatformOrderLines");
+
+            migrationBuilder.DropColumn(
+                name: "RawJson",
+                table: "PlatformOrderLines");
+
+            migrationBuilder.DropColumn(
+                name: "SellerShippingCost",
+                table: "PlatformOrderLines");
+
+            migrationBuilder.DropColumn(
+                name: "ShippingCharged",
+                table: "PlatformOrderLines");
+
+            migrationBuilder.DropColumn(
+                name: "TaxCollected",
+                table: "PlatformOrderLines");
+
+            migrationBuilder.DropColumn(
+                name: "TotalSales",
+                table: "PlatformOrderLines");
         }
     }
 }
