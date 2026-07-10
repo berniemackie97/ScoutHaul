@@ -1,10 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, History } from "lucide-react";
+import { ArrowLeft, ArrowRight, History, Truck } from "lucide-react";
 import { Badge, Card, CardContent, CardHeader, CardTitle } from "@overhaul/ui";
 import { getApiClient } from "@/lib/api";
 import { SaleEditor } from "./sale-editor";
-import { SaleStatusControl } from "./status-control";
 import { RefundPanel } from "./refund-panel";
 
 export const dynamic = "force-dynamic";
@@ -28,10 +27,9 @@ function netFrom(json: string | null | undefined): number | null {
 export default async function SaleDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const api = await getApiClient();
-  const [{ data: sale }, { data: corrections }, { data: shipment }, { data: reference }, { data: refunds }] = await Promise.all([
+  const [{ data: sale }, { data: corrections }, { data: reference }, { data: refunds }] = await Promise.all([
     api.GET("/api/sales/{id}", { params: { path: { id } } }),
     api.GET("/api/sales/{id}/corrections", { params: { path: { id } } }),
-    api.GET("/api/sales/{id}/shipment", { params: { path: { id } } }),
     api.GET("/api/sales/reference-data"),
     api.GET("/api/sales/{id}/refunds", { params: { path: { id } } }),
   ]);
@@ -73,37 +71,34 @@ export default async function SaleDetailPage({ params }: { params: Promise<{ id:
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
         <div className="space-y-6">
-          <SaleStatusControl sale={sale} shipment={shipment} />
           <SaleEditor sale={sale} channels={reference?.channels ?? []} />
           <RefundPanel saleId={sale.id} refunds={refunds ?? []} />
         </div>
 
         <aside className="space-y-6">
+          {/* Fulfillment lives on the order — the single package, one place to ship/deliver. This sale page is
+              financial only. */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Shipment</CardTitle>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Truck className="h-4 w-4" /> Fulfillment
+              </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Carrier</span>
-                <span>{shipment?.carrier ?? "—"}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Tracking</span>
-                <span className="font-mono text-xs">{shipment?.trackingNumber ?? "—"}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Packed</span>
-                <span>{dateTime(shipment?.packedAt)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Shipped</span>
-                <span>{dateTime(shipment?.shippedAt)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Delivered</span>
-                <span>{dateTime(shipment?.deliveredAt)}</span>
-              </div>
+            <CardContent className="space-y-3 text-sm">
+              <p className="text-muted-foreground">
+                Shipping and tracking are managed on the order — a package can hold several sales, so it is the one
+                place to mark shipped or delivered.
+              </p>
+              {sale.saleGroupId ? (
+                <Link
+                  href={`/orders/${sale.saleGroupId}`}
+                  className="text-foreground inline-flex items-center gap-2 font-medium hover:underline"
+                >
+                  Manage on order <ArrowRight className="h-4 w-4" />
+                </Link>
+              ) : (
+                <span className="text-muted-foreground text-xs">This sale is not linked to an order yet.</span>
+              )}
             </CardContent>
           </Card>
           <Card>
