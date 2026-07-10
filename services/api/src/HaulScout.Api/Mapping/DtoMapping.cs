@@ -351,8 +351,9 @@ public static class DtoMapping
         item.SoldAt,
         item.Notes,
         SaleWorkflow.Next(item.Status),
-        item.SaleGroupId,
-        item.GroupOrderReference,
+        // Prefer the real Order; fall back to the legacy group columns for rows written before the unification.
+        item.OrderId ?? item.SaleGroupId,
+        item.Order?.ExternalOrderId ?? item.GroupOrderReference,
         item.Refunds.Sum(refund => refund.ItemAmount + refund.ShippingRefunded),
         item.Refunds.Sum(refund => refund.FeeCredit),
         item.Refunds.Count);
@@ -509,7 +510,19 @@ public static class DtoMapping
         item.ShippingCarrier,
         item.TrackingNumber,
         item.ShippedAt,
-        item.DeliveredAt);
+        item.DeliveredAt,
+        item.Channel,
+        item.ExternalOrderId,
+        item.BuyerReference);
+
+    public static CustomerChannelIdentityDto ToDto(this CustomerChannelIdentity item) => new(
+        item.Id,
+        item.Channel,
+        item.ExternalUserId,
+        item.DisplayName,
+        item.Email,
+        item.FirstSeenAt,
+        item.LastSeenAt);
 
     public static OrderDetailDto ToDetailDto(this Order item)
     {
@@ -549,7 +562,11 @@ public static class DtoMapping
             item.ShippedAt,
             item.DeliveredAt,
             item.CancelledAt,
-            item.Lines.OrderBy(line => line.TitleSnapshot).Select(line => line.ToDto()).ToList());
+            item.Lines.OrderBy(line => line.TitleSnapshot).Select(line => line.ToDto()).ToList(),
+            item.Channel,
+            item.ExternalOrderId,
+            item.ExternalOrderUrl,
+            item.BuyerReference);
     }
 
     public static CustomerAddressDto ToDto(this CustomerAddress item) => new(
@@ -582,7 +599,8 @@ public static class DtoMapping
         item.Orders.Count,
         LifetimeSpend(item),
         item.CreatedAt,
-        LastOrderAt(item));
+        LastOrderAt(item),
+        item.ChannelIdentities.Select(identity => identity.Channel).Distinct().Order().ToList());
 
     public static CustomerDetailDto ToDetailDto(this Customer item) => new(
         item.Id,
@@ -596,7 +614,8 @@ public static class DtoMapping
         item.CreatedAt,
         LastOrderAt(item),
         item.Addresses.OrderByDescending(address => address.IsDefault).Select(address => address.ToDto()).ToList(),
-        item.Orders.OrderByDescending(order => order.CreatedAt).Select(order => order.ToSummaryDto()).ToList());
+        item.Orders.OrderByDescending(order => order.CreatedAt).Select(order => order.ToSummaryDto()).ToList(),
+        item.ChannelIdentities.OrderBy(identity => identity.Channel).Select(identity => identity.ToDto()).ToList());
 
     public static ChannelAccountDto ToDto(this ChannelAccount item) => new(
         item.Id,

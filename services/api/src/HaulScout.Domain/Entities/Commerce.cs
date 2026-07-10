@@ -13,7 +13,10 @@ public sealed class Customer : EntityBase, IOrganizationScoped
 
     /// <summary>External auth subject from the storefront (customer) Supabase project, e.g. "supabase:&lt;uuid&gt;".</summary>
     public string? ExternalSubject { get; set; }
-    public required string Email { get; set; }
+
+    /// <summary>Nullable: a marketplace buyer is identified by their channel username, not an email address.
+    /// See <see cref="ChannelIdentities"/>.</summary>
+    public string? Email { get; set; }
     public string? DisplayName { get; set; }
     public string? Phone { get; set; }
     public bool AcceptsMarketing { get; set; }
@@ -25,6 +28,30 @@ public sealed class Customer : EntityBase, IOrganizationScoped
     public ICollection<Order> Orders { get; set; } = [];
     public ICollection<WishlistItem> WishlistItems { get; set; } = [];
     public ICollection<Review> Reviews { get; set; } = [];
+    public ICollection<CustomerChannelIdentity> ChannelIdentities { get; set; } = [];
+}
+
+/// <summary>
+/// How one customer is known on one channel. A storefront shopper has an email; an eBay or Depop buyer has only a
+/// username. This is what lets "Customers" mean every buyer across every platform rather than storefront accounts
+/// only — and what lets the same human be recognised on two channels and merged.
+/// </summary>
+public sealed class CustomerChannelIdentity : EntityBase, IOrganizationScoped
+{
+    public Guid OrganizationId { get; set; }
+    public Guid CustomerId { get; set; }
+    public Customer? Customer { get; set; }
+
+    /// <summary>SalesChannelCatalog value: "Storefront", "eBay", "Poshmark"…</summary>
+    public required string Channel { get; set; }
+
+    /// <summary>The buyer's id/handle on that channel. Unique per (org, channel).</summary>
+    public required string ExternalUserId { get; set; }
+
+    public string? DisplayName { get; set; }
+    public string? Email { get; set; }
+    public DateTimeOffset FirstSeenAt { get; set; } = DateTimeOffset.UtcNow;
+    public DateTimeOffset LastSeenAt { get; set; } = DateTimeOffset.UtcNow;
 }
 
 public sealed class CustomerAddress : EntityBase, IOrganizationScoped
@@ -130,12 +157,28 @@ public sealed class Order : EntityBase, IOrganizationScoped
     public Guid? CustomerId { get; set; }
     public Customer? Customer { get; set; }
 
+    /// <summary>The channel this order came from — a SalesChannelCatalog value ("Storefront", "eBay",
+    /// "Poshmark"…). The storefront is simply channel #1; there is no storefront-only order type.</summary>
+    public string Channel { get; set; } = "Storefront";
+
+    public Guid? ChannelAccountId { get; set; }
+    public ChannelAccount? ChannelAccount { get; set; }
+
+    /// <summary>The marketplace's own order id. Null for storefront orders, where <see cref="OrderNumber"/> is ours.</summary>
+    public string? ExternalOrderId { get; set; }
+    public string? ExternalOrderUrl { get; set; }
+
+    /// <summary>The buyer's handle on the channel (eBay / Depop / Poshmark username). Marketplaces rarely
+    /// expose a buyer email, so this — not <see cref="Email"/> — is the durable buyer key off-storefront.</summary>
+    public string? BuyerReference { get; set; }
+
     public required string OrderNumber { get; set; }
     public OrderStatus Status { get; set; } = OrderStatus.Pending;
     public PaymentStatus PaymentStatus { get; set; } = PaymentStatus.Pending;
     public FulfillmentStatus FulfillmentStatus { get; set; } = FulfillmentStatus.Unfulfilled;
 
-    public required string Email { get; set; }
+    /// <summary>Storefront orders always carry one; marketplace buyers usually do not.</summary>
+    public string? Email { get; set; }
 
     public decimal Subtotal { get; set; }
     public decimal DiscountTotal { get; set; }

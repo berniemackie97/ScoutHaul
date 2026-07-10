@@ -1083,7 +1083,7 @@ public sealed record OrderSummaryDto(
     OrderStatus Status,
     PaymentStatus PaymentStatus,
     FulfillmentStatus FulfillmentStatus,
-    string Email,
+    string? Email,
     string? CustomerName,
     Guid? CustomerId,
     decimal GrandTotal,
@@ -1095,7 +1095,10 @@ public sealed record OrderSummaryDto(
     string? ShippingCarrier,
     string? TrackingNumber,
     DateTimeOffset? ShippedAt,
-    DateTimeOffset? DeliveredAt);
+    DateTimeOffset? DeliveredAt,
+    string Channel = "Storefront",
+    string? ExternalOrderId = null,
+    string? BuyerReference = null);
 
 public sealed record OrderDetailDto(
     Guid Id,
@@ -1103,7 +1106,7 @@ public sealed record OrderDetailDto(
     OrderStatus Status,
     PaymentStatus PaymentStatus,
     FulfillmentStatus FulfillmentStatus,
-    string Email,
+    string? Email,
     string? CustomerName,
     Guid? CustomerId,
     decimal Subtotal,
@@ -1132,7 +1135,11 @@ public sealed record OrderDetailDto(
     DateTimeOffset? ShippedAt,
     DateTimeOffset? DeliveredAt,
     DateTimeOffset? CancelledAt,
-    IReadOnlyList<OrderLineDto> Lines);
+    IReadOnlyList<OrderLineDto> Lines,
+    string Channel = "Storefront",
+    string? ExternalOrderId = null,
+    string? ExternalOrderUrl = null,
+    string? BuyerReference = null);
 
 public sealed record UpdateOrderStatusRequest(OrderStatus Status);
 
@@ -1145,7 +1152,18 @@ public sealed record UpdateOrderTrackingRequest(
     bool MarkShipped,
     bool MarkDelivered);
 
-// ── Storefront customers ───────────────────────────────────────────────────
+// ── Customers (every channel, not just the storefront) ─────────────────────
+
+/// <summary>How a customer is known on one channel — a storefront email, or an eBay/Depop/Poshmark username.</summary>
+public sealed record CustomerChannelIdentityDto(
+    Guid Id,
+    string Channel,
+    string ExternalUserId,
+    string? DisplayName,
+    string? Email,
+    DateTimeOffset FirstSeenAt,
+    DateTimeOffset LastSeenAt);
+
 public sealed record CustomerAddressDto(
     Guid Id,
     string? Label,
@@ -1161,7 +1179,7 @@ public sealed record CustomerAddressDto(
 
 public sealed record CustomerSummaryDto(
     Guid Id,
-    string Email,
+    string? Email,
     string? DisplayName,
     string? Phone,
     bool AcceptsMarketing,
@@ -1169,11 +1187,12 @@ public sealed record CustomerSummaryDto(
     int OrderCount,
     decimal LifetimeSpend,
     DateTimeOffset CreatedAt,
-    DateTimeOffset? LastOrderAt);
+    DateTimeOffset? LastOrderAt,
+    IReadOnlyList<string>? Channels = null);
 
 public sealed record CustomerDetailDto(
     Guid Id,
-    string Email,
+    string? Email,
     string? DisplayName,
     string? Phone,
     bool AcceptsMarketing,
@@ -1183,7 +1202,8 @@ public sealed record CustomerDetailDto(
     DateTimeOffset CreatedAt,
     DateTimeOffset? LastOrderAt,
     IReadOnlyList<CustomerAddressDto> Addresses,
-    IReadOnlyList<OrderSummaryDto> Orders);
+    IReadOnlyList<OrderSummaryDto> Orders,
+    IReadOnlyList<CustomerChannelIdentityDto>? ChannelIdentities = null);
 
 // ── Channel accounts (cross-listing foundation) ────────────────────────────
 public sealed record ChannelAccountDto(

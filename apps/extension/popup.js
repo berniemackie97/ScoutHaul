@@ -1,7 +1,7 @@
 import { api, getConfig, setConfig } from "./api.js";
 
 const el = (id) => document.getElementById(id);
-const state = { items: [], accounts: [], scraped: null, scrapedOrders: [] };
+const state = { items: [], accounts: [], scraped: null };
 
 function money(value) {
   return typeof value === "number" ? `$${value.toFixed(2)}` : "—";
@@ -22,7 +22,6 @@ async function connect() {
     renderList();
     fillMatchers();
     el("ebayCard").classList.remove("hidden");
-    el("ordersCard").classList.remove("hidden");
     el("status").textContent = `${state.items.length} items · ${state.accounts.length} channels`;
     loadDelist();
   } catch (error) {
@@ -122,45 +121,6 @@ async function prefillEbay(item) {
   el("status").textContent = res?.ok ? `Prefilled ${res.filled?.join(", ") || "nothing"} — review & submit.` : res?.error || "Prefill failed.";
 }
 
-async function readOrders() {
-  const tab = await activeTab();
-  if (!tab?.url || !/ebay\.com/.test(tab.url)) {
-    el("ordersRead").innerHTML = `<span class="err">Open your eBay Seller Hub orders tab first.</span>`;
-    return;
-  }
-  el("pushOrders").classList.add("hidden");
-  el("ordersMsg").textContent = "";
-  try {
-    const res = await chrome.tabs.sendMessage(tab.id, { type: "READ_ORDERS" });
-    if (!res?.ok) throw new Error(res?.error || "Could not read the page.");
-    state.scrapedOrders = res.orders || [];
-    const diag = res.diagnostics || {};
-    const warn = diag.warning ? `<div class="err">${escapeHtml(diag.warning)}</div>` : "";
-    el("ordersRead").innerHTML =
-      `Found <strong>${state.scrapedOrders.length}</strong> order(s) · ${diag.rowsFound ?? 0} rows, ${diag.skipped ?? 0} skipped.${warn}`;
-    if (state.scrapedOrders.length) el("pushOrders").classList.remove("hidden");
-  } catch (error) {
-    el("ordersRead").innerHTML = `<span class="err">${escapeHtml(String(error.message || error))}</span>`;
-  }
-}
-
-async function pushOrders() {
-  const orders = state.scrapedOrders || [];
-  if (!orders.length) return;
-  el("pushOrders").disabled = true;
-  el("ordersMsg").textContent = "Pushing…";
-  try {
-    const result = await api.ingestPlatformOrders("eBay", orders);
-    el("ordersMsg").innerHTML = `<span class="ok">Imported ${result.created}, updated ${result.updated}, skipped ${result.skipped}. Reconcile in Finance.</span>`;
-    state.scrapedOrders = [];
-    el("pushOrders").classList.add("hidden");
-  } catch (error) {
-    el("ordersMsg").innerHTML = `<span class="err">${escapeHtml(String(error.message || error))}</span>`;
-  } finally {
-    el("pushOrders").disabled = false;
-  }
-}
-
 async function loadDelist() {
   const card = el("delistCard");
   const container = el("delistList");
@@ -229,8 +189,6 @@ async function init() {
   el("refresh").onclick = connect;
   el("readTab").onclick = readTab;
   el("saveListed").onclick = saveListed;
-  el("readOrders").onclick = readOrders;
-  el("pushOrders").onclick = pushOrders;
   if (config.token) connect();
   else el("settings").open = true;
 }

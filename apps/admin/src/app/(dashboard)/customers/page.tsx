@@ -83,8 +83,20 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
                 <tr key={customer.id} className="hover:bg-muted/30 transition-colors">
                   <td className="p-0">
                     <Link href={`/customers/${customer.id}`} className="block px-4 py-3">
-                      <span className="text-foreground font-medium">{customer.displayName || customer.email}</span>
-                      {customer.displayName && <span className="text-muted-foreground block text-xs">{customer.email}</span>}
+                      {/* A marketplace buyer has a username, not an email. */}
+                      <span className="text-foreground font-medium">{customer.displayName || customer.email || "Buyer"}</span>
+                      {customer.displayName && customer.email && (
+                        <span className="text-muted-foreground block text-xs">{customer.email}</span>
+                      )}
+                      {(customer.channels?.length ?? 0) > 0 && (
+                        <span className="mt-1 flex flex-wrap gap-1">
+                          {customer.channels!.map((channel) => (
+                            <span key={channel} className="bg-muted rounded px-1.5 py-0.5 text-[10px] font-medium">
+                              {channel}
+                            </span>
+                          ))}
+                        </span>
+                      )}
                     </Link>
                   </td>
                   <td className="px-4 py-3 text-right tabular-nums">{customer.orderCount}</td>

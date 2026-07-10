@@ -22,7 +22,7 @@ namespace HaulScout.Api.Controllers;
 [ApiController]
 [Route("api/platform-orders")]
 [RequireOrganizationPermission(HaulScoutPermissions.ManageFinance)]
-public sealed class PlatformOrdersController(HaulScoutDbContext db, ICurrentUserContext currentUser) : ControllerBase
+public sealed class PlatformOrdersController(HaulScoutDbContext db, ICurrentUserContext currentUser, OrderAssembler orderAssembler) : ControllerBase
 {
     private static readonly SaleStatus[] ReleasedInventoryStatuses = [SaleStatus.Returned, SaleStatus.Refunded, SaleStatus.Cancelled];
 
@@ -279,7 +279,13 @@ public sealed class PlatformOrdersController(HaulScoutDbContext db, ICurrentUser
             return BadRequest(exception.Message);
         }
 
-        Guid groupId = Guid.NewGuid();
+        // The marketplace order becomes a first-class Order — the same entity the storefront uses. This replaces
+        // the old SaleGroupId/GroupOrderReference pair, which was an order header smuggled onto the Sale rows.
+        Order salesOrder = await orderAssembler.GetOrCreateAsync(
+            order.Platform, order.ExternalOrderId, null, order.BuyerReference, order.BuyerName,
+            order.OrderedAt, order.ChannelAccountId, order.ItemsSubtotal, order.ShippingCharged, order.TaxCollected,
+            cancellationToken);
+
         DateTimeOffset soldAt = order.OrderedAt;
         var byId = items.ToDictionary(item => item.Id);
         var lineByItem = order.Lines.ToDictionary(line => mapByLine[line.Id], line => line);
@@ -309,8 +315,7 @@ public sealed class PlatformOrdersController(HaulScoutDbContext db, ICurrentUser
                 {
                     existing.ShippingCost = allocated.ShippingCost;
                 }
-                existing.SaleGroupId = groupId;
-                existing.GroupOrderReference = order.ExternalOrderId;
+                existing.Order = salesOrder;
 
                 RealizedSaleFinancials corrected = ResaleFinancialCalculator.CalculateRealizedSale(
                     existing.SoldPrice, existing.ShippingCharged, existing.CostOfGoods, existing.PlatformFees,
@@ -346,8 +351,7 @@ public sealed class PlatformOrdersController(HaulScoutDbContext db, ICurrentUser
                     NetProfit = financials.NetProfit,
                     SoldAt = soldAt,
                     Notes = TrimToNull(request.Notes),
-                    SaleGroupId = groupId,
-                    GroupOrderReference = order.ExternalOrderId,
+                    Order = salesOrder,
                     InventoryItem = item,
                 };
                 db.Sales.Add(sale);
@@ -383,13 +387,14 @@ public sealed class PlatformOrdersController(HaulScoutDbContext db, ICurrentUser
         }
 
         order.Status = PlatformOrderStatus.Reconciled;
-        order.ReconciledSaleGroupId = groupId;
+        // Records which Order this imported row reconciled into (the column name predates the Order unification).
+        order.ReconciledSaleGroupId = salesOrder.Id;
         order.ReconciledAt = DateTimeOffset.UtcNow;
 
         await db.SaveChangesAsync(cancellationToken);
 
         var dtos = resultSales.Select(sale => sale.ToDto()).ToList();
-        return new PlatformOrderReconcileResultDto(order.Id, groupId, createdCount, correctedCount, dtos);
+        return new PlatformOrderReconcileResultDto(order.Id, salesOrder.Id, createdCount, correctedCount, dtos);
     }
 
     [HttpPost("{id:guid}/ignore")]

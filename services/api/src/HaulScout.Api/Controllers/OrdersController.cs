@@ -17,10 +17,13 @@ namespace HaulScout.Api.Controllers;
 [RequireOrganizationPermission(HaulScoutPermissions.ManageOrders)]
 public sealed class OrdersController(HaulScoutDbContext db, ICurrentUserContext currentUser) : ControllerBase
 {
+    /// <summary>Orders from every channel — the storefront is simply one of them. Pass <paramref name="channel"/>
+    /// to narrow to a single marketplace.</summary>
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<OrderSummaryDto>>> List(
         [FromQuery] string? status,
         [FromQuery] string? search,
+        [FromQuery] string? channel,
         CancellationToken cancellationToken)
     {
         var query = db.Orders
@@ -33,10 +36,21 @@ public sealed class OrdersController(HaulScoutDbContext db, ICurrentUserContext 
             query = query.Where(order => order.Status == parsed);
         }
 
+        if (!string.IsNullOrWhiteSpace(channel))
+        {
+            string wanted = channel.Trim();
+            query = query.Where(order => order.Channel == wanted);
+        }
+
         if (!string.IsNullOrWhiteSpace(search))
         {
             string term = search.Trim();
-            query = query.Where(order => EF.Functions.ILike(order.OrderNumber, $"%{term}%") || EF.Functions.ILike(order.Email, $"%{term}%"));
+            // A marketplace buyer has a username, not an email — search both, plus the platform's own order id.
+            query = query.Where(order =>
+                EF.Functions.ILike(order.OrderNumber, $"%{term}%")
+                || (order.Email != null && EF.Functions.ILike(order.Email, $"%{term}%"))
+                || (order.BuyerReference != null && EF.Functions.ILike(order.BuyerReference, $"%{term}%"))
+                || (order.ExternalOrderId != null && EF.Functions.ILike(order.ExternalOrderId, $"%{term}%")));
         }
 
         var orders = await query
