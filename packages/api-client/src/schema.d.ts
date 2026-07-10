@@ -3193,6 +3193,49 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/platform-listings/import/ebay-csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["ImportPlatformListingsCsvRequest"];
+                    "text/json": components["schemas"]["ImportPlatformListingsCsvRequest"];
+                    "application/*+json": components["schemas"]["ImportPlatformListingsCsvRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["IngestPlatformListingsResultDto"];
+                        "application/json": components["schemas"]["IngestPlatformListingsResultDto"];
+                        "text/json": components["schemas"]["IngestPlatformListingsResultDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/platform-listings/ingest": {
         parameters: {
             query?: never;
@@ -6809,6 +6852,10 @@ export interface components {
         GroupSalesRequest: {
             saleIds?: string[] | null;
             orderReference?: string | null;
+        };
+        ImportPlatformListingsCsvRequest: {
+            platform?: string | null;
+            csv?: string | null;
         };
         ImportPlatformOrdersCsvRequest: {
             platform?: string | null;

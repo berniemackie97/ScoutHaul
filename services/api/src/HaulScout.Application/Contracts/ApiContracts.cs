@@ -928,6 +928,10 @@ public sealed record IngestPlatformOrdersResultDto(int Created, int Updated, int
 /// authoritative fee source. Parsed server-side into the same idempotent ingest path as manual JSON.</summary>
 public sealed record ImportPlatformOrdersCsvRequest(string Platform, string Csv);
 
+/// <summary>Import a marketplace's own listings export (eBay Active Listings today) — parsed server-side into the
+/// same idempotent listing ingest, so legacy listings seed/link inventory without re-entry.</summary>
+public sealed record ImportPlatformListingsCsvRequest(string Platform, string Csv);
+
 /// <summary>Maps one imported order line to the ScoutHaul inventory item it represents, for reconciliation.</summary>
 public sealed record ReconcilePlatformOrderLineMap(Guid PlatformOrderLineId, Guid InventoryItemId);
 
