@@ -125,6 +125,20 @@ public sealed class OrdersController(HaulScoutDbContext db, ICurrentUserContext 
                 break;
         }
 
+        // The order is the single source of truth for fulfillment; push its state onto the sale lines so the
+        // sales views reflect it without being a second place to edit fulfillment.
+        SaleStatus? propagate = request.Status switch
+        {
+            OrderStatus.Fulfilling => SaleStatus.Packed,
+            OrderStatus.Shipped => SaleStatus.Shipped,
+            OrderStatus.Delivered => SaleStatus.Delivered,
+            _ => null,
+        };
+        if (propagate is SaleStatus target)
+        {
+            await PropagateFulfillmentToSalesAsync(order.Id, target, cancellationToken);
+        }
+
         db.AuditLogs.Add(new AuditLog
         {
             OrganizationId = currentUser.OrganizationId,
@@ -223,6 +237,15 @@ public sealed class OrdersController(HaulScoutDbContext db, ICurrentUserContext 
             }
         }
 
+        if (request.MarkDelivered)
+        {
+            await PropagateFulfillmentToSalesAsync(order.Id, SaleStatus.Delivered, cancellationToken);
+        }
+        else if (request.MarkShipped)
+        {
+            await PropagateFulfillmentToSalesAsync(order.Id, SaleStatus.Shipped, cancellationToken);
+        }
+
         db.AuditLogs.Add(new AuditLog
         {
             OrganizationId = currentUser.OrganizationId,
@@ -249,5 +272,24 @@ public sealed class OrdersController(HaulScoutDbContext db, ICurrentUserContext 
 
         await db.SaveChangesAsync(cancellationToken);
         return order.ToDetailDto();
+    }
+
+    // Financial states are never overwritten by fulfillment — a refunded/returned/cancelled line stays that way.
+    private static readonly SaleStatus[] FinancialSaleStatuses =
+        [SaleStatus.Returned, SaleStatus.Refunded, SaleStatus.PartiallyRefunded, SaleStatus.Cancelled];
+
+    /// <summary>Pushes the order's fulfillment onto its (non-financial) sale lines, so the sales views mirror the
+    /// order without becoming a second place to edit fulfillment.</summary>
+    private async Task PropagateFulfillmentToSalesAsync(Guid orderId, SaleStatus target, CancellationToken cancellationToken)
+    {
+        List<Sale> sales = await db.Sales
+            .Where(sale => sale.OrderId == orderId
+                && sale.OrganizationId == currentUser.OrganizationId
+                && !FinancialSaleStatuses.Contains(sale.Status))
+            .ToListAsync(cancellationToken);
+        foreach (Sale sale in sales)
+        {
+            sale.Status = target;
+        }
     }
 }
