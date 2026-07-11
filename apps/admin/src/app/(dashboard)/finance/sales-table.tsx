@@ -182,7 +182,13 @@ export function SalesTable({
                     <td className="px-4 py-3">
                       {sale.saleGroupId ? (
                         <div className="flex items-center gap-2">
-                          <Badge variant="outline" className="font-mono text-xs">{sale.groupOrderReference || "order"}</Badge>
+                          {sale.orderId ? (
+                            <Link href={`/orders/${sale.orderId}`} className="transition-opacity hover:opacity-70" title="Open order">
+                              <Badge variant="outline" className="font-mono text-xs">{sale.groupOrderReference || "order"}</Badge>
+                            </Link>
+                          ) : (
+                            <Badge variant="outline" className="font-mono text-xs">{sale.groupOrderReference || "order"}</Badge>
+                          )}
                           <form action={ungroupSale.bind(null, id)}><UngroupButton /></form>
                         </div>
                       ) : (

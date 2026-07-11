@@ -356,7 +356,8 @@ public static class DtoMapping
         item.Order?.ExternalOrderId ?? item.Order?.OrderNumber ?? item.GroupOrderReference,
         item.Refunds.Sum(refund => refund.ItemAmount + refund.ShippingRefunded),
         item.Refunds.Sum(refund => refund.FeeCredit),
-        item.Refunds.Count);
+        item.Refunds.Count,
+        item.OrderId);
 
     public static RefundDto ToDto(this Refund item) => new(
         item.Id,

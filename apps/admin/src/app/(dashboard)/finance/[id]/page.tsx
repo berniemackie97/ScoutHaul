@@ -89,9 +89,9 @@ export default async function SaleDetailPage({ params }: { params: Promise<{ id:
                 Shipping and tracking are managed on the order — a package can hold several sales, so it is the one
                 place to mark shipped or delivered.
               </p>
-              {sale.saleGroupId ? (
+              {sale.orderId ? (
                 <Link
-                  href={`/orders/${sale.saleGroupId}`}
+                  href={`/orders/${sale.orderId}`}
                   className="text-foreground inline-flex items-center gap-2 font-medium hover:underline"
                 >
                   Manage on order <ArrowRight className="h-4 w-4" />
