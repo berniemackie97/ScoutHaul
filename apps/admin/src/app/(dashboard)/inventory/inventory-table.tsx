@@ -98,8 +98,8 @@ export function InventoryTable({
     navigate({ sort: column, desc: nextDesc ? null : "false", page: null });
   }
 
-  const SortHeader = ({ column, label, align = "left" }: { column: string; label: string; align?: "left" | "right" }) => (
-    <th className={`px-4 py-3 font-medium ${align === "right" ? "text-right" : ""}`}>
+  const SortHeader = ({ column, label, align = "left", className = "" }: { column: string; label: string; align?: "left" | "right"; className?: string }) => (
+    <th className={`px-4 py-3 font-medium ${align === "right" ? "text-right" : ""} ${className}`}>
       <button onClick={() => applySort(column)} className={`inline-flex items-center gap-1 hover:text-foreground ${align === "right" ? "flex-row-reverse" : ""}`}>
         {label}
         {sort === column && (desc ? <ArrowDown className="h-3 w-3" /> : <ArrowUp className="h-3 w-3" />)}
@@ -167,9 +167,9 @@ export function InventoryTable({
               </th>
               <SortHeader column="title" label="Item" />
               <th className="px-4 py-3 font-medium">Stage</th>
-              <th className="px-4 py-3 font-medium">Location</th>
-              <SortHeader column="purchasePrice" label="Cost" align="right" />
-              <SortHeader column="estimatedSalePrice" label="Expected" align="right" />
+              <th className="hidden px-4 py-3 font-medium xl:table-cell">Location</th>
+              <SortHeader column="purchasePrice" label="Cost" align="right" className="hidden md:table-cell" />
+              <SortHeader column="estimatedSalePrice" label="Expected" align="right" className="hidden lg:table-cell" />
               <th className="px-4 py-3 text-right font-medium">Projected profit</th>
             </tr>
           </thead>
@@ -198,7 +198,7 @@ export function InventoryTable({
                     />
                   </td>
                   <td className="p-0">
-                    <Link href={`/inventory/${item.id}`} className="flex min-w-72 items-center gap-3 px-4 py-3">
+                    <Link href={`/inventory/${item.id}`} className="flex min-w-0 items-center gap-3 px-4 py-3 sm:min-w-64">
                       <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-muted">
                         {item.thumbnailUrl ? (
                           // eslint-disable-next-line @next/next/no-img-element
@@ -213,9 +213,9 @@ export function InventoryTable({
                     </Link>
                   </td>
                   <td className="px-4 py-3"><Badge variant={badgeVariant(item.status)}>{inventoryStatusLabel(item.status)}</Badge></td>
-                  <td className="px-4 py-3 text-muted-foreground">{item.storageLocation ?? "—"}</td>
-                  <td className="px-4 py-3 text-right tabular-nums">{money(cost)}</td>
-                  <td className="px-4 py-3 text-right tabular-nums">{money(item.estimatedSalePrice)}</td>
+                  <td className="hidden px-4 py-3 text-muted-foreground xl:table-cell">{item.storageLocation ?? "—"}</td>
+                  <td className="hidden px-4 py-3 text-right tabular-nums md:table-cell">{money(cost)}</td>
+                  <td className="hidden px-4 py-3 text-right tabular-nums lg:table-cell">{money(item.estimatedSalePrice)}</td>
                   <td className={`px-4 py-3 text-right font-medium tabular-nums ${projectedProfit != null && projectedProfit < 0 ? "text-destructive" : ""}`}>{money(projectedProfit)}</td>
                 </tr>
               );
