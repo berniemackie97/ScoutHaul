@@ -43,7 +43,7 @@ export async function importEbayOrders(
 
   revalidatePath("/imports");
   revalidatePath("/orders");
-  revalidatePath("/finance");
+  revalidatePath("/orders");
   revalidatePath("/imports/orders");
   const { created, updated, skipped } = result.data;
   return {

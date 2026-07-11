@@ -84,7 +84,7 @@ export async function recordBundledSale(_previous: BundledResult, formData: Form
   const result = await api.POST("/api/sales/bundled", { body });
   if (!result.data?.saleGroupId) return { ok: false, message: errorMessage(result.error) };
 
-  revalidatePath("/finance");
+  revalidatePath("/orders");
   revalidatePath("/inventory");
-  redirect("/finance");
+  redirect("/orders");
 }

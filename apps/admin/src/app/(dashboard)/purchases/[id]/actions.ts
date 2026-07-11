@@ -15,7 +15,7 @@ function revalidateLot(id: string) {
   revalidatePath("/purchases");
   revalidatePath(`/purchases/${id}`);
   revalidatePath("/inventory");
-  revalidatePath("/finance");
+  revalidatePath("/orders");
 }
 
 /** Revise a lot's landed cost, allocation method, metadata, and the set/weights of allocated items. */

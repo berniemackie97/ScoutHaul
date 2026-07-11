@@ -116,7 +116,7 @@ export async function createSale(_previous: CreateSaleResult, formData: FormData
   const result = await api.POST("/api/sales", { body });
   if (!result.data?.id) return failure(errorMessage(result.error), formData);
 
-  revalidatePath("/finance");
+  revalidatePath("/orders");
   revalidatePath("/inventory");
-  redirect(`/finance/${result.data.id}`);
+  redirect(`/orders/sales/${result.data.id}`);
 }

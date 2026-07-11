@@ -12,7 +12,6 @@ import {
   Truck,
   BarChart3,
   Settings,
-  Wallet,
   ChevronLeft,
   ChevronRight,
   LogOut,
@@ -36,7 +35,6 @@ const navGroups = [
   {
     label: "Commerce",
     items: [
-      { name: "Sales & finance", href: "/finance", icon: Wallet },
       { name: "Orders", href: "/orders", icon: ShoppingCart },
       { name: "Customers", href: "/customers", icon: Users },
       { name: "Channels", href: "/channels", icon: Radio },

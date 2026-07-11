@@ -76,6 +76,6 @@ export async function recordSaleForItem(itemId: string, _previous: SellResult, f
 
   revalidatePath(`/inventory/${itemId}`);
   revalidatePath("/inventory");
-  revalidatePath("/finance");
+  revalidatePath("/orders");
   return { ok: true, message: "Sale recorded — item marked sold." };
 }
