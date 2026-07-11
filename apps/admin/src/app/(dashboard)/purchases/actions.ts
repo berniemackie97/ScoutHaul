@@ -102,7 +102,7 @@ export async function createPurchaseLot(_previous: PurchaseActionResult, formDat
 
   revalidatePath("/purchases");
   revalidatePath("/inventory");
-  revalidatePath("/finance");
+  revalidatePath("/orders");
   // Land on the lot so the operator can itemize it and verify allocation immediately.
   redirect(`/purchases/${result.data.id}`);
 }

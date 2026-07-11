@@ -201,7 +201,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                             <div className="space-y-1">
                               <Badge variant={saleStatusVariant(sale.status)}>{sale.status}</Badge>
                               <Link
-                                href={`/finance/${sale.id}`}
+                                href={`/orders/sales/${sale.id}`}
                                 className="text-brand-700 block text-xs hover:underline"
                               >
                                 Correct sale financials

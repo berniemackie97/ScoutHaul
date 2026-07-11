@@ -120,8 +120,8 @@ export async function updateSale(id: string, _previous: SaleActionResult, formDa
     return failure(errorMessage(result.error, "Could not save the correction."), formData);
   }
 
-  revalidatePath("/finance");
-  revalidatePath(`/finance/${id}`);
+  revalidatePath("/orders");
+  revalidatePath(`/orders/sales/${id}`);
   return { ok: true, message: `Saved. True net is now ${money(result.data.netProfit)}.` };
 }
 
@@ -143,8 +143,8 @@ export async function transitionSale(id: string, _previous: SaleActionResult, fo
   const api = await getApiClient();
   const result = await api.PATCH("/api/sales/{id}/status", { params: { path: { id } }, body });
   if (!result.data) return { ok: false, message: errorMessage(result.error, "Could not update sale status.") };
-  revalidatePath("/finance");
-  revalidatePath(`/finance/${id}`);
+  revalidatePath("/orders");
+  revalidatePath(`/orders/sales/${id}`);
   revalidatePath("/inventory");
   return { ok: true, message: `Sale moved to ${result.data.status}.` };
 }
@@ -184,8 +184,8 @@ export async function recordRefund(id: string, _previous: SaleActionResult, form
   const result = await api.POST("/api/sales/{id}/refunds", { params: { path: { id } }, body });
   if (!result.data) return failure(errorMessage(result.error, "Could not record the refund."), formData);
 
-  revalidatePath("/finance");
-  revalidatePath(`/finance/${id}`);
+  revalidatePath("/orders");
+  revalidatePath(`/orders/sales/${id}`);
   revalidatePath("/inventory");
   return { ok: true, message: `Refund recorded. True net is now ${money(result.data.netProfit)}.` };
 }
@@ -193,7 +193,7 @@ export async function recordRefund(id: string, _previous: SaleActionResult, form
 export async function voidRefund(id: string, refundId: string): Promise<void> {
   const api = await getApiClient();
   await api.DELETE("/api/sales/{id}/refunds/{refundId}", { params: { path: { id, refundId } } });
-  revalidatePath("/finance");
-  revalidatePath(`/finance/${id}`);
+  revalidatePath("/orders");
+  revalidatePath(`/orders/sales/${id}`);
   revalidatePath("/inventory");
 }

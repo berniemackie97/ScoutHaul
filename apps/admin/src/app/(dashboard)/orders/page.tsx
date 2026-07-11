@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { PackageCheck, ShoppingBag, Truck } from "lucide-react";
+import { PackageCheck, Plus, ShoppingBag, Truck } from "lucide-react";
 import type { components } from "@overhaul/api-client";
 import { Badge, Card } from "@overhaul/ui";
 import { getApiClient } from "@/lib/api";
@@ -89,13 +89,29 @@ export default async function OrdersPage({
 
   return (
     <div className="space-y-6">
-      <header>
-        <p className="text-muted-foreground text-sm">Commerce</p>
-        <h1 className="mt-1 text-2xl font-semibold tracking-tight">Orders</h1>
-        <p className="text-muted-foreground mt-1 max-w-3xl text-sm">
-          Every channel order with payment and fulfillment state. Open one to inspect the lines,
-          tracking, buyer, and reconciled sale financials.
-        </p>
+      <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
+        <div>
+          <p className="text-muted-foreground text-sm">Commerce</p>
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight">Orders</h1>
+          <p className="text-muted-foreground mt-1 max-w-3xl text-sm">
+            The operational surface for every channel order — lines, fees, refunds, and fulfillment.
+            Open one to manage its sale financials and tracking.
+          </p>
+        </div>
+        <div className="flex shrink-0 flex-wrap gap-2">
+          <Link
+            href="/orders/new"
+            className="bg-brand-600 hover:bg-brand-700 inline-flex h-10 items-center justify-center gap-2 rounded-lg px-4 text-sm font-medium text-white"
+          >
+            <Plus className="h-4 w-4" /> Record sale
+          </Link>
+          <Link
+            href="/orders/bundled"
+            className="hover:bg-muted inline-flex h-10 items-center justify-center gap-2 rounded-lg border px-4 text-sm font-medium"
+          >
+            <Plus className="h-4 w-4" /> Bundled sale
+          </Link>
+        </div>
       </header>
 
       <div className="grid gap-4 sm:grid-cols-3">

@@ -53,7 +53,7 @@ export function StatusControl({ item }: { item: InventoryItem }) {
               This stage is controlled by its sale record so inventory, fulfillment, reports, and audit history stay synchronized.
             </p>
             <Button asChild className="w-full" variant="outline">
-              <Link href="/finance">Open sales workflow</Link>
+              <Link href="/orders">Open in Orders</Link>
             </Button>
           </>
         ) : (

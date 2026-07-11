@@ -59,7 +59,7 @@ export async function reconcilePlatformOrder(
     return { ok: false, message: errorMessage(result.error, "The order could not be reconciled.") };
 
   revalidatePath("/imports/orders");
-  revalidatePath("/finance");
+  revalidatePath("/orders");
   revalidatePath("/inventory");
   const created = result.data.createdSaleCount ?? 0;
   const corrected = result.data.correctedSaleCount ?? 0;

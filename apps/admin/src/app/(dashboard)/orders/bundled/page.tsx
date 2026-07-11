@@ -15,8 +15,8 @@ export default async function BundledSalePage() {
   return (
     <div className="space-y-6">
       <div>
-        <Link href="/finance" className="text-muted-foreground inline-flex items-center gap-1 text-sm hover:text-foreground">
-          <ArrowLeft className="h-4 w-4" /> Sales &amp; profit
+        <Link href="/orders" className="text-muted-foreground inline-flex items-center gap-1 text-sm hover:text-foreground">
+          <ArrowLeft className="h-4 w-4" /> Orders
         </Link>
         <h1 className="mt-2 text-2xl font-semibold tracking-tight">Record bundled sale</h1>
         <p className="text-muted-foreground mt-1 text-sm">One order, several items, one package/tracking — the total and fees split across items, each keeping its own profit.</p>
