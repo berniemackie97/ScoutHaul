@@ -2316,6 +2316,49 @@ export interface paths {
         };
         trace?: never;
     };
+    "/api/orders/merge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["MergeOrdersRequest"];
+                    "text/json": components["schemas"]["MergeOrdersRequest"];
+                    "application/*+json": components["schemas"]["MergeOrdersRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["OrderDetailDto"];
+                        "application/json": components["schemas"]["OrderDetailDto"];
+                        "text/json": components["schemas"]["OrderDetailDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/organizations": {
         parameters: {
             query?: never;
@@ -3343,7 +3386,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/platform-listings/{id}/ignore": {
+    "/api/platform-listings/{id}/unlink": {
         parameters: {
             query?: never;
             header?: never;
@@ -3382,7 +3425,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/platform-listings/{id}/unlink": {
+    "/api/platform-listings/{id}/ignore": {
         parameters: {
             query?: never;
             header?: never;
@@ -7394,6 +7437,11 @@ export interface components {
         MarketplaceSearchLinksDto: {
             query?: string | null;
             links?: components["schemas"]["MarketplaceSearchLinkDto"][] | null;
+        };
+        MergeOrdersRequest: {
+            orderIds?: string[] | null;
+            /** Format: uuid */
+            survivingOrderId?: string | null;
         };
         NewLotItemDto: {
             title?: string | null;

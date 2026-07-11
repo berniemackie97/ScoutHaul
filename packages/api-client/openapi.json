@@ -2866,6 +2866,54 @@
         }
       }
     },
+    "/api/orders/merge": {
+      "post": {
+        "tags": [
+          "Orders"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MergeOrdersRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MergeOrdersRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/MergeOrdersRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderDetailDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderDetailDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderDetailDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/organizations": {
       "get": {
         "tags": [
@@ -4259,7 +4307,7 @@
         }
       }
     },
-    "/api/platform-listings/{id}/ignore": {
+    "/api/platform-listings/{id}/unlink": {
       "post": {
         "tags": [
           "PlatformListings"
@@ -4299,7 +4347,7 @@
         }
       }
     },
-    "/api/platform-listings/{id}/unlink": {
+    "/api/platform-listings/{id}/ignore": {
       "post": {
         "tags": [
           "PlatformListings"
@@ -10983,6 +11031,25 @@
             "items": {
               "$ref": "#/components/schemas/MarketplaceSearchLinkDto"
             },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "MergeOrdersRequest": {
+        "type": "object",
+        "properties": {
+          "orderIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "nullable": true
+          },
+          "survivingOrderId": {
+            "type": "string",
+            "format": "uuid",
             "nullable": true
           }
         },
