@@ -6,6 +6,7 @@ import { Badge, Card, CardContent, CardHeader, CardTitle } from "@overhaul/ui";
 import { getApiClient } from "@/lib/api";
 import { OrderStatusControl } from "./order-status-control";
 import { OrderTrackingCard } from "./order-tracking-card";
+import { OrderDeleteButton } from "./order-delete-button";
 
 export const dynamic = "force-dynamic";
 
@@ -129,24 +130,27 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
             <h1 className="text-2xl font-semibold tracking-tight">{order.orderNumber}</h1>
             <p className="text-muted-foreground mt-1 text-sm">Placed {dateTime(order.createdAt)}</p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Badge variant="outline">{order.channel ?? "Storefront"}</Badge>
-            {order.externalOrderId && <Badge variant="outline">{order.externalOrderId}</Badge>}
-            <Badge variant={orderStatusVariant(order.status)}>{order.status}</Badge>
-            <Badge
-              variant={
-                order.paymentStatus === "Paid"
-                  ? "success"
-                  : order.paymentStatus === "Refunded"
-                    ? "destructive"
-                    : "secondary"
-              }
-            >
-              {order.paymentStatus}
-            </Badge>
-            <Badge variant={order.fulfillmentStatus === "Fulfilled" ? "success" : "secondary"}>
-              {order.fulfillmentStatus}
-            </Badge>
+          <div className="flex flex-col gap-2 sm:items-end">
+            <div className="flex flex-wrap gap-2">
+              <Badge variant="outline">{order.channel ?? "Storefront"}</Badge>
+              {order.externalOrderId && <Badge variant="outline">{order.externalOrderId}</Badge>}
+              <Badge variant={orderStatusVariant(order.status)}>{order.status}</Badge>
+              <Badge
+                variant={
+                  order.paymentStatus === "Paid"
+                    ? "success"
+                    : order.paymentStatus === "Refunded"
+                      ? "destructive"
+                      : "secondary"
+                }
+              >
+                {order.paymentStatus}
+              </Badge>
+              <Badge variant={order.fulfillmentStatus === "Fulfilled" ? "success" : "secondary"}>
+                {order.fulfillmentStatus}
+              </Badge>
+            </div>
+            <OrderDeleteButton id={order.id!} orderNumber={order.orderNumber ?? "this order"} />
           </div>
         </div>
       </div>

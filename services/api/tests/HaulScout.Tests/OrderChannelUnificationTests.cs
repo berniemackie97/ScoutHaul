@@ -134,6 +134,40 @@ public class OrderChannelUnificationTests
     }
 
     [Fact]
+    public async Task Deleting_an_order_removes_it_and_its_lines_but_preserves_the_sale()
+    {
+        var (db, org, user) = NewContext(nameof(Deleting_an_order_removes_it_and_its_lines_but_preserves_the_sale));
+        await using var _ = db;
+        var (itemId, platformOrderId, lineId) = await SeedEbayOrder(db, org, user, "EB-DEL-1", "buyer_bob");
+
+        await NewPlatformOrders(db, org, user).Reconcile(platformOrderId,
+            new ReconcilePlatformOrderRequest([new ReconcilePlatformOrderLineMap(lineId, itemId)]), CancellationToken.None);
+
+        Order order = await db.Orders.SingleAsync();
+        Guid saleId = (await db.Sales.SingleAsync(sale => sale.OrderId == order.Id)).Id;
+
+        IActionResult result = await NewOrders(db, org, user).Delete(order.Id, CancellationToken.None);
+
+        Assert.IsType<NoContentResult>(result);
+        Assert.False(await db.Orders.AnyAsync(item => item.Id == order.Id));
+        Assert.False(await db.OrderLines.AnyAsync(line => line.OrderId == order.Id));
+        // The sale survives the order — financial history is never destroyed, just detached.
+        Sale survivor = await db.Sales.SingleAsync(sale => sale.Id == saleId);
+        Assert.Null(survivor.OrderId);
+    }
+
+    [Fact]
+    public async Task Deleting_a_missing_order_returns_not_found()
+    {
+        var (db, org, user) = NewContext(nameof(Deleting_a_missing_order_returns_not_found));
+        await using var _ = db;
+
+        IActionResult result = await NewOrders(db, org, user).Delete(Guid.NewGuid(), CancellationToken.None);
+
+        Assert.IsType<NotFoundResult>(result);
+    }
+
+    [Fact]
     public async Task A_marketplace_buyer_becomes_a_customer_with_a_channel_identity()
     {
         var (db, org, user) = NewContext(nameof(A_marketplace_buyer_becomes_a_customer_with_a_channel_identity));

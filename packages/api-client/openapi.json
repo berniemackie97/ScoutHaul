@@ -2725,6 +2725,27 @@
             }
           }
         }
+      },
+      "delete": {
+        "tags": [
+          "Orders"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
       }
     },
     "/api/orders/{id}/status": {
@@ -11175,8 +11196,7 @@
             "nullable": true
           },
           "sale": {
-            "$ref": "#/components/schemas/SaleDto",
-            "nullable": true
+            "$ref": "#/components/schemas/SaleDto"
           }
         },
         "additionalProperties": false

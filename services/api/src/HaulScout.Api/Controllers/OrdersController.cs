@@ -282,6 +282,63 @@ public sealed class OrdersController(HaulScoutDbContext db, ICurrentUserContext 
         return order.ToDetailDto(salesByInventoryItem);
     }
 
+    /// <summary>
+    /// Removes an order and its lines. Broken/phantom orders (a stray marketplace import with no lines, wrong totals,
+    /// or the wrong id used as an order number) can be cleared out from here. Sales carry financial history and are
+    /// never deleted — any sale attached to the order is detached (its order link is cleared) so it survives as a
+    /// standalone sale that can be re-grouped later.
+    /// </summary>
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
+    {
+        Order? order = await db.Orders
+            .Include(item => item.Lines)
+            .SingleOrDefaultAsync(item => item.Id == id && item.OrganizationId == currentUser.OrganizationId, cancellationToken);
+        if (order is null)
+        {
+            return NotFound();
+        }
+
+        // Detach — never delete — sales. The DB would SetNull on its own, but tests run on the in-memory provider
+        // which has no relational cascade, so we do it explicitly to behave identically everywhere.
+        List<Sale> linkedSales = await db.Sales
+            .Where(sale => sale.OrganizationId == currentUser.OrganizationId && sale.OrderId == order.Id)
+            .ToListAsync(cancellationToken);
+        foreach (Sale sale in linkedSales)
+        {
+            sale.OrderId = null;
+            sale.Order = null;
+        }
+
+        if (order.Lines.Count > 0)
+        {
+            db.OrderLines.RemoveRange(order.Lines);
+        }
+
+        db.AuditLogs.Add(new AuditLog
+        {
+            OrganizationId = currentUser.OrganizationId,
+            ActorUserId = currentUser.UserId,
+            EntityName = nameof(Order),
+            EntityId = order.Id,
+            Action = "OrderDeleted",
+            DetailsJson = JsonSerializer.Serialize(new
+            {
+                order.OrderNumber,
+                order.Channel,
+                order.ExternalOrderId,
+                order.Status,
+                order.GrandTotal,
+                LineCount = order.Lines.Count,
+                DetachedSaleIds = linkedSales.Select(sale => sale.Id).ToArray(),
+            }),
+        });
+
+        db.Orders.Remove(order);
+        await db.SaveChangesAsync(cancellationToken);
+        return NoContent();
+    }
+
     // Financial states are never overwritten by fulfillment — a refunded/returned/cancelled line stays that way.
     private static readonly SaleStatus[] FinancialSaleStatuses =
         [SaleStatus.Returned, SaleStatus.Refunded, SaleStatus.PartiallyRefunded, SaleStatus.Cancelled];
