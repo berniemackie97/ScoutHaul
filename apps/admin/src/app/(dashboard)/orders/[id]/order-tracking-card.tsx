@@ -3,7 +3,16 @@
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
 import { Truck } from "lucide-react";
-import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Label } from "@overhaul/ui";
+import {
+  Button,
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+  Input,
+  Label,
+} from "@overhaul/ui";
 import { updateOrderTracking, type OrderActionResult } from "./actions";
 
 type TrackingOrder = {
@@ -17,7 +26,15 @@ type TrackingOrder = {
 };
 
 const initial: OrderActionResult = { ok: false, message: "" };
-const carrierOptions = ["USPS", "UPS", "FedEx", "DHL", "OnTrac", "eBay Standard Envelope", "Local delivery"];
+const carrierOptions = [
+  "USPS",
+  "UPS",
+  "FedEx",
+  "DHL",
+  "OnTrac",
+  "eBay Standard Envelope",
+  "Local delivery",
+];
 
 function localDateTime(value: string | null | undefined) {
   if (!value) return "";
@@ -27,25 +44,43 @@ function localDateTime(value: string | null | undefined) {
   return local.toISOString().slice(0, 16);
 }
 
-function SubmitButtons() {
+function SubmitButtons({
+  hasShipped,
+  hasDelivered,
+}: {
+  hasShipped: boolean;
+  hasDelivered: boolean;
+}) {
   const { pending } = useFormStatus();
   return (
     <div className="grid gap-2 sm:grid-cols-3">
       <Button type="submit" name="intent" value="save" variant="outline" disabled={pending}>
         Save tracking
       </Button>
-      <Button type="submit" name="intent" value="markShipped" disabled={pending}>
-        Mark shipped
-      </Button>
-      <Button type="submit" name="intent" value="markDelivered" variant="secondary" disabled={pending}>
-        Mark delivered
-      </Button>
+      {!hasShipped && (
+        <Button type="submit" name="intent" value="markShipped" disabled={pending}>
+          Mark shipped
+        </Button>
+      )}
+      {!hasDelivered && (
+        <Button
+          type="submit"
+          name="intent"
+          value="markDelivered"
+          variant={hasShipped ? "default" : "secondary"}
+          disabled={pending}
+        >
+          Mark delivered
+        </Button>
+      )}
     </div>
   );
 }
 
 export function OrderTrackingCard({ order }: { order: TrackingOrder }) {
   const [state, action] = useActionState(updateOrderTracking.bind(null, order.id), initial);
+  const hasShipped = Boolean(order.shippedAt);
+  const hasDelivered = Boolean(order.deliveredAt);
 
   return (
     <Card>
@@ -55,11 +90,20 @@ export function OrderTrackingCard({ order }: { order: TrackingOrder }) {
           Package tracking
         </CardTitle>
         <CardDescription>
-          Record carrier evidence and advance fulfillment. Customer-facing tracking can reuse this same order record.
+          Record carrier evidence once. Shipped and delivered timestamps advance the order
+          automatically.
         </CardDescription>
       </CardHeader>
       <CardContent>
         <form action={action} className="space-y-4">
+          {(hasShipped || hasDelivered) && (
+            <p className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 px-3 py-2 text-sm text-emerald-800">
+              {hasDelivered
+                ? "Delivery is already recorded for this order."
+                : "Shipment is already recorded for this order."}
+            </p>
+          )}
+
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="shippingCarrier">Carrier</Label>
@@ -72,38 +116,64 @@ export function OrderTrackingCard({ order }: { order: TrackingOrder }) {
                 autoComplete="off"
               />
               <datalist id="shipping-carriers">
-                {carrierOptions.map((carrier) => <option key={carrier} value={carrier} />)}
+                {carrierOptions.map((carrier) => (
+                  <option key={carrier} value={carrier} />
+                ))}
               </datalist>
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="trackingNumber">Tracking number</Label>
-              <Input id="trackingNumber" name="trackingNumber" defaultValue={order.trackingNumber ?? ""} placeholder="9400…" autoComplete="off" />
+              <Input
+                id="trackingNumber"
+                name="trackingNumber"
+                defaultValue={order.trackingNumber ?? ""}
+                placeholder="9400…"
+                autoComplete="off"
+              />
             </div>
 
             <div className="space-y-2 sm:col-span-2">
               <Label htmlFor="trackingUrl">Tracking URL</Label>
-              <Input id="trackingUrl" name="trackingUrl" defaultValue={order.trackingUrl ?? ""} placeholder="https://tools.usps.com/..." autoComplete="off" />
+              <Input
+                id="trackingUrl"
+                name="trackingUrl"
+                defaultValue={order.trackingUrl ?? ""}
+                placeholder="https://tools.usps.com/..."
+                autoComplete="off"
+              />
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="shippedAt">Shipped at</Label>
-              <Input id="shippedAt" name="shippedAt" type="datetime-local" defaultValue={localDateTime(order.shippedAt)} />
+              <Input
+                id="shippedAt"
+                name="shippedAt"
+                type="datetime-local"
+                defaultValue={localDateTime(order.shippedAt)}
+              />
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="deliveredAt">Delivered at</Label>
-              <Input id="deliveredAt" name="deliveredAt" type="datetime-local" defaultValue={localDateTime(order.deliveredAt)} />
+              <Input
+                id="deliveredAt"
+                name="deliveredAt"
+                type="datetime-local"
+                defaultValue={localDateTime(order.deliveredAt)}
+              />
             </div>
           </div>
 
           {state.message && (
-            <div className={`rounded-lg border p-3 text-sm ${state.ok ? "border-green-200 bg-green-50 text-green-800" : "border-destructive/30 bg-destructive/5 text-destructive"}`}>
+            <div
+              className={`rounded-lg border p-3 text-sm ${state.ok ? "border-green-200 bg-green-50 text-green-800" : "border-destructive/30 bg-destructive/5 text-destructive"}`}
+            >
               {state.message}
             </div>
           )}
 
-          <SubmitButtons />
+          <SubmitButtons hasShipped={hasShipped} hasDelivered={hasDelivered} />
         </form>
       </CardContent>
     </Card>

@@ -8,9 +8,15 @@ type OrderStatus = components["schemas"]["OrderStatus"];
 
 export type OrderActionResult = { ok: boolean; message: string };
 
-export async function updateOrderStatus(id: string, status: OrderStatus): Promise<OrderActionResult> {
+export async function updateOrderStatus(
+  id: string,
+  status: OrderStatus
+): Promise<OrderActionResult> {
   const api = await getApiClient();
-  const result = await api.PATCH("/api/orders/{id}/status", { params: { path: { id } }, body: { status } });
+  const result = await api.PATCH("/api/orders/{id}/status", {
+    params: { path: { id } },
+    body: { status },
+  });
   if (!result.data) return { ok: false, message: "The order status could not be updated." };
 
   revalidatePath("/orders");
@@ -46,7 +52,7 @@ function dateTimeValue(formData: FormData, name: string): string | null {
 export async function updateOrderTracking(
   id: string,
   _previous: OrderActionResult,
-  formData: FormData,
+  formData: FormData
 ): Promise<OrderActionResult> {
   const token = await getApiAccessToken();
   if (!token) return { ok: false, message: "Your session expired. Sign in again." };
@@ -78,7 +84,9 @@ export async function updateOrderTracking(
 
   revalidatePath("/orders");
   revalidatePath(`/orders/${id}`);
-  if (body.markDelivered) return { ok: true, message: "Tracking saved and order marked delivered." };
-  if (body.markShipped) return { ok: true, message: "Tracking saved and order marked shipped." };
+  if (body.markDelivered || body.deliveredAt)
+    return { ok: true, message: "Tracking saved and order marked delivered." };
+  if (body.markShipped || body.shippedAt)
+    return { ok: true, message: "Tracking saved and order marked shipped." };
   return { ok: true, message: "Tracking saved." };
 }

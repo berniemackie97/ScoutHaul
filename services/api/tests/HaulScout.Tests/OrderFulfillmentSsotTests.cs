@@ -71,6 +71,45 @@ public class OrderFulfillmentSsotTests
     }
 
     [Fact]
+    public async Task Saving_a_shipped_timestamp_marks_the_order_shipped_without_a_separate_button()
+    {
+        var (db, org, user) = NewContext(nameof(Saving_a_shipped_timestamp_marks_the_order_shipped_without_a_separate_button));
+        await using var _ = db;
+        var (order, sale) = await SeedOrderWithSale(db, org);
+        var shippedAt = DateTimeOffset.UtcNow.AddHours(-2);
+        var controller = new OrdersController(db, new StubCurrentUser(org, user));
+
+        await controller.UpdateTracking(order.Id, new UpdateOrderTrackingRequest(
+            "USPS", "9400abc", null, shippedAt, null, MarkShipped: false, MarkDelivered: false), CancellationToken.None);
+
+        var stored = await db.Orders.SingleAsync();
+        Assert.Equal(OrderStatus.Shipped, stored.Status);
+        Assert.Equal(FulfillmentStatus.Fulfilled, stored.FulfillmentStatus);
+        Assert.Equal(shippedAt, stored.ShippedAt);
+        Assert.Equal(SaleStatus.Shipped, (await db.Sales.SingleAsync()).Status);
+    }
+
+    [Fact]
+    public async Task Saving_a_delivered_timestamp_marks_delivered_and_backfills_shipped_timestamp()
+    {
+        var (db, org, user) = NewContext(nameof(Saving_a_delivered_timestamp_marks_delivered_and_backfills_shipped_timestamp));
+        await using var _ = db;
+        var (order, sale) = await SeedOrderWithSale(db, org);
+        var deliveredAt = DateTimeOffset.UtcNow.AddHours(-1);
+        var controller = new OrdersController(db, new StubCurrentUser(org, user));
+
+        await controller.UpdateTracking(order.Id, new UpdateOrderTrackingRequest(
+            "USPS", "9400abc", null, null, deliveredAt, MarkShipped: false, MarkDelivered: false), CancellationToken.None);
+
+        var stored = await db.Orders.SingleAsync();
+        Assert.Equal(OrderStatus.Delivered, stored.Status);
+        Assert.Equal(FulfillmentStatus.Fulfilled, stored.FulfillmentStatus);
+        Assert.Equal(deliveredAt, stored.ShippedAt);
+        Assert.Equal(deliveredAt, stored.DeliveredAt);
+        Assert.Equal(SaleStatus.Delivered, (await db.Sales.SingleAsync()).Status);
+    }
+
+    [Fact]
     public async Task Editing_a_sale_after_delivery_does_not_un_deliver_the_order()
     {
         var (db, org, user) = NewContext(nameof(Editing_a_sale_after_delivery_does_not_un_deliver_the_order));

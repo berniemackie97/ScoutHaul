@@ -246,7 +246,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Advance order</CardTitle>
+              <CardTitle className="text-lg">Payment &amp; exceptions</CardTitle>
             </CardHeader>
             <CardContent>
               <OrderStatusControl
