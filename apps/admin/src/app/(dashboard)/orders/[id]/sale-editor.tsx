@@ -4,7 +4,7 @@ import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
 import type { components } from "@overhaul/api-client";
 import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Label, Textarea } from "@overhaul/ui";
-import { updateSale, type SaleActionResult } from "./actions";
+import { updateSale, type SaleActionResult } from "./sale-actions";
 
 type SaleDto = components["schemas"]["SaleDto"];
 type Channel = components["schemas"]["SaleChannelOptionDto"];

@@ -118,5 +118,6 @@ export async function createSale(_previous: CreateSaleResult, formData: FormData
 
   revalidatePath("/orders");
   revalidatePath("/inventory");
-  redirect(`/orders/sales/${result.data.id}`);
+  // Land on the order the sale belongs to — the sale is managed inline there now.
+  redirect(result.data.orderId ? `/orders/${result.data.orderId}` : "/orders");
 }

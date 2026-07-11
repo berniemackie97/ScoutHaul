@@ -2,20 +2,34 @@
 
 import { Fragment, useState } from "react";
 import Link from "next/link";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronRight, History } from "lucide-react";
 import type { components } from "@overhaul/api-client";
 import { Badge, Button } from "@overhaul/ui";
-import { RefundPanel } from "../sales/[id]/refund-panel";
+import { RefundPanel } from "./refund-panel";
+import { SaleEditor } from "./sale-editor";
 import { OrderReturns } from "./order-returns";
 
 type OrderLine = components["schemas"]["OrderLineDto"];
 type Refund = components["schemas"]["RefundDto"];
 type ReturnDto = components["schemas"]["ReturnDto"];
+type Channel = components["schemas"]["SaleChannelOptionDto"];
+type Correction = components["schemas"]["SaleCorrectionDto"];
 
 const money = (value: number | null | undefined) =>
   typeof value === "number"
     ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value)
     : "—";
+const dateTime = (value: string | null | undefined) =>
+  value ? new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)) : "—";
+function netFrom(json: string | null | undefined): number | null {
+  if (!json) return null;
+  try {
+    const parsed = JSON.parse(json) as { NetProfit?: number };
+    return typeof parsed.NetProfit === "number" ? parsed.NetProfit : null;
+  } catch {
+    return null;
+  }
+}
 
 const saleStatusVariant = (status: string | undefined) => {
   if (status === "Delivered") return "success" as const;
@@ -28,13 +42,17 @@ const saleStatusVariant = (status: string | undefined) => {
 export function LineItems({
   lines,
   orderId,
+  channels,
   refundsBySale,
   returnsBySale,
+  correctionsBySale,
 }: {
   lines: OrderLine[];
   orderId: string;
+  channels: Channel[];
   refundsBySale: Record<string, Refund[]>;
   returnsBySale: Record<string, ReturnDto[]>;
+  correctionsBySale: Record<string, Correction[]>;
 }) {
   const [openId, setOpenId] = useState<string | null>(null);
 
@@ -131,12 +149,8 @@ export function LineItems({
                           />
                         </div>
                         <RefundPanel saleId={sale.id} refunds={refundsBySale[sale.id] ?? []} />
-                        <Link
-                          href={`/orders/sales/${sale.id}`}
-                          className="text-brand-700 inline-block text-xs hover:underline"
-                        >
-                          Correct fees / price &amp; view full history →
-                        </Link>
+                        <SaleEditor sale={sale} channels={channels} />
+                        <CorrectionHistory corrections={correctionsBySale[sale.id] ?? []} />
                       </div>
                     </td>
                   </tr>
@@ -146,6 +160,41 @@ export function LineItems({
           })}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+function CorrectionHistory({ corrections }: { corrections: Correction[] }) {
+  if (corrections.length === 0) {
+    return <p className="text-muted-foreground text-xs">No corrections — unchanged since it was recorded.</p>;
+  }
+  return (
+    <div className="space-y-3 rounded-xl border p-4">
+      <p className="text-muted-foreground flex items-center gap-2 text-xs uppercase tracking-wide">
+        <History className="h-3.5 w-3.5" /> Correction history
+      </p>
+      {corrections.map((correction) => {
+        const before = netFrom(correction.beforeJson);
+        const after = netFrom(correction.afterJson);
+        return (
+          <div key={correction.id} className="border-border border-l-2 pl-3 text-sm">
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-medium">#{correction.version}</span>
+              <span className="text-muted-foreground text-xs">{dateTime(correction.correctedAt)}</span>
+            </div>
+            <p className="text-muted-foreground mt-0.5">{correction.reason}</p>
+            <p className="text-muted-foreground mt-1 text-xs">
+              by {correction.correctedBy}
+              {before !== null && after !== null && (
+                <>
+                  {" "}
+                  · net {money(before)} → <span className="text-foreground font-medium">{money(after)}</span>
+                </>
+              )}
+            </p>
+          </div>
+        );
+      })}
     </div>
   );
 }
