@@ -46,6 +46,12 @@ public sealed class PlatformListing : EntityBase, IOrganizationScoped
     public Guid? ReconciledInventoryItemId { get; set; }
     public InventoryItem? ReconciledInventoryItem { get; set; }
     public Guid? ReconciledChannelListingId { get; set; }
+    /// <summary>
+    /// True when reconciling this imported listing created the linked <see cref="ChannelListing"/>.
+    /// Used by unlink so we can remove records ScoutHaul created without deleting a legitimate
+    /// pre-existing channel listing that was merely matched.
+    /// </summary>
+    public bool CreatedChannelListingOnReconcile { get; set; }
     public DateTimeOffset? ReconciledAt { get; set; }
 
     public DateTimeOffset ScrapedAt { get; set; } = DateTimeOffset.UtcNow;

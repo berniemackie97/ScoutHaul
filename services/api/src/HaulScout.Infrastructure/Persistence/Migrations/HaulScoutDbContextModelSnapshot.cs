@@ -2030,6 +2030,11 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<bool>("CreatedChannelListingOnReconcile")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
                     b.Property<string>("Currency")
                         .IsRequired()
                         .HasMaxLength(3)

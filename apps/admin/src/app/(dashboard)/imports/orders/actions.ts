@@ -58,7 +58,7 @@ export async function reconcilePlatformOrder(
   if (!result.data?.saleGroupId)
     return { ok: false, message: errorMessage(result.error, "The order could not be reconciled.") };
 
-  revalidatePath("/finance/platform-orders");
+  revalidatePath("/imports/orders");
   revalidatePath("/finance");
   revalidatePath("/inventory");
   const created = result.data.createdSaleCount ?? 0;
@@ -84,6 +84,6 @@ export async function ignorePlatformOrder(
   if (!result.data?.id)
     return { ok: false, message: errorMessage(result.error, "The order could not be ignored.") };
 
-  revalidatePath("/finance/platform-orders");
+  revalidatePath("/imports/orders");
   return { ok: true, message: "Order set aside." };
 }

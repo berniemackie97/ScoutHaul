@@ -44,7 +44,7 @@ export async function importEbayOrders(
   revalidatePath("/imports");
   revalidatePath("/orders");
   revalidatePath("/finance");
-  revalidatePath("/finance/platform-orders");
+  revalidatePath("/imports/orders");
   const { created, updated, skipped } = result.data;
   return {
     ok: true,
@@ -72,7 +72,7 @@ export async function importEbayListings(
     };
 
   revalidatePath("/imports");
-  revalidatePath("/listings");
+  revalidatePath("/imports/listings");
   revalidatePath("/inventory");
   const { created, updated, skipped } = result.data;
   return {

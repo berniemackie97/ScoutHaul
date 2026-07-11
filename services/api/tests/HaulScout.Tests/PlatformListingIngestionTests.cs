@@ -79,6 +79,7 @@ public class PlatformListingIngestionTests
         PlatformListing linked = await db.PlatformListings.SingleAsync();
         Assert.Equal(PlatformListingReconcileStatus.Linked, linked.ReconcileStatus);
         Assert.Equal(item.Id, linked.ReconciledInventoryItemId);
+        Assert.True(linked.CreatedChannelListingOnReconcile);
     }
 
     [Fact]
@@ -99,6 +100,82 @@ public class PlatformListingIngestionTests
         Assert.Equal(1, await db.InventoryItems.CountAsync()); // no new item
         ChannelListing channel = await db.ChannelListings.SingleAsync();
         Assert.Equal(item.Id, channel.InventoryItemId);
+    }
+
+    [Fact]
+    public async Task Unlink_reverts_to_pending_and_removes_channel_listing_created_by_reconcile()
+    {
+        (HaulScoutDbContext db, Guid org, Guid user) = NewContext(nameof(Unlink_reverts_to_pending_and_removes_channel_listing_created_by_reconcile));
+        await using HaulScoutDbContext _ = db;
+        PlatformListingsController controller = new(db, new StubCurrentUser(org, user));
+        await controller.Ingest(new IngestPlatformListingsRequest("eBay", [Listing("EB-UNLINK", "Vintage Camera", 120m)]), CancellationToken.None);
+        PlatformListing listing = await db.PlatformListings.SingleAsync();
+        await controller.Reconcile(listing.Id, new ReconcilePlatformListingRequest(CreateNewItem: true), CancellationToken.None);
+
+        ActionResult<PlatformListingDto> result = await controller.Unlink(listing.Id, CancellationToken.None);
+
+        PlatformListingDto dto = result.Value!;
+        Assert.Equal(PlatformListingReconcileStatus.Pending, dto.ReconcileStatus);
+        Assert.Null(dto.ReconciledInventoryItemId);
+        PlatformListing stored = await db.PlatformListings.SingleAsync();
+        Assert.False(stored.CreatedChannelListingOnReconcile);
+        Assert.Null(stored.ReconciledChannelListingId);
+        Assert.Equal(0, await db.ChannelListings.CountAsync());
+    }
+
+    [Fact]
+    public async Task Unlink_preserves_channel_listing_that_existed_before_reconcile()
+    {
+        (HaulScoutDbContext db, Guid org, Guid user) = NewContext(nameof(Unlink_preserves_channel_listing_that_existed_before_reconcile));
+        await using HaulScoutDbContext _ = db;
+        InventoryItem first = new() { OrganizationId = org, Title = "First Camera", Status = InventoryStatus.ReadyToList };
+        InventoryItem second = new() { OrganizationId = org, Title = "Second Camera", Status = InventoryStatus.ReadyToList };
+        ChannelAccount account = new() { OrganizationId = org, Channel = "eBay", DisplayName = "eBay", ConnectedAt = DateTimeOffset.UtcNow };
+        db.InventoryItems.AddRange(first, second);
+        db.ChannelAccounts.Add(account);
+        await db.SaveChangesAsync();
+        db.ChannelListings.Add(new ChannelListing
+        {
+            OrganizationId = org,
+            InventoryItemId = first.Id,
+            ChannelAccountId = account.Id,
+            ExternalListingId = "EB-PREEXISTING",
+        });
+        await db.SaveChangesAsync();
+
+        PlatformListingsController controller = new(db, new StubCurrentUser(org, user));
+        await controller.Ingest(new IngestPlatformListingsRequest("eBay", [Listing("EB-PREEXISTING", "Vintage Camera", 120m)]), CancellationToken.None);
+        PlatformListing listing = await db.PlatformListings.SingleAsync();
+        await controller.Reconcile(listing.Id, new ReconcilePlatformListingRequest(InventoryItemId: second.Id), CancellationToken.None);
+
+        await controller.Unlink(listing.Id, CancellationToken.None);
+
+        ChannelListing channel = await db.ChannelListings.SingleAsync();
+        Assert.Equal(second.Id, channel.InventoryItemId); // unlink removes only the import reconciliation, not an existing channel record.
+        Assert.Equal(PlatformListingReconcileStatus.Pending, (await db.PlatformListings.SingleAsync()).ReconcileStatus);
+    }
+
+    [Fact]
+    public async Task Reconcile_again_moves_the_channel_listing_to_the_new_inventory_item()
+    {
+        (HaulScoutDbContext db, Guid org, Guid user) = NewContext(nameof(Reconcile_again_moves_the_channel_listing_to_the_new_inventory_item));
+        await using HaulScoutDbContext _ = db;
+        InventoryItem first = new() { OrganizationId = org, Title = "First Camera", Status = InventoryStatus.ReadyToList };
+        InventoryItem second = new() { OrganizationId = org, Title = "Second Camera", Status = InventoryStatus.ReadyToList };
+        db.InventoryItems.AddRange(first, second);
+        await db.SaveChangesAsync();
+        PlatformListingsController controller = new(db, new StubCurrentUser(org, user));
+        await controller.Ingest(new IngestPlatformListingsRequest("eBay", [Listing("EB-RELINK", "Vintage Camera", 120m)]), CancellationToken.None);
+        PlatformListing listing = await db.PlatformListings.SingleAsync();
+        await controller.Reconcile(listing.Id, new ReconcilePlatformListingRequest(InventoryItemId: first.Id), CancellationToken.None);
+
+        await controller.Reconcile(listing.Id, new ReconcilePlatformListingRequest(InventoryItemId: second.Id), CancellationToken.None);
+
+        ChannelListing channel = await db.ChannelListings.SingleAsync();
+        Assert.Equal(second.Id, channel.InventoryItemId);
+        PlatformListing linked = await db.PlatformListings.SingleAsync();
+        Assert.Equal(second.Id, linked.ReconciledInventoryItemId);
+        Assert.True(linked.CreatedChannelListingOnReconcile);
     }
 
     [Fact]
@@ -133,9 +210,9 @@ public class PlatformListingIngestionTests
     }
 
     [Fact]
-    public async Task Ignored_listings_are_skipped_on_reingest()
+    public async Task Ignored_listings_refresh_on_reingest_but_stay_ignored_until_restored()
     {
-        (HaulScoutDbContext db, Guid org, Guid user) = NewContext(nameof(Ignored_listings_are_skipped_on_reingest));
+        (HaulScoutDbContext db, Guid org, Guid user) = NewContext(nameof(Ignored_listings_refresh_on_reingest_but_stay_ignored_until_restored));
         await using HaulScoutDbContext _ = db;
         PlatformListingsController controller = new(db, new StubCurrentUser(org, user));
         await controller.Ingest(new IngestPlatformListingsRequest("eBay", [Listing("EB-6", "Thing", 10m)]), CancellationToken.None);
@@ -143,7 +220,13 @@ public class PlatformListingIngestionTests
         await controller.Ignore(listing.Id, CancellationToken.None);
 
         ActionResult<IngestPlatformListingsResultDto> reingest = await controller.Ingest(new IngestPlatformListingsRequest("eBay", [Listing("EB-6", "Thing", 999m)]), CancellationToken.None);
-        Assert.Equal(1, reingest.Value!.Skipped);
-        Assert.Equal(10m, (await db.PlatformListings.SingleAsync()).Price); // untouched
+        Assert.Equal(0, reingest.Value!.Skipped);
+        Assert.Equal(1, reingest.Value!.Updated);
+        PlatformListing refreshed = await db.PlatformListings.SingleAsync();
+        Assert.Equal(999m, refreshed.Price);
+        Assert.Equal(PlatformListingReconcileStatus.Ignored, refreshed.ReconcileStatus);
+
+        await controller.Unlink(refreshed.Id, CancellationToken.None);
+        Assert.Equal(PlatformListingReconcileStatus.Pending, (await db.PlatformListings.SingleAsync()).ReconcileStatus);
     }
 }
