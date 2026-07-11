@@ -7,7 +7,7 @@ import { getApiClient } from "@/lib/api";
 import { OrderStatusControl } from "./order-status-control";
 import { OrderTrackingCard } from "./order-tracking-card";
 import { OrderDeleteButton } from "./order-delete-button";
-import { OrderReturns } from "./order-returns";
+import { LineItems } from "./line-items";
 
 export const dynamic = "force-dynamic";
 
@@ -29,14 +29,6 @@ const orderStatusVariant = (status: string | undefined) => {
   if (["Paid", "Fulfilling", "Shipped"].includes(status ?? "")) return "info" as const;
   return "secondary" as const;
 };
-const saleStatusVariant = (status: string | undefined) => {
-  if (status === "Delivered") return "success" as const;
-  if (["Returned", "Refunded", "Cancelled"].includes(status ?? "")) return "destructive" as const;
-  if (["ReturnRequested", "PartiallyRefunded"].includes(status ?? "")) return "warning" as const;
-  if (["Packed", "Shipped"].includes(status ?? "")) return "info" as const;
-  return "secondary" as const;
-};
-
 type OrderStatus =
   | "Pending"
   | "Paid"
@@ -78,14 +70,24 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
     .map((line) => line.sale)
     .filter((sale): sale is OrderLineSale => Boolean(sale));
 
-  // Returns live on the sale line; fetch them per line so each can be started/advanced from the order.
-  const returnsBySale = new Map(
-    await Promise.all(
-      saleLines.map(async (sale) => {
-        const { data } = await api.GET("/api/sales/{id}/returns", { params: { path: { id: sale.id! } } });
-        return [sale.id!, data ?? []] as const;
-      }),
-    ),
+  // Refunds and returns live on the sale line; fetch them per line so the whole sale can be managed inline on the
+  // order (refund, return, correct) instead of on a separate buried page.
+  type Refund = components["schemas"]["RefundDto"];
+  type ReturnDto = components["schemas"]["ReturnDto"];
+  const perLine = await Promise.all(
+    saleLines.map(async (sale) => {
+      const [{ data: returns }, { data: refunds }] = await Promise.all([
+        api.GET("/api/sales/{id}/returns", { params: { path: { id: sale.id! } } }),
+        api.GET("/api/sales/{id}/refunds", { params: { path: { id: sale.id! } } }),
+      ]);
+      return { id: sale.id!, returns: returns ?? [], refunds: refunds ?? [] };
+    }),
+  );
+  const returnsBySale: Record<string, ReturnDto[]> = Object.fromEntries(
+    perLine.map((entry) => [entry.id, entry.returns]),
+  );
+  const refundsBySale: Record<string, Refund[]> = Object.fromEntries(
+    perLine.map((entry) => [entry.id, entry.refunds]),
   );
   const saleFinancials = saleLines.reduce<SaleFinancials>(
     (total, sale) => ({
@@ -173,91 +175,12 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
               <CardTitle className="text-lg">Line items</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
-              <table className="w-full text-sm">
-                <thead className="bg-muted/40 text-muted-foreground border-y text-left text-xs uppercase tracking-wide">
-                  <tr>
-                    <th className="px-4 py-2 font-medium">Item</th>
-                    <th className="px-4 py-2 font-medium">Sale</th>
-                    <th className="px-4 py-2 text-right font-medium">Item</th>
-                    <th className="px-4 py-2 text-right font-medium">Buyer ship</th>
-                    <th className="px-4 py-2 text-right font-medium">Fees</th>
-                    <th className="px-4 py-2 text-right font-medium">COGS</th>
-                    <th className="px-4 py-2 text-right font-medium">Refunded</th>
-                    <th className="px-4 py-2 text-right font-medium">Qty</th>
-                    <th className="px-4 py-2 text-right font-medium">True net</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {lines.map((line) => {
-                    const sale = line.sale;
-                    const fees = (sale?.platformFees ?? 0) + (sale?.paymentFees ?? 0);
-                    const refunded = sale?.totalRefunded ?? 0;
-                    return (
-                      <tr key={line.id}>
-                        <td className="px-4 py-3">
-                          <Link
-                            href={`/inventory/${line.inventoryItemId}`}
-                            className="font-medium hover:underline"
-                          >
-                            {line.titleSnapshot}
-                          </Link>
-                          {line.skuSnapshot && (
-                            <span className="text-muted-foreground block text-xs">
-                              SKU {line.skuSnapshot}
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3">
-                          {sale?.id ? (
-                            <div className="space-y-1">
-                              <Badge variant={saleStatusVariant(sale.status)}>{sale.status}</Badge>
-                              <Link
-                                href={`/orders/sales/${sale.id}`}
-                                className="text-brand-700 block text-xs hover:underline"
-                              >
-                                Correct sale financials
-                              </Link>
-                              <OrderReturns
-                                saleId={sale.id}
-                                orderId={id}
-                                soldPrice={sale.soldPrice ?? 0}
-                                returns={returnsBySale.get(sale.id) ?? []}
-                              />
-                            </div>
-                          ) : (
-                            <span className="text-muted-foreground text-xs">No sale line</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-right tabular-nums">
-                          {money(line.unitPrice)}
-                        </td>
-                        <td className="px-4 py-3 text-right tabular-nums">
-                          {money(sale?.shippingCharged)}
-                        </td>
-                        <td className="px-4 py-3 text-right tabular-nums">
-                          {sale ? (fees > 0 ? `-${money(fees)}` : money(0)) : "—"}
-                        </td>
-                        <td className="px-4 py-3 text-right tabular-nums">
-                          {money(sale?.costOfGoods ?? line.unitCostSnapshot)}
-                        </td>
-                        <td className="px-4 py-3 text-right tabular-nums">
-                          {refunded > 0 ? (
-                            <span className="text-amber-700">-{money(refunded)}</span>
-                          ) : (
-                            <span className="text-muted-foreground text-xs">—</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-right tabular-nums">{line.quantity}</td>
-                        <td
-                          className={`px-4 py-3 text-right font-medium tabular-nums ${(sale?.netProfit ?? 0) < 0 ? "text-destructive" : ""}`}
-                        >
-                          {money(sale?.netProfit)}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+              <LineItems
+                lines={lines}
+                orderId={id}
+                refundsBySale={refundsBySale}
+                returnsBySale={returnsBySale}
+              />
             </CardContent>
           </Card>
 

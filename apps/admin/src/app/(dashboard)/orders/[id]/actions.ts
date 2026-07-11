@@ -121,11 +121,17 @@ export async function receiveReturn(returnId: string, orderId: string): Promise<
   return { ok: true, message: "Return received." };
 }
 
-export async function resolveReturn(returnId: string, orderId: string, itemAmount: number, restock: boolean): Promise<OrderActionResult> {
+export async function resolveReturn(
+  returnId: string,
+  orderId: string,
+  itemAmount: number,
+  restock: boolean,
+  type: "Partial" | "Full",
+): Promise<OrderActionResult> {
   const api = await getApiClient();
   const r = await api.POST("/api/sales/returns/{returnId}/resolve", {
     params: { path: { returnId } },
-    body: { itemAmount, type: "Full", restock },
+    body: { itemAmount, type, restock },
   });
   if (r.error || !r.data) return { ok: false, message: "The refund could not be issued." };
   await revalidateOrder(orderId);

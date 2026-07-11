@@ -19,17 +19,18 @@ type Action = {
   variant?: "default" | "outline" | "destructive";
 };
 
-// Shipment movement belongs to the Package tracking form. This control only covers payment and exception
-// actions so operators do not have to mark the same shipment state in two places.
+// Shipment movement belongs to the Package tracking form; refunds/returns are money events recorded per line.
+// This control only covers payment and cancellation, so nothing is edited in two places. A "Refunded" order
+// status is derived from real refund events on the lines — never flipped by hand here.
 const NEXT_ACTIONS: Record<OrderStatus, Action[]> = {
   Pending: [
     { label: "Mark paid", status: "Paid" },
     { label: "Cancel", status: "Cancelled", variant: "destructive" },
   ],
-  Paid: [{ label: "Refund", status: "Refunded", variant: "outline" }],
-  Fulfilling: [{ label: "Refund", status: "Refunded", variant: "outline" }],
-  Shipped: [{ label: "Refund", status: "Refunded", variant: "outline" }],
-  Delivered: [{ label: "Refund", status: "Refunded", variant: "outline" }],
+  Paid: [{ label: "Cancel", status: "Cancelled", variant: "destructive" }],
+  Fulfilling: [{ label: "Cancel", status: "Cancelled", variant: "destructive" }],
+  Shipped: [],
+  Delivered: [],
   Cancelled: [],
   Refunded: [],
 };

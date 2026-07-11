@@ -106,11 +106,11 @@ export function OrderReturns({
               <>
                 <Action pending={pending} label="Refund + restock" onClick={() => {
                   const amt = num("Item amount to refund:", soldPrice);
-                  if (amt !== null) run(() => resolveReturn(open.id!, orderId, amt, true));
+                  if (amt !== null) run(() => resolveReturn(open.id!, orderId, amt, true, amt < soldPrice ? "Partial" : "Full"));
                 }} />
                 <Action pending={pending} label="Refund, keep item" onClick={() => {
                   const amt = num("Item amount to refund:", soldPrice);
-                  if (amt !== null) run(() => resolveReturn(open.id!, orderId, amt, false));
+                  if (amt !== null) run(() => resolveReturn(open.id!, orderId, amt, false, amt < soldPrice ? "Partial" : "Full"));
                 }} />
                 <Action pending={pending} label="Reject" onClick={() => {
                   const reason = window.prompt("Reason for rejecting?");
