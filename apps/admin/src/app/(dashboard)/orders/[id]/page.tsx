@@ -7,6 +7,7 @@ import { getApiClient } from "@/lib/api";
 import { OrderStatusControl } from "./order-status-control";
 import { OrderTrackingCard } from "./order-tracking-card";
 import { OrderDeleteButton } from "./order-delete-button";
+import { OrderReturns } from "./order-returns";
 
 export const dynamic = "force-dynamic";
 
@@ -76,6 +77,16 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   const saleLines = lines
     .map((line) => line.sale)
     .filter((sale): sale is OrderLineSale => Boolean(sale));
+
+  // Returns live on the sale line; fetch them per line so each can be started/advanced from the order.
+  const returnsBySale = new Map(
+    await Promise.all(
+      saleLines.map(async (sale) => {
+        const { data } = await api.GET("/api/sales/{id}/returns", { params: { path: { id: sale.id! } } });
+        return [sale.id!, data ?? []] as const;
+      }),
+    ),
+  );
   const saleFinancials = saleLines.reduce<SaleFinancials>(
     (total, sale) => ({
       itemRevenue: total.itemRevenue + (sale.soldPrice ?? 0),
@@ -206,6 +217,12 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                               >
                                 Correct sale financials
                               </Link>
+                              <OrderReturns
+                                saleId={sale.id}
+                                orderId={id}
+                                soldPrice={sale.soldPrice ?? 0}
+                                returns={returnsBySale.get(sale.id) ?? []}
+                              />
                             </div>
                           ) : (
                             <span className="text-muted-foreground text-xs">No sale line</span>

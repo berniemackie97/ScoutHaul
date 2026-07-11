@@ -90,3 +90,60 @@ export async function updateOrderTracking(
     return { ok: true, message: "Tracking saved and order marked shipped." };
   return { ok: true, message: "Tracking saved." };
 }
+
+// ── Returns (RMA lifecycle) ────────────────────────────────────────────────
+async function revalidateOrder(orderId: string) {
+  revalidatePath("/orders");
+  revalidatePath(`/orders/${orderId}`);
+}
+
+export async function openReturn(saleId: string, orderId: string, reason: string): Promise<OrderActionResult> {
+  const api = await getApiClient();
+  const r = await api.POST("/api/sales/{id}/returns", { params: { path: { id: saleId } }, body: { reason } });
+  if (r.error || !r.data) return { ok: false, message: "The return could not be opened." };
+  await revalidateOrder(orderId);
+  return { ok: true, message: "Return opened." };
+}
+
+export async function issueReturnLabel(returnId: string, orderId: string, returnShippingCost: number): Promise<OrderActionResult> {
+  const api = await getApiClient();
+  const r = await api.POST("/api/sales/returns/{returnId}/label", { params: { path: { returnId } }, body: { returnShippingCost } });
+  if (r.error || !r.data) return { ok: false, message: "The label could not be issued." };
+  await revalidateOrder(orderId);
+  return { ok: true, message: "Return label issued." };
+}
+
+export async function receiveReturn(returnId: string, orderId: string): Promise<OrderActionResult> {
+  const api = await getApiClient();
+  const r = await api.POST("/api/sales/returns/{returnId}/receive", { params: { path: { returnId } } });
+  if (r.error || !r.data) return { ok: false, message: "The return could not be marked received." };
+  await revalidateOrder(orderId);
+  return { ok: true, message: "Return received." };
+}
+
+export async function resolveReturn(returnId: string, orderId: string, itemAmount: number, restock: boolean): Promise<OrderActionResult> {
+  const api = await getApiClient();
+  const r = await api.POST("/api/sales/returns/{returnId}/resolve", {
+    params: { path: { returnId } },
+    body: { itemAmount, type: "Full", restock },
+  });
+  if (r.error || !r.data) return { ok: false, message: "The refund could not be issued." };
+  await revalidateOrder(orderId);
+  return { ok: true, message: restock ? "Refunded and restocked." : "Refunded." };
+}
+
+export async function rejectReturn(returnId: string, orderId: string, reason: string): Promise<OrderActionResult> {
+  const api = await getApiClient();
+  const r = await api.POST("/api/sales/returns/{returnId}/reject", { params: { path: { returnId } }, body: { reason } });
+  if (r.error || !r.data) return { ok: false, message: "The return could not be rejected." };
+  await revalidateOrder(orderId);
+  return { ok: true, message: "Return rejected." };
+}
+
+export async function cancelReturn(returnId: string, orderId: string): Promise<OrderActionResult> {
+  const api = await getApiClient();
+  const r = await api.POST("/api/sales/returns/{returnId}/cancel", { params: { path: { returnId } } });
+  if (r.error || !r.data) return { ok: false, message: "The return could not be cancelled." };
+  await revalidateOrder(orderId);
+  return { ok: true, message: "Return cancelled." };
+}
