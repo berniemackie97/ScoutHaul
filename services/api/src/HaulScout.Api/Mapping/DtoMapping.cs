@@ -553,6 +553,10 @@ public static class DtoMapping
                 : null;
 
         decimal cogs = item.Lines.Sum(line => (line.UnitCostSnapshot ?? 0) * line.Quantity);
+        // Refunds live on the sale lines; roll them up so the order shows what the buyer was actually charged net.
+        decimal totalRefunded = salesByInventoryItem is null
+            ? 0
+            : salesByInventoryItem.Values.Sum(sale => sale.Refunds.Sum(refund => refund.ItemAmount + refund.ShippingRefunded));
         return new(
             item.Id,
             item.OrderNumber,
@@ -592,7 +596,8 @@ public static class DtoMapping
             item.Channel,
             item.ExternalOrderId,
             item.ExternalOrderUrl,
-            item.BuyerReference);
+            item.BuyerReference,
+            totalRefunded);
     }
 
     public static CustomerAddressDto ToDto(this CustomerAddress item) => new(

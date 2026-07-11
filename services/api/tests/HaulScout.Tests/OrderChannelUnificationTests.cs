@@ -136,6 +136,35 @@ public class OrderChannelUnificationTests
     }
 
     [Fact]
+    public async Task Order_detail_rolls_up_refunds_across_its_lines()
+    {
+        var (db, org, user) = NewContext(nameof(Order_detail_rolls_up_refunds_across_its_lines));
+        await using var _ = db;
+        var (itemId, platformOrderId, lineId) = await SeedEbayOrder(db, org, user, "EB-RF", "buyer_bob");
+        await NewPlatformOrders(db, org, user).Reconcile(platformOrderId,
+            new ReconcilePlatformOrderRequest([new ReconcilePlatformOrderLineMap(lineId, itemId)]), CancellationToken.None);
+
+        Order order = await db.Orders.SingleAsync();
+        Sale sale = await db.Sales.SingleAsync(item => item.OrderId == order.Id);
+        db.Refunds.Add(new Refund
+        {
+            OrganizationId = org,
+            SaleId = sale.Id,
+            Type = RefundType.Partial,
+            ItemAmount = 20m,
+            ShippingRefunded = 5m,
+            Reason = "Buyer kept it, partial refund",
+            RecordedByUserId = user,
+        });
+        await db.SaveChangesAsync();
+
+        ActionResult<OrderDetailDto> result = await NewOrders(db, org, user).Get(order.Id, CancellationToken.None);
+
+        // Buyer money refunded rolls up to the order: 20 item + 5 shipping.
+        Assert.Equal(25m, result.Value!.TotalRefunded);
+    }
+
+    [Fact]
     public async Task Deleting_an_order_removes_it_and_its_lines_but_preserves_the_sale()
     {
         var (db, org, user) = NewContext(nameof(Deleting_an_order_removes_it_and_its_lines_but_preserves_the_sale));

@@ -1202,7 +1202,9 @@ public sealed record OrderDetailDto(
     string Channel = "Storefront",
     string? ExternalOrderId = null,
     string? ExternalOrderUrl = null,
-    string? BuyerReference = null);
+    string? BuyerReference = null,
+    // Buyer money refunded across every line of the order (item + shipping). Net received = GrandTotal − TotalRefunded.
+    decimal TotalRefunded = 0);
 
 public sealed record UpdateOrderStatusRequest(OrderStatus Status);
 
