@@ -7511,6 +7511,8 @@ export interface components {
             externalOrderId?: string | null;
             externalOrderUrl?: string | null;
             buyerReference?: string | null;
+            /** Format: double */
+            totalRefunded?: number;
         };
         OrderLineDto: {
             /** Format: uuid */

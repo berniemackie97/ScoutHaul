@@ -11262,6 +11262,10 @@
           "buyerReference": {
             "type": "string",
             "nullable": true
+          },
+          "totalRefunded": {
+            "type": "number",
+            "format": "double"
           }
         },
         "additionalProperties": false

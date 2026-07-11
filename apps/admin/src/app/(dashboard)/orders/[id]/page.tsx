@@ -283,6 +283,20 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                   <span className="tabular-nums">{money(value)}</span>
                 </div>
               ))}
+              {(order.totalRefunded ?? 0) > 0 && (
+                <>
+                  <div className="flex justify-between text-amber-700">
+                    <span>Refunded to buyer</span>
+                    <span className="tabular-nums">-{money(order.totalRefunded)}</span>
+                  </div>
+                  <div className="flex justify-between border-t pt-2 font-semibold">
+                    <span>Net received</span>
+                    <span className="tabular-nums">
+                      {money((order.grandTotal ?? 0) - (order.totalRefunded ?? 0))}
+                    </span>
+                  </div>
+                </>
+              )}
               <div className="text-muted-foreground flex justify-between pt-2 text-xs">
                 <span>Merchandise margin (ex tax/ship)</span>
                 <span className="tabular-nums">{money(order.grossMargin)}</span>
