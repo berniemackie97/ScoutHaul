@@ -1206,6 +1206,11 @@ public sealed record OrderDetailDto(
 
 public sealed record UpdateOrderStatusRequest(OrderStatus Status);
 
+/// <summary>Combine several orders into one (e.g. items a buyer purchased together but recorded as separate sales).
+/// The lines and sales move onto a single surviving order; the emptied orders are removed. When
+/// <see cref="SurvivingOrderId"/> is null the oldest order in the set survives so its original number/history is kept.</summary>
+public sealed record MergeOrdersRequest(IReadOnlyList<Guid> OrderIds, Guid? SurvivingOrderId = null);
+
 public sealed record UpdateOrderTrackingRequest(
     string? ShippingCarrier,
     string? TrackingNumber,

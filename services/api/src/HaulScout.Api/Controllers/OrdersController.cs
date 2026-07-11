@@ -15,8 +15,10 @@ namespace HaulScout.Api.Controllers;
 [ApiController]
 [Route("api/orders")]
 [RequireOrganizationPermission(HaulScoutPermissions.ManageOrders)]
-public sealed class OrdersController(HaulScoutDbContext db, ICurrentUserContext currentUser) : ControllerBase
+public sealed class OrdersController(HaulScoutDbContext db, ICurrentUserContext currentUser, OrderAssembler? orderAssembler = null) : ControllerBase
 {
+    private OrderAssembler OrderWriter => orderAssembler ?? new OrderAssembler(db, currentUser);
+
     /// <summary>Orders from every channel — the storefront is simply one of them. Pass <paramref name="channel"/>
     /// to narrow to a single marketplace.</summary>
     [HttpGet]
@@ -347,6 +349,82 @@ public sealed class OrdersController(HaulScoutDbContext db, ICurrentUserContext 
         db.Orders.Remove(order);
         await db.SaveChangesAsync(cancellationToken);
         return NoContent();
+    }
+
+    /// <summary>
+    /// Combines several orders into one. Lines and sales move onto the surviving order (the oldest by default, so its
+    /// original number and history are kept); the emptied orders are removed. This is how separately recorded sales
+    /// that a buyer actually purchased together get bundled into a single order.
+    /// </summary>
+    [HttpPost("merge")]
+    public async Task<ActionResult<OrderDetailDto>> Merge(MergeOrdersRequest request, CancellationToken cancellationToken)
+    {
+        List<Guid> ids = request.OrderIds?.Distinct().ToList() ?? [];
+        if (ids.Count < 2)
+        {
+            return BadRequest("Select at least two orders to merge.");
+        }
+
+        List<Order> orders = await db.Orders
+            .Include(order => order.Lines)
+            .Where(order => ids.Contains(order.Id) && order.OrganizationId == currentUser.OrganizationId)
+            .ToListAsync(cancellationToken);
+        if (orders.Count != ids.Count)
+        {
+            return NotFound("One or more orders were not found.");
+        }
+
+        // Merging across channels would fabricate an order that never existed on any marketplace.
+        if (orders.Select(order => order.Channel).Distinct().Count() > 1)
+        {
+            return BadRequest("Orders on different channels cannot be merged.");
+        }
+
+        Order surviving = request.SurvivingOrderId is Guid pinned
+            ? orders.SingleOrDefault(order => order.Id == pinned) ?? orders.OrderBy(order => order.CreatedAt).First()
+            : orders.OrderBy(order => order.CreatedAt).First();
+        List<Order> merged = orders.Where(order => order.Id != surviving.Id).ToList();
+        List<Guid> mergedIds = merged.Select(order => order.Id).ToList();
+
+        List<Sale> movedSales = await db.Sales
+            .Where(sale => sale.OrderId != null && mergedIds.Contains(sale.OrderId.Value)
+                && sale.OrganizationId == currentUser.OrganizationId)
+            .ToListAsync(cancellationToken);
+
+        // Drop the merged orders' lines (the surviving order's are rebuilt from every sale below), reparent the sales
+        // onto the surviving order, then delete the now-empty orders. The sales are reassigned before the delete so
+        // the Sale→Order SetNull never fires.
+        foreach (Order order in merged.Where(order => order.Lines.Count > 0))
+        {
+            db.OrderLines.RemoveRange(order.Lines);
+        }
+
+        await OrderWriter.SyncSalesOrderAsync(surviving, movedSales, cancellationToken);
+        db.Orders.RemoveRange(merged);
+
+        db.AuditLogs.Add(new AuditLog
+        {
+            OrganizationId = currentUser.OrganizationId,
+            ActorUserId = currentUser.UserId,
+            EntityName = nameof(Order),
+            EntityId = surviving.Id,
+            Action = "OrdersMerged",
+            DetailsJson = JsonSerializer.Serialize(new
+            {
+                SurvivingOrderNumber = surviving.OrderNumber,
+                MergedOrderIds = mergedIds,
+                MovedSaleCount = movedSales.Count,
+            }),
+        });
+
+        await db.SaveChangesAsync(cancellationToken);
+
+        Order refreshed = await db.Orders
+            .Include(order => order.Customer)
+            .Include(order => order.Lines)
+            .SingleAsync(order => order.Id == surviving.Id && order.OrganizationId == currentUser.OrganizationId, cancellationToken);
+        IReadOnlyDictionary<Guid, Sale> salesByInventoryItem = await SalesByInventoryItemAsync(surviving.Id, cancellationToken);
+        return refreshed.ToDetailDto(salesByInventoryItem);
     }
 
     // Financial states are never overwritten by fulfillment — a refunded/returned/cancelled line stays that way.

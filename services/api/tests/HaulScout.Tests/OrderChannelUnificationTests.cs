@@ -317,6 +317,58 @@ public class OrderChannelUnificationTests
     }
 
     [Fact]
+    public async Task Merging_orders_consolidates_lines_and_sales_and_removes_the_empty_order()
+    {
+        var (db, org, user) = NewContext(nameof(Merging_orders_consolidates_lines_and_sales_and_removes_the_empty_order));
+        await using var _ = db;
+        InventoryItem a = await SeedItem(db, org, "Game A");
+        InventoryItem b = await SeedItem(db, org, "Game B");
+        SalesController sales = NewSales(db, org, user);
+
+        // Two sales the buyer made together but recorded under separate order numbers → two separate orders.
+        await sales.Record(new RecordSaleRequest(a.Id, null, "eBay", 20m, 2m, 0m, 3m, 0m, 0m,
+            DateTimeOffset.UtcNow.AddDays(-3), null, ShippingCharged: 4m, ExternalOrderId: "EB-A"), CancellationToken.None);
+        await sales.Record(new RecordSaleRequest(b.Id, null, "eBay", 30m, 3m, 0m, 0m, 0m, 0m,
+            DateTimeOffset.UtcNow.AddDays(-2), null, ShippingCharged: 5m, ExternalOrderId: "EB-B"), CancellationToken.None);
+        List<Guid> ids = (await db.Orders.ToListAsync()).Select(order => order.Id).ToList();
+        Assert.Equal(2, ids.Count);
+
+        ActionResult<OrderDetailDto> result = await NewOrders(db, org, user).Merge(
+            new MergeOrdersRequest(ids), CancellationToken.None);
+
+        // One order remains, holding both lines and both sales, with summed totals.
+        Order survivor = Assert.Single(await db.Orders.ToListAsync());
+        Assert.Equal(survivor.Id, result.Value!.Id);
+        Assert.Equal(2, await db.OrderLines.CountAsync(line => line.OrderId == survivor.Id));
+        Assert.Equal(2, await db.Sales.CountAsync(sale => sale.OrderId == survivor.Id));
+        Assert.Equal(50m, survivor.Subtotal);       // 20 + 30
+        Assert.Equal(9m, survivor.ShippingTotal);   // 4 + 5
+        Assert.Equal(59m, survivor.GrandTotal);
+    }
+
+    [Fact]
+    public async Task Merging_orders_on_different_channels_is_rejected()
+    {
+        var (db, org, user) = NewContext(nameof(Merging_orders_on_different_channels_is_rejected));
+        await using var _ = db;
+        InventoryItem a = await SeedItem(db, org, "Game A");
+        InventoryItem b = await SeedItem(db, org, "Game B");
+        SalesController sales = NewSales(db, org, user);
+
+        await sales.Record(new RecordSaleRequest(a.Id, null, "eBay", 20m, 2m, 0m, 0m, 0m, 0m,
+            DateTimeOffset.UtcNow.AddDays(-2), null, ExternalOrderId: "EB-X"), CancellationToken.None);
+        await sales.Record(new RecordSaleRequest(b.Id, null, "Poshmark", 30m, 3m, 0m, 0m, 0m, 0m,
+            DateTimeOffset.UtcNow.AddDays(-2), null, ExternalOrderId: "PM-X"), CancellationToken.None);
+        List<Guid> ids = (await db.Orders.ToListAsync()).Select(order => order.Id).ToList();
+
+        ActionResult<OrderDetailDto> result = await NewOrders(db, org, user).Merge(
+            new MergeOrdersRequest(ids), CancellationToken.None);
+
+        Assert.IsType<BadRequestObjectResult>(result.Result);
+        Assert.Equal(2, await db.Orders.CountAsync()); // nothing merged
+    }
+
+    [Fact]
     public async Task Manual_sales_with_same_tracking_number_reuse_one_order_when_order_number_is_missing()
     {
         var (db, org, user) = NewContext(nameof(Manual_sales_with_same_tracking_number_reuse_one_order_when_order_number_is_missing));
