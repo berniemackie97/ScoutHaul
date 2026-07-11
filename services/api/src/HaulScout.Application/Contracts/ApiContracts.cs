@@ -777,6 +777,42 @@ public sealed record RefundDto(
     DateTimeOffset RefundedAt,
     string RecordedBy);
 
+// ── Returns (RMA lifecycle — distinct from the Refund money event) ──────────
+
+public sealed record ReturnDto(
+    Guid Id,
+    Guid SaleId,
+    Guid? OrderId,
+    string InventoryItemTitle,
+    ReturnStatus Status,
+    decimal ReturnShippingCost,
+    string Reason,
+    string? Notes,
+    bool Restocked,
+    Guid? RefundId,
+    DateTimeOffset RequestedAt,
+    DateTimeOffset? LabelIssuedAt,
+    DateTimeOffset? ReceivedAt,
+    DateTimeOffset? ResolvedAt);
+
+public sealed record OpenReturnRequest(string Reason, string? Notes = null);
+
+/// <summary>Issues the buyer's return label; the cost is booked against the sale immediately.</summary>
+public sealed record IssueReturnLabelRequest(decimal ReturnShippingCost, string? Notes = null);
+
+/// <summary>Received + inspected → issue the refund. Restock puts a resellable item back into inventory (frees COGS).</summary>
+public sealed record ResolveReturnRequest(
+    decimal ItemAmount,
+    RefundType Type = RefundType.Full,
+    decimal ShippingRefunded = 0,
+    decimal TaxRefunded = 0,
+    decimal FeeCredit = 0,
+    bool Restock = true,
+    string? Reason = null,
+    string? Notes = null);
+
+public sealed record RejectReturnRequest(string Reason);
+
 public sealed record BundledSaleItemInput(Guid InventoryItemId, decimal? ManualPrice = null);
 public sealed record RecordBundledSaleRequest(
     IReadOnlyList<BundledSaleItemInput> Items,

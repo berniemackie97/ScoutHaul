@@ -155,6 +155,24 @@ public enum RefundType
     Full
 }
 
+/// <summary>Stages of a return (RMA). A refund is issued only once the item is back and inspected (Received), never
+/// at Requested — the seller pays the buyer's return shipping up front and takes the money hit whatever the outcome.</summary>
+public enum ReturnStatus
+{
+    /// <summary>Buyer asked to return; nothing paid or moved yet.</summary>
+    Requested,
+    /// <summary>Return shipping label issued to the buyer (the seller's cost is now booked).</summary>
+    LabelIssued,
+    /// <summary>Item received back and inspected — ready to refund.</summary>
+    Received,
+    /// <summary>Item received and the refund issued (and restocked if resellable). Terminal.</summary>
+    Refunded,
+    /// <summary>Return denied after inspection (e.g. not the item, damaged) — no or reduced refund. Terminal.</summary>
+    Rejected,
+    /// <summary>Return abandoned before completion. Terminal.</summary>
+    Cancelled
+}
+
 public enum WorkTaskStatus
 {
     Open,

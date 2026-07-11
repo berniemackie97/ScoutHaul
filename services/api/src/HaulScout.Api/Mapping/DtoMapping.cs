@@ -373,6 +373,22 @@ public static class DtoMapping
         item.RefundedAt,
         item.RecordedByUser?.DisplayName ?? item.RecordedByUser?.Email ?? "Operator");
 
+    public static ReturnDto ToDto(this Return item) => new(
+        item.Id,
+        item.SaleId,
+        item.OrderId,
+        item.Sale?.InventoryItem?.Title ?? string.Empty,
+        item.Status,
+        item.ReturnShippingCost,
+        item.Reason,
+        item.Notes,
+        item.Restocked,
+        item.RefundId,
+        item.RequestedAt,
+        item.LabelIssuedAt,
+        item.ReceivedAt,
+        item.ResolvedAt);
+
     public static SaleShipmentDto ToDto(this Shipment item) => new(
         item.Id,
         item.SaleId,
