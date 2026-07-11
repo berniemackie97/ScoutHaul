@@ -27,8 +27,10 @@ const nextConfig: NextConfig = {
     return [
       { source: "/finance/new", destination: "/orders/new", permanent: true },
       { source: "/finance/bundled", destination: "/orders/bundled", permanent: true },
-      { source: "/finance/:id", destination: "/orders/sales/:id", permanent: true },
       { source: "/finance", destination: "/analytics", permanent: true },
+      // The per-sale page folded into the order line; both old routes now resolve to Orders.
+      { source: "/finance/:id", destination: "/orders", permanent: true },
+      { source: "/orders/sales/:id", destination: "/orders", permanent: true },
     ];
   },
 };

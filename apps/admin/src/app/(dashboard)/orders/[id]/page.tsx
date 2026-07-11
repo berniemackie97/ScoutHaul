@@ -70,24 +70,33 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
     .map((line) => line.sale)
     .filter((sale): sale is OrderLineSale => Boolean(sale));
 
-  // Refunds and returns live on the sale line; fetch them per line so the whole sale can be managed inline on the
-  // order (refund, return, correct) instead of on a separate buried page.
+  // Refunds, returns and corrections all live on the sale line; fetch them per line so the whole sale can be
+  // managed inline on the order (refund, return, correct fees/price, history) instead of on a separate buried page.
   type Refund = components["schemas"]["RefundDto"];
   type ReturnDto = components["schemas"]["ReturnDto"];
-  const perLine = await Promise.all(
-    saleLines.map(async (sale) => {
-      const [{ data: returns }, { data: refunds }] = await Promise.all([
-        api.GET("/api/sales/{id}/returns", { params: { path: { id: sale.id! } } }),
-        api.GET("/api/sales/{id}/refunds", { params: { path: { id: sale.id! } } }),
-      ]);
-      return { id: sale.id!, returns: returns ?? [], refunds: refunds ?? [] };
-    }),
-  );
+  type Correction = components["schemas"]["SaleCorrectionDto"];
+  const [{ data: reference }, perLine] = await Promise.all([
+    api.GET("/api/sales/reference-data"),
+    Promise.all(
+      saleLines.map(async (sale) => {
+        const [{ data: returns }, { data: refunds }, { data: corrections }] = await Promise.all([
+          api.GET("/api/sales/{id}/returns", { params: { path: { id: sale.id! } } }),
+          api.GET("/api/sales/{id}/refunds", { params: { path: { id: sale.id! } } }),
+          api.GET("/api/sales/{id}/corrections", { params: { path: { id: sale.id! } } }),
+        ]);
+        return { id: sale.id!, returns: returns ?? [], refunds: refunds ?? [], corrections: corrections ?? [] };
+      }),
+    ),
+  ]);
+  const channels = reference?.channels ?? [];
   const returnsBySale: Record<string, ReturnDto[]> = Object.fromEntries(
     perLine.map((entry) => [entry.id, entry.returns]),
   );
   const refundsBySale: Record<string, Refund[]> = Object.fromEntries(
     perLine.map((entry) => [entry.id, entry.refunds]),
+  );
+  const correctionsBySale: Record<string, Correction[]> = Object.fromEntries(
+    perLine.map((entry) => [entry.id, entry.corrections]),
   );
   const saleFinancials = saleLines.reduce<SaleFinancials>(
     (total, sale) => ({
@@ -178,8 +187,10 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
               <LineItems
                 lines={lines}
                 orderId={id}
+                channels={channels}
                 refundsBySale={refundsBySale}
                 returnsBySale={returnsBySale}
+                correctionsBySale={correctionsBySale}
               />
             </CardContent>
           </Card>

@@ -4,7 +4,7 @@ import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
 import type { components } from "@overhaul/api-client";
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Input, Label, Textarea } from "@overhaul/ui";
-import { recordRefund, voidRefund, type SaleActionResult } from "./actions";
+import { recordRefund, voidRefund, type SaleActionResult } from "./sale-actions";
 
 type Refund = components["schemas"]["RefundDto"];
 
