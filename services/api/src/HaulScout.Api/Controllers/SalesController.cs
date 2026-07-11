@@ -438,11 +438,20 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
         }
 
         db.Sales.Remove(sale);
+        Guid? affectedOrderId = sale.OrderId;
         if (sale.Order is not null)
         {
             await OrderWriter.SyncSalesOrderAsync(sale.Order, [], cancellationToken, [sale.Id]);
         }
         await db.SaveChangesAsync(cancellationToken);
+
+        // Deleting the last sale on a marketplace order would otherwise strand an empty phantom order (no lines,
+        // $0, no buyer). Prune it once the sale removal is persisted so the emptiness check is accurate.
+        if (affectedOrderId is Guid orderId)
+        {
+            await OrderWriter.PruneEmptyMarketplaceOrderAsync(orderId, cancellationToken);
+            await db.SaveChangesAsync(cancellationToken);
+        }
         return NoContent();
     }
 

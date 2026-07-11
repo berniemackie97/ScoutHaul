@@ -272,6 +272,29 @@ public class OrderChannelUnificationTests
     }
 
     [Fact]
+    public async Task Deleting_the_only_sale_on_a_marketplace_order_prunes_the_phantom_order()
+    {
+        var (db, org, user) = NewContext(nameof(Deleting_the_only_sale_on_a_marketplace_order_prunes_the_phantom_order));
+        await using var _ = db;
+        InventoryItem item = await SeedItem(db, org, "Wii Sports");
+        SalesController sales = NewSales(db, org, user);
+
+        ActionResult<SaleDto> recorded = await sales.Record(new RecordSaleRequest(
+            item.Id, null, "eBay", 28m, 3m, 1m, 4m, 0m, 0m,
+            DateTimeOffset.UtcNow.AddDays(-1), null,
+            ShippingCharged: 5m, ExternalOrderId: "EB-PHANTOM-1", BuyerReference: "buyer_bob"), CancellationToken.None);
+        SaleDto sale = Assert.IsType<CreatedAtActionResult>(recorded.Result).Value as SaleDto
+            ?? throw new InvalidOperationException("Expected sale DTO.");
+        Assert.Single(await db.Orders.ToListAsync());
+
+        await sales.Delete(sale.Id, CancellationToken.None);
+
+        // The order lost its only sale, so it must not linger as an empty phantom.
+        Assert.Empty(await db.Orders.ToListAsync());
+        Assert.Empty(await db.OrderLines.ToListAsync());
+    }
+
+    [Fact]
     public async Task Manual_sales_with_same_external_order_number_reuse_one_order()
     {
         var (db, org, user) = NewContext(nameof(Manual_sales_with_same_external_order_number_reuse_one_order));
