@@ -121,6 +121,7 @@ public sealed class Sale : EntityBase, IOrganizationScoped
 
     public ICollection<SaleCorrection> Corrections { get; set; } = [];
     public ICollection<Refund> Refunds { get; set; } = [];
+    public ICollection<Return> Returns { get; set; } = [];
 }
 
 /// <summary>

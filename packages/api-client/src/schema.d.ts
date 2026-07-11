@@ -4870,6 +4870,287 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/sales/{id}/returns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ReturnDto"][];
+                        "application/json": components["schemas"]["ReturnDto"][];
+                        "text/json": components["schemas"]["ReturnDto"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["OpenReturnRequest"];
+                    "text/json": components["schemas"]["OpenReturnRequest"];
+                    "application/*+json": components["schemas"]["OpenReturnRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ReturnDto"];
+                        "application/json": components["schemas"]["ReturnDto"];
+                        "text/json": components["schemas"]["ReturnDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sales/returns/{returnId}/label": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    returnId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["IssueReturnLabelRequest"];
+                    "text/json": components["schemas"]["IssueReturnLabelRequest"];
+                    "application/*+json": components["schemas"]["IssueReturnLabelRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ReturnDto"];
+                        "application/json": components["schemas"]["ReturnDto"];
+                        "text/json": components["schemas"]["ReturnDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sales/returns/{returnId}/receive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    returnId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ReturnDto"];
+                        "application/json": components["schemas"]["ReturnDto"];
+                        "text/json": components["schemas"]["ReturnDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sales/returns/{returnId}/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    returnId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["ResolveReturnRequest"];
+                    "text/json": components["schemas"]["ResolveReturnRequest"];
+                    "application/*+json": components["schemas"]["ResolveReturnRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ReturnDto"];
+                        "application/json": components["schemas"]["ReturnDto"];
+                        "text/json": components["schemas"]["ReturnDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sales/returns/{returnId}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    returnId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["RejectReturnRequest"];
+                    "text/json": components["schemas"]["RejectReturnRequest"];
+                    "application/*+json": components["schemas"]["RejectReturnRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ReturnDto"];
+                        "application/json": components["schemas"]["ReturnDto"];
+                        "text/json": components["schemas"]["ReturnDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sales/returns/{returnId}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    returnId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ReturnDto"];
+                        "application/json": components["schemas"]["ReturnDto"];
+                        "text/json": components["schemas"]["ReturnDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/session/bootstrap": {
         parameters: {
             query?: never;
@@ -7277,6 +7558,11 @@ export interface components {
             /** Format: double */
             estimatedResaleValue?: number;
         };
+        IssueReturnLabelRequest: {
+            /** Format: double */
+            returnShippingCost?: number;
+            notes?: string | null;
+        };
         ListingDto: {
             /** Format: uuid */
             id?: string;
@@ -7455,6 +7741,10 @@ export interface components {
             /** Format: double */
             allocationWeight?: number | null;
             storageLocation?: string | null;
+            notes?: string | null;
+        };
+        OpenReturnRequest: {
+            reason?: string | null;
             notes?: string | null;
         };
         OrderDetailDto: {
@@ -8021,6 +8311,9 @@ export interface components {
         };
         /** @enum {string} */
         RefundType: "Partial" | "Full";
+        RejectReturnRequest: {
+            reason?: string | null;
+        };
         ReorderSourcingTripStopsRequest: {
             stopIds?: string[] | null;
         };
@@ -8165,6 +8458,47 @@ export interface components {
             /** Format: date-time */
             createdAt?: string;
         };
+        ResolveReturnRequest: {
+            /** Format: double */
+            itemAmount?: number;
+            type?: components["schemas"]["RefundType"];
+            /** Format: double */
+            shippingRefunded?: number;
+            /** Format: double */
+            taxRefunded?: number;
+            /** Format: double */
+            feeCredit?: number;
+            restock?: boolean;
+            reason?: string | null;
+            notes?: string | null;
+        };
+        ReturnDto: {
+            /** Format: uuid */
+            id?: string;
+            /** Format: uuid */
+            saleId?: string;
+            /** Format: uuid */
+            orderId?: string | null;
+            inventoryItemTitle?: string | null;
+            status?: components["schemas"]["ReturnStatus"];
+            /** Format: double */
+            returnShippingCost?: number;
+            reason?: string | null;
+            notes?: string | null;
+            restocked?: boolean;
+            /** Format: uuid */
+            refundId?: string | null;
+            /** Format: date-time */
+            requestedAt?: string;
+            /** Format: date-time */
+            labelIssuedAt?: string | null;
+            /** Format: date-time */
+            receivedAt?: string | null;
+            /** Format: date-time */
+            resolvedAt?: string | null;
+        };
+        /** @enum {string} */
+        ReturnStatus: "Requested" | "LabelIssued" | "Received" | "Refunded" | "Rejected" | "Cancelled";
         SaleCandidateDto: {
             /** Format: uuid */
             inventoryItemId?: string;

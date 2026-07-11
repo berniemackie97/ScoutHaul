@@ -2553,6 +2553,81 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                     b.ToTable("Tasks", (string)null);
                 });
 
+            modelBuilder.Entity("HaulScout.Domain.Entities.Return", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("LabelIssuedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<Guid?>("OrderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTimeOffset?>("ReceivedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("RefundId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("RequestedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("RequestedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("ResolvedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("Restocked")
+                        .HasColumnType("boolean");
+
+                    b.Property<decimal>("ReturnShippingCost")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
+
+                    b.Property<Guid>("SaleId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RefundId");
+
+                    b.HasIndex("RequestedByUserId");
+
+                    b.HasIndex("SaleId");
+
+                    b.HasIndex("OrganizationId", "OrderId");
+
+                    b.HasIndex("OrganizationId", "SaleId");
+
+                    b.ToTable("Returns", (string)null);
+                });
+
             modelBuilder.Entity("HaulScout.Domain.Entities.Review", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3848,6 +3923,32 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                     b.Navigation("InventoryItem");
                 });
 
+            modelBuilder.Entity("HaulScout.Domain.Entities.Return", b =>
+                {
+                    b.HasOne("HaulScout.Domain.Entities.Refund", "Refund")
+                        .WithMany()
+                        .HasForeignKey("RefundId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("HaulScout.Domain.Entities.AppUser", "RequestedByUser")
+                        .WithMany()
+                        .HasForeignKey("RequestedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("HaulScout.Domain.Entities.Sale", "Sale")
+                        .WithMany("Returns")
+                        .HasForeignKey("SaleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Refund");
+
+                    b.Navigation("RequestedByUser");
+
+                    b.Navigation("Sale");
+                });
+
             modelBuilder.Entity("HaulScout.Domain.Entities.Review", b =>
                 {
                     b.HasOne("HaulScout.Domain.Entities.Customer", "Customer")
@@ -4137,6 +4238,8 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                     b.Navigation("Corrections");
 
                     b.Navigation("Refunds");
+
+                    b.Navigation("Returns");
                 });
 
             modelBuilder.Entity("HaulScout.Domain.Entities.SourcingTrip", b =>

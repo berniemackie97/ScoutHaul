@@ -42,6 +42,7 @@ public sealed class HaulScoutDbContext(DbContextOptions<HaulScoutDbContext> opti
     public DbSet<Sale> Sales => Set<Sale>();
     public DbSet<SaleCorrection> SaleCorrections => Set<SaleCorrection>();
     public DbSet<Refund> Refunds => Set<Refund>();
+    public DbSet<Return> Returns => Set<Return>();
     public DbSet<Shipment> Shipments => Set<Shipment>();
     public DbSet<Expense> Expenses => Set<Expense>();
     public DbSet<Budget> Budgets => Set<Budget>();
@@ -463,6 +464,21 @@ public sealed class HaulScoutDbContext(DbContextOptions<HaulScoutDbContext> opti
             entity.HasIndex(item => new { item.OrganizationId, item.SaleId });
             entity.HasOne(item => item.Sale).WithMany(item => item.Refunds).HasForeignKey(item => item.SaleId).OnDelete(DeleteBehavior.Cascade);
             entity.HasOne(item => item.RecordedByUser).WithMany().HasForeignKey(item => item.RecordedByUserId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<Return>(entity =>
+        {
+            entity.ToTable("Returns");
+            entity.Property(item => item.Status).HasConversion<string>().HasMaxLength(16);
+            entity.Property(item => item.Reason).HasMaxLength(1000).IsRequired();
+            entity.Property(item => item.Notes).HasMaxLength(2000);
+            entity.Ignore(item => item.IsOpen);
+            ConfigureMoney(entity.Property(item => item.ReturnShippingCost));
+            entity.HasIndex(item => new { item.OrganizationId, item.SaleId });
+            entity.HasIndex(item => new { item.OrganizationId, item.OrderId });
+            entity.HasOne(item => item.Sale).WithMany(item => item.Returns).HasForeignKey(item => item.SaleId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(item => item.Refund).WithMany().HasForeignKey(item => item.RefundId).OnDelete(DeleteBehavior.SetNull);
+            entity.HasOne(item => item.RequestedByUser).WithMany().HasForeignKey(item => item.RequestedByUserId).OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<Shipment>(entity =>
