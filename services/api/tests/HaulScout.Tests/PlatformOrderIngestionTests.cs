@@ -442,6 +442,91 @@ Repeat Listing Item,REPEAT-ITEM,-,-,2,$110.00,$100.00,$0.00,$0.00,$10.00,$20.00,
         Assert.Single(await db.SaleCorrections.Where(correction => correction.SaleId == sale.Id).ToListAsync());
     }
 
+    private const string EbayRefundListingSalesCsv = """
+"Report for Jan 1, 2026 to Jul 10, 2026"
+Listing title,eBay item ID,Quantity sold,Total sales (Includes taxes),Item sales,Taxes and government fees paid by buyer to you,Taxes and government fees paid by buyer to eBay,Shipping and handling paid by buyer to you,Total selling costs,Insertion fees,Optional listing upgrade fees,Final value fees,Promoted Listings - General fees,Promoted Listings - Priority fees,Ads Express fees,Promoted Offsite - Fees,International fees,Other eBay fees,Deposit processing fees,Fee credits,Shipping labels cost (Amount you paid to buy shipping labels on eBay),Net sales (Net of taxes and selling costs),Average Selling price,Quantity sold via promoted listing,Quantity sold via Best Offers,Quantity sold via Seller Initiated Offers,
+Brass Lamp,377251318593,1,$0.00,$0.00,$0.00,$0.00,$0.00,$12.34,$0.00,$0.00,$16.90,$0.00,$0.00,$0.00,$0.00,$0.00,$0.00,$0.00,$16.50,$11.94,($12.34),$0.00,0,1,0
+""";
+
+    [Fact]
+    public async Task Refund_import_posts_ebay_fee_credit_row_to_exact_reconciled_sale()
+    {
+        var (db, org, user) = NewContext(nameof(Refund_import_posts_ebay_fee_credit_row_to_exact_reconciled_sale));
+        await using var _ = db;
+        var controller = NewController(db, org, user);
+        var item = SeedItem(db, org, "Brass Lamp", 40m);
+
+        await controller.ImportEbayCsv(new ImportPlatformOrdersCsvRequest("eBay", EbayAllOrdersCsv), CancellationToken.None);
+        await controller.ImportEbayCsv(new ImportPlatformOrdersCsvRequest("eBay", EbayListingSalesCsv), CancellationToken.None);
+        PlatformOrder order = await db.PlatformOrders.Include(o => o.Lines).SingleAsync();
+        await controller.Reconcile(order.Id,
+            new ReconcilePlatformOrderRequest([new ReconcilePlatformOrderLineMap(order.Lines.First().Id, item.Id)]), CancellationToken.None);
+
+        ActionResult<ImportMarketplaceRefundsResultDto> result = await controller.ImportMarketplaceRefundsCsv(
+            new ImportMarketplaceRefundsCsvRequest("eBay", EbayRefundListingSalesCsv), CancellationToken.None);
+
+        Assert.Equal(1, result.Value!.Imported);
+        Refund refund = Assert.Single(await db.Refunds.ToListAsync());
+        Assert.Equal(RefundType.Full, refund.Type);
+        Assert.Equal(77.28m, refund.ItemAmount);
+        Assert.Equal(3.69m, refund.ShippingRefunded);
+        Assert.Equal(7.15m, refund.TaxRefunded);
+        Assert.Equal(12.08m, refund.FeeCredit); // capped to the sale's actual fee exposure
+
+        Sale sale = await db.Sales.SingleAsync();
+        Assert.Equal(SaleStatus.Refunded, sale.Status);
+        Assert.Equal(-45.97m, sale.NetProfit);
+
+        ActionResult<ImportMarketplaceRefundsResultDto> second = await controller.ImportMarketplaceRefundsCsv(
+            new ImportMarketplaceRefundsCsvRequest("eBay", EbayRefundListingSalesCsv), CancellationToken.None);
+        Assert.Equal(0, second.Value!.Imported);
+        Assert.Single(await db.Refunds.ToListAsync());
+    }
+
+    private const string DepopRefundCsv = """"
+"Date of sale","Time of sale","Buyer","Brand","SKU","Description","Size","Item price","Buyer shipping cost","Total","US Sales tax","Refunded to buyer amount","Fees refunded to seller"
+"07/03/2026","1:46 PM","strickss","Vans","N/A","Vans Shorts Mens 34 Blue Chino Denim Casual Skate 5 pockets
+#skater #summer","34""","$5.00","$0.00","$5.42","$0.42","$6.37","$2.00"
+"""";
+
+    [Fact]
+    public async Task Refund_import_posts_depop_refund_when_one_sale_matches()
+    {
+        var (db, org, user) = NewContext(nameof(Refund_import_posts_depop_refund_when_one_sale_matches));
+        await using var _ = db;
+        var controller = NewController(db, org, user);
+        var item = SeedItem(db, org, "Vans Shorts Mens 34 Blue Chino Denim Casual Skate 5 pockets", 1m);
+        db.Sales.Add(new Sale
+        {
+            OrganizationId = org,
+            InventoryItemId = item.Id,
+            InventoryItem = item,
+            Platform = "Depop",
+            SoldPrice = 5m,
+            SalesTaxCollected = 0.42m,
+            PlatformFees = 2m,
+            CostOfGoods = 1m,
+            NetProfit = 2m,
+            SoldAt = new DateTimeOffset(2026, 7, 3, 12, 0, 0, TimeSpan.Zero),
+            Status = SaleStatus.Delivered,
+        });
+        await db.SaveChangesAsync();
+
+        ActionResult<ImportMarketplaceRefundsResultDto> result = await controller.ImportMarketplaceRefundsCsv(
+            new ImportMarketplaceRefundsCsvRequest("Depop", DepopRefundCsv), CancellationToken.None);
+
+        Assert.Equal(1, result.Value!.Imported);
+        Refund refund = Assert.Single(await db.Refunds.ToListAsync());
+        Assert.Equal(RefundType.Full, refund.Type);
+        Assert.Equal(5m, refund.ItemAmount);
+        Assert.Equal(0.42m, refund.TaxRefunded);
+        Assert.Equal(2m, refund.FeeCredit);
+
+        Sale sale = await db.Sales.SingleAsync();
+        Assert.Equal(SaleStatus.Refunded, sale.Status);
+        Assert.Equal(-1m, sale.NetProfit);
+    }
+
     [Fact]
     public async Task Reconcile_correction_preserves_the_recorded_sale_date()
     {

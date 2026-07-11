@@ -44,6 +44,29 @@ public sealed class CsvTable
         return negative ? -value : value;
     }
 
+    public string TextStartsWith(IReadOnlyList<string> row, string prefix)
+    {
+        for (int i = 0; i < Header.Count; i++)
+        {
+            if (Header[i].StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            {
+                return i < row.Count ? row[i].Trim() : string.Empty;
+            }
+        }
+        return string.Empty;
+    }
+
+    public decimal MoneyStartsWith(IReadOnlyList<string> row, string prefix)
+    {
+        string text = TextStartsWith(row, prefix);
+        if (text.Length == 0) return 0;
+        bool negative = text.StartsWith('(') && text.EndsWith(')');
+        text = text.Replace("(", "").Replace(")", "").Replace("$", "").Replace(",", "").Replace("--", "").Trim();
+        if (text.Length == 0 || text == "-") return 0;
+        if (!decimal.TryParse(text, NumberStyles.Number, CultureInfo.InvariantCulture, out decimal value)) return 0;
+        return negative ? -value : value;
+    }
+
     public int Int(IReadOnlyList<string> row, string column, int fallback = 0) =>
         int.TryParse(Text(row, column), NumberStyles.Integer, CultureInfo.InvariantCulture, out int value) ? value : fallback;
 

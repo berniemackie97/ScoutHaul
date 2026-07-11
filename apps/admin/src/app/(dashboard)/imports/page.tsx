@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowRight, FileSpreadsheet } from "lucide-react";
 import { getApiClient } from "@/lib/api";
 import { CsvUploader } from "./csv-uploader";
-import { importEbayOrders, importEbayListings } from "./actions";
+import { importEbayOrders, importEbayListings, importMarketplaceRefunds } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -29,7 +29,7 @@ export default async function ImportsPage() {
         </p>
       </header>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-3">
         <CsvUploader
           title="eBay orders"
           description="Seller Hub → Orders (All Orders report) for buyers + tracking, or Performance → Sales for exact fees. The importer detects which and merges them."
@@ -41,6 +41,12 @@ export default async function ImportsPage() {
           description="Seller Hub → Listings → Active → Download. Seeds or links inventory from listings that predate ScoutHaul."
           action={importEbayListings}
           buttonLabel="Import eBay listings"
+        />
+        <CsvUploader
+          title="Marketplace refunds"
+          description="Depop Sales refund columns or eBay Listing Sales fee-credit refund rows. Only exact sale matches are posted."
+          action={importMarketplaceRefunds}
+          buttonLabel="Import refunds"
         />
       </div>
 
