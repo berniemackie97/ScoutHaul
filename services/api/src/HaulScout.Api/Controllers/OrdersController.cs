@@ -188,8 +188,12 @@ public sealed class OrdersController(HaulScoutDbContext db, ICurrentUserContext 
         }
 
         DateTimeOffset now = DateTimeOffset.UtcNow;
-        DateTimeOffset? shippedAt = request.ShippedAt ?? (request.MarkShipped || request.MarkDelivered ? now : order.ShippedAt);
         DateTimeOffset? deliveredAt = request.DeliveredAt ?? (request.MarkDelivered ? now : order.DeliveredAt);
+        DateTimeOffset? shippedAt = request.ShippedAt ?? (request.MarkShipped || request.MarkDelivered ? now : order.ShippedAt);
+        if (deliveredAt.HasValue && !shippedAt.HasValue)
+        {
+            shippedAt = deliveredAt;
+        }
 
         if (shippedAt > now.AddMinutes(5) || deliveredAt > now.AddMinutes(5))
         {
@@ -201,7 +205,12 @@ public sealed class OrdersController(HaulScoutDbContext db, ICurrentUserContext 
             return BadRequest("Delivered time cannot be earlier than shipped time.");
         }
 
-        if (!order.IsLocalPickup && (request.MarkShipped || request.MarkDelivered) && (carrier is null || trackingNumber is null))
+        bool hasShippedEvidence = shippedAt.HasValue;
+        bool hasDeliveredEvidence = deliveredAt.HasValue;
+        bool shouldAdvanceToDelivered = request.MarkDelivered || hasDeliveredEvidence;
+        bool shouldAdvanceToShipped = request.MarkShipped || hasShippedEvidence;
+
+        if (!order.IsLocalPickup && (shouldAdvanceToShipped || shouldAdvanceToDelivered) && (carrier is null || trackingNumber is null))
         {
             return BadRequest("Carrier and tracking number are required before marking a shipped storefront order shipped or delivered.");
         }
@@ -223,7 +232,8 @@ public sealed class OrdersController(HaulScoutDbContext db, ICurrentUserContext 
         order.ShippedAt = shippedAt;
         order.DeliveredAt = deliveredAt;
 
-        if (request.MarkDelivered)
+        bool canAdvanceFulfillment = order.Status is not OrderStatus.Cancelled and not OrderStatus.Refunded;
+        if (canAdvanceFulfillment && shouldAdvanceToDelivered)
         {
             order.Status = OrderStatus.Delivered;
             order.FulfillmentStatus = FulfillmentStatus.Fulfilled;
@@ -233,7 +243,7 @@ public sealed class OrdersController(HaulScoutDbContext db, ICurrentUserContext 
                 order.PaidAt ??= now;
             }
         }
-        else if (request.MarkShipped)
+        else if (canAdvanceFulfillment && shouldAdvanceToShipped)
         {
             order.Status = OrderStatus.Shipped;
             order.FulfillmentStatus = FulfillmentStatus.Fulfilled;
@@ -244,11 +254,11 @@ public sealed class OrdersController(HaulScoutDbContext db, ICurrentUserContext 
             }
         }
 
-        if (request.MarkDelivered)
+        if (canAdvanceFulfillment && shouldAdvanceToDelivered)
         {
             await PropagateFulfillmentToSalesAsync(order.Id, SaleStatus.Delivered, cancellationToken);
         }
-        else if (request.MarkShipped)
+        else if (canAdvanceFulfillment && shouldAdvanceToShipped)
         {
             await PropagateFulfillmentToSalesAsync(order.Id, SaleStatus.Shipped, cancellationToken);
         }
