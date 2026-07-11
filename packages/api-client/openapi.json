@@ -11175,8 +11175,7 @@
             "nullable": true
           },
           "sale": {
-            "$ref": "#/components/schemas/SaleDto",
-            "nullable": true
+            "$ref": "#/components/schemas/SaleDto"
           }
         },
         "additionalProperties": false
@@ -13178,6 +13177,11 @@
           "refundCount": {
             "type": "integer",
             "format": "int32"
+          },
+          "orderId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
           }
         },
         "additionalProperties": false

@@ -7421,7 +7421,7 @@ export interface components {
             lineTotal?: number;
             /** Format: double */
             unitCostSnapshot?: number | null;
-            sale?: components["schemas"]["SaleDto"] | null;
+            sale?: components["schemas"]["SaleDto"];
         };
         /** @enum {string} */
         OrderStatus: "Pending" | "Paid" | "Fulfilling" | "Shipped" | "Delivered" | "Cancelled" | "Refunded";
@@ -8139,6 +8139,8 @@ export interface components {
             feeCreditTotal?: number;
             /** Format: int32 */
             refundCount?: number;
+            /** Format: uuid */
+            orderId?: string | null;
         };
         SaleGroupResultDto: {
             /** Format: uuid */

@@ -131,6 +131,8 @@ public class OrderChannelUnificationTests
         Assert.Equal(10m, sale.ShippingCharged);
         Assert.Equal(18m, sale.PlatformFees + sale.PaymentFees);
         Assert.Equal(72m, sale.NetProfit);
+        // The sale carries its real Order id so the finance table can link straight back to the order.
+        Assert.Equal(order.Id, sale.OrderId);
     }
 
     [Fact]
