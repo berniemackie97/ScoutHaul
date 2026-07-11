@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getApiClient } from "@/lib/api";
+import { getApiAccessToken, getApiBaseUrl, getApiClient } from "@/lib/api";
 
 export type ImportResult = { ok: boolean; message: string };
 
@@ -43,12 +43,51 @@ export async function importEbayOrders(
 
   revalidatePath("/imports");
   revalidatePath("/orders");
-  revalidatePath("/orders");
   revalidatePath("/imports/orders");
   const { created, updated, skipped } = result.data;
   return {
     ok: true,
     message: `${created} new · ${updated} updated · ${skipped} skipped. Reconcile below.`,
+  };
+}
+
+/** Marketplace refund exports → posted refunds on exact sale matches. Ambiguous rows are skipped. */
+export async function importMarketplaceRefunds(
+  _previous: ImportResult,
+  formData: FormData
+): Promise<ImportResult> {
+  const csv = await readCsv(formData);
+  if (!csv)
+    return { ok: false, message: "Choose a Depop Sales or eBay Listing Sales CSV." };
+
+  const token = await getApiAccessToken();
+  const response = await fetch(`${getApiBaseUrl()}/api/platform-orders/import/refunds-csv`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ platform: "Marketplace", csv }),
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    return { ok: false, message: text || "That did not look like a supported refund export." };
+  }
+
+  const result = (await response.json()) as {
+    imported: number;
+    skipped: number;
+    warnings?: string[];
+  };
+
+  revalidatePath("/imports");
+  revalidatePath("/orders");
+  revalidatePath("/analytics");
+  const warningText = result.warnings?.length ? ` ${result.warnings.length} warning(s).` : "";
+  return {
+    ok: true,
+    message: `${result.imported} refund(s) imported · ${result.skipped} skipped.${warningText}`,
   };
 }
 

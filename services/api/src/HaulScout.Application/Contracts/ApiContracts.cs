@@ -968,6 +968,12 @@ public sealed record ImportPlatformOrdersCsvRequest(string Platform, string Csv)
 /// same idempotent listing ingest, so legacy listings seed/link inventory without re-entry.</summary>
 public sealed record ImportPlatformListingsCsvRequest(string Platform, string Csv);
 
+/// <summary>Import marketplace refund rows from seller exports. The importer posts only exact sale matches and
+/// reports ambiguous rows as skipped warnings.</summary>
+public sealed record ImportMarketplaceRefundsCsvRequest(string Platform, string Csv);
+
+public sealed record ImportMarketplaceRefundsResultDto(int Imported, int Skipped, IReadOnlyList<string> Warnings);
+
 /// <summary>Maps one imported order line to the ScoutHaul inventory item it represents, for reconciliation.</summary>
 public sealed record ReconcilePlatformOrderLineMap(Guid PlatformOrderLineId, Guid InventoryItemId);
 
