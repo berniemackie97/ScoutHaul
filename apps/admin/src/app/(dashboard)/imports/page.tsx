@@ -46,13 +46,13 @@ export default async function ImportsPage() {
 
       <section className="grid gap-4 sm:grid-cols-2">
         <ReconcileCard
-          href="/finance/platform-orders"
+          href="/imports/orders"
           title="Orders to reconcile"
           count={ordersToReconcile}
           hint="Match imported orders to inventory → creates sales with exact fees."
         />
         <ReconcileCard
-          href="/listings"
+          href="/imports/listings"
           title="Listings to reconcile"
           count={listingsToReconcile}
           hint="Link imported listings to an inventory item, or seed a new draft."

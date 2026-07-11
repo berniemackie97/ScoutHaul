@@ -808,6 +808,7 @@ public sealed class HaulScoutDbContext(DbContextOptions<HaulScoutDbContext> opti
             entity.Property(item => item.PrimaryImageUrl).HasMaxLength(500);
             entity.Property(item => item.Status).HasConversion<string>().HasMaxLength(24);
             entity.Property(item => item.ReconcileStatus).HasConversion<string>().HasMaxLength(24);
+            entity.Property(item => item.CreatedChannelListingOnReconcile).HasDefaultValue(false);
             entity.Property(item => item.RawJson).HasColumnType("jsonb");
             ConfigureMoney(entity.Property(item => item.Price));
             entity.HasIndex(item => new { item.OrganizationId, item.Platform, item.ExternalListingId }).IsUnique();

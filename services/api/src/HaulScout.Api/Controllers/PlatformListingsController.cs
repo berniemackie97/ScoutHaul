@@ -149,16 +149,12 @@ public sealed class PlatformListingsController(HaulScoutDbContext db, ICurrentUs
                 ApplyImportedFields(listing, input, channelAccountId);
                 created++;
             }
-            else if (listing.ReconcileStatus != PlatformListingReconcileStatus.Ignored)
-            {
-                // Refresh imported fields in place (keeps the inventory link if already reconciled).
-                ApplyImportedFields(listing, input, channelAccountId);
-                updated++;
-            }
             else
             {
-                skipped++; // ignored listings are left alone
-                continue;
+                // Refresh imported fields in place. Ignored listings stay ignored until an operator restores
+                // them, but their imported facts must not get frozen forever after a bad first import.
+                ApplyImportedFields(listing, input, channelAccountId);
+                updated++;
             }
             touched.Add(listing.Id);
         }
@@ -223,6 +219,7 @@ public sealed class PlatformListingsController(HaulScoutDbContext db, ICurrentUs
             existing => existing.OrganizationId == currentUser.OrganizationId
                 && existing.ChannelAccountId == channelAccountId
                 && existing.ExternalListingId == listing.ExternalListingId, cancellationToken);
+        bool createdChannelListing = false;
         if (channelListing is null)
         {
             channelListing = new ChannelListing
@@ -234,6 +231,7 @@ public sealed class PlatformListingsController(HaulScoutDbContext db, ICurrentUs
                 InventoryItem = item,
             };
             db.ChannelListings.Add(channelListing);
+            createdChannelListing = true;
         }
         else
         {
@@ -250,11 +248,45 @@ public sealed class PlatformListingsController(HaulScoutDbContext db, ICurrentUs
         listing.ReconcileStatus = PlatformListingReconcileStatus.Linked;
         listing.ReconciledInventoryItemId = item.Id;
         listing.ReconciledChannelListingId = channelListing.Id;
+        listing.CreatedChannelListingOnReconcile = listing.CreatedChannelListingOnReconcile || createdChannelListing;
         listing.ReconciledAt = DateTimeOffset.UtcNow;
 
         await db.SaveChangesAsync(cancellationToken);
         listing.ReconciledInventoryItem = item;
         return new PlatformListingReconcileResultDto(listing.Id, item.Id, channelListing.Id, createdItem, listing.ToDto());
+    }
+
+    [HttpPost("{id:guid}/unlink")]
+    public async Task<ActionResult<PlatformListingDto>> Unlink(Guid id, CancellationToken cancellationToken)
+    {
+        PlatformListing? listing = await db.PlatformListings
+            .Include(item => item.ReconciledInventoryItem)
+            .SingleOrDefaultAsync(item => item.Id == id && item.OrganizationId == currentUser.OrganizationId, cancellationToken);
+        if (listing is null)
+        {
+            return NotFound();
+        }
+
+        if (listing.CreatedChannelListingOnReconcile && listing.ReconciledChannelListingId is Guid channelListingId)
+        {
+            ChannelListing? channelListing = await db.ChannelListings.SingleOrDefaultAsync(
+                item => item.Id == channelListingId && item.OrganizationId == currentUser.OrganizationId,
+                cancellationToken);
+            if (channelListing is not null)
+            {
+                db.ChannelListings.Remove(channelListing);
+            }
+        }
+
+        listing.ReconcileStatus = PlatformListingReconcileStatus.Pending;
+        listing.ReconciledInventoryItemId = null;
+        listing.ReconciledInventoryItem = null;
+        listing.ReconciledChannelListingId = null;
+        listing.CreatedChannelListingOnReconcile = false;
+        listing.ReconciledAt = null;
+
+        await db.SaveChangesAsync(cancellationToken);
+        return listing.ToDto();
     }
 
     [HttpPost("{id:guid}/ignore")]

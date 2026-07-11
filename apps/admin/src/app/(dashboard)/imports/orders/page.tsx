@@ -61,14 +61,14 @@ export default async function PlatformOrdersPage() {
     <div className="space-y-6">
       <header className="space-y-3">
         <Link
-          href="/finance"
+          href="/imports"
           className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-sm"
         >
-          <ArrowLeft className="h-4 w-4" /> Finance
+          <ArrowLeft className="h-4 w-4" /> Imports
         </Link>
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
           <div>
-            <p className="text-muted-foreground text-sm">Finance</p>
+            <p className="text-muted-foreground text-sm">Data</p>
             <h1 className="mt-1 text-2xl font-semibold tracking-tight">
               Platform orders &amp; reconciliation
             </h1>
