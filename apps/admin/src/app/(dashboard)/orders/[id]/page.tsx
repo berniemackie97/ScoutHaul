@@ -181,7 +181,10 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
         <div className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Line items</CardTitle>
+              <CardTitle className="text-lg">Line items &amp; money</CardTitle>
+              <p className="text-muted-foreground text-sm">
+                Expand a line to refund, run a return, or correct its fees — everything for that sale in one place.
+              </p>
             </CardHeader>
             <CardContent className="p-0">
               <LineItems
@@ -337,31 +340,6 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
               </p>
             )}
           </Card>
-
-          {(trackedOrder.trackingNumber || trackedOrder.shippedAt || trackedOrder.deliveredAt) && (
-            <Card className="p-5 text-sm">
-              <p className="text-muted-foreground text-xs uppercase tracking-wide">Tracking</p>
-              <p className="mt-1 font-medium">
-                {[trackedOrder.shippingCarrier, trackedOrder.trackingNumber]
-                  .filter(Boolean)
-                  .join(" · ") || "Tracking recorded"}
-              </p>
-              {trackedOrder.trackingUrl && (
-                <Link
-                  href={trackedOrder.trackingUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-brand-700 mt-2 inline-block hover:underline"
-                >
-                  Open carrier tracking
-                </Link>
-              )}
-              <div className="text-muted-foreground mt-3 space-y-1 border-t pt-3">
-                <p>Shipped: {dateTime(trackedOrder.shippedAt)}</p>
-                <p>Delivered: {dateTime(trackedOrder.deliveredAt)}</p>
-              </div>
-            </Card>
-          )}
         </aside>
       </div>
     </div>
