@@ -18,6 +18,17 @@ export async function updateOrderStatus(id: string, status: OrderStatus): Promis
   return { ok: true, message: `Order marked ${status}.` };
 }
 
+export async function deleteOrder(id: string): Promise<OrderActionResult> {
+  const api = await getApiClient();
+  const result = await api.DELETE("/api/orders/{id}", { params: { path: { id } } });
+  if (result.error || !result.response.ok) {
+    return { ok: false, message: "The order could not be deleted." };
+  }
+
+  revalidatePath("/orders");
+  return { ok: true, message: "Order deleted." };
+}
+
 function textValue(formData: FormData, name: string): string | null {
   const value = formData.get(name);
   if (typeof value !== "string") return null;

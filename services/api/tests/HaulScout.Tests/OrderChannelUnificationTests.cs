@@ -136,6 +136,40 @@ public class OrderChannelUnificationTests
     }
 
     [Fact]
+    public async Task Deleting_an_order_removes_it_and_its_lines_but_preserves_the_sale()
+    {
+        var (db, org, user) = NewContext(nameof(Deleting_an_order_removes_it_and_its_lines_but_preserves_the_sale));
+        await using var _ = db;
+        var (itemId, platformOrderId, lineId) = await SeedEbayOrder(db, org, user, "EB-DEL-1", "buyer_bob");
+
+        await NewPlatformOrders(db, org, user).Reconcile(platformOrderId,
+            new ReconcilePlatformOrderRequest([new ReconcilePlatformOrderLineMap(lineId, itemId)]), CancellationToken.None);
+
+        Order order = await db.Orders.SingleAsync();
+        Guid saleId = (await db.Sales.SingleAsync(sale => sale.OrderId == order.Id)).Id;
+
+        IActionResult result = await NewOrders(db, org, user).Delete(order.Id, CancellationToken.None);
+
+        Assert.IsType<NoContentResult>(result);
+        Assert.False(await db.Orders.AnyAsync(item => item.Id == order.Id));
+        Assert.False(await db.OrderLines.AnyAsync(line => line.OrderId == order.Id));
+        // The sale survives the order — financial history is never destroyed, just detached.
+        Sale survivor = await db.Sales.SingleAsync(sale => sale.Id == saleId);
+        Assert.Null(survivor.OrderId);
+    }
+
+    [Fact]
+    public async Task Deleting_a_missing_order_returns_not_found()
+    {
+        var (db, org, user) = NewContext(nameof(Deleting_a_missing_order_returns_not_found));
+        await using var _ = db;
+
+        IActionResult result = await NewOrders(db, org, user).Delete(Guid.NewGuid(), CancellationToken.None);
+
+        Assert.IsType<NotFoundResult>(result);
+    }
+
+    [Fact]
     public async Task A_marketplace_buyer_becomes_a_customer_with_a_channel_identity()
     {
         var (db, org, user) = NewContext(nameof(A_marketplace_buyer_becomes_a_customer_with_a_channel_identity));
@@ -237,6 +271,29 @@ public class OrderChannelUnificationTests
         Assert.Equal(35m, order.GrandTotal); // 28 item + 5 shipping + 2 tax
         Assert.Equal(order.Id, recordedSale.SaleGroupId);
         Assert.Single(order.Lines);
+    }
+
+    [Fact]
+    public async Task Deleting_the_only_sale_on_a_marketplace_order_prunes_the_phantom_order()
+    {
+        var (db, org, user) = NewContext(nameof(Deleting_the_only_sale_on_a_marketplace_order_prunes_the_phantom_order));
+        await using var _ = db;
+        InventoryItem item = await SeedItem(db, org, "Wii Sports");
+        SalesController sales = NewSales(db, org, user);
+
+        ActionResult<SaleDto> recorded = await sales.Record(new RecordSaleRequest(
+            item.Id, null, "eBay", 28m, 3m, 1m, 4m, 0m, 0m,
+            DateTimeOffset.UtcNow.AddDays(-1), null,
+            ShippingCharged: 5m, ExternalOrderId: "EB-PHANTOM-1", BuyerReference: "buyer_bob"), CancellationToken.None);
+        SaleDto sale = Assert.IsType<CreatedAtActionResult>(recorded.Result).Value as SaleDto
+            ?? throw new InvalidOperationException("Expected sale DTO.");
+        Assert.Single(await db.Orders.ToListAsync());
+
+        await sales.Delete(sale.Id, CancellationToken.None);
+
+        // The order lost its only sale, so it must not linger as an empty phantom.
+        Assert.Empty(await db.Orders.ToListAsync());
+        Assert.Empty(await db.OrderLines.ToListAsync());
     }
 
     [Fact]
