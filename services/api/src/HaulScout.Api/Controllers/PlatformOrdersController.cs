@@ -27,7 +27,9 @@ public sealed class PlatformOrdersController(
     ICurrentUserContext currentUser,
     OrderAssembler orderAssembler,
     MarketplaceRefundImportService marketplaceRefundImportService,
-    PlatformOrderFeeEnrichmentService platformOrderFeeEnrichmentService) : ControllerBase
+    PlatformOrderFeeEnrichmentService platformOrderFeeEnrichmentService,
+    PlatformOrderIngestionService platformOrderIngestionService,
+    PlatformOrderSuggestionService platformOrderSuggestionService) : ControllerBase
 {
     private static readonly SaleStatus[] ReleasedInventoryStatuses = [SaleStatus.Returned, SaleStatus.Refunded, SaleStatus.Cancelled];
 
@@ -50,7 +52,8 @@ public sealed class PlatformOrdersController(
             .Take(200)
             .ToListAsync(cancellationToken);
 
-        Dictionary<Guid, (Guid Id, string Title, bool AlreadySold)> suggestions = await BuildSuggestions(orders, cancellationToken);
+        Dictionary<Guid, (Guid Id, string Title, bool AlreadySold)> suggestions =
+            await platformOrderSuggestionService.BuildSuggestionsAsync(orders, cancellationToken);
         return orders.Select(order => order.ToDto(suggestions)).ToList();
     }
 
@@ -66,7 +69,8 @@ public sealed class PlatformOrdersController(
             return NotFound();
         }
 
-        Dictionary<Guid, (Guid Id, string Title, bool AlreadySold)> suggestions = await BuildSuggestions([order], cancellationToken);
+        Dictionary<Guid, (Guid Id, string Title, bool AlreadySold)> suggestions =
+            await platformOrderSuggestionService.BuildSuggestionsAsync([order], cancellationToken);
         return order.ToDto(suggestions);
     }
 
@@ -93,7 +97,8 @@ public sealed class PlatformOrdersController(
             channelAccountId = request.ChannelAccountId;
         }
 
-        (IngestPlatformOrdersResultDto? result, string? error) = await IngestOrders(request.Platform, request.Orders, channelAccountId, cancellationToken);
+        (IngestPlatformOrdersResultDto? result, string? error) =
+            await platformOrderIngestionService.IngestAsync(request.Platform, request.Orders, channelAccountId, cancellationToken);
         return error is not null ? BadRequest(error) : result!;
     }
 
@@ -115,7 +120,7 @@ public sealed class PlatformOrdersController(
                 return BadRequest(parsed.Warning ?? "No order rows were found in the report.");
             }
 
-            (IngestPlatformOrdersResultDto? result, string? error) = await IngestOrders(
+            (IngestPlatformOrdersResultDto? result, string? error) = await platformOrderIngestionService.IngestAsync(
                 string.IsNullOrWhiteSpace(request.Platform) ? "eBay" : request.Platform,
                 parsed.Orders,
                 null,
@@ -143,106 +148,6 @@ public sealed class PlatformOrdersController(
     {
         (ImportMarketplaceRefundsResultDto? result, string? error) = await marketplaceRefundImportService.ImportCsvAsync(request, cancellationToken);
         return error is not null ? BadRequest(error) : result!;
-    }
-
-    // Shared idempotent upsert for report CSVs and manual normalized JSON. Validates the whole batch first so a
-    // bad row fails atomically rather than half-importing. Reconciled orders may be refreshed and moved back to
-    // Imported so the operator can re-run reconciliation with better source data.
-    private async Task<(IngestPlatformOrdersResultDto? Result, string? Error)> IngestOrders(
-        string? defaultPlatform, IReadOnlyList<IngestPlatformOrderInput> orders, Guid? channelAccountId, CancellationToken cancellationToken)
-    {
-        List<string> existingChannels = await ExistingChannels(cancellationToken);
-        string? defaultChannel = SalesChannelCatalog.CanonicalValue(defaultPlatform, existingChannels);
-
-        List<(IngestPlatformOrderInput Input, string Channel, string ExternalOrderId)> normalized = [];
-        foreach (IngestPlatformOrderInput input in orders)
-        {
-            string externalOrderId = (input.ExternalOrderId ?? string.Empty).Trim();
-            if (externalOrderId.Length == 0)
-            {
-                return (null, "Every order needs an external order id.");
-            }
-
-            string? channel = SalesChannelCatalog.CanonicalValue(input.Platform, existingChannels) ?? defaultChannel;
-            if (channel is null)
-            {
-                return (null, $"Order {externalOrderId} has no recognized sales channel.");
-            }
-
-            if (input.Lines is null || input.Lines.Count == 0)
-            {
-                return (null, $"Order {externalOrderId} has no line items.");
-            }
-
-            if (new[] { input.ItemsSubtotal, input.ShippingCharged, input.TaxCollected, input.FeeTotal }.Any(value => value < 0)
-                || (input.ShippingCost.HasValue && input.ShippingCost.Value < 0)
-                || (input.PayoutAmount.HasValue && input.PayoutAmount.Value < 0)
-                || input.Lines.Any(line => line.UnitPrice < 0 || line.Quantity <= 0))
-            {
-                return (null, $"Order {externalOrderId} has negative money or a non-positive quantity.");
-            }
-
-            normalized.Add((input, channel, externalOrderId));
-        }
-
-        HashSet<string> keys = normalized.Select(entry => entry.ExternalOrderId).ToHashSet();
-        List<PlatformOrder> existing = await db.PlatformOrders
-            .Include(order => order.Lines)
-            .Where(order => order.OrganizationId == currentUser.OrganizationId && keys.Contains(order.ExternalOrderId))
-            .ToListAsync(cancellationToken);
-
-        int created = 0, updated = 0, skipped = 0;
-        List<Guid> touched = [];
-
-        foreach ((IngestPlatformOrderInput input, string channel, string externalOrderId) in normalized)
-        {
-            PlatformOrder? order = existing.SingleOrDefault(candidate =>
-                candidate.Platform == channel && candidate.ExternalOrderId == externalOrderId);
-
-            if (order is null)
-            {
-                order = new PlatformOrder
-                {
-                    OrganizationId = currentUser.OrganizationId,
-                    Platform = channel,
-                    ExternalOrderId = externalOrderId,
-                    ChannelAccountId = channelAccountId,
-                };
-                db.PlatformOrders.Add(order);
-                existing.Add(order);
-                ApplyImportedFields(order, input, channelAccountId);
-                ReplaceLines(order, input, preserveExistingMappings: false);
-                created++;
-            }
-            else if (order.Status != PlatformOrderStatus.Ignored)
-            {
-                ApplyImportedFields(order, input, channelAccountId);
-                ReplaceLines(order, input, preserveExistingMappings: order.Status == PlatformOrderStatus.Reconciled);
-                if (order.Status == PlatformOrderStatus.Reconciled)
-                {
-                    order.Status = PlatformOrderStatus.Imported;
-                }
-                updated++;
-            }
-            else
-            {
-                // Ignored orders are intentionally dismissed — never silently resurrect them.
-                skipped++;
-                continue;
-            }
-
-            touched.Add(order.Id);
-        }
-
-        await db.SaveChangesAsync(cancellationToken);
-
-        List<PlatformOrder> refreshed = await db.PlatformOrders
-            .Include(order => order.Lines).ThenInclude(line => line.InventoryItem)
-            .Where(order => order.OrganizationId == currentUser.OrganizationId && touched.Contains(order.Id))
-            .ToListAsync(cancellationToken);
-        Dictionary<Guid, (Guid Id, string Title, bool AlreadySold)> suggestions = await BuildSuggestions(refreshed, cancellationToken);
-        List<PlatformOrderDto> dtos = refreshed.Select(order => order.ToDto(suggestions)).ToList();
-        return (new IngestPlatformOrdersResultDto(created, updated, skipped, dtos), null);
     }
 
     /// <summary>Turn an imported order into ScoutHaul sales. Each mapped line becomes a linked sale carrying the
@@ -503,128 +408,6 @@ public sealed class PlatformOrdersController(
         return order.ToDto();
     }
 
-    private static void ApplyImportedFields(PlatformOrder order, IngestPlatformOrderInput input, Guid? channelAccountId)
-    {
-        if (channelAccountId.HasValue)
-        {
-            order.ChannelAccountId = channelAccountId;
-        }
-        order.BuyerName = TrimToNull(input.BuyerName);
-        order.BuyerReference = TrimToNull(input.BuyerReference);
-        order.BuyerEmail = TrimToNull(input.BuyerEmail);
-        order.BuyerNote = TrimToNull(input.BuyerNote);
-        order.ShipToName = TrimToNull(input.ShipToName);
-        order.ShipToPhone = TrimToNull(input.ShipToPhone);
-        order.ShipToLine1 = TrimToNull(input.ShipToLine1);
-        order.ShipToLine2 = TrimToNull(input.ShipToLine2);
-        order.ShipToCity = TrimToNull(input.ShipToCity);
-        order.ShipToRegion = TrimToNull(input.ShipToRegion);
-        order.ShipToPostalCode = TrimToNull(input.ShipToPostalCode);
-        order.ShipToCountry = TrimToNull(input.ShipToCountry);
-        order.OrderedAt = input.OrderedAt;
-        order.PaidAt = input.PaidAt;
-        order.ShippedAt = input.ShippedAt;
-        order.ItemsSubtotal = input.ItemsSubtotal;
-        order.ShippingCharged = input.ShippingCharged;
-        order.TaxCollected = input.TaxCollected;
-        order.FeeTotal = input.FeeTotal;
-        order.SellerShippingCost = input.ShippingCost;
-        order.PayoutAmount = input.PayoutAmount;
-        order.Currency = string.IsNullOrWhiteSpace(input.Currency) ? "USD" : input.Currency.Trim().ToUpperInvariant();
-        order.TaxRemittedByPlatform = input.TaxRemittedByPlatform;
-        order.FeeBreakdownJson = TrimToNull(input.FeeBreakdownJson);
-        order.Carrier = TrimToNull(input.Carrier);
-        order.TrackingNumber = TrimToNull(input.TrackingNumber);
-        order.RawJson = TrimToNull(input.RawJson);
-        order.ScrapedAt = DateTimeOffset.UtcNow;
-    }
-
-    private void ReplaceLines(PlatformOrder order, IngestPlatformOrderInput input, bool preserveExistingMappings)
-    {
-        Dictionary<string, Guid?> mappingsByExternalId = preserveExistingMappings
-            ? order.Lines
-                .Where(line => !string.IsNullOrWhiteSpace(line.ExternalItemId) && line.InventoryItemId.HasValue)
-                .GroupBy(line => line.ExternalItemId!, StringComparer.OrdinalIgnoreCase)
-                .ToDictionary(group => group.Key, group => group.First().InventoryItemId, StringComparer.OrdinalIgnoreCase)
-            : [];
-        db.PlatformOrderLines.RemoveRange(order.Lines);
-
-        foreach (IngestPlatformOrderLineInput line in input.Lines)
-        {
-            string? externalItemId = TrimToNull(line.ExternalItemId);
-            db.PlatformOrderLines.Add(new PlatformOrderLine
-            {
-                OrganizationId = currentUser.OrganizationId,
-                PlatformOrderId = order.Id,
-                Title = string.IsNullOrWhiteSpace(line.Title) ? "Untitled item" : line.Title.Trim(),
-                UnitPrice = line.UnitPrice,
-                Quantity = line.Quantity <= 0 ? 1 : line.Quantity,
-                ExternalItemId = externalItemId,
-                Sku = TrimToNull(line.Sku),
-                ShippingCharged = line.ShippingCharged,
-                TaxCollected = line.TaxCollected,
-                PlatformFees = line.PlatformFees,
-                SellerShippingCost = line.SellerShippingCost,
-                NetSales = line.NetSales,
-                TotalSales = line.TotalSales,
-                FeeBreakdownJson = TrimToNull(line.FeeBreakdownJson),
-                RawJson = TrimToNull(line.RawJson),
-                InventoryItemId = externalItemId is not null && mappingsByExternalId.TryGetValue(externalItemId, out Guid? mapped) ? mapped : null,
-            });
-        }
-    }
-
-    /// <summary>Best-effort auto-match of unreconciled order lines to inventory — first by the platform's own listing
-    /// id (via <see cref="ChannelListing.ExternalListingId"/>), then by <see cref="TitleMatch"/> when there is no
-    /// link yet. Suggestions include whether the item is already sold (so a match points at the sale to correct).
-    /// Only surfaces suggestions; the operator always confirms — nothing is posted from here.</summary>
-    private async Task<Dictionary<Guid, (Guid Id, string Title, bool AlreadySold)>> BuildSuggestions(IReadOnlyList<PlatformOrder> orders, CancellationToken cancellationToken)
-    {
-        Dictionary<Guid, (Guid, string, bool)> suggestions = new();
-        List<PlatformOrderLine> openLines = orders
-            .Where(order => order.Status != PlatformOrderStatus.Reconciled)
-            .SelectMany(order => order.Lines.Where(line => line.InventoryItemId is null))
-            .ToList();
-        if (openLines.Count == 0)
-        {
-            return suggestions;
-        }
-
-        // Inventory pool for title matching + sold-state lookup (bounded to the most recently touched items).
-        var inventory = await db.InventoryItems
-            .Where(item => item.OrganizationId == currentUser.OrganizationId && !item.IsArchived)
-            .OrderByDescending(item => item.UpdatedAt)
-            .Select(item => new { item.Id, item.Title, item.Status })
-            .Take(2000)
-            .ToListAsync(cancellationToken);
-        Dictionary<Guid, string> titleById = inventory.ToDictionary(item => item.Id, item => item.Title);
-        Dictionary<Guid, bool> soldById = inventory.ToDictionary(item => item.Id, item => InventoryLifecycle.IsSold(item.Status));
-        List<(Guid Id, string Title)> titleCandidates = inventory.Select(item => (item.Id, item.Title)).ToList();
-
-        List<string> externalIds = openLines.Where(line => line.ExternalItemId is not null).Select(line => line.ExternalItemId!).Distinct().ToList();
-        var byExternalId = externalIds.Count == 0
-            ? []
-            : await db.ChannelListings
-                .Where(listing => listing.OrganizationId == currentUser.OrganizationId
-                    && listing.ExternalListingId != null && externalIds.Contains(listing.ExternalListingId))
-                .Select(listing => new { listing.ExternalListingId, listing.InventoryItemId })
-                .ToListAsync(cancellationToken);
-
-        foreach (PlatformOrderLine line in openLines)
-        {
-            Guid? matchId = line.ExternalItemId is null
-                ? null
-                : byExternalId.FirstOrDefault(candidate => candidate.ExternalListingId == line.ExternalItemId)?.InventoryItemId;
-            matchId ??= TitleMatch.Best(line.Title, titleCandidates);
-            if (matchId is Guid id && titleById.TryGetValue(id, out string? title))
-            {
-                suggestions[line.Id] = (id, title, soldById.GetValueOrDefault(id));
-            }
-        }
-
-        return suggestions;
-    }
-
     private static void ApplyBundleComponentInventoryStatus(InventoryItem inventoryItem, InventoryStatus componentStatus, DateTimeOffset? soldAt)
     {
         if (!inventoryItem.IsBundle)
@@ -716,20 +499,4 @@ public sealed class PlatformOrdersController(
         observation.TotalPrice = allocated.Price + allocated.ShippingCharged;
     }
 
-    private async Task<List<string>> ExistingChannels(CancellationToken cancellationToken)
-    {
-        List<string> saleChannels = await db.Sales
-            .AsNoTracking()
-            .Where(item => item.OrganizationId == currentUser.OrganizationId)
-            .Select(item => item.Platform)
-            .Distinct()
-            .ToListAsync(cancellationToken);
-        List<string> listingChannels = await db.Listings
-            .AsNoTracking()
-            .Where(item => item.OrganizationId == currentUser.OrganizationId)
-            .Select(item => item.Platform)
-            .Distinct()
-            .ToListAsync(cancellationToken);
-        return saleChannels.Concat(listingChannels).Distinct(StringComparer.OrdinalIgnoreCase).Order().ToList();
-    }
 }
