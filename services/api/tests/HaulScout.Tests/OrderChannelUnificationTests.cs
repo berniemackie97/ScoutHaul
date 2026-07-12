@@ -45,7 +45,8 @@ public class OrderChannelUnificationTests
             db,
             currentUser,
             new OrderAssembler(db, currentUser),
-            new MarketplaceRefundImportService(db, currentUser));
+            new MarketplaceRefundImportService(db, currentUser),
+            new PlatformOrderFeeEnrichmentService(db, currentUser));
     }
 
     private static SalesController NewSales(HaulScoutDbContext db, Guid org, Guid user)
