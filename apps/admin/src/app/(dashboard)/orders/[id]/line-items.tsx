@@ -5,9 +5,8 @@ import Link from "next/link";
 import { ChevronDown, ChevronRight, History } from "lucide-react";
 import type { components } from "@overhaul/api-client";
 import { Badge, Button } from "@overhaul/ui";
-import { RefundPanel } from "./refund-panel";
 import { SaleEditor } from "./sale-editor";
-import { OrderReturns } from "./order-returns";
+import { LineWorkspace } from "./line-workspace";
 
 type OrderLine = components["schemas"]["OrderLineDto"];
 type Refund = components["schemas"]["RefundDto"];
@@ -136,21 +135,23 @@ export function LineItems({
                 {open && sale?.id && (
                   <tr className="bg-muted/20">
                     <td colSpan={9} className="px-4 pb-6 pt-2">
-                      <div className="space-y-4">
-                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-                          <p className="text-muted-foreground text-xs uppercase tracking-wide">
-                            Returns for this item
-                          </p>
-                          <OrderReturns
-                            saleId={sale.id}
-                            orderId={orderId}
-                            soldPrice={sale.soldPrice ?? 0}
-                            returns={returnsBySale[sale.id] ?? []}
-                          />
-                        </div>
-                        <RefundPanel saleId={sale.id} refunds={refundsBySale[sale.id] ?? []} />
-                        <SaleEditor sale={sale} channels={channels} />
-                        <CorrectionHistory corrections={correctionsBySale[sale.id] ?? []} />
+                      <div className="space-y-5">
+                        <LineWorkspace
+                          saleId={sale.id}
+                          orderId={orderId}
+                          soldPrice={sale.soldPrice ?? 0}
+                          refunds={refundsBySale[sale.id] ?? []}
+                          returns={returnsBySale[sale.id] ?? []}
+                        />
+                        <details className="group">
+                          <summary className="text-muted-foreground hover:text-foreground cursor-pointer text-xs">
+                            Correct fees / price &amp; view history
+                          </summary>
+                          <div className="mt-3 space-y-4">
+                            <SaleEditor sale={sale} channels={channels} />
+                            <CorrectionHistory corrections={correctionsBySale[sale.id] ?? []} />
+                          </div>
+                        </details>
                       </div>
                     </td>
                   </tr>
