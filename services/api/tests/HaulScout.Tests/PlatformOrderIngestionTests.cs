@@ -38,12 +38,15 @@ public class PlatformOrderIngestionTests
     private static PlatformOrdersController NewController(HaulScoutDbContext db, Guid org, Guid user)
     {
         var currentUser = new StubCurrentUser(org, user);
+        var suggestionService = new PlatformOrderSuggestionService(db, currentUser);
         return new PlatformOrdersController(
             db,
             currentUser,
             new OrderAssembler(db, currentUser),
             new MarketplaceRefundImportService(db, currentUser),
-            new PlatformOrderFeeEnrichmentService(db, currentUser));
+            new PlatformOrderFeeEnrichmentService(db, currentUser),
+            new PlatformOrderIngestionService(db, currentUser, suggestionService),
+            suggestionService);
     }
 
     private static InventoryItem SeedItem(HaulScoutDbContext db, Guid org, string title, decimal cost)
