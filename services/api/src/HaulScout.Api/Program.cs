@@ -64,6 +64,7 @@ builder.Services.AddScoped<InventoryPhotoStorageService>();
 builder.Services.AddScoped<InventoryReferenceDataService>();
 builder.Services.AddScoped<OrderAssembler>();
 builder.Services.AddScoped<MarketplaceRefundImportService>();
+builder.Services.AddScoped<PlatformOrderFeeEnrichmentService>();
 builder.Services.AddHttpClient<SupabaseAdminInviteService>();
 builder.Services.AddAuthorization(options =>
 {

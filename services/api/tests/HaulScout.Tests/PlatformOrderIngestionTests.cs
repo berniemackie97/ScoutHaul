@@ -42,7 +42,8 @@ public class PlatformOrderIngestionTests
             db,
             currentUser,
             new OrderAssembler(db, currentUser),
-            new MarketplaceRefundImportService(db, currentUser));
+            new MarketplaceRefundImportService(db, currentUser),
+            new PlatformOrderFeeEnrichmentService(db, currentUser));
     }
 
     private static InventoryItem SeedItem(HaulScoutDbContext db, Guid org, string title, decimal cost)
