@@ -21,6 +21,7 @@ export function statusTone(status: string): ToneKey {
     case 'ReadyToList':
       return 'warning';
     case 'Purchased':
+    case 'Bundled':
       return 'info';
     case 'Returned':
     case 'Disposed':

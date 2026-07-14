@@ -8,6 +8,7 @@ export type InventoryStatus =
   | 'NeedsRepair'
   | 'NeedsPhotos'
   | 'ReadyToList'
+  | 'Bundled'
   | 'Listed'
   | 'Sold'
   | 'Packed'

@@ -67,6 +67,12 @@ export default function MoreScreen() {
         onPress={() => router.push('/budget')}
       />
       <ActionCard
+        icon="receipt-outline"
+        title="Purchases"
+        subtitle="Inspect acquisition lots, landed cost, and item allocation"
+        onPress={() => router.push('/purchases')}
+      />
+      <ActionCard
         icon="pricetags-outline"
         title="Listing Queue"
         subtitle="Manage items through the listing workflow"

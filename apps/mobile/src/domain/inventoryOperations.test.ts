@@ -38,6 +38,13 @@ describe('inventory operations', () => {
     });
   });
 
+  it('locks archive for bundled components', () => {
+    expect(archiveInventoryPolicy(item({ status: 'Bundled' }))).toMatchObject({
+      allowed: false,
+      recovery: 'delist-first',
+    });
+  });
+
   it('prefers acquisition allocated cost for cost basis', () => {
     const acquired = item({
       acquisitionAllocatedCost: 12.34,
