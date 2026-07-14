@@ -139,9 +139,7 @@ function RootStack() {
       <Stack.Screen name="trips/[id]" options={{ title: 'Trip Detail' }} />
       <Stack.Screen name="budget" options={{ title: 'Budget' }} />
       <Stack.Screen name="listing-queue" options={{ title: 'Listing Queue' }} />
-      <Stack.Screen name="sales" options={{ title: 'Sales & Shipping' }} />
       <Stack.Screen name="record-sale" options={{ title: 'Record Sale' }} />
-      <Stack.Screen name="sale-transition" options={{ title: 'Sale Workflow' }} />
       <Stack.Screen name="tasks" options={{ title: 'Tasks' }} />
       <Stack.Screen name="settings" options={{ title: 'Settings' }} />
       <Stack.Screen name="workspace-admin" options={{ title: 'Workspace Admin' }} />

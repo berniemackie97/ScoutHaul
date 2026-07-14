@@ -52,11 +52,9 @@ export type {
 
 export type {
   ListingStatus,
-  SaleStatus,
   WorkTaskStatus,
   ExpenseCategory,
   Listing,
-  Sale,
   ResaleTask,
   BudgetSummary,
   Budget,

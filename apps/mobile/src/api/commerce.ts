@@ -1,5 +1,5 @@
 import { apiRequest } from './client';
-import type { Budget, BudgetSummary, Expense, ExpenseCategory, Listing, ListingStatus, Sale, SaleStatus } from '../domain/types';
+import type { Budget, BudgetSummary, Expense, ExpenseCategory, Listing, ListingStatus } from '../domain/types';
 
 export type CreateListingRequest = {
   inventoryItemId: string;
@@ -15,38 +15,6 @@ export type UpdateListingRequest = {
   listPrice: number;
   status?: ListingStatus;
   notes?: string | null;
-};
-
-export type RecordSaleRequest = {
-  inventoryItemId: string;
-  listingId?: string | null;
-  platform: string;
-  soldPrice: number;
-  platformFees: number;
-  paymentFees: number;
-  shippingCost: number;
-  suppliesCost: number;
-  otherCosts: number;
-  salesTaxCollected: number;
-  taxRemittedByPlatform: boolean;
-  shippingCharged?: number;
-  soldAt: string;
-  notes?: string | null;
-  externalOrderId?: string | null;
-  buyerReference?: string | null;
-  buyerName?: string | null;
-  shippingCarrier?: string | null;
-  trackingNumber?: string | null;
-};
-
-export type SaleChannelOption = { value: string; label: string; group: string; isLegacy?: boolean };
-export type SalesReferenceData = { channels: SaleChannelOption[] };
-export type SaleStatusTransitionRequest = {
-  status: SaleStatus;
-  occurredAt?: string | null;
-  reason?: string | null;
-  carrier?: string | null;
-  trackingNumber?: string | null;
 };
 
 export type CreateBudgetRequest = {
@@ -72,15 +40,6 @@ export const commerceApi = {
   updateListing: (id: string, body: UpdateListingRequest) => apiRequest<Listing>(`/api/listings/${id}`, { method: 'PUT', body }),
   markListingListed: (id: string) => apiRequest<Listing>(`/api/listings/${id}/mark-listed`, { method: 'POST' }),
   deleteListing: (id: string) => apiRequest<void>(`/api/listings/${id}`, { method: 'DELETE' }),
-
-  sales: () => apiRequest<Sale[]>('/api/sales'),
-  sale: (id: string) => apiRequest<Sale>(`/api/sales/${id}`),
-  salesReferenceData: () => apiRequest<SalesReferenceData>('/api/sales/reference-data'),
-  recordSale: (body: RecordSaleRequest) => apiRequest<Sale>('/api/sales', { method: 'POST', body }),
-  transitionSale: (id: string, body: SaleStatusTransitionRequest) => apiRequest<Sale>(`/api/sales/${id}/status`, { method: 'PATCH', body }),
-  markSalePacked: (id: string) => apiRequest<Sale>(`/api/sales/${id}/packed`, { method: 'PATCH' }),
-  markSaleShipped: (id: string) => apiRequest<Sale>(`/api/sales/${id}/shipped`, { method: 'PATCH' }),
-  markSaleDelivered: (id: string) => apiRequest<Sale>(`/api/sales/${id}/delivered`, { method: 'PATCH' }),
 
   budgetSummary: () => apiRequest<BudgetSummary>('/api/budgets/summary'),
   currentBudget: () => apiRequest<Budget>('/api/budgets/current'),

@@ -1,5 +1,4 @@
 export type ListingStatus = 'Draft' | 'Active' | 'Ended' | 'Sold' | 'Cancelled';
-export type SaleStatus = 'Recorded' | 'Packed' | 'Shipped' | 'Delivered' | 'ReturnRequested' | 'Returned' | 'Refunded' | 'Cancelled';
 export type WorkTaskStatus = 'Open' | 'InProgress' | 'Blocked' | 'Completed' | 'Cancelled';
 export type ExpenseCategory =
   | 'InventoryPurchase'
@@ -24,29 +23,6 @@ export type Listing = {
   listedAt?: string | null;
   endedAt?: string | null;
   notes?: string | null;
-};
-
-export type Sale = {
-  id: string;
-  inventoryItemId: string;
-  inventoryItemTitle: string;
-  listingId?: string | null;
-  platform: string;
-  soldPrice: number;
-  costOfGoods: number;
-  platformFees: number;
-  paymentFees: number;
-  shippingCost: number;
-  suppliesCost: number;
-  otherCosts: number;
-  salesTaxCollected: number;
-  taxRemittedByPlatform: boolean;
-  salesTaxOwed: number;
-  netProfit: number;
-  status: SaleStatus;
-  soldAt: string;
-  notes?: string | null;
-  allowedTransitions: SaleStatus[];
 };
 
 export type ResaleTask = {
