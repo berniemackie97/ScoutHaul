@@ -51,6 +51,18 @@ export type {
 } from './marketplace.types';
 
 export type {
+  BusinessReport,
+  ReportAgingBucket,
+  ReportChange,
+  ReportComparison,
+  ReportDimension,
+  ReportInventorySnapshot,
+  ReportKpi,
+  ReportSaleRow,
+  ReportSeriesPoint,
+} from './report.types';
+
+export type {
   SourcingRouteStatus,
   SourcingRouteType,
   SourcingStopSourceType,

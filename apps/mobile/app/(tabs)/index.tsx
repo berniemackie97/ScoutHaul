@@ -21,7 +21,8 @@ import { Text } from '../../src/components/Text';
 import { spacing } from '../../src/components/theme';
 import { useColors } from '../../src/context/ThemeContext';
 import { getPendingSyncCount, getWorkspaceProfile, type AppWorkspaceProfile } from '../../src/db/localStore';
-import type { DashboardSummary } from '../../src/domain/types';
+import { reportRange } from '../../src/domain/reports';
+import type { BusinessReport, DashboardSummary } from '../../src/domain/types';
 import { useConnectivity } from '../../src/hooks/useConnectivity';
 import { formatMoney } from '../../src/utils/money';
 
@@ -29,6 +30,7 @@ export default function DashboardScreen() {
   const c = useColors();
   const connectivity = useConnectivity();
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
+  const [report, setReport] = useState<BusinessReport | null>(null);
   const [pendingSync, setPendingSync] = useState(0);
   const [workspaceProfile, setWorkspaceProfile] = useState<AppWorkspaceProfile | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -43,7 +45,13 @@ export default function DashboardScreen() {
       setPendingSync(syncCount);
 
       if (connectivity.isOnline && authStore.isAuthenticated) {
-        setSummary(await api.dashboard());
+        const range = reportRange('30d');
+        const [dashboardSummary, businessReport] = await Promise.all([
+          api.dashboard(),
+          api.reportOverview({ from: range.from, to: range.to }).catch(() => null),
+        ]);
+        setSummary(dashboardSummary);
+        setReport(businessReport);
         setError(null);
       }
     } catch (e) {
@@ -115,9 +123,10 @@ export default function DashboardScreen() {
               />
               <MetricCard
                 label="Net Profit"
-                value={formatMoney(summary?.netProfit)}
+                value={formatMoney(report?.kpis?.realizedNetProfit ?? summary?.netProfit)}
                 icon="trending-up-outline"
-                tone={summary?.netProfit && summary.netProfit > 0 ? 'success' : undefined}
+                tone={(report?.kpis?.realizedNetProfit ?? summary?.netProfit ?? 0) > 0 ? 'success' : undefined}
+                onPress={() => router.push('/reports')}
               />
             </View>
           </AnimatedEntry>
@@ -138,6 +147,22 @@ export default function DashboardScreen() {
               />
             </View>
           </AnimatedEntry>
+
+          {report ? (
+            <AnimatedEntry delay={120}>
+              <Card>
+                <SectionHeader
+                  title="Business health · 30 days"
+                  trailing={<StatusPill label={`${report.kpis?.salesCount ?? 0} sales`} tone="info" size="sm" />}
+                />
+                <View style={styles.healthGrid}>
+                  <HealthMetric label="Gross" value={formatMoney(report.kpis?.grossSales ?? 0)} />
+                  <HealthMetric label="Net income" value={formatMoney(report.kpis?.netIncomeAfterExpenses ?? 0)} />
+                  <HealthMetric label="Avg sale" value={formatMoney(report.kpis?.averageSaleValue ?? 0)} />
+                </View>
+              </Card>
+            </AnimatedEntry>
+          ) : null}
 
           <SectionHeader title="Needs Attention" />
 
@@ -203,6 +228,12 @@ export default function DashboardScreen() {
             onPress={() => router.push('/scanner')}
           />
           <ActionCard
+            icon="analytics-outline"
+            title="Reports"
+            subtitle="Review sales, margin, expenses, and inventory health"
+            onPress={() => router.push('/reports')}
+          />
+          <ActionCard
             icon="checkbox-outline"
             title="Tasks"
             subtitle="View your to-do list"
@@ -211,6 +242,15 @@ export default function DashboardScreen() {
         </>
       )}
     </Screen>
+  );
+}
+
+function HealthMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.healthMetric}>
+      <Text variant="label">{label}</Text>
+      <Text variant="bodyBold">{value}</Text>
+    </View>
   );
 }
 
@@ -261,5 +301,13 @@ const styles = StyleSheet.create({
   },
   centered: {
     textAlign: 'center',
+  },
+  healthGrid: {
+    flexDirection: 'row',
+    gap: spacing.md,
+  },
+  healthMetric: {
+    flex: 1,
+    gap: spacing.xs,
   },
 });
