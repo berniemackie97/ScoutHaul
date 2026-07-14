@@ -2,6 +2,77 @@ import type { Ionicons } from '@expo/vector-icons';
 import type { SelectOption } from '../components/SelectField';
 import type { InventoryStatus } from './types';
 
+export const manualInventoryStatusOptions: SelectOption[] = [
+  { value: 'Draft', label: 'Draft', description: 'Captured but not operationally ready', group: 'Active' },
+  { value: 'Researching', label: 'Researching', description: 'Needs identity, comps, or listing research', group: 'Active' },
+  { value: 'Watchlist', label: 'Watchlist', description: 'Tracked but not yet purchased/committed', group: 'Active' },
+  { value: 'Purchased', label: 'Purchased', description: 'Owned/acquired and waiting for intake work', group: 'Active' },
+  { value: 'NeedsCleaning', label: 'Needs cleaning', description: 'Physical cleanup is required before listing', group: 'Prep' },
+  { value: 'NeedsTesting', label: 'Needs testing', description: 'Function must be tested or disclosed', group: 'Prep' },
+  { value: 'NeedsRepair', label: 'Needs repair', description: 'Repair or parts-only decision is required', group: 'Prep' },
+  { value: 'NeedsPhotos', label: 'Needs photos', description: 'Photography is required before listing', group: 'Prep' },
+  { value: 'ReadyToList', label: 'Ready to list', description: 'Facts, condition, valuation, and prep are ready', group: 'Listing' },
+  { value: 'Listed', label: 'Listed', description: 'Published on at least one sales channel', group: 'Listing' },
+  { value: 'Donated', label: 'Donated', description: 'Removed from active resale inventory', group: 'Closed' },
+  { value: 'Disposed', label: 'Disposed', description: 'Removed from active inventory as waste/loss', group: 'Closed' },
+];
+
+export const createInventoryStatusOptions = manualInventoryStatusOptions.filter(
+  (option) => !['Listed', 'Donated', 'Disposed'].includes(option.value),
+);
+
+export const commerceManagedStatuses: InventoryStatus[] = ['Sold', 'Packed', 'Shipped', 'Delivered', 'Returned'];
+export const terminalInventoryStatuses: InventoryStatus[] = ['Donated', 'Disposed'];
+
+export function inventoryStatusLabel(value?: string | null): string {
+  if (!value) return '—';
+  return value.replace(/([a-z])([A-Z])/g, '$1 $2');
+}
+
+export const ownershipOptions: SelectOption[] = [
+  { value: 'Owned', label: 'Owned inventory' },
+  { value: 'Consigned', label: 'Consigned inventory' },
+  { value: 'CustomerRepair', label: 'Customer-owned repair' },
+  { value: 'VendorManaged', label: 'Vendor-managed inventory' },
+];
+
+export const functionalStatusOptions: SelectOption[] = [
+  { value: 'Unknown', label: 'Unknown' },
+  { value: 'Untested', label: 'Untested' },
+  { value: 'FullyFunctional', label: 'Fully functional' },
+  { value: 'FunctionalWithIssues', label: 'Functional with issues' },
+  { value: 'Intermittent', label: 'Intermittent' },
+  { value: 'NonFunctional', label: 'Non-functional' },
+  { value: 'PartsOnly', label: 'Parts only' },
+];
+
+export const completenessStatusOptions: SelectOption[] = [
+  { value: 'Unknown', label: 'Unknown / not recorded' },
+  { value: 'Complete', label: 'Complete' },
+  { value: 'MissingAccessories', label: 'Missing accessories' },
+  { value: 'MissingParts', label: 'Missing parts' },
+  { value: 'Incomplete', label: 'Incomplete set' },
+];
+
+export const authenticityStatusOptions: SelectOption[] = [
+  { value: 'NotAssessed', label: 'Not assessed' },
+  { value: 'Authentic', label: 'Authenticated' },
+  { value: 'LikelyAuthentic', label: 'Likely authentic' },
+  { value: 'NeedsVerification', label: 'Needs verification' },
+  { value: 'Replica', label: 'Replica (disclosed)' },
+  { value: 'Counterfeit', label: 'Counterfeit — do not list' },
+];
+
+export const packagingStatusOptions: SelectOption[] = [
+  { value: 'NotApplicable', label: 'Not applicable' },
+  { value: 'FactorySealed', label: 'Factory sealed' },
+  { value: 'OriginalExcellent', label: 'Original packaging — excellent' },
+  { value: 'OriginalWorn', label: 'Original packaging — worn' },
+  { value: 'OriginalDamaged', label: 'Original packaging — damaged' },
+  { value: 'ReplacementPackaging', label: 'Replacement packaging' },
+  { value: 'LooseNoPackaging', label: 'Loose / no packaging' },
+];
+
 export const conditionOptions: SelectOption[] = [
   { value: 'Factory sealed', label: 'Factory sealed', description: 'Original factory seal is intact', icon: 'lock-closed-outline' },
   { value: 'New', label: 'New', description: 'Unused and complete', icon: 'sparkles-outline' },

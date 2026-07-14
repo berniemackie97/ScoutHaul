@@ -17,6 +17,34 @@ export type InventoryStatus =
   | 'Donated'
   | 'Disposed';
 
+export type InventoryOwnershipType = 'Owned' | 'Consigned' | 'CustomerRepair' | 'VendorManaged';
+export type InventoryFunctionalStatus =
+  | 'Unknown'
+  | 'Untested'
+  | 'FullyFunctional'
+  | 'FunctionalWithIssues'
+  | 'Intermittent'
+  | 'NonFunctional'
+  | 'PartsOnly';
+export type InventoryCompletenessStatus = 'Unknown' | 'Complete' | 'MissingAccessories' | 'MissingParts' | 'Incomplete';
+export type InventoryAuthenticityStatus =
+  | 'NotAssessed'
+  | 'Authentic'
+  | 'LikelyAuthentic'
+  | 'NeedsVerification'
+  | 'Replica'
+  | 'Counterfeit';
+export type InventoryPackagingStatus =
+  | 'NotApplicable'
+  | 'FactorySealed'
+  | 'OriginalExcellent'
+  | 'OriginalWorn'
+  | 'OriginalDamaged'
+  | 'ReplacementPackaging'
+  | 'LooseNoPackaging';
+export type DimensionUnit = 'Inches' | 'Centimeters';
+export type WeightUnit = 'Ounces' | 'Pounds' | 'Grams' | 'Kilograms';
+
 export type InventoryItem = {
   id: string;
   productIdentityId?: string | null;
@@ -50,6 +78,28 @@ export type InventoryItem = {
   photos?: InventoryPhoto[];
   heroPhotoThumbnailUrl?: string | null;
   isArchived: boolean;
+  isBundle?: boolean;
+  bundleComponentCount?: number;
+  acquisitionLotId?: string | null;
+  acquisitionLotName?: string | null;
+  acquisitionAllocatedCost?: number | null;
+  lifecycleGroup?: string | null;
+  isSold?: boolean;
+  ownershipType?: InventoryOwnershipType;
+  functionalStatus?: InventoryFunctionalStatus;
+  completenessStatus?: InventoryCompletenessStatus;
+  authenticityStatus?: InventoryAuthenticityStatus;
+  packagingStatus?: InventoryPackagingStatus;
+  manufacturerPartNumber?: string | null;
+  serialNumber?: string | null;
+  countryOfOrigin?: string | null;
+  manufactureYear?: number | null;
+  length?: number | null;
+  width?: number | null;
+  height?: number | null;
+  dimensionUnit?: DimensionUnit;
+  weight?: number | null;
+  weightUnit?: WeightUnit;
   createdAt: string;
   updatedAt: string;
 };

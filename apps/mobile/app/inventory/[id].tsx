@@ -17,6 +17,8 @@ import { Text } from '../../src/components/Text';
 import { radius, spacing, type ToneKey } from '../../src/components/theme';
 import { useColors } from '../../src/context/ThemeContext';
 import type { InventoryIssue, InventoryItem, InventoryStatus, MarketObservation } from '../../src/domain/types';
+import { commerceManagedStatuses, inventoryStatusLabel } from '../../src/domain/inventoryOptions';
+import { factsFromInventoryItem, readinessBlockers } from '../../src/domain/lifecycleReadiness';
 import { formatMoney } from '../../src/utils/money';
 import { getPhotos, type ItemPhoto } from '../../src/utils/photos';
 import { resolvePhotoUrl } from '../../src/utils/photoUrl';
@@ -28,6 +30,10 @@ type WorkflowStage = {
 };
 
 const workflowStages: WorkflowStage[] = [
+  { status: 'Draft', label: 'Draft', icon: 'document-outline' },
+  { status: 'Researching', label: 'Research', icon: 'search-outline' },
+  { status: 'Watchlist', label: 'Watch', icon: 'eye-outline' },
+  { status: 'Purchased', label: 'Bought', icon: 'bag-check-outline' },
   { status: 'NeedsCleaning', label: 'Clean', icon: 'water-outline' },
   { status: 'NeedsTesting', label: 'Test', icon: 'flask-outline' },
   { status: 'NeedsRepair', label: 'Repair', icon: 'construct-outline' },
@@ -39,9 +45,11 @@ const workflowStages: WorkflowStage[] = [
   { status: 'Shipped', label: 'Shipped', icon: 'airplane-outline' },
   { status: 'Delivered', label: 'Delivered', icon: 'checkmark-done-outline' },
   { status: 'Returned', label: 'Returned', icon: 'return-down-back-outline' },
+  { status: 'Donated', label: 'Donated', icon: 'gift-outline' },
+  { status: 'Disposed', label: 'Disposed', icon: 'trash-outline' },
 ];
 
-const saleManagedStatuses = new Set<InventoryStatus>(['Sold', 'Packed', 'Shipped', 'Delivered', 'Returned']);
+const saleManagedStatuses = new Set<InventoryStatus>(commerceManagedStatuses);
 
 function stageTone(current: InventoryStatus, stage: InventoryStatus): ToneKey {
   const order = workflowStages.map((s) => s.status);
@@ -119,6 +127,13 @@ export default function InventoryDetailScreen() {
       }
       router.push('/(tabs)/orders');
       return;
+    }
+    if (item && (status === 'ReadyToList' || status === 'Listed')) {
+      const blockers = readinessBlockers(status, { ...factsFromInventoryItem(item), photoCount: photos.length });
+      if (blockers.length > 0) {
+        setError(`Resolve ${blockers.length} readiness blocker${blockers.length === 1 ? '' : 's'} before moving to ${inventoryStatusLabel(status)}.`);
+        return;
+      }
     }
     try {
       setItem(await api.changeInventoryStatus(id, status));
@@ -210,7 +225,7 @@ export default function InventoryDetailScreen() {
         <Text variant="title" style={styles.titleText}>
           {item.title}
         </Text>
-        <StatusPill label={item.status} tone={item.status === 'Sold' ? 'success' : item.status === 'Listed' ? 'info' : 'neutral'} />
+        <StatusPill label={inventoryStatusLabel(item.status)} tone={item.status === 'Sold' ? 'success' : item.status === 'Listed' ? 'info' : 'neutral'} />
       </View>
 
       <PhotoStrip photos={photos.map((p) => p.localUri)} />

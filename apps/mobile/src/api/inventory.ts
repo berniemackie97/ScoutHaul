@@ -1,9 +1,16 @@
 import { apiRequest, uploadMultipart } from './client';
 import type {
+  DimensionUnit,
+  InventoryAuthenticityStatus,
+  InventoryCompletenessStatus,
+  InventoryFunctionalStatus,
   InventoryItem,
   InventoryIssue,
+  InventoryOwnershipType,
+  InventoryPackagingStatus,
   InventoryPhoto,
   InventoryStatus,
+  WeightUnit,
 } from '../domain/types';
 
 export type PhotoResponse = {
@@ -60,6 +67,22 @@ export type CreateInventoryRequest = {
   sourcingTripId?: string | null;
   sourcingTripStopId?: string | null;
   sourceLocationId?: string | null;
+  ownershipType?: InventoryOwnershipType | null;
+  functionalStatus?: InventoryFunctionalStatus | null;
+  completenessStatus?: InventoryCompletenessStatus | null;
+  authenticityStatus?: InventoryAuthenticityStatus | null;
+  packagingStatus?: InventoryPackagingStatus | null;
+  manufacturerPartNumber?: string | null;
+  serialNumber?: string | null;
+  countryOfOrigin?: string | null;
+  manufactureYear?: number | null;
+  length?: number | null;
+  width?: number | null;
+  height?: number | null;
+  dimensionUnit?: DimensionUnit | null;
+  weight?: number | null;
+  weightUnit?: WeightUnit | null;
+  status?: InventoryStatus | null;
 };
 
 export type CreateIssueRequest = {
