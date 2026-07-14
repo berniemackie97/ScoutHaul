@@ -6,6 +6,7 @@ using HaulScout.Application.Common;
 using HaulScout.Application.Contracts;
 using HaulScout.Domain;
 using HaulScout.Domain.Entities;
+using HaulScout.Infrastructure.Channels;
 using HaulScout.Infrastructure.Persistence;
 
 namespace HaulScout.Tests;
@@ -29,7 +30,7 @@ public class ChannelAccountTests
         HaulScoutDbContext db = new(options, tenant);
         db.Organizations.Add(new Organization { Id = org, Name = "Overhaul Trading Company" });
         db.SaveChanges();
-        return (db, new ChannelAccountsController(db, new StubCurrentUser(org, Guid.NewGuid())), org);
+        return (db, new ChannelAccountsController(new EfChannelAccountService(db), new StubCurrentUser(org, Guid.NewGuid())), org);
     }
 
     private static UpsertChannelAccountRequest Request(string channel, string name) =>
