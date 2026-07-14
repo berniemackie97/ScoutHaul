@@ -31,23 +31,27 @@ import {
   createInventoryStatusOptions,
   damageSeverityOptions,
   damageTypeOptions,
+  dimensionUnitOptions,
   functionalStatusOptions,
   inventoryStatusLabel,
   manualInventoryStatusOptions,
   ownershipOptions,
   packagingStatusOptions,
   sizeSystemOptions,
+  weightUnitOptions,
 } from '../../src/domain/inventoryOptions';
 import { readinessBlockers } from '../../src/domain/lifecycleReadiness';
 import { ReadinessChecklist } from '../../src/features/inventory/ReadinessChecklist';
 import type {
   InventoryAuthenticityStatus,
   InventoryCompletenessStatus,
+  DimensionUnit,
   InventoryFunctionalStatus,
   InventoryItem,
   InventoryOwnershipType,
   InventoryPackagingStatus,
   InventoryStatus,
+  WeightUnit,
 } from '../../src/domain/types';
 import { parseOptionalNumber } from '../../src/utils/money';
 import { resolvePhotoUrl } from '../../src/utils/photoUrl';
@@ -127,6 +131,16 @@ export default function EditInventoryScreen() {
   const [purchasePrice, setPurchasePrice] = useState('');
   const [estimatedSalePrice, setEstimatedSalePrice] = useState(params.estimatedSalePrice ?? '');
   const [barcode, setBarcode] = useState(params.barcode ?? '');
+  const [manufacturerPartNumber, setManufacturerPartNumber] = useState('');
+  const [serialNumber, setSerialNumber] = useState('');
+  const [countryOfOrigin, setCountryOfOrigin] = useState('');
+  const [manufactureYear, setManufactureYear] = useState('');
+  const [length, setLength] = useState('');
+  const [width, setWidth] = useState('');
+  const [height, setHeight] = useState('');
+  const [dimensionUnit, setDimensionUnit] = useState<DimensionUnit>('Inches');
+  const [weight, setWeight] = useState('');
+  const [weightUnit, setWeightUnit] = useState<WeightUnit>('Ounces');
   const [notes, setNotes] = useState('');
   const [description, setDescription] = useState('');
   const [photos, setPhotos] = useState<LocalPhoto[]>([]);
@@ -162,6 +176,10 @@ export default function EditInventoryScreen() {
     () => referenceOptions(referenceData?.storageLocations, [], storageLocation),
     [referenceData, storageLocation],
   );
+  const controlledCountries = useMemo(
+    () => referenceOptions(referenceData?.countries, [], countryOfOrigin),
+    [referenceData, countryOfOrigin],
+  );
   const statusOptions = isEdit ? manualInventoryStatusOptions : createInventoryStatusOptions;
   const isCommerceManagedStage = Boolean(loadedStatus && commerceManagedStatuses.includes(loadedStatus));
 
@@ -194,13 +212,24 @@ export default function EditInventoryScreen() {
     let n = 0;
     if (sizeSystem) n++;
     if (sizeValue.trim()) n++;
-    if (barcode.trim()) n++;
     const filled = Object.values(attributes).filter((v) => v.trim()).length;
     n += filled;
     return n;
-  }, [sizeSystem, sizeValue, barcode, attributes]);
+  }, [sizeSystem, sizeValue, attributes]);
 
-  const detailsTotal = useMemo(() => 3 + categoryFields.length, [categoryFields]);
+  const detailsTotal = useMemo(() => 2 + categoryFields.length, [categoryFields]);
+
+  const physicalFilled = useMemo(() => {
+    let n = 0;
+    if (barcode.trim()) n++;
+    if (manufacturerPartNumber.trim()) n++;
+    if (serialNumber.trim()) n++;
+    if (countryOfOrigin) n++;
+    if (manufactureYear.trim()) n++;
+    if (length.trim() || width.trim() || height.trim()) n++;
+    if (weight.trim()) n++;
+    return n;
+  }, [barcode, manufacturerPartNumber, serialNumber, countryOfOrigin, manufactureYear, length, width, height, weight]);
 
   const workFilled = useMemo(() => {
     let n = 0;
@@ -322,6 +351,16 @@ export default function EditInventoryScreen() {
       setPurchasePrice(item.purchasePrice != null ? String(item.purchasePrice) : '');
       setEstimatedSalePrice(item.estimatedSalePrice != null ? String(item.estimatedSalePrice) : '');
       setBarcode(item.barcode ?? '');
+      setManufacturerPartNumber(item.manufacturerPartNumber ?? '');
+      setSerialNumber(item.serialNumber ?? '');
+      setCountryOfOrigin(item.countryOfOrigin ?? '');
+      setManufactureYear(item.manufactureYear != null ? String(item.manufactureYear) : '');
+      setLength(item.length != null ? String(item.length) : '');
+      setWidth(item.width != null ? String(item.width) : '');
+      setHeight(item.height != null ? String(item.height) : '');
+      setDimensionUnit(item.dimensionUnit ?? 'Inches');
+      setWeight(item.weight != null ? String(item.weight) : '');
+      setWeightUnit(item.weightUnit ?? 'Ounces');
       setNotes(item.notes ?? '');
       setDescription(item.description ?? '');
       const typedPhotos = item.photos ?? [];
@@ -402,9 +441,14 @@ export default function EditInventoryScreen() {
     if (brand.trim()) facts.push(`Brand: ${brand.trim()}`);
     if (title.trim()) facts.push(`Name/title: ${title.trim()}`);
     if (model.trim()) facts.push(`Model: ${model.trim()}`);
+    if (manufacturerPartNumber.trim()) facts.push(`Manufacturer part number: ${manufacturerPartNumber.trim()}`);
+    if (serialNumber.trim()) facts.push(`Serial number: ${serialNumber.trim()}`);
+    if (barcode.trim()) facts.push(`Barcode / GTIN: ${barcode.trim()}`);
     if (category) facts.push(`Category: ${category}`);
     if (color.trim()) facts.push(`Color: ${color.trim()}`);
     if (condition) facts.push(`Condition: ${condition}`);
+    if (countryOfOrigin) facts.push(`Country of origin: ${countryOfOrigin}`);
+    if (manufactureYear.trim()) facts.push(`Manufacture year: ${manufactureYear.trim()}`);
     const size = [sizeSystem, sizeValue.trim()].filter(Boolean).join(' ');
     if (size) facts.push(`Size: ${size}`);
     if (notes.trim()) facts.push(`Notes: ${notes.trim()}`);
@@ -433,6 +477,22 @@ export default function EditInventoryScreen() {
       setError('Resolve readiness blockers before saving as Ready to list or Listed.');
       return;
     }
+    const parsedManufactureYear = parseOptionalValidatedNumber(manufactureYear, 'Manufacture year', { integer: true, min: 1800, max: 2200 });
+    const parsedLength = parseOptionalValidatedNumber(length, 'Length', { min: 0 });
+    const parsedWidth = parseOptionalValidatedNumber(width, 'Width', { min: 0 });
+    const parsedHeight = parseOptionalValidatedNumber(height, 'Height', { min: 0 });
+    const parsedWeight = parseOptionalValidatedNumber(weight, 'Weight', { min: 0 });
+    const validationError =
+      parsedManufactureYear.error ??
+      parsedLength.error ??
+      parsedWidth.error ??
+      parsedHeight.error ??
+      parsedWeight.error;
+    if (validationError) {
+      haptics.error();
+      setError(validationError);
+      return;
+    }
 
     const body = {
       title,
@@ -454,6 +514,16 @@ export default function EditInventoryScreen() {
       purchasePrice: parseOptionalNumber(purchasePrice),
       estimatedSalePrice: parseOptionalNumber(estimatedSalePrice),
       barcode: barcode || null,
+      manufacturerPartNumber: manufacturerPartNumber.trim() || null,
+      serialNumber: serialNumber.trim() || null,
+      countryOfOrigin: countryOfOrigin || null,
+      manufactureYear: parsedManufactureYear.value,
+      length: parsedLength.value,
+      width: parsedWidth.value,
+      height: parsedHeight.value,
+      dimensionUnit,
+      weight: parsedWeight.value,
+      weightUnit,
       notes: notes || null,
       description: description || null,
       productIdentityId: params.productIdentityId ?? null,
@@ -705,9 +775,111 @@ export default function EditInventoryScreen() {
         />
       </ExpandableSection>
 
-      {/* ── Size, Identifiers & Category Details — collapsed ── */}
+      {/* ── Identifiers & Physical Data — collapsed ── */}
       <ExpandableSection
-        title="Details & Identifiers"
+        title="Identifiers & physical data"
+        icon="barcode-outline"
+        filledCount={physicalFilled}
+        totalCount={7}
+      >
+        <TextField
+          label="Barcode / GTIN"
+          value={barcode}
+          onChangeText={setBarcode}
+          keyboardType="number-pad"
+          placeholder="UPC, EAN, ISBN"
+        />
+        <View style={styles.row}>
+          <TextField
+            label="Manufacturer part #"
+            value={manufacturerPartNumber}
+            onChangeText={setManufacturerPartNumber}
+            placeholder="MPN, style code, part number"
+            containerStyle={styles.flex}
+          />
+          <TextField
+            label="Serial number"
+            value={serialNumber}
+            onChangeText={setSerialNumber}
+            placeholder="Serial, IMEI, service tag"
+            containerStyle={styles.flex}
+          />
+        </View>
+        <View style={styles.row}>
+          <SelectField
+            label="Country of origin"
+            value={countryOfOrigin}
+            options={controlledCountries}
+            onChange={setCountryOfOrigin}
+            placeholder="Search countries..."
+            searchable
+            containerStyle={styles.flex}
+          />
+          <TextField
+            label="Manufacture year"
+            value={manufactureYear}
+            onChangeText={setManufactureYear}
+            keyboardType="number-pad"
+            placeholder="YYYY"
+            containerStyle={styles.flex}
+          />
+        </View>
+        <View style={styles.row}>
+          <TextField
+            label="Length"
+            value={length}
+            onChangeText={setLength}
+            keyboardType="decimal-pad"
+            placeholder="0"
+            containerStyle={styles.flex}
+          />
+          <TextField
+            label="Width"
+            value={width}
+            onChangeText={setWidth}
+            keyboardType="decimal-pad"
+            placeholder="0"
+            containerStyle={styles.flex}
+          />
+          <TextField
+            label="Height"
+            value={height}
+            onChangeText={setHeight}
+            keyboardType="decimal-pad"
+            placeholder="0"
+            containerStyle={styles.flex}
+          />
+        </View>
+        <SelectField
+          label="Dimension unit"
+          value={dimensionUnit}
+          options={dimensionUnitOptions}
+          onChange={(value) => setDimensionUnit(value as DimensionUnit)}
+          clearable={false}
+        />
+        <View style={styles.row}>
+          <TextField
+            label="Weight"
+            value={weight}
+            onChangeText={setWeight}
+            keyboardType="decimal-pad"
+            placeholder="0"
+            containerStyle={styles.flex}
+          />
+          <SelectField
+            label="Weight unit"
+            value={weightUnit}
+            options={weightUnitOptions}
+            onChange={(value) => setWeightUnit(value as WeightUnit)}
+            clearable={false}
+            containerStyle={styles.flex}
+          />
+        </View>
+      </ExpandableSection>
+
+      {/* ── Size & Category Details — collapsed ── */}
+      <ExpandableSection
+        title="Size & category details"
         icon="resize-outline"
         filledCount={detailsFilled}
         totalCount={detailsTotal}
@@ -729,13 +901,6 @@ export default function EditInventoryScreen() {
             searchable
           />
         ) : null}
-        <TextField
-          label="Barcode"
-          value={barcode}
-          onChangeText={setBarcode}
-          keyboardType="number-pad"
-          placeholder="UPC, EAN, ISBN"
-        />
 
         {/* Dynamic category attribute fields */}
         {categoryFields.length > 0 ? (
@@ -1084,6 +1249,34 @@ function serializeAttributes(value: AttributeMap): string | null {
       .filter(([, entry]) => entry.length > 0),
   );
   return Object.keys(cleaned).length > 0 ? JSON.stringify(cleaned) : null;
+}
+
+function parseOptionalValidatedNumber(
+  value: string,
+  label: string,
+  rules: { min?: number; max?: number; integer?: boolean } = {},
+): { value: number | null; error: string | null } {
+  const trimmed = value.trim();
+  if (!trimmed) return { value: null, error: null };
+
+  const parsed = Number(trimmed);
+  if (!Number.isFinite(parsed)) {
+    return { value: null, error: `${label} must be a valid number.` };
+  }
+
+  if (rules.integer && !Number.isInteger(parsed)) {
+    return { value: null, error: `${label} must be a whole number.` };
+  }
+
+  if (rules.min !== undefined && parsed < rules.min) {
+    return { value: null, error: `${label} must be at least ${rules.min}.` };
+  }
+
+  if (rules.max !== undefined && parsed > rules.max) {
+    return { value: null, error: `${label} must be ${rules.max} or less.` };
+  }
+
+  return { value: parsed, error: null };
 }
 
 // ── Styles ──
