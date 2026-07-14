@@ -4,6 +4,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Button } from '../../src/components/Button';
 import { EmptyState } from '../../src/components/EmptyState';
 import { ErrorBanner } from '../../src/components/ErrorBanner';
 import { FilterChips } from '../../src/components/FilterChips';
@@ -137,7 +138,13 @@ export default function OrdersListScreen() {
 
   const listHeader = useMemo(() => (
     <View style={styles.listHeader}>
-      <Text variant="title">Orders</Text>
+      <View style={styles.headerRow}>
+        <View style={styles.headerText}>
+          <Text variant="title">Orders</Text>
+          <Text variant="caption">Order-backed sales, fulfillment, refunds, and returns.</Text>
+        </View>
+        <Button label="Record" icon="cash-outline" size="sm" onPress={() => router.push('/record-sale')} />
+      </View>
       <TextField label="" value={search} onChangeText={setSearch} placeholder="Search order #, buyer, channel..." />
       <FilterChips options={filterOptions} selected={filter} onSelect={setFilter} />
       {error ? <ErrorBanner message={error} onRetry={() => void load()} /> : null}
@@ -179,6 +186,8 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1 },
   listContent: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxl },
   listHeader: { gap: spacing.md, paddingTop: spacing.lg },
+  headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
+  headerText: { flex: 1, gap: spacing.xxs },
   listItem: { paddingTop: spacing.md },
   card: { borderRadius: radius.lg, padding: spacing.lg, borderWidth: 1, gap: spacing.md },
   cardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
