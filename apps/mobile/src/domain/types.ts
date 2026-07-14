@@ -1,9 +1,16 @@
 export type {
+  DimensionUnit,
+  InventoryAuthenticityStatus,
+  InventoryCompletenessStatus,
+  InventoryFunctionalStatus,
   InventoryStatus,
   InventoryItem,
   InventoryPhoto,
   InventoryIssue,
+  InventoryOwnershipType,
+  InventoryPackagingStatus,
   LocalItemDraft,
+  WeightUnit,
 } from './inventory.types';
 
 export type {

@@ -22,14 +22,33 @@ import { enqueueOperation } from '../../src/db/localStore';
 import { takeIdentifyHandoff } from '../../src/features/scanner/identifyHandoff';
 import {
   categoryAttributeFields,
+  authenticityStatusOptions,
   categoryOptions,
   colorOptions,
+  commerceManagedStatuses,
+  completenessStatusOptions,
   conditionOptions,
+  createInventoryStatusOptions,
   damageSeverityOptions,
   damageTypeOptions,
+  functionalStatusOptions,
+  inventoryStatusLabel,
+  manualInventoryStatusOptions,
+  ownershipOptions,
+  packagingStatusOptions,
   sizeSystemOptions,
 } from '../../src/domain/inventoryOptions';
-import type { InventoryItem } from '../../src/domain/types';
+import { readinessBlockers } from '../../src/domain/lifecycleReadiness';
+import { ReadinessChecklist } from '../../src/features/inventory/ReadinessChecklist';
+import type {
+  InventoryAuthenticityStatus,
+  InventoryCompletenessStatus,
+  InventoryFunctionalStatus,
+  InventoryItem,
+  InventoryOwnershipType,
+  InventoryPackagingStatus,
+  InventoryStatus,
+} from '../../src/domain/types';
 import { parseOptionalNumber } from '../../src/utils/money';
 import { resolvePhotoUrl } from '../../src/utils/photoUrl';
 
@@ -80,6 +99,8 @@ export default function EditInventoryScreen() {
 
   const isEdit = !!params.id;
   const [isLoading, setIsLoading] = useState(isEdit);
+  const [status, setStatus] = useState<InventoryStatus>('Draft');
+  const [loadedStatus, setLoadedStatus] = useState<InventoryStatus | null>(null);
   const [title, setTitle] = useState(params.title ?? '');
   const [condition, setCondition] = useState(params.condition ?? '');
   const [category, setCategory] = useState(params.category ?? '');
@@ -95,6 +116,11 @@ export default function EditInventoryScreen() {
   const [testingNotes, setTestingNotes] = useState('');
   const [cleaningNotes, setCleaningNotes] = useState('');
   const [listingNotes, setListingNotes] = useState('');
+  const [ownershipType, setOwnershipType] = useState<InventoryOwnershipType>('Owned');
+  const [functionalStatus, setFunctionalStatus] = useState<InventoryFunctionalStatus>('Unknown');
+  const [completenessStatus, setCompletenessStatus] = useState<InventoryCompletenessStatus>('Unknown');
+  const [authenticityStatus, setAuthenticityStatus] = useState<InventoryAuthenticityStatus>('NotAssessed');
+  const [packagingStatus, setPackagingStatus] = useState<InventoryPackagingStatus>('NotApplicable');
   const [damageType, setDamageType] = useState('');
   const [damageSeverity, setDamageSeverity] = useState('');
   const [damageNote, setDamageNote] = useState('');
@@ -136,6 +162,8 @@ export default function EditInventoryScreen() {
     () => referenceOptions(referenceData?.storageLocations, [], storageLocation),
     [referenceData, storageLocation],
   );
+  const statusOptions = isEdit ? manualInventoryStatusOptions : createInventoryStatusOptions;
+  const isCommerceManagedStage = Boolean(loadedStatus && commerceManagedStatuses.includes(loadedStatus));
 
   useEffect(() => {
     let active = true;
@@ -176,6 +204,7 @@ export default function EditInventoryScreen() {
 
   const workFilled = useMemo(() => {
     let n = 0;
+    if (ownershipType) n++;
     if (storageLocation.trim()) n++;
     if (accessories.trim()) n++;
     if (testingNotes.trim()) n++;
@@ -183,7 +212,23 @@ export default function EditInventoryScreen() {
     if (listingNotes.trim()) n++;
     if (missingParts.trim()) n++;
     return n;
-  }, [storageLocation, accessories, testingNotes, cleaningNotes, listingNotes, missingParts]);
+  }, [ownershipType, storageLocation, accessories, testingNotes, cleaningNotes, listingNotes, missingParts]);
+
+  const readinessFacts = useMemo(() => ({
+    title,
+    description,
+    category,
+    condition,
+    functionalStatus,
+    completenessStatus,
+    authenticityStatus,
+    packagingStatus,
+    testingNotes,
+    estimatedSalePrice,
+    photoCount: photos.length,
+  }), [title, description, category, condition, functionalStatus, completenessStatus, authenticityStatus, packagingStatus, testingNotes, estimatedSalePrice, photos.length]);
+  const readinessBlockingItems = useMemo(() => readinessBlockers(status, readinessFacts), [status, readinessFacts]);
+  const blockedReadyToList = (status === 'ReadyToList' || status === 'Listed') && readinessBlockingItems.length > 0;
 
   const damageFilled = useMemo(() => {
     let n = 0;
@@ -252,6 +297,8 @@ export default function EditInventoryScreen() {
     try {
       setIsLoading(true);
       const item = await api.inventoryItem(id);
+      setStatus(item.status);
+      setLoadedStatus(item.status);
       setTitle(item.title);
       setCondition(item.condition ?? '');
       setCategory(item.category ?? '');
@@ -267,6 +314,11 @@ export default function EditInventoryScreen() {
       setTestingNotes(item.testingNotes ?? '');
       setCleaningNotes(item.cleaningNotes ?? '');
       setListingNotes(item.listingNotes ?? '');
+      setOwnershipType(item.ownershipType ?? 'Owned');
+      setFunctionalStatus(item.functionalStatus ?? 'Unknown');
+      setCompletenessStatus(item.completenessStatus ?? 'Unknown');
+      setAuthenticityStatus(item.authenticityStatus ?? 'NotAssessed');
+      setPackagingStatus(item.packagingStatus ?? 'NotApplicable');
       setPurchasePrice(item.purchasePrice != null ? String(item.purchasePrice) : '');
       setEstimatedSalePrice(item.estimatedSalePrice != null ? String(item.estimatedSalePrice) : '');
       setBarcode(item.barcode ?? '');
@@ -376,6 +428,11 @@ export default function EditInventoryScreen() {
       setError('Item title is required.');
       return;
     }
+    if (blockedReadyToList) {
+      haptics.error();
+      setError('Resolve readiness blockers before saving as Ready to list or Listed.');
+      return;
+    }
 
     const body = {
       title,
@@ -403,6 +460,12 @@ export default function EditInventoryScreen() {
       sourcingTripId: params.sourcingTripId ?? null,
       sourcingTripStopId: params.sourcingTripStopId ?? null,
       sourceLocationId: null,
+      ownershipType,
+      functionalStatus,
+      completenessStatus,
+      authenticityStatus,
+      packagingStatus,
+      status: isEdit ? null : status,
       sellerAskingPrice: null,
     };
 
@@ -419,6 +482,11 @@ export default function EditInventoryScreen() {
       savedItem = item;
       await persistPhotoChanges(item.id);
       await persistIssueChanges(item.id);
+      if (isEdit && loadedStatus && status !== loadedStatus && !isCommerceManagedStage) {
+        item = await api.changeInventoryStatus(item.id, status);
+        savedItem = item;
+        setLoadedStatus(item.status);
+      }
       haptics.success();
       if (params.sourcingTripId) {
         router.replace({ pathname: '/active-route', params: { tripId: params.sourcingTripId } });
@@ -507,6 +575,46 @@ export default function EditInventoryScreen() {
         onSetHero={setHero}
       />
 
+      <ExpandableSection
+        title={isEdit ? 'Lifecycle stage' : 'Starting stage'}
+        icon="git-branch-outline"
+        defaultExpanded
+        badge={inventoryStatusLabel(status)}
+      >
+        {isCommerceManagedStage ? (
+          <View style={[styles.lifecycleNotice, { backgroundColor: c.surfaceAlt, borderColor: c.borderLight }]}>
+            <View style={styles.lifecycleNoticeText}>
+              <Text variant="bodyBold">Controlled by Orders</Text>
+              <Text variant="caption">
+                This item is {inventoryStatusLabel(loadedStatus)}. Sale, fulfillment, and return stages must move through the order workspace.
+              </Text>
+            </View>
+            <Button label="Open Orders" icon="receipt-outline" size="sm" variant="secondary" onPress={() => router.push('/(tabs)/orders')} />
+          </View>
+        ) : (
+          <>
+            <SelectField
+              label={isEdit ? 'Current stage' : 'Starting stage'}
+              value={status}
+              options={statusOptions}
+              onChange={(value) => setStatus(value as InventoryStatus)}
+              placeholder="Select stage..."
+              searchable
+              clearable={false}
+            />
+            <ReadinessChecklist targetStatus={status} facts={readinessFacts} />
+            {blockedReadyToList ? (
+              <View style={[styles.blockerBox, { borderColor: c.warning, backgroundColor: c.warningLight }]}>
+                <Ionicons name="alert-circle-outline" size={16} color={c.warning} />
+                <Text variant="caption" color={c.warningDark}>
+                  Resolve the blocker{readinessBlockingItems.length === 1 ? '' : 's'} before moving this item to Ready to list or Listed.
+                </Text>
+              </View>
+            ) : null}
+          </>
+        )}
+      </ExpandableSection>
+
       {/* ── Essentials — always expanded ── */}
       <ExpandableSection
         title="Item Info"
@@ -553,6 +661,47 @@ export default function EditInventoryScreen() {
           onChange={setCondition}
           placeholder="Select condition..."
           required
+        />
+      </ExpandableSection>
+
+      <ExpandableSection
+        title="Condition controls"
+        icon="shield-checkmark-outline"
+        filledCount={[
+          functionalStatus !== 'Unknown',
+          completenessStatus !== 'Unknown',
+          authenticityStatus !== 'NotAssessed',
+          packagingStatus !== 'NotApplicable',
+        ].filter(Boolean).length}
+        totalCount={4}
+      >
+        <SelectField
+          label="Functional / tested state"
+          value={functionalStatus}
+          options={functionalStatusOptions}
+          onChange={(value) => setFunctionalStatus(value as InventoryFunctionalStatus)}
+          clearable={false}
+        />
+        <SelectField
+          label="Completeness"
+          value={completenessStatus}
+          options={completenessStatusOptions}
+          onChange={(value) => setCompletenessStatus(value as InventoryCompletenessStatus)}
+          clearable={false}
+        />
+        <SelectField
+          label="Authenticity"
+          value={authenticityStatus}
+          options={authenticityStatusOptions}
+          onChange={(value) => setAuthenticityStatus(value as InventoryAuthenticityStatus)}
+          clearable={false}
+        />
+        <SelectField
+          label="Packaging / CIB state"
+          value={packagingStatus}
+          options={packagingStatusOptions}
+          onChange={(value) => setPackagingStatus(value as InventoryPackagingStatus)}
+          clearable={false}
         />
       </ExpandableSection>
 
@@ -684,8 +833,15 @@ export default function EditInventoryScreen() {
         title="Item Work"
         icon="construct-outline"
         filledCount={workFilled}
-        totalCount={6}
+        totalCount={7}
       >
+        <SelectField
+          label="Ownership"
+          value={ownershipType}
+          options={ownershipOptions}
+          onChange={(value) => setOwnershipType(value as InventoryOwnershipType)}
+          clearable={false}
+        />
         <SelectField
           label="Storage / bin location"
           value={storageLocation}
@@ -939,6 +1095,23 @@ const styles = StyleSheet.create({
   },
   flex: {
     flex: 1,
+  },
+  lifecycleNotice: {
+    borderWidth: 1,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    gap: spacing.md,
+  },
+  lifecycleNoticeText: {
+    gap: spacing.xs,
+  },
+  blockerBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    gap: spacing.sm,
   },
 
   // Photo section
