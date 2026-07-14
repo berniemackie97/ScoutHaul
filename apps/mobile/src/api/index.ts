@@ -5,6 +5,7 @@ export { marketplaceApi } from './marketplace';
 export { sourcingApi } from './sourcing';
 export { commerceApi } from './commerce';
 export { tasksApi } from './tasks';
+export { acquisitionApi } from './acquisition';
 
 // Unified API surface. All screens import from this object.
 import { inventoryApi } from './inventory';
@@ -13,6 +14,7 @@ import { marketplaceApi } from './marketplace';
 import { sourcingApi } from './sourcing';
 import { commerceApi } from './commerce';
 import { tasksApi } from './tasks';
+import { acquisitionApi } from './acquisition';
 
 export const api = {
   // Session & dashboard
@@ -60,6 +62,10 @@ export const api = {
   createInventoryIssue: inventoryApi.createIssue,
   updateInventoryIssue: inventoryApi.updateIssue,
   deleteInventoryIssue: inventoryApi.deleteIssue,
+
+  // Acquisition lots / purchases
+  acquisitionLots: acquisitionApi.lots,
+  acquisitionLot: acquisitionApi.lot,
 
   // Marketplace & Products
   searchProducts: marketplaceApi.searchProducts,

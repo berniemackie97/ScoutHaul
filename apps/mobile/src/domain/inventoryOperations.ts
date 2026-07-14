@@ -20,6 +20,14 @@ export function archiveInventoryPolicy(item: InventoryItem): ArchivePolicy {
     };
   }
 
+  if (item.status === 'Bundled') {
+    return {
+      allowed: false,
+      recovery: 'delist-first',
+      reason: 'This item is part of a bundle. Remove it from the bundle before archiving the component record.',
+    };
+  }
+
   if (item.status === 'Listed') {
     return {
       allowed: false,

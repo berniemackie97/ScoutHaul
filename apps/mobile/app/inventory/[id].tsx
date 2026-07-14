@@ -340,6 +340,17 @@ export default function InventoryDetailScreen() {
             </Text>
           </>
         ) : null}
+        {item.acquisitionLotId ? (
+          <>
+            <Divider />
+            <Button
+              label="Open acquisition lot"
+              icon="receipt-outline"
+              variant="secondary"
+              onPress={() => router.push(`/purchases/${item.acquisitionLotId}`)}
+            />
+          </>
+        ) : null}
       </Card>
 
       {hasPhysicalData ? (

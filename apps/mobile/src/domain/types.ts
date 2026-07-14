@@ -1,4 +1,10 @@
 export type {
+  AcquisitionLot,
+  AcquisitionLotAllocationMethod,
+  AcquisitionLotItem,
+} from './acquisition.types';
+
+export type {
   DimensionUnit,
   InventoryAuthenticityStatus,
   InventoryCompletenessStatus,
