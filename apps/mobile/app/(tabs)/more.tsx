@@ -73,10 +73,10 @@ export default function MoreScreen() {
         onPress={() => router.push('/listing-queue')}
       />
       <ActionCard
-        icon="paper-plane-outline"
-        title="Sales & Shipping"
-        subtitle="Record sales, pack orders, move shipments"
-        onPress={() => router.push('/sales')}
+        icon="receipt-outline"
+        title="Orders & Sales"
+        subtitle="Record sales, fulfill orders, handle refunds and returns"
+        onPress={() => router.push('/(tabs)/orders')}
       />
       <ActionCard
         icon="checkbox-outline"

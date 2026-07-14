@@ -220,7 +220,39 @@ export interface SaleChannelOption {
   label: string;
   group: string;
   isLegacy?: boolean;
+  feeProfiles?: ChannelFeeProfile[] | null;
 }
 export interface SalesReferenceData {
   channels: SaleChannelOption[];
+}
+
+export interface SaleCandidate {
+  inventoryItemId: string;
+  title: string;
+  status: string;
+  costOfGoods: number;
+  expectedSalePrice: number | null;
+  listingId: string | null;
+  listingPlatform: string | null;
+  listingPrice: number | null;
+}
+
+export interface ChannelFeeRule {
+  name: string;
+  percent?: number | null;
+  fixedAmount?: number | null;
+  appliesAboveAmount?: number | null;
+  appliesUpToAmount?: number | null;
+  minimumFee?: number | null;
+  maximumFee?: number | null;
+  notes?: string | null;
+}
+
+export interface ChannelFeeProfile {
+  id: string;
+  label: string;
+  description: string;
+  isDefault: boolean;
+  platformRules: ChannelFeeRule[];
+  paymentRules: ChannelFeeRule[];
 }

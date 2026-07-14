@@ -11,6 +11,7 @@ import type {
   Refund,
   ResolveReturnRequest,
   Return,
+  SaleCandidate,
   SaleFinancials,
   SalesReferenceData,
   UpdateOrderTrackingRequest,
@@ -37,6 +38,7 @@ export const ordersApi = {
   remove: (id: string) => apiRequest<void>(`/api/orders/${id}`, { method: 'DELETE' }),
 
   // ── Sale (record + reference) ───────────────────────────────────────────────
+  candidates: () => apiRequest<SaleCandidate[]>('/api/sales/candidates'),
   recordSale: (body: RecordSaleRequest, idempotencyKey?: string) =>
     apiRequest<SaleFinancials>('/api/sales', { method: 'POST', body, idempotencyKey }),
   referenceData: () => apiRequest<SalesReferenceData>('/api/sales/reference-data'),
