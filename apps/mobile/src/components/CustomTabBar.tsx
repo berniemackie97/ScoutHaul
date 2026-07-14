@@ -91,7 +91,7 @@ function getTabIcon(routeName: string, focused: boolean): keyof typeof Ionicons.
     case 'index': return focused ? 'grid' : 'grid-outline';
     case 'scout': return focused ? 'scan' : 'scan-outline';
     case 'inventory': return focused ? 'cube' : 'cube-outline';
-    case 'trips': return focused ? 'navigate' : 'navigate-outline';
+    case 'orders': return focused ? 'receipt' : 'receipt-outline';
     case 'more': return focused ? 'menu' : 'menu-outline';
     default: return 'ellipse-outline';
   }

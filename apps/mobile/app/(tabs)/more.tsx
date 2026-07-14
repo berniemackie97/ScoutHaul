@@ -84,6 +84,12 @@ export default function MoreScreen() {
         subtitle="To-do list for resale work"
         onPress={() => router.push('/tasks')}
       />
+      <ActionCard
+        icon="navigate-outline"
+        title="Routes"
+        subtitle="Sourcing trips and stops"
+        onPress={() => router.push('/trips')}
+      />
 
       <SectionHeader title="Workspace" />
       <ActionCard
