@@ -664,18 +664,6 @@ public static class DtoMapping
         item.Orders.OrderByDescending(order => order.CreatedAt).Select(order => order.ToSummaryDto()).ToList(),
         item.ChannelIdentities.OrderBy(identity => identity.Channel).Select(identity => identity.ToDto()).ToList());
 
-    public static ChannelAccountDto ToDto(this ChannelAccount item) => new(
-        item.Id,
-        item.Channel,
-        item.DisplayName,
-        item.ExternalAccountId,
-        item.DefaultFeeProfileId,
-        item.IsNativelySynced,
-        item.IsActive,
-        item.ConnectedAt,
-        item.Notes,
-        item.Listings.Count(listing => listing.Status == ChannelListingStatus.Active));
-
     public static ChannelListingDto ToDto(this ChannelListing item) => new(
         item.Id,
         item.InventoryItemId,

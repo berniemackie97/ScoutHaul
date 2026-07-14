@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using HaulScout.Application.Services;
+using HaulScout.Infrastructure.Channels;
 using HaulScout.Infrastructure.Marketplace;
 using HaulScout.Infrastructure.Persistence;
 using HaulScout.Infrastructure.Vision;
@@ -19,6 +20,8 @@ public static class DependencyInjection
         }
 
         services.AddDbContext<HaulScoutDbContext>(options => options.UseNpgsql(connectionString));
+
+        services.AddScoped<IChannelAccountService, EfChannelAccountService>();
 
         // In-memory cache (resale estimates, etc.) — protects the shared Gemini free-tier quota.
         services.AddMemoryCache();
