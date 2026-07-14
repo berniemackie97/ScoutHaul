@@ -139,6 +139,9 @@ function RootStack() {
       <Stack.Screen name="trips/[id]" options={{ title: 'Trip Detail' }} />
       <Stack.Screen name="budget" options={{ title: 'Budget' }} />
       <Stack.Screen name="reports" options={{ title: 'Reports' }} />
+      <Stack.Screen name="customers/index" options={{ title: 'Customers' }} />
+      <Stack.Screen name="customers/[id]" options={{ title: 'Customer Detail' }} />
+      <Stack.Screen name="channels" options={{ title: 'Channels' }} />
       <Stack.Screen name="purchases/index" options={{ title: 'Purchases' }} />
       <Stack.Screen name="purchases/[id]" options={{ title: 'Purchase Detail' }} />
       <Stack.Screen name="listing-queue" options={{ title: 'Listing Queue' }} />

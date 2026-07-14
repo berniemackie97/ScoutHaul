@@ -63,6 +63,48 @@ export type {
 } from './report.types';
 
 export type {
+  CustomerAddress,
+  CustomerChannelIdentity,
+  CustomerDetail,
+  CustomerSummary,
+} from './customer.types';
+
+export type {
+  ChannelAccount,
+  ChannelListing,
+  ChannelListingStatus,
+  MobileChannelOption,
+  UpsertChannelAccountRequest,
+} from './channel.types';
+
+export type {
+  ChannelFeeProfile,
+  ChannelFeeRule,
+  FulfillmentStatus,
+  IssueReturnLabelRequest,
+  MergeOrdersRequest,
+  OpenReturnRequest,
+  OrderDetail,
+  OrderLine,
+  OrderStatus,
+  OrderSummary,
+  PaymentStatus,
+  RecordRefundRequest,
+  RecordSaleRequest,
+  Refund,
+  RefundType,
+  ResolveReturnRequest,
+  Return,
+  ReturnStatus,
+  SaleCandidate,
+  SaleChannelOption,
+  SaleFinancials,
+  SalesReferenceData,
+  SaleStatus,
+  UpdateOrderTrackingRequest,
+} from './order.types';
+
+export type {
   SourcingRouteStatus,
   SourcingRouteType,
   SourcingStopSourceType,

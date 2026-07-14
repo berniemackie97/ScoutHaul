@@ -91,6 +91,18 @@ export default function MoreScreen() {
         onPress={() => router.push('/(tabs)/orders')}
       />
       <ActionCard
+        icon="people-outline"
+        title="Customers"
+        subtitle="Buyer records, channel identities, order history, and store credit"
+        onPress={() => router.push('/customers')}
+      />
+      <ActionCard
+        icon="radio-outline"
+        title="Channels"
+        subtitle="Manage marketplace accounts, fee defaults, and manual listing state"
+        onPress={() => router.push('/channels')}
+      />
+      <ActionCard
         icon="checkbox-outline"
         title="Tasks"
         subtitle="To-do list for resale work"
