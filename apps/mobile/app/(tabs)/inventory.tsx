@@ -17,6 +17,12 @@ import { TextField } from '../../src/components/TextField';
 import { radius, spacing } from '../../src/components/theme';
 import { useAppTheme } from '../../src/context/ThemeContext';
 import type { InventoryItem, InventoryStatus } from '../../src/domain/types';
+import {
+  archiveInventoryPolicy,
+  inventoryCostBasis,
+  inventorySummaryBadges,
+  isOrderManagedInventory,
+} from '../../src/domain/inventoryOperations';
 import { formatMoney } from '../../src/utils/money';
 import { getHeroPhoto } from '../../src/utils/photos';
 import { resolvePhotoUrl } from '../../src/utils/photoUrl';
@@ -86,6 +92,10 @@ function ItemCard({
 }) {
   const { colors: c, shadows: s } = useAppTheme();
   const heroUri = useHeroUri(item);
+  const badges = inventorySummaryBadges(item);
+  const costBasis = inventoryCostBasis(item);
+  const lockedForArchive = archiveInventoryPolicy(item).allowed === false;
+  const orderManaged = isOrderManagedInventory(item);
   return (
     <View style={[styles.itemCard, { backgroundColor: c.surface, borderColor: c.borderLight, ...s.sm }]}>
       <Pressable
@@ -109,20 +119,37 @@ function ItemCard({
             </View>
             <View style={styles.itemMeta}>
               <Text variant="caption">
-                {item.condition ?? 'Condition unknown'}
+                {[item.condition ?? 'Condition unknown', item.category, item.brand].filter(Boolean).join(' · ')}
               </Text>
               <Text variant="caption">
-                Cost {formatMoney(item.purchasePrice ?? item.sellerAskingPrice)}
+                Cost {formatMoney(costBasis)}
                 {item.estimatedSalePrice ? ` · Value ${formatMoney(item.estimatedSalePrice)}` : ''}
               </Text>
+              {badges.length > 0 ? (
+                <View style={styles.itemBadgeRow}>
+                  {badges.slice(0, 3).map((badge) => (
+                    <StatusPill key={badge} label={badge} tone="neutral" size="sm" />
+                  ))}
+                </View>
+              ) : null}
             </View>
           </View>
         </View>
       </Pressable>
       <View style={[styles.itemActions, { borderTopColor: c.borderLight }]}>
         <InlineAction icon="calculator-outline" label="Analyze" color={c.primary} onPress={onAnalyze} />
-        <InlineAction icon="pricetag-outline" label="List" color={c.info} onPress={onCreateListing} />
-        <InlineAction icon="archive-outline" label="Archive" color={c.danger} onPress={onArchive} />
+        <InlineAction
+          icon={orderManaged ? 'receipt-outline' : 'pricetag-outline'}
+          label={orderManaged ? 'Orders' : 'List'}
+          color={orderManaged ? c.primary : c.info}
+          onPress={onCreateListing}
+        />
+        <InlineAction
+          icon={lockedForArchive ? 'lock-closed-outline' : 'archive-outline'}
+          label={lockedForArchive ? 'Locked' : 'Archive'}
+          color={lockedForArchive ? c.textMuted : c.danger}
+          onPress={onArchive}
+        />
       </View>
     </View>
   );
@@ -163,6 +190,21 @@ export default function InventoryListScreen() {
   }
 
   function confirmArchiveItem(item: InventoryItem) {
+    const archivePolicy = archiveInventoryPolicy(item);
+    if (!archivePolicy.allowed) {
+      Alert.alert(
+        'Archive locked',
+        archivePolicy.reason,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          archivePolicy.recovery === 'orders'
+            ? { text: 'Open Orders', onPress: () => router.push('/(tabs)/orders') }
+            : { text: 'Edit Item', onPress: () => router.push({ pathname: '/inventory/edit', params: { id: item.id } }) },
+        ],
+      );
+      return;
+    }
+
     Alert.alert(
       'Archive item?',
       item.title,
@@ -174,6 +216,11 @@ export default function InventoryListScreen() {
   }
 
   async function createDraftListing(item: InventoryItem) {
+    if (isOrderManagedInventory(item)) {
+      router.push('/(tabs)/orders');
+      return;
+    }
+
     const listPrice = item.estimatedSalePrice ?? item.sellerAskingPrice ?? item.purchasePrice;
     if (!listPrice || listPrice <= 0) {
       setError('Set an estimated sale price before creating a listing draft.');
@@ -210,7 +257,12 @@ export default function InventoryListScreen() {
       result = result.filter((i) =>
         i.title.toLowerCase().includes(q) ||
         i.barcode?.toLowerCase().includes(q) ||
-        i.condition?.toLowerCase().includes(q),
+        i.condition?.toLowerCase().includes(q) ||
+        i.brand?.toLowerCase().includes(q) ||
+        i.model?.toLowerCase().includes(q) ||
+        i.category?.toLowerCase().includes(q) ||
+        i.storageLocation?.toLowerCase().includes(q) ||
+        i.acquisitionLotName?.toLowerCase().includes(q),
       );
     }
     return result;
@@ -343,6 +395,12 @@ const styles = StyleSheet.create({
   },
   itemMeta: {
     gap: spacing.xxs,
+  },
+  itemBadgeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+    paddingTop: spacing.xs,
   },
   itemActions: {
     flexDirection: 'row',
