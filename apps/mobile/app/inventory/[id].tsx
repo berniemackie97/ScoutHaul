@@ -18,6 +18,12 @@ import { radius, spacing, type ToneKey } from '../../src/components/theme';
 import { useColors } from '../../src/context/ThemeContext';
 import type { InventoryIssue, InventoryItem, InventoryStatus, MarketObservation } from '../../src/domain/types';
 import { commerceManagedStatuses, inventoryStatusLabel } from '../../src/domain/inventoryOptions';
+import {
+  archiveInventoryPolicy,
+  inventoryCostBasis,
+  inventoryCostBasisLabel,
+  isOrderManagedInventory,
+} from '../../src/domain/inventoryOperations';
 import { factsFromInventoryItem, readinessBlockers } from '../../src/domain/lifecycleReadiness';
 import { formatMoney } from '../../src/utils/money';
 import { getPhotos, type ItemPhoto } from '../../src/utils/photos';
@@ -50,6 +56,20 @@ const workflowStages: WorkflowStage[] = [
 ];
 
 const saleManagedStatuses = new Set<InventoryStatus>(commerceManagedStatuses);
+
+const nextStatusMap: Partial<Record<InventoryStatus, InventoryStatus[]>> = {
+  Draft: ['Researching', 'Purchased'],
+  Watchlist: ['Purchased', 'Researching'],
+  Researching: ['Purchased', 'NeedsPhotos'],
+  Purchased: ['NeedsCleaning', 'NeedsTesting', 'NeedsPhotos'],
+  NeedsCleaning: ['NeedsTesting', 'NeedsPhotos'],
+  NeedsTesting: ['NeedsPhotos', 'ReadyToList'],
+  NeedsRepair: ['NeedsTesting', 'NeedsPhotos'],
+  NeedsPhotos: ['ReadyToList'],
+  ReadyToList: ['Listed'],
+  Listed: ['Sold'],
+  Returned: ['NeedsRepair', 'ReadyToList'],
+};
 
 function stageTone(current: InventoryStatus, stage: InventoryStatus): ToneKey {
   const order = workflowStages.map((s) => s.status);
@@ -120,6 +140,10 @@ export default function InventoryDetailScreen() {
 
   async function setStatus(status: InventoryStatus) {
     if (!id) return;
+    if (item && isOrderManagedInventory(item)) {
+      router.push('/(tabs)/orders');
+      return;
+    }
     if (saleManagedStatuses.has(status)) {
       if (status === 'Sold' && item && !saleManagedStatuses.has(item.status)) {
         openRecordSale(item);
@@ -156,7 +180,13 @@ export default function InventoryDetailScreen() {
   }
 
   async function archiveItem() {
-    if (!id) return;
+    if (!id || !item) return;
+    const archivePolicy = archiveInventoryPolicy(item);
+    if (!archivePolicy.allowed) {
+      setError(archivePolicy.reason);
+      return;
+    }
+
     try {
       await api.deleteInventory(id);
       router.replace('/(tabs)/inventory');
@@ -167,6 +197,17 @@ export default function InventoryDetailScreen() {
 
   function confirmArchiveItem() {
     if (!item) return;
+    const archivePolicy = archiveInventoryPolicy(item);
+    if (!archivePolicy.allowed) {
+      Alert.alert('Archive locked', archivePolicy.reason, [
+        { text: 'Cancel', style: 'cancel' },
+        archivePolicy.recovery === 'orders'
+          ? { text: 'Open Orders', onPress: () => router.push('/(tabs)/orders') }
+          : { text: 'Edit Item', onPress: () => router.push({ pathname: '/inventory/edit', params: { id: item.id } }) },
+      ]);
+      return;
+    }
+
     Alert.alert('Archive item?', item.title, [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Archive', style: 'destructive', onPress: () => void archiveItem() },
@@ -175,6 +216,15 @@ export default function InventoryDetailScreen() {
 
   async function createDraftListing() {
     if (!item) return;
+    if (isOrderManagedInventory(item)) {
+      router.push('/(tabs)/orders');
+      return;
+    }
+    if (item.status === 'Listed') {
+      setError('This item is already marked Listed. Update the existing listing state before creating another draft.');
+      return;
+    }
+
     const listPrice = item.estimatedSalePrice ?? item.sellerAskingPrice ?? item.purchasePrice;
     if (!listPrice || listPrice <= 0) {
       setError('Set an estimated sale price before creating a listing draft.');
@@ -212,10 +262,12 @@ export default function InventoryDetailScreen() {
     );
   }
 
-  const cost = item.purchasePrice ?? item.sellerAskingPrice;
+  const cost = inventoryCostBasis(item);
   const projectedProfit = item.estimatedSalePrice && cost ? item.estimatedSalePrice - cost : null;
   const attributes = parseAttributes(item.attributesJson);
-  const isSaleManaged = saleManagedStatuses.has(item.status);
+  const orderManaged = isOrderManagedInventory(item);
+  const archivePolicy = archiveInventoryPolicy(item);
+  const nextStatuses = nextStatusMap[item.status] ?? [];
   const dimensions = formatDimensions(item);
   const itemWeight = formatWeight(item);
   const hasPhysicalData = Boolean(
@@ -243,7 +295,7 @@ export default function InventoryDetailScreen() {
 
       <Card>
         <View style={styles.detailGrid}>
-          <DetailRow label="Cost" value={formatMoney(cost)} />
+          <DetailRow label={inventoryCostBasisLabel(item)} value={formatMoney(cost)} />
           <DetailRow label="Estimated Value" value={formatMoney(item.estimatedSalePrice)} />
           <DetailRow
             label="Projected Profit"
@@ -261,6 +313,31 @@ export default function InventoryDetailScreen() {
           <>
             <Divider />
             <Text variant="caption">{item.notes}</Text>
+          </>
+        ) : null}
+      </Card>
+
+      <Card>
+        <SectionHeader title="Operations context" />
+        <View style={styles.detailGrid}>
+          <DetailRow label="Record type" value={item.isBundle ? `Bundle · ${item.bundleComponentCount ?? 0} component${item.bundleComponentCount === 1 ? '' : 's'}` : 'Single item'} />
+          <DetailRow label="Lifecycle owner" value={orderManaged ? 'Orders' : 'Inventory'} />
+          {item.acquisitionLotName ? <DetailRow label="Acquisition lot" value={item.acquisitionLotName} /> : null}
+          {item.acquisitionAllocatedCost != null ? <DetailRow label="Allocated lot cost" value={formatMoney(item.acquisitionAllocatedCost)} /> : null}
+        </View>
+        {orderManaged ? (
+          <>
+            <Divider />
+            <Text variant="caption">
+              Sale and fulfillment stages are controlled by Orders. Use the order workspace for shipping, delivery, return, or refund changes.
+            </Text>
+          </>
+        ) : item.isBundle ? (
+          <>
+            <Divider />
+            <Text variant="caption">
+              Bundle readiness requires component selection in the admin. Mobile can inspect, price, list, and record the bundle sale.
+            </Text>
           </>
         ) : null}
       </Card>
@@ -331,7 +408,7 @@ export default function InventoryDetailScreen() {
         />
       </View>
       <View style={styles.actionRow}>
-        {isSaleManaged ? (
+        {orderManaged ? (
           <Button label="Open Orders" icon="receipt-outline" variant="secondary" fullWidth onPress={() => router.push('/(tabs)/orders')} />
         ) : (
           <>
@@ -341,8 +418,38 @@ export default function InventoryDetailScreen() {
         )}
       </View>
       <View style={styles.actionRow}>
-        <Button label="Archive" icon="archive-outline" variant="danger" fullWidth onPress={confirmArchiveItem} />
+        <Button
+          label={archivePolicy.allowed ? 'Archive' : 'Archive locked'}
+          icon={archivePolicy.allowed ? 'archive-outline' : 'lock-closed-outline'}
+          variant={archivePolicy.allowed ? 'danger' : 'secondary'}
+          fullWidth
+          onPress={confirmArchiveItem}
+        />
       </View>
+
+      <SectionHeader title="Next operations" />
+      <Card>
+        {orderManaged ? (
+          <View style={styles.nextActionStack}>
+            <Text variant="caption">This item is tied to an order. Continue fulfillment from Orders.</Text>
+            <Button label="Open Orders" icon="receipt-outline" variant="secondary" onPress={() => router.push('/(tabs)/orders')} />
+          </View>
+        ) : nextStatuses.length > 0 ? (
+          <View style={styles.nextActionStack}>
+            {nextStatuses.slice(0, 2).map((status) => (
+              <Button
+                key={status}
+                label={status === 'Sold' ? 'Record sale' : `Move to ${inventoryStatusLabel(status)}`}
+                icon={status === 'Sold' ? 'cash-outline' : 'arrow-forward-circle-outline'}
+                variant={status === 'Sold' ? 'primary' : 'secondary'}
+                onPress={() => void setStatus(status)}
+              />
+            ))}
+          </View>
+        ) : (
+          <Text variant="caption">No recommended next inventory action for this stage.</Text>
+        )}
+      </Card>
 
       <SectionHeader title="Workflow" />
       <Card noPadding>
@@ -510,6 +617,9 @@ const styles = StyleSheet.create({
   },
   actionRow: {
     flexDirection: 'row',
+    gap: spacing.md,
+  },
+  nextActionStack: {
     gap: spacing.md,
   },
   workflowRow: {
