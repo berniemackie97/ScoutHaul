@@ -6,6 +6,7 @@ export { sourcingApi } from './sourcing';
 export { commerceApi } from './commerce';
 export { tasksApi } from './tasks';
 export { acquisitionApi } from './acquisition';
+export { reportsApi } from './reports';
 
 // Unified API surface. All screens import from this object.
 import { inventoryApi } from './inventory';
@@ -15,6 +16,7 @@ import { sourcingApi } from './sourcing';
 import { commerceApi } from './commerce';
 import { tasksApi } from './tasks';
 import { acquisitionApi } from './acquisition';
+import { reportsApi } from './reports';
 
 export const api = {
   // Session & dashboard
@@ -66,6 +68,9 @@ export const api = {
   // Acquisition lots / purchases
   acquisitionLots: acquisitionApi.lots,
   acquisitionLot: acquisitionApi.lot,
+
+  // Reports
+  reportOverview: reportsApi.overview,
 
   // Marketplace & Products
   searchProducts: marketplaceApi.searchProducts,

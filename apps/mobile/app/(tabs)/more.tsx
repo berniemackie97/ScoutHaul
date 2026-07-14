@@ -67,6 +67,12 @@ export default function MoreScreen() {
         onPress={() => router.push('/budget')}
       />
       <ActionCard
+        icon="analytics-outline"
+        title="Reports"
+        subtitle="Sales, profit, inventory health, channels, and expenses"
+        onPress={() => router.push('/reports')}
+      />
+      <ActionCard
         icon="receipt-outline"
         title="Purchases"
         subtitle="Inspect acquisition lots, landed cost, and item allocation"
