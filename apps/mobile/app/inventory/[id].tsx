@@ -113,7 +113,11 @@ export default function InventoryDetailScreen() {
   async function setStatus(status: InventoryStatus) {
     if (!id) return;
     if (saleManagedStatuses.has(status)) {
-      router.push('/sales');
+      if (status === 'Sold' && item && !saleManagedStatuses.has(item.status)) {
+        openRecordSale(item);
+        return;
+      }
+      router.push('/(tabs)/orders');
       return;
     }
     try {
@@ -122,6 +126,18 @@ export default function InventoryDetailScreen() {
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unable to update status.');
     }
+  }
+
+  function openRecordSale(inventoryItem: InventoryItem) {
+    router.push({
+      pathname: '/record-sale',
+      params: {
+        inventoryItemId: inventoryItem.id,
+        title: inventoryItem.title,
+        listPrice: inventoryItem.estimatedSalePrice != null ? String(inventoryItem.estimatedSalePrice) : undefined,
+        purchaseCost: inventoryItem.purchasePrice != null ? String(inventoryItem.purchasePrice) : undefined,
+      },
+    });
   }
 
   async function archiveItem() {
@@ -184,6 +200,7 @@ export default function InventoryDetailScreen() {
   const cost = item.purchasePrice ?? item.sellerAskingPrice;
   const projectedProfit = item.estimatedSalePrice && cost ? item.estimatedSalePrice - cost : null;
   const attributes = parseAttributes(item.attributesJson);
+  const isSaleManaged = saleManagedStatuses.has(item.status);
 
   return (
     <Screen>
@@ -274,23 +291,14 @@ export default function InventoryDetailScreen() {
         />
       </View>
       <View style={styles.actionRow}>
-        <Button label="Create Listing" icon="pricetag-outline" variant="secondary" onPress={() => void createDraftListing()} />
-        <Button
-          label="Record Sale"
-          icon="cash-outline"
-          variant="secondary"
-          onPress={() =>
-            router.push({
-              pathname: '/record-sale',
-              params: {
-                inventoryItemId: item.id,
-                title: item.title,
-                listPrice: item.estimatedSalePrice != null ? String(item.estimatedSalePrice) : undefined,
-                purchaseCost: item.purchasePrice != null ? String(item.purchasePrice) : undefined,
-              },
-            })
-          }
-        />
+        {isSaleManaged ? (
+          <Button label="Open Orders" icon="receipt-outline" variant="secondary" fullWidth onPress={() => router.push('/(tabs)/orders')} />
+        ) : (
+          <>
+            <Button label="Create Listing" icon="pricetag-outline" variant="secondary" onPress={() => void createDraftListing()} />
+            <Button label="Record Sale" icon="cash-outline" variant="secondary" onPress={() => openRecordSale(item)} />
+          </>
+        )}
       </View>
       <View style={styles.actionRow}>
         <Button label="Archive" icon="archive-outline" variant="danger" fullWidth onPress={confirmArchiveItem} />
@@ -308,7 +316,7 @@ export default function InventoryDetailScreen() {
                 onPress={() => void setStatus(stage.status)}
                 accessibilityRole="button"
                 accessibilityLabel={
-                  saleManagedStatuses.has(stage.status) ? `Open sales workflow for ${stage.label}` : `Set status to ${stage.label}`
+                  saleManagedStatuses.has(stage.status) ? `Open order workspace for ${stage.label}` : `Set status to ${stage.label}`
                 }
                 accessibilityState={{ selected: isCurrent }}
                 style={[styles.workflowStep, isCurrent && { backgroundColor: c.primaryLight }]}
