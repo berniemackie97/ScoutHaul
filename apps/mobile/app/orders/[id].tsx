@@ -8,10 +8,11 @@ import { Card } from '../../src/components/Card';
 import { ErrorBanner } from '../../src/components/ErrorBanner';
 import { StatusPill } from '../../src/components/StatusPill';
 import { Text } from '../../src/components/Text';
-import { radius, spacing } from '../../src/components/theme';
+import { spacing } from '../../src/components/theme';
 import { useAppTheme } from '../../src/context/ThemeContext';
 import { ordersApi } from '../../src/api/orders';
-import type { OrderDetail, OrderLine } from '../../src/domain/order.types';
+import type { OrderDetail } from '../../src/domain/order.types';
+import { OrderLineRow, type LineEvents, type MutationRunner } from '../../src/features/orders/OrderLineWorkspace';
 import { formatMoney } from '../../src/utils/money';
 import { orderStatusTone } from '../(tabs)/orders';
 
@@ -20,8 +21,9 @@ const dateTime = (value: string | null | undefined) =>
 
 export default function OrderDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { colors: c, shadows: s } = useAppTheme();
+  const { colors: c } = useAppTheme();
   const [order, setOrder] = useState<OrderDetail | null>(null);
+  const [lineEvents, setLineEvents] = useState<Record<string, LineEvents>>({});
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -31,7 +33,21 @@ export default function OrderDetailScreen() {
     if (!id) return;
     if (showRefresh) setRefreshing(true);
     try {
-      setOrder(await ordersApi.get(id));
+      const detail = await ordersApi.get(id);
+      const saleIds = Array.from(new Set(
+        detail.lines.map((line) => line.sale?.id).filter((saleId): saleId is string => Boolean(saleId)),
+      ));
+      const entries = await Promise.all(
+        saleIds.map(async (saleId) => {
+          const [refunds, returns] = await Promise.all([
+            ordersApi.listRefunds(saleId),
+            ordersApi.listReturns(saleId),
+          ]);
+          return [saleId, { refunds, returns }] as const;
+        }),
+      );
+      setOrder(detail);
+      setLineEvents(Object.fromEntries(entries));
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Order unavailable.');
@@ -43,13 +59,15 @@ export default function OrderDetailScreen() {
 
   useFocusEffect(useCallback(() => { void load(); }, [load]));
 
-  async function act(fn: () => Promise<unknown>) {
+  async function act(fn: () => Promise<unknown>): Promise<boolean> {
     setBusy(true);
     try {
       await fn();
       await load();
+      return true;
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Action failed.');
+      return false;
     } finally {
       setBusy(false);
     }
@@ -81,6 +99,7 @@ export default function OrderDetailScreen() {
       <Stack.Screen options={{ title: order.orderNumber }} />
       <ScrollView
         contentContainerStyle={styles.body}
+        keyboardShouldPersistTaps="handled"
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void load(true)} tintColor={c.primary} colors={[c.primary]} />}
       >
         <Pressable onPress={() => router.back()} style={styles.backRow} hitSlop={8}>
@@ -100,13 +119,19 @@ export default function OrderDetailScreen() {
 
         {error ? <ErrorBanner message={error} onRetry={() => void load()} /> : null}
 
-        {/* Line items */}
         <Card style={styles.card}>
-          <Text variant="label" color={c.textMuted}>Line items &amp; money</Text>
-          {order.lines.map((line) => <LineRow key={line.id} line={line} />)}
+          <Text variant="label" color={c.textMuted}>Line items, money, refunds &amp; returns</Text>
+          {order.lines.map((line) => (
+            <OrderLineRow
+              key={line.id}
+              line={line}
+              events={line.sale ? lineEvents[line.sale.id] ?? { refunds: [], returns: [] } : { refunds: [], returns: [] }}
+              busy={busy}
+              runMutation={act}
+            />
+          ))}
         </Card>
 
-        {/* Totals */}
         <Card style={styles.card}>
           <TotalRow label="Subtotal" value={order.subtotal} />
           <TotalRow label="Tax" value={order.taxTotal} />
@@ -120,7 +145,6 @@ export default function OrderDetailScreen() {
           )}
         </Card>
 
-        {/* Payment + fulfillment actions */}
         <Card style={styles.card}>
           <Text variant="label" color={c.textMuted}>Fulfillment</Text>
           {order.isLocalPickup ? (
@@ -147,10 +171,9 @@ export default function OrderDetailScreen() {
               </>
             )}
           </View>
-          <Text variant="caption" color={c.textMuted}>Refunds and returns are managed per line (coming to mobile next).</Text>
+          <Text variant="caption" color={c.textMuted}>Shipment state is order-level. Refunds and returns are handled on each sale line above.</Text>
         </Card>
 
-        {/* Customer */}
         <Card style={styles.card}>
           <Text variant="label" color={c.textMuted}>Customer</Text>
           <Text variant="bodyBold">{buyer}</Text>
@@ -162,7 +185,6 @@ export default function OrderDetailScreen() {
           ) : null}
         </Card>
 
-        {/* Ship to */}
         {!order.isLocalPickup && (order.shipToName || order.shipToLine1) ? (
           <Card style={styles.card}>
             <Text variant="label" color={c.textMuted}>Ship to</Text>
@@ -174,27 +196,6 @@ export default function OrderDetailScreen() {
         ) : null}
       </ScrollView>
     </SafeAreaView>
-  );
-}
-
-function LineRow({ line }: { line: OrderLine }) {
-  const { colors: c } = useAppTheme();
-  const sale = line.sale;
-  const fees = (sale?.platformFees ?? 0) + (sale?.paymentFees ?? 0);
-  return (
-    <View style={[styles.lineRow, { borderTopColor: c.borderLight }]}>
-      <View style={styles.lineHead}>
-        <Text variant="bodyBold" numberOfLines={2} style={styles.flex}>{line.titleSnapshot}</Text>
-        <Text variant="bodyBold">{formatMoney(sale?.netProfit ?? 0)}</Text>
-      </View>
-      <View style={styles.lineMeta}>
-        <Text variant="caption" color={c.textMuted}>Sold {formatMoney(line.unitPrice)}</Text>
-        {fees > 0 ? <Text variant="caption" color={c.textMuted}>Fees -{formatMoney(fees)}</Text> : null}
-        <Text variant="caption" color={c.textMuted}>COGS {formatMoney(sale?.costOfGoods ?? line.unitCostSnapshot ?? 0)}</Text>
-        {(sale?.totalRefunded ?? 0) > 0 ? <Text variant="caption" color={c.warning}>Refunded -{formatMoney(sale?.totalRefunded ?? 0)}</Text> : null}
-      </View>
-      {sale ? <Text variant="label" color={c.textMuted}>Net profit · true</Text> : <Text variant="caption" color={c.textMuted}>No sale line</Text>}
-    </View>
   );
 }
 
@@ -227,11 +228,8 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   pills: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.xs },
   card: { gap: spacing.sm, marginTop: spacing.md },
-  lineRow: { gap: spacing.xxs, borderTopWidth: 1, paddingTop: spacing.sm, marginTop: spacing.xs },
-  lineHead: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
-  lineMeta: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
   totalRow: { flexDirection: 'row', justifyContent: 'space-between' },
   metaGrid: { flexDirection: 'row', gap: spacing.xl },
   metaCell: { gap: spacing.xxs },
-  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.xs },
+  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.xs, alignItems: 'center' },
 });
