@@ -216,6 +216,17 @@ export default function InventoryDetailScreen() {
   const projectedProfit = item.estimatedSalePrice && cost ? item.estimatedSalePrice - cost : null;
   const attributes = parseAttributes(item.attributesJson);
   const isSaleManaged = saleManagedStatuses.has(item.status);
+  const dimensions = formatDimensions(item);
+  const itemWeight = formatWeight(item);
+  const hasPhysicalData = Boolean(
+    item.barcode ||
+      item.manufacturerPartNumber ||
+      item.serialNumber ||
+      item.countryOfOrigin ||
+      item.manufactureYear ||
+      dimensions ||
+      itemWeight,
+  );
 
   return (
     <Screen>
@@ -245,7 +256,6 @@ export default function InventoryDetailScreen() {
           <DetailRow label="Brand/model" value={[item.brand, item.model].filter(Boolean).join(' / ') || 'Not set'} />
           <DetailRow label="Size" value={[item.sizeSystem, item.sizeValue].filter(Boolean).join(' · ') || 'Not set'} />
           <DetailRow label="Storage" value={item.storageLocation ?? 'Not set'} />
-          <DetailRow label="Barcode" value={item.barcode ?? 'None'} />
         </View>
         {item.notes ? (
           <>
@@ -254,6 +264,21 @@ export default function InventoryDetailScreen() {
           </>
         ) : null}
       </Card>
+
+      {hasPhysicalData ? (
+        <Card>
+          <SectionHeader title="Identifiers & physical data" />
+          <View style={styles.detailGrid}>
+            {item.barcode ? <DetailRow label="Barcode / GTIN" value={item.barcode} /> : null}
+            {item.manufacturerPartNumber ? <DetailRow label="MPN" value={item.manufacturerPartNumber} /> : null}
+            {item.serialNumber ? <DetailRow label="Serial" value={item.serialNumber} /> : null}
+            {item.countryOfOrigin ? <DetailRow label="Country of origin" value={item.countryOfOrigin} /> : null}
+            {item.manufactureYear ? <DetailRow label="Manufacture year" value={String(item.manufactureYear)} /> : null}
+            {dimensions ? <DetailRow label="Dimensions" value={dimensions} /> : null}
+            {itemWeight ? <DetailRow label="Weight" value={itemWeight} /> : null}
+          </View>
+        </Card>
+      ) : null}
 
       {attributes.length > 0 ? (
         <Card>
@@ -434,6 +459,38 @@ function formatAttributeLabel(key: string): string {
     .replace(/([A-Z])/g, ' $1')
     .replace(/^./, (letter) => letter.toUpperCase())
     .trim();
+}
+
+function formatDimensions(item: InventoryItem): string | null {
+  const parts: string[] = [];
+  if (item.length != null) parts.push(`L ${formatCompactNumber(item.length)}`);
+  if (item.width != null) parts.push(`W ${formatCompactNumber(item.width)}`);
+  if (item.height != null) parts.push(`H ${formatCompactNumber(item.height)}`);
+  if (parts.length === 0) return null;
+  return `${parts.join(' × ')} ${item.dimensionUnit === 'Centimeters' ? 'cm' : 'in'}`;
+}
+
+function formatWeight(item: InventoryItem): string | null {
+  if (item.weight == null) return null;
+  return `${formatCompactNumber(item.weight)} ${weightUnitLabel(item.weightUnit)}`;
+}
+
+function formatCompactNumber(value: number): string {
+  return Number.isInteger(value) ? String(value) : value.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
+}
+
+function weightUnitLabel(unit: InventoryItem['weightUnit']): string {
+  switch (unit) {
+    case 'Pounds':
+      return 'lb';
+    case 'Grams':
+      return 'g';
+    case 'Kilograms':
+      return 'kg';
+    case 'Ounces':
+    default:
+      return 'oz';
+  }
 }
 
 const styles = StyleSheet.create({

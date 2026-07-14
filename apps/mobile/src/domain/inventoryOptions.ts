@@ -73,6 +73,18 @@ export const packagingStatusOptions: SelectOption[] = [
   { value: 'LooseNoPackaging', label: 'Loose / no packaging' },
 ];
 
+export const dimensionUnitOptions: SelectOption[] = [
+  { value: 'Inches', label: 'Inches' },
+  { value: 'Centimeters', label: 'Centimeters' },
+];
+
+export const weightUnitOptions: SelectOption[] = [
+  { value: 'Ounces', label: 'Ounces' },
+  { value: 'Pounds', label: 'Pounds' },
+  { value: 'Grams', label: 'Grams' },
+  { value: 'Kilograms', label: 'Kilograms' },
+];
+
 export const conditionOptions: SelectOption[] = [
   { value: 'Factory sealed', label: 'Factory sealed', description: 'Original factory seal is intact', icon: 'lock-closed-outline' },
   { value: 'New', label: 'New', description: 'Unused and complete', icon: 'sparkles-outline' },
