@@ -18,6 +18,7 @@ import { Text } from '../src/components/Text';
 import { TextField } from '../src/components/TextField';
 import { spacing } from '../src/components/theme';
 import { useColors } from '../src/context/ThemeContext';
+import { usableChannelOptions } from '../src/domain/channelOptions';
 import type { ChannelAccount, ChannelListing, SaleChannelOption, UpsertChannelAccountRequest } from '../src/domain/types';
 import { formatMoney } from '../src/utils/money';
 
@@ -40,6 +41,7 @@ export default function ChannelsScreen() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -47,16 +49,28 @@ export default function ChannelsScreen() {
   const load = useCallback(async (showRefresh = false) => {
     if (showRefresh) setRefreshing(true);
     try {
-      const [nextAccounts, reference, delist] = await Promise.all([
-        api.channelAccounts(),
+      const nextAccounts = await api.channelAccounts();
+      const [referenceResult, delistResult] = await Promise.allSettled([
         ordersApi.referenceData(),
         api.channelListings({ status: 'PendingDelist' }),
       ]);
+
+      const warnings: string[] = [];
       setAccounts(nextAccounts);
-      setChannelOptions(reference.channels.filter((option) => option.value && !option.isLegacy));
-      setPendingDelist(delist);
+      setChannelOptions(usableChannelOptions(referenceResult.status === 'fulfilled' ? referenceResult.value : null));
+      if (referenceResult.status === 'rejected') {
+        warnings.push('Reference data unavailable. Using default channels; fee profiles may be hidden.');
+      }
+      if (delistResult.status === 'fulfilled') {
+        setPendingDelist(delistResult.value);
+      } else {
+        setPendingDelist([]);
+        warnings.push('Manual delist worklist unavailable.');
+      }
+      setWarning(warnings.length > 0 ? warnings.join(' ') : null);
       setError(null);
     } catch (e) {
+      setWarning(null);
       setError(e instanceof Error ? e.message : 'Channels unavailable.');
     } finally {
       setIsLoading(false);
@@ -146,6 +160,7 @@ export default function ChannelsScreen() {
         ? await api.updateChannelAccount(editing.id, body)
         : await api.createChannelAccount(body);
       setMessage(editing ? 'Channel account updated.' : `Connected ${saved.displayName}.`);
+      setError(null);
       resetForm();
       await load();
     } catch (e) {
@@ -167,6 +182,7 @@ export default function ChannelsScreen() {
         notes: account.notes,
       });
       setMessage(nextActive ? 'Channel reactivated.' : 'Channel deactivated.');
+      setError(null);
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Channel account could not be updated.');
@@ -191,6 +207,7 @@ export default function ChannelsScreen() {
     try {
       await api.deleteChannelAccount(account.id);
       setMessage('Channel account deleted.');
+      setError(null);
       if (editing?.id === account.id) resetForm();
       await load();
     } catch (e) {
@@ -221,6 +238,11 @@ export default function ChannelsScreen() {
       {error ? <ErrorBanner message={error} onRetry={() => void load()} /> : null}
       {message ? (
         <Card><Text variant="caption" color={c.success}>{message}</Text></Card>
+      ) : null}
+      {warning ? (
+        <Card style={{ borderColor: c.warning }}>
+          <Text variant="caption" color={c.warning}>{warning}</Text>
+        </Card>
       ) : null}
 
       {pendingDelist.length > 0 ? (
