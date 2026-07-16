@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Time.Testing;
 using HaulScout.Api.Authorization;
 using HaulScout.Api.Controllers;
 using HaulScout.Api.Services;
@@ -46,8 +47,9 @@ public class OrganizationSecurityTests
         return (db, org, user);
     }
 
-    private static OrganizationsController NewController(HaulScoutDbContext db, Guid org, Guid user)
+    private static OrganizationsController NewController(HaulScoutDbContext db, Guid org, Guid user, TimeProvider? clock = null)
     {
+        TimeProvider timeProvider = clock ?? TimeProvider.System;
         StubCurrentUser currentUser = new(org, user);
         OrganizationAccessService access = new(db, currentUser);
         OrganizationRoleGuard guard = new(db);
@@ -60,7 +62,7 @@ public class OrganizationSecurityTests
         return new OrganizationsController(
             new OrganizationWorkflowService(db, currentUser, access),
             new OrganizationMemberWorkflowService(db, access, guard, invites),
-            new OrganizationInviteCodeWorkflowService(db, currentUser, access, guard),
+            new OrganizationInviteCodeWorkflowService(db, currentUser, access, guard, timeProvider),
             new OrganizationRoleWorkflowService(db, access, guard),
             new OrganizationTeamWorkflowService(db, access, guard));
     }
@@ -98,6 +100,19 @@ public class OrganizationSecurityTests
         db.OrganizationInviteCodes.Add(invite);
         db.SaveChanges();
         return invite;
+    }
+
+    /// <summary>Makes the user an owner, so permission-gated paths are actually reached rather than short-circuiting.</summary>
+    private static void SeedOwner(HaulScoutDbContext db, Guid org, Guid user)
+    {
+        db.OrganizationMembers.Add(new OrganizationMember
+        {
+            OrganizationId = org,
+            UserId = user,
+            Role = OrganizationRole.Owner,
+            JoinedAt = DateTimeOffset.UnixEpoch,
+        });
+        db.SaveChanges();
     }
 
     [Fact]
@@ -239,5 +254,51 @@ public class OrganizationSecurityTests
             CancellationToken.None));
 
         Assert.False(await db.OrganizationRoles.AnyAsync());
+    }
+
+    /// <summary>
+    /// Expiry is a decision about time, so it has to be exact. With the clock injected we can sit one tick either
+    /// side of the deadline — the case that matters and that a wall-clock test can never express.
+    /// </summary>
+    [Fact]
+    public async Task An_invite_code_is_valid_up_to_its_expiry_instant_and_dead_on_it()
+    {
+        (HaulScoutDbContext db, Guid org, Guid user) = NewContext(nameof(An_invite_code_is_valid_up_to_its_expiry_instant_and_dead_on_it));
+        await using HaulScoutDbContext _ = db;
+        DateTimeOffset expiry = new(2026, 7, 16, 12, 0, 0, TimeSpan.Zero);
+        SeedCode(db, org, "SH-EDGE-0000-0000", expiresAt: expiry);
+
+        FakeTimeProvider clock = new(expiry.AddTicks(-1));   // one tick before: still good
+        ActionResult<OrganizationJoinResultDto> justInTime = await NewController(db, org, user, clock)
+            .RedeemInviteCode(new RedeemOrganizationInviteCodeRequest("SH-EDGE-0000-0000"), CancellationToken.None);
+        Assert.NotNull(justInTime.Value);
+
+        // Reset membership so the second redemption is judged purely on the clock.
+        db.OrganizationMembers.RemoveRange(db.OrganizationMembers);
+        await db.SaveChangesAsync();
+
+        clock.SetUtcNow(expiry);                             // exactly on it: expired (<=)
+        ActionResult<OrganizationJoinResultDto> tooLate = await NewController(db, org, user, clock)
+            .RedeemInviteCode(new RedeemOrganizationInviteCodeRequest("SH-EDGE-0000-0000"), CancellationToken.None);
+        Assert.IsType<BadRequestObjectResult>(tooLate.Result);
+    }
+
+    /// <summary>A code cannot be minted already dead — the same clock decides both ends.</summary>
+    [Fact]
+    public async Task An_invite_code_cannot_be_created_expiring_in_the_past()
+    {
+        (HaulScoutDbContext db, Guid org, Guid user) = NewContext(nameof(An_invite_code_cannot_be_created_expiring_in_the_past));
+        await using HaulScoutDbContext _ = db;
+        SeedOwner(db, org, user);
+        FakeTimeProvider clock = new(new DateTimeOffset(2026, 7, 16, 12, 0, 0, TimeSpan.Zero));
+
+        ActionResult<OrganizationInviteCodeCreatedDto> result = await NewController(db, org, user, clock).CreateInviteCode(
+            org,
+            new CreateOrganizationInviteCodeRequest("Late", null, null, clock.GetUtcNow().AddHours(-1), 5),
+            CancellationToken.None);
+
+        // Reaches the expiry rule (not the permission gate) and is refused on the injected clock.
+        Assert.IsType<BadRequestObjectResult>(result.Result);
+        Assert.False(await db.OrganizationInviteCodes.AnyAsync());
     }
 }

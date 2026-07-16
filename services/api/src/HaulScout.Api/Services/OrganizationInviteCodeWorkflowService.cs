@@ -19,7 +19,8 @@ public sealed class OrganizationInviteCodeWorkflowService(
     HaulScoutDbContext db,
     ICurrentUserContext currentUser,
     OrganizationAccessService access,
-    OrganizationRoleGuard guard)
+    OrganizationRoleGuard guard,
+    TimeProvider timeProvider)
 {
     public async Task<IReadOnlyList<OrganizationInviteCodeDto>> ListAsync(Guid id, CancellationToken cancellationToken)
     {
@@ -51,7 +52,7 @@ public sealed class OrganizationInviteCodeWorkflowService(
         {
             return AppResult<OrganizationInviteCodeCreatedDto>.Validation("Max uses must be greater than zero.");
         }
-        if (request.ExpiresAt is not null && request.ExpiresAt <= DateTimeOffset.UtcNow)
+        if (request.ExpiresAt is not null && request.ExpiresAt <= timeProvider.GetUtcNow())
         {
             return AppResult<OrganizationInviteCodeCreatedDto>.Validation("Expiration must be in the future.");
         }
@@ -176,7 +177,7 @@ public sealed class OrganizationInviteCodeWorkflowService(
         }
 
         if (!inviteCode.IsActive
-            || (inviteCode.ExpiresAt.HasValue && inviteCode.ExpiresAt.Value <= DateTimeOffset.UtcNow)
+            || (inviteCode.ExpiresAt.HasValue && inviteCode.ExpiresAt.Value <= timeProvider.GetUtcNow())
             || inviteCode.MaxUses <= inviteCode.UseCount)
         {
             return AppResult<OrganizationJoinResultDto>.Validation("Invite code is expired or inactive.");
@@ -198,7 +199,7 @@ public sealed class OrganizationInviteCodeWorkflowService(
                 UserId = user.Id,
                 RoleId = inviteCode.RoleId,
                 Role = Domain.OrganizationRole.Member,
-                JoinedAt = DateTimeOffset.UtcNow
+                JoinedAt = timeProvider.GetUtcNow()
             };
             db.OrganizationMembers.Add(member);
         }
@@ -214,7 +215,7 @@ public sealed class OrganizationInviteCodeWorkflowService(
                     TeamId = inviteCode.TeamId.Value,
                     UserId = user.Id,
                     RoleId = inviteCode.RoleId,
-                    JoinedAt = DateTimeOffset.UtcNow
+                    JoinedAt = timeProvider.GetUtcNow()
                 });
             }
         }
