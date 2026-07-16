@@ -6,6 +6,7 @@ using HaulScout.Application.Services;
 using HaulScout.Domain;
 using HaulScout.Domain.Entities;
 using HaulScout.Infrastructure.Persistence;
+using HaulScout.Domain.Services;
 
 namespace HaulScout.Api.Services;
 
@@ -123,6 +124,7 @@ public sealed class PlatformOrderFeeEnrichmentService(HaulScoutDbContext db, ICu
     {
         Guid reconciledOrderId = order.ReconciledSaleGroupId!.Value;
         List<Sale> sales = await db.Sales
+            .Include(sale => sale.Refunds)
             .Include(sale => sale.InventoryItem)
             .Where(sale => sale.OrganizationId == currentUser.OrganizationId && sale.OrderId == reconciledOrderId && !ReleasedInventoryStatuses.Contains(sale.Status))
             .ToListAsync(cancellationToken);
@@ -153,15 +155,7 @@ public sealed class PlatformOrderFeeEnrichmentService(HaulScoutDbContext db, ICu
             sale.ShippingCost = newShippingCost;
             sale.ShippingCharged = newShippingCharged;
             sale.SalesTaxCollected = newTax;
-            sale.NetProfit = ResaleFinancialCalculator.CalculateRealizedSale(
-                sale.SoldPrice,
-                sale.ShippingCharged,
-                sale.CostOfGoods,
-                sale.PlatformFees,
-                sale.PaymentFees,
-                sale.ShippingCost,
-                sale.SuppliesCost,
-                sale.OtherCosts).NetProfit;
+            sale.RecomputeNet();
             await AddCorrection(sale, before, $"Imported eBay listing-sales fees for item {line.ExternalItemId}.", cancellationToken);
             correctedSales++;
         }

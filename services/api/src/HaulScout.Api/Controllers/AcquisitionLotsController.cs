@@ -11,6 +11,7 @@ using HaulScout.Domain.Entities;
 using HaulScout.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore.Storage;
 using static HaulScout.Api.Helpers.StringHelpers;
+using HaulScout.Domain.Services;
 
 namespace HaulScout.Api.Controllers;
 
@@ -329,6 +330,7 @@ public sealed class AcquisitionLotsController(HaulScoutDbContext db, ICurrentUse
         Guid[] itemIds = items.Select(item => item.Id).ToArray();
         Dictionary<Guid, decimal> costs = items.ToDictionary(item => item.Id, item => item.PurchasePrice ?? 0);
         List<Sale> sales = await db.Sales
+            .Include(item => item.Refunds)
             .Where(item => item.OrganizationId == currentUser.OrganizationId && itemIds.Contains(item.InventoryItemId))
             .ToListAsync(cancellationToken);
 
@@ -342,16 +344,7 @@ public sealed class AcquisitionLotsController(HaulScoutDbContext db, ICurrentUse
 
             string before = SnapshotSale(sale);
             sale.CostOfGoods = correctedCost;
-            RealizedSaleFinancials financials = ResaleFinancialCalculator.CalculateRealizedSale(
-                sale.SoldPrice,
-                sale.ShippingCharged,
-                sale.CostOfGoods,
-                sale.PlatformFees,
-                sale.PaymentFees,
-                sale.ShippingCost,
-                sale.SuppliesCost,
-                sale.OtherCosts);
-            sale.NetProfit = financials.NetProfit;
+            sale.RecomputeNet();
             await AddCorrection(sale, before, "Acquisition lot allocation updated cost basis.", cancellationToken);
         }
     }

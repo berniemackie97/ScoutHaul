@@ -7,6 +7,7 @@ using HaulScout.Domain;
 using HaulScout.Domain.Entities;
 using HaulScout.Infrastructure.Persistence;
 using static HaulScout.Api.Helpers.StringHelpers;
+using HaulScout.Domain.Services;
 
 namespace HaulScout.Api.Services;
 

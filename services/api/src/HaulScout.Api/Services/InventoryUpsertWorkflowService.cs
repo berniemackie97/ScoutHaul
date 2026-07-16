@@ -8,6 +8,7 @@ using HaulScout.Domain;
 using HaulScout.Domain.Entities;
 using HaulScout.Infrastructure.Persistence;
 using static HaulScout.Api.Helpers.StringHelpers;
+using HaulScout.Domain.Services;
 
 namespace HaulScout.Api.Services;
 
@@ -127,6 +128,7 @@ public sealed class InventoryUpsertWorkflowService(
         }
 
         List<Sale> sales = await db.Sales
+            .Include(sale => sale.Refunds)
             .Where(sale => sale.InventoryItemId == item.Id && sale.OrganizationId == currentUser.OrganizationId)
             .ToListAsync(cancellationToken);
         foreach (Sale sale in sales)
@@ -138,16 +140,7 @@ public sealed class InventoryUpsertWorkflowService(
 
             string before = SnapshotSale(sale);
             sale.CostOfGoods = newCost;
-            RealizedSaleFinancials financials = ResaleFinancialCalculator.CalculateRealizedSale(
-                sale.SoldPrice,
-                sale.ShippingCharged,
-                sale.CostOfGoods,
-                sale.PlatformFees,
-                sale.PaymentFees,
-                sale.ShippingCost,
-                sale.SuppliesCost,
-                sale.OtherCosts);
-            sale.NetProfit = financials.NetProfit;
+            sale.RecomputeNet();
 
             int version = await db.SaleCorrections.CountAsync(
                 correction => correction.SaleId == sale.Id && correction.OrganizationId == currentUser.OrganizationId,

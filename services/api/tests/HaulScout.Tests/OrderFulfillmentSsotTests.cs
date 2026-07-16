@@ -45,7 +45,8 @@ public class OrderFulfillmentSsotTests
         db.InventoryItems.Add(item);
         var order = new Order { OrganizationId = org, Channel = "eBay", ExternalOrderId = "EB-1", OrderNumber = "EB-1", Status = OrderStatus.Paid, PaymentStatus = PaymentStatus.Paid, FulfillmentStatus = FulfillmentStatus.Unfulfilled };
         db.Orders.Add(order);
-        var sale = new Sale { OrganizationId = org, InventoryItemId = item.Id, Platform = "eBay", SoldPrice = 100m, CostOfGoods = 40m, NetProfit = 60m, Status = SaleStatus.Recorded, Order = order, InventoryItem = item };
+        var sale = new Sale { OrganizationId = org, InventoryItemId = item.Id, Platform = "eBay", SoldPrice = 100m, CostOfGoods = 40m, Status = SaleStatus.Recorded, Order = order, InventoryItem = item };
+        sale.RecomputeNet();
         db.Sales.Add(sale);
         await db.SaveChangesAsync();
         return (order, sale);

@@ -97,7 +97,7 @@ public sealed class SaleReturnWorkflowService(
 
         // The seller pays the return label now; book it as a shipping cost so net reflects it whatever the outcome.
         sale.ShippingCost += request.ReturnShippingCost;
-        SaleFinancialStateService.RecomputeNet(sale);
+        sale.RecomputeNet();
         await saleState.AddCorrectionAsync(sale, before, $"Return label issued: return shipping {request.ReturnShippingCost:C}", cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         return AppResult<ReturnDto>.Ok(rma.ToDto());

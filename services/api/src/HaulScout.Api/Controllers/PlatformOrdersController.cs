@@ -10,6 +10,7 @@ using static HaulScout.Api.Helpers.StringHelpers;
 using HaulScout.Domain;
 using HaulScout.Domain.Entities;
 using HaulScout.Infrastructure.Persistence;
+using HaulScout.Domain.Services;
 
 namespace HaulScout.Api.Controllers;
 
@@ -194,6 +195,7 @@ public sealed class PlatformOrdersController(
         // platform's exact figures rather than sold twice — so a recorded history and a fresh order both end up
         // matching eBay. Released (returned/refunded/cancelled) sales don't block a new one.
         List<Sale> existingSales = await db.Sales
+            .Include(sale => sale.Refunds)
             .Include(sale => sale.InventoryItem)
             .Include(sale => sale.Listing)
             .Include(sale => sale.Order)
@@ -292,10 +294,7 @@ public sealed class PlatformOrdersController(
                 existing.OrderId = salesOrder.Id;
                 existing.Order = salesOrder;
 
-                RealizedSaleFinancials corrected = ResaleFinancialCalculator.CalculateRealizedSale(
-                    existing.SoldPrice, existing.ShippingCharged, existing.CostOfGoods, existing.PlatformFees,
-                    existing.PaymentFees, existing.ShippingCost, existing.SuppliesCost, existing.OtherCosts);
-                existing.NetProfit = corrected.NetProfit;
+                existing.RecomputeNet();
 
                 await UpdateInternalSaleObservation(item, existing.SoldAt, applied, cancellationToken);
                 await AddCorrection(existing, before, $"Reconciled to {order.Platform} order {order.ExternalOrderId} — exact platform fees.", cancellationToken);
@@ -323,13 +322,13 @@ public sealed class PlatformOrdersController(
                     OtherCosts = applied.OtherCosts,
                     SalesTaxCollected = applied.SalesTaxCollected,
                     TaxRemittedByPlatform = order.TaxRemittedByPlatform,
-                    NetProfit = financials.NetProfit,
                     SoldAt = soldAt,
                     Notes = TrimToNull(request.Notes),
                     OrderId = salesOrder.Id,
                     Order = salesOrder,
                     InventoryItem = item,
                 };
+                sale.RecomputeNet();
                 db.Sales.Add(sale);
                 resultSales.Add(sale);
                 createdCount++;

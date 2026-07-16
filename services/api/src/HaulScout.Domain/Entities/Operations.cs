@@ -1,4 +1,5 @@
 using HaulScout.Domain.Common;
+using HaulScout.Domain.Services;
 
 namespace HaulScout.Domain.Entities;
 
@@ -102,7 +103,11 @@ public sealed class Sale : EntityBase, IOrganizationScoped
     /// </summary>
     public bool TaxRemittedByPlatform { get; set; } = true;
 
-    public decimal NetProfit { get; set; }
+    /// <summary>
+    /// Derived, never assigned: the only writer is <see cref="RecomputeNet"/>. Private-set is the guardrail — the
+    /// refund-blind duplicates that used to set this directly now cannot compile.
+    /// </summary>
+    public decimal NetProfit { get; private set; }
     public SaleStatus Status { get; set; } = SaleStatus.Recorded;
     public DateTimeOffset SoldAt { get; set; } = DateTimeOffset.UtcNow;
     public string? Notes { get; set; }
@@ -122,6 +127,56 @@ public sealed class Sale : EntityBase, IOrganizationScoped
     public ICollection<SaleCorrection> Corrections { get; set; } = [];
     public ICollection<Refund> Refunds { get; set; } = [];
     public ICollection<Return> Returns { get; set; } = [];
+
+    /// <summary>
+    /// The aggregate refund impact on this sale, derived from its own refunds rather than passed in — so no caller
+    /// can compute it from a partial view.
+    /// </summary>
+    private ResaleFinancialCalculator.SaleRefundImpact RefundImpact() => new(
+        Refunds.Sum(refund => refund.ItemAmount),
+        Refunds.Sum(refund => refund.ShippingRefunded),
+        Refunds.Sum(refund => refund.TaxRefunded),
+        Refunds.Sum(refund => refund.FeeCredit),
+        Refunds.Any(refund => refund.ItemReturned));
+
+    /// <summary>
+    /// Re-derives <see cref="NetProfit"/> from this sale's current figures <em>and</em> its refunds. This is the only
+    /// way net is ever set, which is the entire point: it used to be derived at seven call sites, five of which used
+    /// the refund-blind calculator, so correcting a refunded sale silently handed the refunded money back as profit.
+    /// Refunds are part of the derivation here, so a caller cannot forget them.
+    ///
+    /// Requires <see cref="Refunds"/> to be loaded — an unloaded collection would read as "no refunds" and produce
+    /// exactly the wrong number this method exists to prevent. Callers must Include it (enforced by the tests).
+    /// </summary>
+    public void RecomputeNet() => NetProfit = ResaleFinancialCalculator.NetProfitAfterRefunds(
+        SoldPrice, ShippingCharged, CostOfGoods, PlatformFees, PaymentFees,
+        ShippingCost, SuppliesCost, OtherCosts, RefundImpact());
+
+    /// <summary>
+    /// Re-derives net <em>and</em> the resulting sale status from the current refund set. Full/partial and whether the
+    /// item came back decide the status; an emptied refund set reverts to a realized sale. The matching inventory
+    /// transition is a different aggregate's business and stays with the caller.
+    /// </summary>
+    /// <returns>True when the refunds mean the item is back in our hands and inventory should follow.</returns>
+    public bool ApplyRefunds()
+    {
+        RecomputeNet();
+
+        if (Refunds.Count == 0)
+        {
+            // Last refund voided — back to a realized state; the operator can re-set the exact status.
+            Status = SaleStatus.Delivered;
+            return false;
+        }
+
+        decimal itemRefunded = Refunds.Sum(refund => refund.ItemAmount);
+        bool restocked = Refunds.Any(refund => refund.ItemReturned);
+        bool isFull = Refunds.Any(refund => refund.Type == RefundType.Full)
+                      || (SoldPrice > 0 && itemRefunded >= SoldPrice - 0.01m);
+
+        Status = restocked ? SaleStatus.Returned : isFull ? SaleStatus.Refunded : SaleStatus.PartiallyRefunded;
+        return restocked;
+    }
 }
 
 /// <summary>

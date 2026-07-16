@@ -8,6 +8,7 @@ using HaulScout.Application.Services;
 using HaulScout.Domain;
 using HaulScout.Domain.Entities;
 using HaulScout.Infrastructure.Persistence;
+using HaulScout.Domain.Services;
 
 namespace HaulScout.Tests;
 
@@ -54,9 +55,9 @@ public class SaleAccountingTests
             OtherCosts = 0m,
             SalesTaxCollected = 9.90m,
             TaxRemittedByPlatform = true,
-            NetProfit = 52.60m,
             SoldAt = DateTimeOffset.UtcNow.AddDays(-10),
         };
+        sale.RecomputeNet();
         db.Sales.Add(sale);
         db.SaveChanges();
         return sale;

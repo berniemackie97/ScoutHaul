@@ -3,6 +3,7 @@ using HaulScout.Application.Services;
 using HaulScout.Domain;
 using HaulScout.Domain.Entities;
 using System.Text.Json;
+using HaulScout.Domain.Services;
 
 namespace HaulScout.Api.Mapping;
 

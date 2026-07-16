@@ -36,7 +36,9 @@ public class SalesBrowseAndDeleteTests
 
     private static Sale SeedSale(HaulScoutDbContext db, Guid org, string title, decimal price, decimal net, DateTimeOffset soldAt, string platform = "eBay")
     {
-        InventoryItem item = new() { OrganizationId = org, Title = title, PurchasePrice = 10m, Status = InventoryStatus.Sold, SoldAt = soldAt };
+        // Net is derived by the sale, never assigned — so the cost basis is what makes it land on the requested net.
+        decimal costOfGoods = price - net;
+        InventoryItem item = new() { OrganizationId = org, Title = title, PurchasePrice = costOfGoods, Status = InventoryStatus.Sold, SoldAt = soldAt };
         db.InventoryItems.Add(item);
         Sale sale = new()
         {
@@ -44,12 +46,12 @@ public class SalesBrowseAndDeleteTests
             InventoryItemId = item.Id,
             Platform = platform,
             SoldPrice = price,
-            CostOfGoods = 10m,
-            NetProfit = net,
+            CostOfGoods = costOfGoods,
             Status = SaleStatus.Delivered,
             SoldAt = soldAt,
             InventoryItem = item,
         };
+        sale.RecomputeNet();
         db.Sales.Add(sale);
         db.SaveChanges();
         return sale;
