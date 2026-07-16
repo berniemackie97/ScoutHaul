@@ -336,7 +336,7 @@ public sealed class PlatformOrdersController(
 
                 item.Status = InventoryStatus.Sold;
                 item.SoldAt = soldAt;
-                ApplyBundleComponentInventoryStatus(item, InventoryStatus.Sold, soldAt);
+                InventoryStatePropagation.ApplyBundleComponentInventoryStatus(item, InventoryStatus.Sold, soldAt);
 
                 db.MarketObservations.Add(new MarketObservation
                 {
@@ -406,27 +406,6 @@ public sealed class PlatformOrdersController(
         order.Status = PlatformOrderStatus.Ignored;
         await db.SaveChangesAsync(cancellationToken);
         return order.ToDto();
-    }
-
-    private static void ApplyBundleComponentInventoryStatus(InventoryItem inventoryItem, InventoryStatus componentStatus, DateTimeOffset? soldAt)
-    {
-        if (!inventoryItem.IsBundle)
-        {
-            return;
-        }
-
-        foreach (InventoryBundleComponent componentLink in inventoryItem.BundleComponents)
-        {
-            if (componentLink.ComponentInventoryItem is null)
-            {
-                continue;
-            }
-
-            componentLink.ComponentInventoryItem.Status = componentStatus;
-            componentLink.ComponentInventoryItem.SoldAt = InventoryLifecycle.IsSold(componentStatus) || componentStatus == InventoryStatus.Returned
-                ? soldAt
-                : null;
-        }
     }
 
     // Serializes a sale's financial state for the immutable before/after correction snapshot (mirrors SalesController).

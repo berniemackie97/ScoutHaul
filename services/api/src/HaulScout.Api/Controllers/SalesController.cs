@@ -21,10 +21,12 @@ public sealed class SalesController(
     HaulScoutDbContext db,
     ICurrentUserContext currentUser,
     OrderAssembler? orderAssembler = null,
-    SalesChannelWorkflowService? salesChannels = null) : ControllerBase
+    SalesChannelWorkflowService? salesChannels = null,
+    SaleRecordingWorkflowService? saleRecording = null) : ControllerBase
 {
     private OrderAssembler OrderWriter => orderAssembler ?? new OrderAssembler(db, currentUser);
     private SalesChannelWorkflowService SalesChannels => salesChannels ?? new SalesChannelWorkflowService(db, currentUser);
+    private SaleRecordingWorkflowService SaleRecording => saleRecording ?? new SaleRecordingWorkflowService(db, currentUser, OrderWriter, SalesChannels);
 
     [HttpGet("reference-data")]
     public async Task<ActionResult<SalesReferenceDataDto>> ReferenceData(CancellationToken cancellationToken) =>
@@ -351,7 +353,7 @@ public sealed class SalesController(
             {
                 sale.InventoryItem.Status = sale.ListingId.HasValue ? InventoryStatus.Listed : InventoryStatus.ReadyToList;
                 sale.InventoryItem.SoldAt = null;
-                ApplyBundleComponentInventoryStatus(sale.InventoryItem, sale.InventoryItem.Status, null);
+                InventoryStatePropagation.ApplyBundleComponentInventoryStatus(sale.InventoryItem, sale.InventoryItem.Status, null);
             }
         }
 
@@ -410,149 +412,15 @@ public sealed class SalesController(
     [RequireOrganizationPermission(HaulScoutPermissions.ManageFinance)]
     public async Task<ActionResult<SaleDto>> Record(RecordSaleRequest request, CancellationToken cancellationToken)
     {
-        InventoryItem? item = await db.InventoryItems
-            .Include(inventoryItem => inventoryItem.BundleComponents)
-                .ThenInclude(component => component.ComponentInventoryItem)
-            .SingleOrDefaultAsync(
-            inventoryItem => inventoryItem.Id == request.InventoryItemId && inventoryItem.OrganizationId == currentUser.OrganizationId,
-            cancellationToken);
-
-        if (item is null)
+        AppResult<SaleDto> result = await SaleRecording.RecordAsync(request, cancellationToken);
+        return result.Status switch
         {
-            return NotFound("Inventory item was not found.");
-        }
-
-        string? channel = await SalesChannels.CanonicalChannelAsync(request.Platform, cancellationToken);
-        if (channel is null || request.SoldPrice <= 0)
-        {
-            return BadRequest("Select a controlled sales channel and enter a positive sold price.");
-        }
-
-        if (request.ShippingCharged < 0 || request.PlatformFees < 0 || request.PaymentFees < 0 || request.ShippingCost < 0 || request.SuppliesCost < 0 || request.OtherCosts < 0 || request.SalesTaxCollected < 0)
-        {
-            return BadRequest("Revenue, costs, fees, and tax cannot be negative.");
-        }
-
-        if (request.SoldAt?.UtcDateTime.Date > DateTime.UtcNow.Date)
-        {
-            return BadRequest("Sale date cannot be in the future.");
-        }
-
-        bool alreadySold = await db.Sales.AnyAsync(
-            saleItem => saleItem.InventoryItemId == request.InventoryItemId
-                        && saleItem.OrganizationId == currentUser.OrganizationId
-                        && !SaleWorkflow.InventoryReleaseStatuses.Contains(saleItem.Status),
-            cancellationToken);
-
-        if (alreadySold)
-        {
-            return Conflict("Inventory item already has a recorded sale.");
-        }
-
-        Listing? listing = null;
-        if (request.ListingId.HasValue)
-        {
-            listing = await db.Listings.SingleOrDefaultAsync(
-                listingItem => listingItem.Id == request.ListingId.Value && listingItem.OrganizationId == currentUser.OrganizationId,
-                cancellationToken);
-
-            if (listing is null)
-            {
-                return NotFound("Listing was not found.");
-            }
-
-            if (listing.InventoryItemId != item.Id)
-            {
-                return BadRequest("Listing does not belong to the supplied inventory item.");
-            }
-        }
-
-        RealizedSaleFinancials financials = ResaleFinancialCalculator.CalculateRealizedSale(
-            request.SoldPrice,
-            request.ShippingCharged,
-            item.PurchasePrice ?? 0,
-            request.PlatformFees,
-            request.PaymentFees,
-            request.ShippingCost,
-            request.SuppliesCost,
-            request.OtherCosts);
-
-        Sale sale = new()
-        {
-            OrganizationId = currentUser.OrganizationId,
-            InventoryItemId = request.InventoryItemId,
-            ListingId = request.ListingId,
-            Platform = channel,
-            SoldPrice = request.SoldPrice,
-            ShippingCharged = request.ShippingCharged,
-            CostOfGoods = item.PurchasePrice ?? 0,
-            PlatformFees = request.PlatformFees,
-            PaymentFees = request.PaymentFees,
-            ShippingCost = request.ShippingCost,
-            SuppliesCost = request.SuppliesCost,
-            OtherCosts = request.OtherCosts,
-            SalesTaxCollected = request.SalesTaxCollected,
-            TaxRemittedByPlatform = request.TaxRemittedByPlatform,
-            NetProfit = financials.NetProfit,
-            SoldAt = request.SoldAt ?? DateTimeOffset.UtcNow,
-            Notes = TrimToNull(request.Notes)
+            AppResultStatus.Ok when result.Value is not null => CreatedAtAction(nameof(GetProfit), new { id = result.Value.Id }, result.Value),
+            AppResultStatus.NotFound => NotFound(result.Message),
+            AppResultStatus.Conflict => Conflict(result.Message),
+            AppResultStatus.Validation => BadRequest(result.Message),
+            _ => BadRequest(result.Message),
         };
-
-        Order salesOrder = await OrderWriter.GetOrCreateAsync(
-            channel,
-            request.ExternalOrderId,
-            externalOrderUrl: null,
-            request.BuyerReference,
-            request.BuyerName,
-            sale.SoldAt,
-            channelAccountId: null,
-            itemsSubtotal: sale.SoldPrice,
-            shippingTotal: sale.ShippingCharged,
-            taxTotal: sale.SalesTaxCollected,
-            cancellationToken,
-            request.ShippingCarrier,
-            request.TrackingNumber);
-        sale.OrderId = salesOrder.Id;
-        sale.Order = salesOrder;
-
-        item.Status = InventoryStatus.Sold;
-        item.SoldAt = sale.SoldAt;
-        ApplyBundleComponentInventoryStatus(item, InventoryStatus.Sold, sale.SoldAt);
-
-        if (listing is not null)
-        {
-            listing.Status = ListingStatus.Sold;
-            listing.EndedAt ??= sale.SoldAt;
-        }
-
-        db.Sales.Add(sale);
-        sale.InventoryItem = item;
-        db.MarketObservations.Add(new MarketObservation
-        {
-            OrganizationId = currentUser.OrganizationId,
-            ProductIdentityId = item.ProductIdentityId,
-            InventoryItemId = item.Id,
-            ObservationType = MarketObservationType.InternalSale,
-            Source = "Internal",
-            Title = item.Title,
-            Price = request.SoldPrice,
-            TotalPrice = request.SoldPrice + request.ShippingCharged,
-            Condition = item.Condition,
-            ObservedAt = sale.SoldAt,
-            SoldAt = sale.SoldAt,
-            Notes = "Created from recorded sale."
-        });
-
-        // Reflect the sale across channels: the channel it sold on → Sold, every other live channel → PendingDelist.
-        List<ChannelListing> channelListings = await db.ChannelListings
-            .Include(listing => listing.ChannelAccount)
-            .Where(listing => listing.InventoryItemId == item.Id && listing.OrganizationId == currentUser.OrganizationId)
-            .ToListAsync(cancellationToken);
-        ChannelListingSync.ApplySale(channelListings, channel, DateTimeOffset.UtcNow);
-
-        await OrderWriter.SyncSalesOrderAsync(salesOrder, [sale], cancellationToken);
-        await db.SaveChangesAsync(cancellationToken);
-        return CreatedAtAction(nameof(GetProfit), new { id = sale.Id }, sale.ToDto());
     }
 
     /// <summary>Record one bundled order covering several items — one package, one tracking. Creates a linked
@@ -561,127 +429,8 @@ public sealed class SalesController(
     [RequireOrganizationPermission(HaulScoutPermissions.ManageFinance)]
     public async Task<ActionResult<BundledSaleResultDto>> RecordBundled(RecordBundledSaleRequest request, CancellationToken cancellationToken)
     {
-        Guid[] itemIds = (request.Items ?? []).Select(item => item.InventoryItemId).Distinct().ToArray();
-        if (itemIds.Length < 2)
-        {
-            return BadRequest("A bundled sale needs at least two distinct items. Use a normal sale for one item.");
-        }
-
-        string? channel = await SalesChannels.CanonicalChannelAsync(request.Platform, cancellationToken);
-        if (channel is null || request.TotalSoldPrice <= 0)
-        {
-            return BadRequest("Select a controlled sales channel and enter a positive order total.");
-        }
-
-        if (new[] { request.ShippingCharged, request.PlatformFees, request.PaymentFees, request.ShippingCost, request.SuppliesCost, request.OtherCosts, request.SalesTaxCollected }.Any(value => value < 0))
-        {
-            return BadRequest("Revenue, costs, fees, and tax cannot be negative.");
-        }
-
-        if (request.SoldAt?.UtcDateTime.Date > DateTime.UtcNow.Date)
-        {
-            return BadRequest("Sale date cannot be in the future.");
-        }
-
-        List<InventoryItem> items = await db.InventoryItems
-            .Include(inventoryItem => inventoryItem.BundleComponents).ThenInclude(component => component.ComponentInventoryItem)
-            .Where(inventoryItem => itemIds.Contains(inventoryItem.Id) && inventoryItem.OrganizationId == currentUser.OrganizationId)
-            .ToListAsync(cancellationToken);
-        if (items.Count != itemIds.Length)
-        {
-            return NotFound("One or more inventory items were not found.");
-        }
-
-        bool anySold = await db.Sales.AnyAsync(
-            sale => itemIds.Contains(sale.InventoryItemId) && sale.OrganizationId == currentUser.OrganizationId && !SaleWorkflow.InventoryReleaseStatuses.Contains(sale.Status),
-            cancellationToken);
-        if (anySold)
-        {
-            return Conflict("One or more of these items already has a recorded sale.");
-        }
-
-        Dictionary<Guid, decimal?> manualById = request.Items!.GroupBy(item => item.InventoryItemId).ToDictionary(group => group.Key, group => group.First().ManualPrice);
-        List<BundledSaleItemAllocation> allocationInputs = items
-            .Select(item => new BundledSaleItemAllocation(item.Id, manualById[item.Id], item.EstimatedSalePrice ?? item.SellerAskingPrice ?? item.PurchasePrice ?? 0))
-            .ToList();
-
-        IReadOnlyList<AllocatedSaleLine> lines;
-        try
-        {
-            lines = BundledSaleAllocator.Allocate(allocationInputs, request.TotalSoldPrice, request.ShippingCharged, request.PlatformFees, request.PaymentFees, request.ShippingCost, request.SuppliesCost, request.OtherCosts, request.SalesTaxCollected);
-        }
-        catch (InvalidOperationException exception)
-        {
-            return BadRequest(exception.Message);
-        }
-
-        string? orderReference = TrimToNull(request.OrderReference);
-        DateTimeOffset soldAt = request.SoldAt ?? DateTimeOffset.UtcNow;
-        Order salesOrder = await OrderWriter.GetOrCreateAsync(
-            channel,
-            orderReference,
-            externalOrderUrl: null,
-            buyerReference: null,
-            buyerName: null,
-            soldAt,
-            channelAccountId: null,
-            itemsSubtotal: request.TotalSoldPrice,
-            shippingTotal: request.ShippingCharged,
-            taxTotal: request.SalesTaxCollected,
-            cancellationToken);
-        Guid groupId = salesOrder.Id;
-        Dictionary<Guid, InventoryItem> byId = items.ToDictionary(item => item.Id);
-        List<Sale> created = [];
-
-        foreach (AllocatedSaleLine line in lines)
-        {
-            InventoryItem item = byId[line.InventoryItemId];
-            RealizedSaleFinancials financials = ResaleFinancialCalculator.CalculateRealizedSale(
-                line.Price, line.ShippingCharged, item.PurchasePrice ?? 0, line.PlatformFees, line.PaymentFees, line.ShippingCost, line.SuppliesCost, line.OtherCosts);
-
-            Sale sale = new()
-            {
-                OrganizationId = currentUser.OrganizationId,
-                InventoryItemId = item.Id,
-                Platform = channel,
-                SoldPrice = line.Price,
-                ShippingCharged = line.ShippingCharged,
-                CostOfGoods = item.PurchasePrice ?? 0,
-                PlatformFees = line.PlatformFees,
-                PaymentFees = line.PaymentFees,
-                ShippingCost = line.ShippingCost,
-                SuppliesCost = line.SuppliesCost,
-                OtherCosts = line.OtherCosts,
-                SalesTaxCollected = line.SalesTaxCollected,
-                TaxRemittedByPlatform = request.TaxRemittedByPlatform,
-                NetProfit = financials.NetProfit,
-                SoldAt = soldAt,
-                Notes = TrimToNull(request.Notes),
-                SaleGroupId = groupId,
-                GroupOrderReference = orderReference,
-                OrderId = salesOrder.Id,
-                Order = salesOrder,
-                InventoryItem = item,
-            };
-            db.Sales.Add(sale);
-            created.Add(sale);
-
-            item.Status = InventoryStatus.Sold;
-            item.SoldAt = soldAt;
-            ApplyBundleComponentInventoryStatus(item, InventoryStatus.Sold, soldAt);
-
-            List<ChannelListing> channelListings = await db.ChannelListings
-                .Include(listing => listing.ChannelAccount)
-                .Where(listing => listing.InventoryItemId == item.Id && listing.OrganizationId == currentUser.OrganizationId)
-                .ToListAsync(cancellationToken);
-            ChannelListingSync.ApplySale(channelListings, channel, DateTimeOffset.UtcNow);
-        }
-
-        await OrderWriter.SyncSalesOrderAsync(salesOrder, created, cancellationToken);
-        await db.SaveChangesAsync(cancellationToken);
-
-        List<SaleDto> dtos = created.Select(sale => sale.ToDto()).ToList();
-        return new BundledSaleResultDto(groupId, orderReference, dtos.Count, dtos.Sum(sale => sale.NetProfit), dtos);
+        AppResult<BundledSaleResultDto> result = await SaleRecording.RecordBundledAsync(request, cancellationToken);
+        return ToActionResult(result);
     }
 
     [HttpGet("{id:guid}/profit")]
@@ -823,7 +572,7 @@ public sealed class SalesController(
                 sale.InventoryItem.SoldAt = null;
             }
 
-            ApplyBundleComponentInventoryStatus(
+            InventoryStatePropagation.ApplyBundleComponentInventoryStatus(
                 sale.InventoryItem,
                 request.Status == SaleStatus.Cancelled
                     ? InventoryStatus.Bundled
@@ -950,7 +699,7 @@ public sealed class SalesController(
         if (sale.InventoryItem is not null) sale.InventoryItem.SoldAt = request.SoldAt;
         if (sale.InventoryItem is not null && !SaleWorkflow.InventoryReleaseStatuses.Contains(sale.Status))
         {
-            ApplyBundleComponentInventoryStatus(
+            InventoryStatePropagation.ApplyBundleComponentInventoryStatus(
                 sale.InventoryItem,
                 SaleWorkflow.InventoryStatusFor(sale.Status, sale.ListingId.HasValue),
                 request.SoldAt);
@@ -1369,6 +1118,16 @@ public sealed class SalesController(
             .Include(item => item.Sale).ThenInclude(sale => sale!.Refunds)
             .SingleOrDefaultAsync(item => item.Id == returnId && item.OrganizationId == currentUser.OrganizationId, cancellationToken);
 
+    private ActionResult<T> ToActionResult<T>(AppResult<T> result) where T : class =>
+        result.Status switch
+        {
+            AppResultStatus.Ok when result.Value is not null => result.Value,
+            AppResultStatus.NotFound => NotFound(result.Message),
+            AppResultStatus.Conflict => Conflict(result.Message),
+            AppResultStatus.Validation => BadRequest(result.Message),
+            _ => BadRequest(result.Message),
+        };
+
     /// <summary>Recomputes only a sale's net from its refunds + current cost fields, leaving status untouched (used
     /// when a cost like return shipping changes but no refund/inventory transition should be implied).</summary>
     private static void RecomputeSaleNet(Sale sale)
@@ -1410,7 +1169,7 @@ public sealed class SalesController(
             if (sale.InventoryItem is not null && sale.InventoryItem.Status == InventoryStatus.Returned)
             {
                 sale.InventoryItem.Status = InventoryStatus.Delivered;
-                ApplyBundleComponentInventoryStatus(sale.InventoryItem, InventoryStatus.Delivered, sale.InventoryItem.SoldAt);
+                InventoryStatePropagation.ApplyBundleComponentInventoryStatus(sale.InventoryItem, InventoryStatus.Delivered, sale.InventoryItem.SoldAt);
             }
             return;
         }
@@ -1423,7 +1182,7 @@ public sealed class SalesController(
             if (restocked)
             {
                 sale.InventoryItem.Status = InventoryStatus.Returned;
-                ApplyBundleComponentInventoryStatus(sale.InventoryItem, InventoryStatus.Returned, sale.InventoryItem.SoldAt);
+                InventoryStatePropagation.ApplyBundleComponentInventoryStatus(sale.InventoryItem, InventoryStatus.Returned, sale.InventoryItem.SoldAt);
             }
             // Partial or full-but-kept: the buyer still has the item, so inventory state is unchanged.
         }
@@ -1467,30 +1226,6 @@ public sealed class SalesController(
             AfterJson = SnapshotSale(sale),
             Version = nextVersion,
         });
-    }
-
-    private static void ApplyBundleComponentInventoryStatus(
-        InventoryItem inventoryItem,
-        InventoryStatus componentStatus,
-        DateTimeOffset? soldAt)
-    {
-        if (!inventoryItem.IsBundle)
-        {
-            return;
-        }
-
-        foreach (InventoryBundleComponent componentLink in inventoryItem.BundleComponents)
-        {
-            if (componentLink.ComponentInventoryItem is null)
-            {
-                continue;
-            }
-
-            componentLink.ComponentInventoryItem.Status = componentStatus;
-            componentLink.ComponentInventoryItem.SoldAt = InventoryLifecycle.IsSold(componentStatus) || componentStatus == InventoryStatus.Returned
-                ? soldAt
-                : null;
-        }
     }
 
 }

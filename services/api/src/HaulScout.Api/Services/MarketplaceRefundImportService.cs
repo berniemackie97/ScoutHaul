@@ -314,7 +314,7 @@ public sealed class MarketplaceRefundImportService(HaulScoutDbContext db, ICurre
             if (sale.InventoryItem is not null && sale.InventoryItem.Status == InventoryStatus.Returned)
             {
                 sale.InventoryItem.Status = InventoryStatus.Delivered;
-                ApplyBundleComponentInventoryStatus(sale.InventoryItem, InventoryStatus.Delivered, sale.InventoryItem.SoldAt);
+                InventoryStatePropagation.ApplyBundleComponentInventoryStatus(sale.InventoryItem, InventoryStatus.Delivered, sale.InventoryItem.SoldAt);
             }
             return;
         }
@@ -325,28 +325,7 @@ public sealed class MarketplaceRefundImportService(HaulScoutDbContext db, ICurre
         if (sale.InventoryItem is not null && restocked)
         {
             sale.InventoryItem.Status = InventoryStatus.Returned;
-            ApplyBundleComponentInventoryStatus(sale.InventoryItem, InventoryStatus.Returned, sale.InventoryItem.SoldAt);
-        }
-    }
-
-    private static void ApplyBundleComponentInventoryStatus(InventoryItem inventoryItem, InventoryStatus componentStatus, DateTimeOffset? soldAt)
-    {
-        if (!inventoryItem.IsBundle)
-        {
-            return;
-        }
-
-        foreach (InventoryBundleComponent componentLink in inventoryItem.BundleComponents)
-        {
-            if (componentLink.ComponentInventoryItem is null)
-            {
-                continue;
-            }
-
-            componentLink.ComponentInventoryItem.Status = componentStatus;
-            componentLink.ComponentInventoryItem.SoldAt = InventoryLifecycle.IsSold(componentStatus) || componentStatus == InventoryStatus.Returned
-                ? soldAt
-                : null;
+            InventoryStatePropagation.ApplyBundleComponentInventoryStatus(sale.InventoryItem, InventoryStatus.Returned, sale.InventoryItem.SoldAt);
         }
     }
 
