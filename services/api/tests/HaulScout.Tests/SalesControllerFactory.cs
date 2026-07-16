@@ -24,6 +24,6 @@ internal static class SalesControllerFactory
             new SaleTransitionWorkflowService(db, currentUser, assembler, saleState),
             new SaleCorrectionWorkflowService(db, currentUser, assembler, channels, saleState),
             new SaleRefundWorkflowService(db, currentUser, saleState),
-            new SaleReturnWorkflowService(db, currentUser, saleState));
+            new SaleReturnWorkflowService(db, currentUser, saleState, TimeProvider.System));
     }
 }
