@@ -59,6 +59,9 @@ builder.Services
     });
 
 builder.Services.AddScoped<OrganizationAccessService>();
+builder.Services.AddScoped<SourcingTripQueryService>();
+builder.Services.AddScoped<SourcingTripWorkflowService>();
+builder.Services.AddScoped<SourcingTripStopWorkflowService>();
 builder.Services.AddScoped<SessionBootstrapService>();
 builder.Services.AddScoped<ReferenceOverrideWorkflowService>();
 builder.Services.AddScoped<MarketplaceLookupPersistenceService>();

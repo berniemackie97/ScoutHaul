@@ -33,7 +33,6 @@ public class ArchitectureTests
         "PlatformOrdersController",
         "ProductIdentitiesController",
         "ReportsController",
-        "SourcingTripsController",
         "StoreController",
         "StoreSettingsController",
         "StorefrontController",
