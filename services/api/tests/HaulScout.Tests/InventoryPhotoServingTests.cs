@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using HaulScout.Api.Controllers;
+using HaulScout.Api.Services;
 using HaulScout.Application.Common;
 using HaulScout.Domain.Entities;
 using HaulScout.Infrastructure.Persistence;
@@ -41,7 +42,15 @@ public class InventoryPhotoServingTests
         // fetching the photo URL with no bearer token. Must still resolve via IgnoreQueryFilters.
         TenantContext anonTenant = new();
         await using HaulScoutDbContext db = new(options, anonTenant);
-        InventoryController controller = new(db, null!, null!, null!);
+        InventoryController controller = new(
+            null!,
+            null!,
+            null!,
+            null!,
+            null!,
+            new InventoryPhotoWorkflowService(db, null!, null!),
+            null!,
+            null!);
 
         IActionResult result = await controller.GetPhotoThumbnail(itemId, photoId, CancellationToken.None);
 
