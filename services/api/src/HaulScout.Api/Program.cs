@@ -72,6 +72,10 @@ builder.Services.AddScoped<SaleRecordingWorkflowService>();
 builder.Services.AddScoped<InventoryBundleWorkflowService>();
 builder.Services.AddScoped<InventoryDeletionWorkflowService>();
 builder.Services.AddScoped<InventoryUpsertWorkflowService>();
+builder.Services.AddScoped<InventoryQueryService>();
+builder.Services.AddScoped<InventoryPhotoWorkflowService>();
+builder.Services.AddScoped<InventoryIssueWorkflowService>();
+builder.Services.AddScoped<InventoryStatusWorkflowService>();
 builder.Services.AddHttpClient<SupabaseAdminInviteService>();
 builder.Services.AddAuthorization(options =>
 {

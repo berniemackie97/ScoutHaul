@@ -33,8 +33,20 @@ public class InventoryBrowseTests
         return (db, org, user);
     }
 
-    private static InventoryController NewController(HaulScoutDbContext db, Guid org, Guid user) =>
-        new(db, new StubCurrentUser(org, user), null!, null!);
+    private static InventoryController NewController(HaulScoutDbContext db, Guid org, Guid user)
+    {
+        StubCurrentUser currentUser = new(org, user);
+        InventoryReferenceDataService referenceData = new(db, currentUser);
+        return new InventoryController(
+            referenceData,
+            new InventoryBundleWorkflowService(db, currentUser),
+            new InventoryDeletionWorkflowService(db, currentUser),
+            new InventoryUpsertWorkflowService(db, currentUser, referenceData),
+            new InventoryQueryService(db, currentUser),
+            null!,
+            new InventoryIssueWorkflowService(db, currentUser),
+            new InventoryStatusWorkflowService(db, currentUser));
+    }
 
     private static void SeedItem(HaulScoutDbContext db, Guid org, string title, InventoryStatus status, decimal cost, string? brand = null)
     {
