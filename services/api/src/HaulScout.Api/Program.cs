@@ -59,6 +59,7 @@ builder.Services
     });
 
 builder.Services.AddScoped<OrganizationAccessService>();
+builder.Services.AddScoped<StoreSettingsWorkflowService>();
 builder.Services.AddScoped<SourcingTripQueryService>();
 builder.Services.AddScoped<SourcingTripWorkflowService>();
 builder.Services.AddScoped<SourcingTripStopWorkflowService>();
