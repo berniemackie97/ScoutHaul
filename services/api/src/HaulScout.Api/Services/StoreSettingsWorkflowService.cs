@@ -1,10 +1,11 @@
 using Microsoft.EntityFrameworkCore;
+using static HaulScout.Api.Helpers.StringHelpers;
 using HaulScout.Application.Common;
 using HaulScout.Application.Contracts;
+using HaulScout.Application.Security;
 using HaulScout.Application.Services;
 using HaulScout.Domain.Entities;
 using HaulScout.Infrastructure.Persistence;
-using static HaulScout.Api.Helpers.StringHelpers;
 
 namespace HaulScout.Api.Services;
 

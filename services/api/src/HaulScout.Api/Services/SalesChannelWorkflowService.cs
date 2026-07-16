@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using HaulScout.Application.Common;
 using HaulScout.Application.Contracts;
+using HaulScout.Application.Security;
 using HaulScout.Application.Services;
 using HaulScout.Domain;
 using HaulScout.Infrastructure.Persistence;

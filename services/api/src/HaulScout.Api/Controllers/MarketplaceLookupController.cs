@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using HaulScout.Api.Authorization;
 using HaulScout.Api.Services;
 using HaulScout.Application.Contracts;
+using HaulScout.Application.Security;
 using HaulScout.Application.Services;
 using HaulScout.Infrastructure.Marketplace;
 

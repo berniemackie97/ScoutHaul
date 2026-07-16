@@ -4,6 +4,7 @@ using HaulScout.Api.Authorization;
 using HaulScout.Api.Mapping;
 using HaulScout.Api.Services;
 using HaulScout.Application.Contracts;
+using HaulScout.Application.Security;
 using HaulScout.Domain.Entities;
 using HaulScout.Infrastructure.Persistence;
 

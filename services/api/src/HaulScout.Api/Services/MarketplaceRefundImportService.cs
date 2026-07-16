@@ -4,11 +4,12 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using HaulScout.Application.Contracts;
 using HaulScout.Application.Imports;
+using HaulScout.Application.Security;
 using HaulScout.Application.Services;
 using HaulScout.Domain;
 using HaulScout.Domain.Entities;
-using HaulScout.Infrastructure.Persistence;
 using HaulScout.Domain.Services;
+using HaulScout.Infrastructure.Persistence;
 
 namespace HaulScout.Api.Services;
 

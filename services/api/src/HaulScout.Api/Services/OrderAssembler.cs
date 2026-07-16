@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using HaulScout.Application.Security;
 using HaulScout.Domain;
 using HaulScout.Domain.Entities;
 using HaulScout.Infrastructure.Persistence;

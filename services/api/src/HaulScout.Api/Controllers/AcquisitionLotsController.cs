@@ -1,17 +1,18 @@
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using HaulScout.Api.Authorization;
+using static HaulScout.Api.Helpers.StringHelpers;
 using HaulScout.Api.Mapping;
 using HaulScout.Api.Services;
 using HaulScout.Application.Contracts;
+using HaulScout.Application.Security;
 using HaulScout.Application.Services;
 using HaulScout.Domain;
 using HaulScout.Domain.Entities;
-using HaulScout.Infrastructure.Persistence;
-using Microsoft.EntityFrameworkCore.Storage;
-using static HaulScout.Api.Helpers.StringHelpers;
 using HaulScout.Domain.Services;
+using HaulScout.Infrastructure.Persistence;
 
 namespace HaulScout.Api.Controllers;
 

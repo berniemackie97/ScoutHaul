@@ -3,6 +3,7 @@ using HaulScout.Api.Authorization;
 using HaulScout.Api.Services;
 using HaulScout.Application.Common;
 using HaulScout.Application.Contracts;
+using HaulScout.Application.Security;
 using HaulScout.Domain;
 
 namespace HaulScout.Api.Controllers;
