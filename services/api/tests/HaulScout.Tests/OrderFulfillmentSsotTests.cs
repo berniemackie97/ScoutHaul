@@ -51,13 +51,16 @@ public class OrderFulfillmentSsotTests
         return (order, sale);
     }
 
+    private static OrdersController NewController(HaulScoutDbContext db, StubCurrentUser currentUser) =>
+        new(new OrdersWorkflowService(db, currentUser, new OrderAssembler(db, currentUser)));
+
     [Fact]
     public async Task Marking_the_order_delivered_propagates_to_its_sales()
     {
         var (db, org, user) = NewContext(nameof(Marking_the_order_delivered_propagates_to_its_sales));
         await using var _ = db;
         var (order, sale) = await SeedOrderWithSale(db, org);
-        var controller = new OrdersController(db, new StubCurrentUser(org, user));
+        var controller = NewController(db, new StubCurrentUser(org, user));
 
         await controller.UpdateTracking(order.Id, new UpdateOrderTrackingRequest(
             "USPS", "9400abc", null, null, null, MarkShipped: false, MarkDelivered: true), CancellationToken.None);
@@ -77,7 +80,7 @@ public class OrderFulfillmentSsotTests
         await using var _ = db;
         var (order, sale) = await SeedOrderWithSale(db, org);
         var shippedAt = DateTimeOffset.UtcNow.AddHours(-2);
-        var controller = new OrdersController(db, new StubCurrentUser(org, user));
+        var controller = NewController(db, new StubCurrentUser(org, user));
 
         await controller.UpdateTracking(order.Id, new UpdateOrderTrackingRequest(
             "USPS", "9400abc", null, shippedAt, null, MarkShipped: false, MarkDelivered: false), CancellationToken.None);
@@ -96,7 +99,7 @@ public class OrderFulfillmentSsotTests
         await using var _ = db;
         var (order, sale) = await SeedOrderWithSale(db, org);
         var deliveredAt = DateTimeOffset.UtcNow.AddHours(-1);
-        var controller = new OrdersController(db, new StubCurrentUser(org, user));
+        var controller = NewController(db, new StubCurrentUser(org, user));
 
         await controller.UpdateTracking(order.Id, new UpdateOrderTrackingRequest(
             "USPS", "9400abc", null, null, deliveredAt, MarkShipped: false, MarkDelivered: false), CancellationToken.None);
@@ -116,7 +119,7 @@ public class OrderFulfillmentSsotTests
         await using var _ = db;
         var (order, sale) = await SeedOrderWithSale(db, org);
         var currentUser = new StubCurrentUser(org, user);
-        await new OrdersController(db, currentUser).UpdateTracking(order.Id,
+        await NewController(db, currentUser).UpdateTracking(order.Id,
             new UpdateOrderTrackingRequest("USPS", "9400abc", null, null, null, false, MarkDelivered: true), CancellationToken.None);
 
         // Re-sync the order's money from its sales (what a sale edit / refund / reconcile triggers).
@@ -142,7 +145,7 @@ public class OrderFulfillmentSsotTests
         sale.Status = SaleStatus.Refunded;
         await db.SaveChangesAsync();
 
-        await new OrdersController(db, new StubCurrentUser(org, user)).UpdateTracking(order.Id,
+        await NewController(db, new StubCurrentUser(org, user)).UpdateTracking(order.Id,
             new UpdateOrderTrackingRequest("USPS", "9400abc", null, null, null, false, MarkDelivered: true), CancellationToken.None);
 
         Assert.Equal(SaleStatus.Refunded, (await db.Sales.SingleAsync()).Status); // financial state preserved

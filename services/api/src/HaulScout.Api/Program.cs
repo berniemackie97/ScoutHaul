@@ -63,6 +63,7 @@ builder.Services.AddScoped<MarketplaceLookupPersistenceService>();
 builder.Services.AddScoped<InventoryPhotoStorageService>();
 builder.Services.AddScoped<InventoryReferenceDataService>();
 builder.Services.AddScoped<OrderAssembler>();
+builder.Services.AddScoped<OrdersWorkflowService>();
 builder.Services.AddScoped<MarketplaceRefundImportService>();
 builder.Services.AddScoped<PlatformOrderFeeEnrichmentService>();
 builder.Services.AddScoped<PlatformOrderSuggestionService>();
