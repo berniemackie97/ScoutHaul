@@ -34,7 +34,6 @@ public class ArchitectureTests
         "ProductIdentitiesController",
         "ReportsController",
         "StoreController",
-        "StoreSettingsController",
         "StorefrontController",
         "TasksController",
     ];
