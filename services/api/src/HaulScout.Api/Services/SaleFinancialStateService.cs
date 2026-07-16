@@ -4,6 +4,7 @@ using HaulScout.Application.Services;
 using HaulScout.Domain;
 using HaulScout.Domain.Entities;
 using HaulScout.Infrastructure.Persistence;
+using HaulScout.Domain.Services;
 
 namespace HaulScout.Api.Services;
 
@@ -14,28 +15,21 @@ namespace HaulScout.Api.Services;
 /// </summary>
 public sealed class SaleFinancialStateService(HaulScoutDbContext db, ICurrentUserContext currentUser)
 {
-    /// <summary>Recomputes only a sale's net from its refunds + current cost fields, leaving status untouched (used
-    /// when a cost like return shipping changes but no refund/inventory transition should be implied).</summary>
-    public static void RecomputeNet(Sale sale)
-    {
-        sale.NetProfit = NetFrom(sale, RefundImpact(sale));
-    }
-
-    /// <summary>Recomputes a sale's net profit and status from its current set of refunds. Item + buyer shipping
-    /// reduce revenue, the platform's fee credit reduces selling cost, a returned item drops COGS; tax never nets.
-    /// Full/partial + restock decide the resulting status and whether the item releases back to inventory.</summary>
+    /// <summary>Applies a sale's refund state and carries the result across to inventory, which is a separate
+    /// aggregate and therefore this service's job rather than the sale's. The money and the sale's own status are
+    /// derived by <see cref="Sale.ApplyRefunds"/>; only the inventory consequence is decided here.</summary>
     public static void ApplyRefundState(Sale sale)
     {
-        ICollection<Refund> refunds = sale.Refunds;
-        decimal itemRefunded = refunds.Sum(refund => refund.ItemAmount);
-        bool restocked = refunds.Any(refund => refund.ItemReturned);
-        sale.NetProfit = NetFrom(sale, RefundImpact(sale));
+        bool restocked = sale.ApplyRefunds();
 
-        if (refunds.Count == 0)
+        if (sale.InventoryItem is null)
         {
-            // Last refund voided — revert to a realized state; the operator can re-set the exact status.
-            sale.Status = SaleStatus.Delivered;
-            if (sale.InventoryItem is not null && sale.InventoryItem.Status == InventoryStatus.Returned)
+            return;
+        }
+
+        if (sale.Refunds.Count == 0)
+        {
+            if (sale.InventoryItem.Status == InventoryStatus.Returned)
             {
                 sale.InventoryItem.Status = InventoryStatus.Delivered;
                 InventoryStatePropagation.ApplyBundleComponentInventoryStatus(sale.InventoryItem, InventoryStatus.Delivered, sale.InventoryItem.SoldAt);
@@ -43,32 +37,13 @@ public sealed class SaleFinancialStateService(HaulScoutDbContext db, ICurrentUse
             return;
         }
 
-        bool isFull = refunds.Any(refund => refund.Type == RefundType.Full) || (sale.SoldPrice > 0 && itemRefunded >= sale.SoldPrice - 0.01m);
-        sale.Status = restocked ? SaleStatus.Returned : isFull ? SaleStatus.Refunded : SaleStatus.PartiallyRefunded;
-
-        if (sale.InventoryItem is not null && restocked)
+        if (restocked)
         {
             sale.InventoryItem.Status = InventoryStatus.Returned;
             InventoryStatePropagation.ApplyBundleComponentInventoryStatus(sale.InventoryItem, InventoryStatus.Returned, sale.InventoryItem.SoldAt);
         }
         // Partial or full-but-kept: the buyer still has the item, so inventory state is unchanged.
     }
-
-    private static ResaleFinancialCalculator.SaleRefundImpact RefundImpact(Sale sale)
-    {
-        ICollection<Refund> refunds = sale.Refunds;
-        return new(
-            refunds.Sum(refund => refund.ItemAmount),
-            refunds.Sum(refund => refund.ShippingRefunded),
-            refunds.Sum(refund => refund.TaxRefunded),
-            refunds.Sum(refund => refund.FeeCredit),
-            refunds.Any(refund => refund.ItemReturned));
-    }
-
-    private static decimal NetFrom(Sale sale, ResaleFinancialCalculator.SaleRefundImpact impact) =>
-        ResaleFinancialCalculator.NetProfitAfterRefunds(
-            sale.SoldPrice, sale.ShippingCharged, sale.CostOfGoods, sale.PlatformFees, sale.PaymentFees,
-            sale.ShippingCost, sale.SuppliesCost, sale.OtherCosts, impact);
 
     /// <summary>Serializes a sale's financial state for the immutable before/after audit snapshot.</summary>
     public static string Snapshot(Sale sale) => JsonSerializer.Serialize(new

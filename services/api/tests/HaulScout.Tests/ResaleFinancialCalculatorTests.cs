@@ -1,4 +1,5 @@
 using HaulScout.Application.Services;
+using HaulScout.Domain.Services;
 
 namespace HaulScout.Tests;
 

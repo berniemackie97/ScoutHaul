@@ -1,4 +1,4 @@
-namespace HaulScout.Application.Services;
+namespace HaulScout.Domain.Services;
 
 public sealed record RealizedSaleFinancials(
     decimal SoldPrice,

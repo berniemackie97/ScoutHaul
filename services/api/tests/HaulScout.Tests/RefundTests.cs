@@ -8,6 +8,7 @@ using HaulScout.Application.Services;
 using HaulScout.Domain;
 using HaulScout.Domain.Entities;
 using HaulScout.Infrastructure.Persistence;
+using HaulScout.Domain.Services;
 
 namespace HaulScout.Tests;
 
@@ -50,10 +51,10 @@ public class RefundTests
             CostOfGoods = 30m,
             PlatformFees = 15m,
             ShippingCost = 8m,
-            NetProfit = 57m,
             Status = SaleStatus.Delivered,
             InventoryItem = item,
         };
+        sale.RecomputeNet();
         db.Sales.Add(sale);
         db.SaveChanges();
         return sale;

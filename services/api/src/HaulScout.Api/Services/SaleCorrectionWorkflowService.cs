@@ -7,6 +7,7 @@ using HaulScout.Domain;
 using HaulScout.Domain.Entities;
 using HaulScout.Infrastructure.Persistence;
 using static HaulScout.Api.Helpers.StringHelpers;
+using HaulScout.Domain.Services;
 
 namespace HaulScout.Api.Services;
 
@@ -47,6 +48,7 @@ public sealed class SaleCorrectionWorkflowService(
         }
 
         Sale? sale = await db.Sales
+            .Include(item => item.Refunds)
             .Include(item => item.InventoryItem)
                 .ThenInclude(item => item!.BundleComponents)
                     .ThenInclude(item => item.ComponentInventoryItem)
@@ -99,11 +101,9 @@ public sealed class SaleCorrectionWorkflowService(
             observation.SoldAt = request.SoldAt;
         }
 
-        // Net profit is always recomputed from the corrected inputs (tax excluded); never trust a stored figure.
-        RealizedSaleFinancials financials = ResaleFinancialCalculator.CalculateRealizedSale(
-            sale.SoldPrice, sale.ShippingCharged, sale.CostOfGoods, sale.PlatformFees, sale.PaymentFees,
-            sale.ShippingCost, sale.SuppliesCost, sale.OtherCosts);
-        sale.NetProfit = financials.NetProfit;
+        // Net is always re-derived from the corrected inputs and this sale's refunds together (tax excluded);
+        // never trust a stored figure, and never drop the refunds while correcting around them.
+        sale.RecomputeNet();
 
         await saleState.AddCorrectionAsync(sale, before, request.Reason.Trim(), cancellationToken);
         if (sale.Order is not null)

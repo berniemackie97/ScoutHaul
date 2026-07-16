@@ -45,10 +45,10 @@ public class SaleGroupingTests
             Platform = "eBay",
             SoldPrice = 50m,
             CostOfGoods = 10m,
-            NetProfit = 40m,
             Status = SaleStatus.Delivered,
             InventoryItem = item,
         };
+        sale.RecomputeNet();
         db.Sales.Add(sale);
         db.SaveChanges();
         return sale;

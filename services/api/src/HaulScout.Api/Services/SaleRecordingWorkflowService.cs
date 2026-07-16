@@ -7,6 +7,7 @@ using static HaulScout.Api.Helpers.StringHelpers;
 using HaulScout.Domain;
 using HaulScout.Domain.Entities;
 using HaulScout.Infrastructure.Persistence;
+using HaulScout.Domain.Services;
 
 namespace HaulScout.Api.Services;
 
@@ -105,10 +106,10 @@ public sealed class SaleRecordingWorkflowService(
             OtherCosts = request.OtherCosts,
             SalesTaxCollected = request.SalesTaxCollected,
             TaxRemittedByPlatform = request.TaxRemittedByPlatform,
-            NetProfit = financials.NetProfit,
             SoldAt = request.SoldAt ?? DateTimeOffset.UtcNow,
             Notes = TrimToNull(request.Notes)
         };
+        sale.RecomputeNet();
 
         Order salesOrder = await orderWriter.GetOrCreateAsync(
             channel,
@@ -263,7 +264,6 @@ public sealed class SaleRecordingWorkflowService(
                 OtherCosts = line.OtherCosts,
                 SalesTaxCollected = line.SalesTaxCollected,
                 TaxRemittedByPlatform = request.TaxRemittedByPlatform,
-                NetProfit = financials.NetProfit,
                 SoldAt = soldAt,
                 Notes = TrimToNull(request.Notes),
                 SaleGroupId = groupId,
@@ -272,6 +272,7 @@ public sealed class SaleRecordingWorkflowService(
                 Order = salesOrder,
                 InventoryItem = item,
             };
+            sale.RecomputeNet();
             db.Sales.Add(sale);
             created.Add(sale);
 

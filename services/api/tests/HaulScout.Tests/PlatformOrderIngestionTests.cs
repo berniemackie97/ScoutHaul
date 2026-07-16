@@ -246,7 +246,6 @@ public class PlatformOrderIngestionTests
             CostOfGoods = 40m,
             PlatformFees = 12m,
             ShippingCost = 8m,
-            NetProfit = 40m,
             Status = SaleStatus.Recorded,
         });
         await db.SaveChangesAsync();
@@ -293,7 +292,6 @@ public class PlatformOrderIngestionTests
             Platform = "eBay",
             SoldPrice = 50m,
             CostOfGoods = 15m,
-            NetProfit = 35m,
             Status = SaleStatus.Recorded,
         });
         await db.SaveChangesAsync();
@@ -514,7 +512,6 @@ Brass Lamp,377251318593,1,$0.00,$0.00,$0.00,$0.00,$0.00,$12.34,$0.00,$0.00,$16.9
             SalesTaxCollected = 0.42m,
             PlatformFees = 2m,
             CostOfGoods = 1m,
-            NetProfit = 2m,
             SoldAt = new DateTimeOffset(2026, 7, 3, 12, 0, 0, TimeSpan.Zero),
             Status = SaleStatus.Delivered,
         });
@@ -551,7 +548,6 @@ Brass Lamp,377251318593,1,$0.00,$0.00,$0.00,$0.00,$0.00,$12.34,$0.00,$0.00,$16.9
             Platform = "eBay",
             SoldPrice = 70m,
             CostOfGoods = 40m,
-            NetProfit = 30m,
             Status = SaleStatus.Recorded,
             SoldAt = recordedDate,
         });

@@ -52,10 +52,10 @@ public class RelationalIntegrityTests(PostgresFixture postgres)
             Platform = "eBay",
             SoldPrice = 120m,
             CostOfGoods = 40m,
-            NetProfit = 80m,
             Status = SaleStatus.Delivered,
             SoldAt = DateTimeOffset.UtcNow,
         };
+        sale.RecomputeNet();
         db.Sales.Add(sale);
         await db.SaveChangesAsync();
         return (order, sale);

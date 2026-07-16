@@ -8,6 +8,7 @@ using HaulScout.Application.Services;
 using HaulScout.Domain;
 using HaulScout.Domain.Entities;
 using HaulScout.Infrastructure.Persistence;
+using HaulScout.Domain.Services;
 
 namespace HaulScout.Api.Services;
 
@@ -304,9 +305,7 @@ public sealed class MarketplaceRefundImportService(HaulScoutDbContext db, ICurre
             refunds.Sum(refund => refund.TaxRefunded),
             refunds.Sum(refund => refund.FeeCredit),
             restocked);
-        sale.NetProfit = ResaleFinancialCalculator.NetProfitAfterRefunds(
-            sale.SoldPrice, sale.ShippingCharged, sale.CostOfGoods, sale.PlatformFees, sale.PaymentFees,
-            sale.ShippingCost, sale.SuppliesCost, sale.OtherCosts, impact);
+        sale.RecomputeNet();
 
         if (refunds.Count == 0)
         {
