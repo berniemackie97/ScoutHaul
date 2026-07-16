@@ -49,14 +49,20 @@ public class OrganizationSecurityTests
     private static OrganizationsController NewController(HaulScoutDbContext db, Guid org, Guid user)
     {
         StubCurrentUser currentUser = new(org, user);
+        OrganizationAccessService access = new(db, currentUser);
+        OrganizationRoleGuard guard = new(db);
+        SupabaseAdminInviteService invites = new(
+            new HttpClient(),
+            new ConfigurationBuilder().Build(),
+            NullLogger<SupabaseAdminInviteService>.Instance);
+
+        // Same composition DI builds in production — the controller owns no persistence of its own.
         return new OrganizationsController(
-            db,
-            currentUser,
-            new OrganizationAccessService(db, currentUser),
-            new SupabaseAdminInviteService(
-                new HttpClient(),
-                new ConfigurationBuilder().Build(),
-                NullLogger<SupabaseAdminInviteService>.Instance));
+            new OrganizationWorkflowService(db, currentUser, access),
+            new OrganizationMemberWorkflowService(db, access, guard, invites),
+            new OrganizationInviteCodeWorkflowService(db, currentUser, access, guard),
+            new OrganizationRoleWorkflowService(db, access, guard),
+            new OrganizationTeamWorkflowService(db, access, guard));
     }
 
     /// <summary>Mirrors the controller's private hashing so a code can be seeded the way redemption will look it up.</summary>

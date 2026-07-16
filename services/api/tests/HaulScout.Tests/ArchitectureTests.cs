@@ -28,7 +28,6 @@ public class ArchitectureTests
         "ListingsController",
         "MarketAnalysisController",
         "MarketObservationsController",
-        "OrganizationsController",
         "PlatformListingsController",
         "PlatformOrdersController",
         "ProductIdentitiesController",
