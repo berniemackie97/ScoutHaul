@@ -22,11 +22,15 @@ public sealed class SalesController(
     ICurrentUserContext currentUser,
     OrderAssembler? orderAssembler = null,
     SalesChannelWorkflowService? salesChannels = null,
-    SaleRecordingWorkflowService? saleRecording = null) : ControllerBase
+    SaleRecordingWorkflowService? saleRecording = null,
+    SaleFinancialStateService? saleState = null,
+    SaleReturnWorkflowService? saleReturns = null) : ControllerBase
 {
     private OrderAssembler OrderWriter => orderAssembler ?? new OrderAssembler(db, currentUser);
     private SalesChannelWorkflowService SalesChannels => salesChannels ?? new SalesChannelWorkflowService(db, currentUser);
     private SaleRecordingWorkflowService SaleRecording => saleRecording ?? new SaleRecordingWorkflowService(db, currentUser, OrderWriter, SalesChannels);
+    private SaleFinancialStateService SaleState => saleState ?? new SaleFinancialStateService(db, currentUser);
+    private SaleReturnWorkflowService SaleReturns => saleReturns ?? new SaleReturnWorkflowService(db, currentUser, SaleState);
 
     [HttpGet("reference-data")]
     public async Task<ActionResult<SalesReferenceDataDto>> ReferenceData(CancellationToken cancellationToken) =>
@@ -896,227 +900,38 @@ public sealed class SalesController(
     // all of this and posts a Refund directly (RecordRefund).
 
     [HttpGet("{id:guid}/returns")]
-    public async Task<ActionResult<IReadOnlyList<ReturnDto>>> ListReturns(Guid id, CancellationToken cancellationToken)
-    {
-        List<Return> items = await db.Returns
-            .Include(item => item.Sale).ThenInclude(sale => sale!.InventoryItem)
-            .Where(item => item.SaleId == id && item.OrganizationId == currentUser.OrganizationId)
-            .OrderByDescending(item => item.RequestedAt)
-            .ToListAsync(cancellationToken);
-        return items.Select(item => item.ToDto()).ToList();
-    }
+    public async Task<ActionResult<IReadOnlyList<ReturnDto>>> ListReturns(Guid id, CancellationToken cancellationToken) =>
+        (await SaleReturns.ListAsync(id, cancellationToken)).ToList();
 
     [HttpPost("{id:guid}/returns")]
     [RequireOrganizationPermission(HaulScoutPermissions.ManageFinance)]
-    public async Task<ActionResult<ReturnDto>> OpenReturn(Guid id, OpenReturnRequest request, CancellationToken cancellationToken)
-    {
-        if (string.IsNullOrWhiteSpace(request.Reason))
-        {
-            return BadRequest("A reason is required to open a return.");
-        }
-
-        Sale? sale = await db.Sales
-            .Include(item => item.InventoryItem)
-            .SingleOrDefaultAsync(item => item.Id == id && item.OrganizationId == currentUser.OrganizationId, cancellationToken);
-        if (sale is null)
-        {
-            return NotFound();
-        }
-        if (sale.Status is SaleStatus.Cancelled)
-        {
-            return Conflict("A cancelled sale cannot be returned.");
-        }
-
-        bool hasOpen = await db.Returns.AnyAsync(item => item.SaleId == sale.Id
-            && item.OrganizationId == currentUser.OrganizationId
-            && (item.Status == ReturnStatus.Requested || item.Status == ReturnStatus.LabelIssued || item.Status == ReturnStatus.Received),
-            cancellationToken);
-        if (hasOpen)
-        {
-            return Conflict("This sale already has an open return.");
-        }
-
-        Return rma = new()
-        {
-            OrganizationId = currentUser.OrganizationId,
-            SaleId = sale.Id,
-            OrderId = sale.OrderId,
-            Status = ReturnStatus.Requested,
-            Reason = request.Reason.Trim(),
-            Notes = TrimToNull(request.Notes),
-            RequestedByUserId = currentUser.UserId,
-            Sale = sale,
-        };
-        db.Returns.Add(rma);
-        await db.SaveChangesAsync(cancellationToken);
-        return rma.ToDto();
-    }
+    public async Task<ActionResult<ReturnDto>> OpenReturn(Guid id, OpenReturnRequest request, CancellationToken cancellationToken) =>
+        ToActionResult(await SaleReturns.OpenAsync(id, request, cancellationToken));
 
     [HttpPost("returns/{returnId:guid}/label")]
     [RequireOrganizationPermission(HaulScoutPermissions.ManageFinance)]
-    public async Task<ActionResult<ReturnDto>> IssueReturnLabel(Guid returnId, IssueReturnLabelRequest request, CancellationToken cancellationToken)
-    {
-        if (request.ReturnShippingCost < 0)
-        {
-            return BadRequest("Return shipping cost cannot be negative.");
-        }
-        Return? rma = await LoadReturnAsync(returnId, cancellationToken);
-        if (rma is null)
-        {
-            return NotFound();
-        }
-        if (rma.Status != ReturnStatus.Requested)
-        {
-            return Conflict($"A return label can only be issued from Requested (it is {rma.Status}).");
-        }
-
-        Sale sale = rma.Sale!;
-        string before = SnapshotSale(sale);
-        rma.ReturnShippingCost = request.ReturnShippingCost;
-        rma.Status = ReturnStatus.LabelIssued;
-        rma.LabelIssuedAt = DateTimeOffset.UtcNow;
-        if (request.Notes is not null)
-        {
-            rma.Notes = TrimToNull(request.Notes);
-        }
-        // The seller pays the return label now; book it as a shipping cost so net reflects it whatever the outcome.
-        sale.ShippingCost += request.ReturnShippingCost;
-        RecomputeSaleNet(sale);
-        await AddCorrection(sale, before, $"Return label issued: return shipping {request.ReturnShippingCost:C}", cancellationToken);
-        await db.SaveChangesAsync(cancellationToken);
-        return rma.ToDto();
-    }
+    public async Task<ActionResult<ReturnDto>> IssueReturnLabel(Guid returnId, IssueReturnLabelRequest request, CancellationToken cancellationToken) =>
+        ToActionResult(await SaleReturns.IssueLabelAsync(returnId, request, cancellationToken));
 
     [HttpPost("returns/{returnId:guid}/receive")]
     [RequireOrganizationPermission(HaulScoutPermissions.ManageFinance)]
-    public async Task<ActionResult<ReturnDto>> ReceiveReturn(Guid returnId, CancellationToken cancellationToken)
-    {
-        Return? rma = await LoadReturnAsync(returnId, cancellationToken);
-        if (rma is null)
-        {
-            return NotFound();
-        }
-        if (rma.Status is not (ReturnStatus.Requested or ReturnStatus.LabelIssued))
-        {
-            return Conflict($"Only a Requested or LabelIssued return can be marked received (it is {rma.Status}).");
-        }
-
-        rma.Status = ReturnStatus.Received;
-        rma.ReceivedAt = DateTimeOffset.UtcNow;
-        await db.SaveChangesAsync(cancellationToken);
-        return rma.ToDto();
-    }
+    public async Task<ActionResult<ReturnDto>> ReceiveReturn(Guid returnId, CancellationToken cancellationToken) =>
+        ToActionResult(await SaleReturns.ReceiveAsync(returnId, cancellationToken));
 
     [HttpPost("returns/{returnId:guid}/resolve")]
     [RequireOrganizationPermission(HaulScoutPermissions.ManageFinance)]
-    public async Task<ActionResult<ReturnDto>> ResolveReturn(Guid returnId, ResolveReturnRequest request, CancellationToken cancellationToken)
-    {
-        if (request.ItemAmount < 0 || request.ShippingRefunded < 0 || request.TaxRefunded < 0 || request.FeeCredit < 0)
-        {
-            return BadRequest("Refund amounts cannot be negative.");
-        }
-        Return? rma = await LoadReturnAsync(returnId, cancellationToken);
-        if (rma is null)
-        {
-            return NotFound();
-        }
-        if (rma.Status != ReturnStatus.Received)
-        {
-            return Conflict($"A refund is issued once the return is Received (it is {rma.Status}). Mark it received first.");
-        }
-
-        Sale sale = rma.Sale!;
-        decimal alreadyRefundedItem = sale.Refunds.Sum(refund => refund.ItemAmount);
-        if (alreadyRefundedItem + request.ItemAmount > sale.SoldPrice + 0.01m)
-        {
-            return BadRequest("Total item refunds cannot exceed the sold price.");
-        }
-
-        string before = SnapshotSale(sale);
-        Refund refund = new()
-        {
-            OrganizationId = currentUser.OrganizationId,
-            SaleId = sale.Id,
-            Type = request.Type,
-            ItemAmount = request.ItemAmount,
-            ShippingRefunded = request.ShippingRefunded,
-            TaxRefunded = request.TaxRefunded,
-            FeeCredit = request.FeeCredit,
-            ItemReturned = request.Restock,
-            Reason = TrimToNull(request.Reason) ?? rma.Reason,
-            Notes = TrimToNull(request.Notes),
-            RefundedAt = DateTimeOffset.UtcNow,
-            RecordedByUserId = currentUser.UserId,
-            Sale = sale,
-        };
-        db.Refunds.Add(refund);
-        ApplyRefundState(sale);
-
-        rma.Status = ReturnStatus.Refunded;
-        rma.Refund = refund;
-        rma.RefundId = refund.Id;
-        rma.Restocked = request.Restock;
-        rma.ResolvedAt = DateTimeOffset.UtcNow;
-
-        await AddCorrection(sale, before,
-            $"Return refunded ({request.Type}): item {request.ItemAmount:C}{(request.Restock ? ", restocked" : ", item kept")} — {refund.Reason}",
-            cancellationToken);
-        await db.SaveChangesAsync(cancellationToken);
-        return rma.ToDto();
-    }
+    public async Task<ActionResult<ReturnDto>> ResolveReturn(Guid returnId, ResolveReturnRequest request, CancellationToken cancellationToken) =>
+        ToActionResult(await SaleReturns.ResolveAsync(returnId, request, cancellationToken));
 
     [HttpPost("returns/{returnId:guid}/reject")]
     [RequireOrganizationPermission(HaulScoutPermissions.ManageFinance)]
-    public async Task<ActionResult<ReturnDto>> RejectReturn(Guid returnId, RejectReturnRequest request, CancellationToken cancellationToken)
-    {
-        if (string.IsNullOrWhiteSpace(request.Reason))
-        {
-            return BadRequest("A reason is required to reject a return.");
-        }
-        Return? rma = await LoadReturnAsync(returnId, cancellationToken);
-        if (rma is null)
-        {
-            return NotFound();
-        }
-        if (!rma.IsOpen)
-        {
-            return Conflict($"This return is already resolved ({rma.Status}).");
-        }
-
-        // The return shipping already paid stays booked — the seller ate that cost regardless.
-        rma.Status = ReturnStatus.Rejected;
-        rma.ResolvedAt = DateTimeOffset.UtcNow;
-        rma.Notes = TrimToNull(request.Reason);
-        await db.SaveChangesAsync(cancellationToken);
-        return rma.ToDto();
-    }
+    public async Task<ActionResult<ReturnDto>> RejectReturn(Guid returnId, RejectReturnRequest request, CancellationToken cancellationToken) =>
+        ToActionResult(await SaleReturns.RejectAsync(returnId, request, cancellationToken));
 
     [HttpPost("returns/{returnId:guid}/cancel")]
     [RequireOrganizationPermission(HaulScoutPermissions.ManageFinance)]
-    public async Task<ActionResult<ReturnDto>> CancelReturn(Guid returnId, CancellationToken cancellationToken)
-    {
-        Return? rma = await LoadReturnAsync(returnId, cancellationToken);
-        if (rma is null)
-        {
-            return NotFound();
-        }
-        if (rma.Status is not (ReturnStatus.Requested or ReturnStatus.LabelIssued))
-        {
-            return Conflict($"Only a Requested or LabelIssued return can be cancelled (it is {rma.Status}).");
-        }
-
-        rma.Status = ReturnStatus.Cancelled;
-        rma.ResolvedAt = DateTimeOffset.UtcNow;
-        await db.SaveChangesAsync(cancellationToken);
-        return rma.ToDto();
-    }
-
-    private Task<Return?> LoadReturnAsync(Guid returnId, CancellationToken cancellationToken) =>
-        db.Returns
-            .Include(item => item.Sale).ThenInclude(sale => sale!.InventoryItem).ThenInclude(inv => inv!.BundleComponents).ThenInclude(component => component.ComponentInventoryItem)
-            .Include(item => item.Sale).ThenInclude(sale => sale!.Listing)
-            .Include(item => item.Sale).ThenInclude(sale => sale!.Refunds)
-            .SingleOrDefaultAsync(item => item.Id == returnId && item.OrganizationId == currentUser.OrganizationId, cancellationToken);
+    public async Task<ActionResult<ReturnDto>> CancelReturn(Guid returnId, CancellationToken cancellationToken) =>
+        ToActionResult(await SaleReturns.CancelAsync(returnId, cancellationToken));
 
     private ActionResult<T> ToActionResult<T>(AppResult<T> result) where T : class =>
         result.Status switch
@@ -1128,104 +943,12 @@ public sealed class SalesController(
             _ => BadRequest(result.Message),
         };
 
-    /// <summary>Recomputes only a sale's net from its refunds + current cost fields, leaving status untouched (used
-    /// when a cost like return shipping changes but no refund/inventory transition should be implied).</summary>
-    private static void RecomputeSaleNet(Sale sale)
-    {
-        ICollection<Refund> refunds = sale.Refunds;
-        ResaleFinancialCalculator.SaleRefundImpact impact = new(
-            refunds.Sum(refund => refund.ItemAmount),
-            refunds.Sum(refund => refund.ShippingRefunded),
-            refunds.Sum(refund => refund.TaxRefunded),
-            refunds.Sum(refund => refund.FeeCredit),
-            refunds.Any(refund => refund.ItemReturned));
-        sale.NetProfit = ResaleFinancialCalculator.NetProfitAfterRefunds(
-            sale.SoldPrice, sale.ShippingCharged, sale.CostOfGoods, sale.PlatformFees, sale.PaymentFees,
-            sale.ShippingCost, sale.SuppliesCost, sale.OtherCosts, impact);
-    }
+    // Sale money state + audit trail live in SaleFinancialStateService so refunds, returns, and corrections all
+    // derive the same invariants. These thin wrappers keep the existing call sites readable.
+    private static void ApplyRefundState(Sale sale) => SaleFinancialStateService.ApplyRefundState(sale);
 
-    /// <summary>Recomputes a sale's net profit and status from its current set of refunds. Item + buyer shipping
-    /// reduce revenue, the platform's fee credit reduces selling cost, a returned item drops COGS; tax never nets.
-    /// Full/partial + restock decide the resulting status and whether the item releases back to inventory.</summary>
-    private static void ApplyRefundState(Sale sale)
-    {
-        ICollection<Refund> refunds = sale.Refunds;
-        decimal itemRefunded = refunds.Sum(refund => refund.ItemAmount);
-        bool restocked = refunds.Any(refund => refund.ItemReturned);
-        ResaleFinancialCalculator.SaleRefundImpact impact = new(
-            itemRefunded,
-            refunds.Sum(refund => refund.ShippingRefunded),
-            refunds.Sum(refund => refund.TaxRefunded),
-            refunds.Sum(refund => refund.FeeCredit),
-            restocked);
-        sale.NetProfit = ResaleFinancialCalculator.NetProfitAfterRefunds(
-            sale.SoldPrice, sale.ShippingCharged, sale.CostOfGoods, sale.PlatformFees, sale.PaymentFees,
-            sale.ShippingCost, sale.SuppliesCost, sale.OtherCosts, impact);
+    private static string SnapshotSale(Sale sale) => SaleFinancialStateService.Snapshot(sale);
 
-        if (refunds.Count == 0)
-        {
-            // Last refund voided — revert to a realized state; the operator can re-set the exact status.
-            sale.Status = SaleStatus.Delivered;
-            if (sale.InventoryItem is not null && sale.InventoryItem.Status == InventoryStatus.Returned)
-            {
-                sale.InventoryItem.Status = InventoryStatus.Delivered;
-                InventoryStatePropagation.ApplyBundleComponentInventoryStatus(sale.InventoryItem, InventoryStatus.Delivered, sale.InventoryItem.SoldAt);
-            }
-            return;
-        }
-
-        bool isFull = refunds.Any(refund => refund.Type == RefundType.Full) || (sale.SoldPrice > 0 && itemRefunded >= sale.SoldPrice - 0.01m);
-        sale.Status = restocked ? SaleStatus.Returned : isFull ? SaleStatus.Refunded : SaleStatus.PartiallyRefunded;
-
-        if (sale.InventoryItem is not null)
-        {
-            if (restocked)
-            {
-                sale.InventoryItem.Status = InventoryStatus.Returned;
-                InventoryStatePropagation.ApplyBundleComponentInventoryStatus(sale.InventoryItem, InventoryStatus.Returned, sale.InventoryItem.SoldAt);
-            }
-            // Partial or full-but-kept: the buyer still has the item, so inventory state is unchanged.
-        }
-    }
-
-    // Serializes a sale's financial state for the immutable before/after audit snapshot.
-    private static string SnapshotSale(Sale sale) => JsonSerializer.Serialize(new
-    {
-        sale.Platform,
-        sale.SoldPrice,
-        sale.ShippingCharged,
-        sale.CostOfGoods,
-        sale.PlatformFees,
-        sale.PaymentFees,
-        sale.ShippingCost,
-        sale.SuppliesCost,
-        sale.OtherCosts,
-        sale.SalesTaxCollected,
-        sale.TaxRemittedByPlatform,
-        sale.NetProfit,
-        sale.SoldAt,
-        Status = sale.Status.ToString(),
-        sale.Notes,
-    });
-
-    private async Task AddCorrection(
-        Sale sale,
-        string before,
-        string reason,
-        CancellationToken cancellationToken)
-    {
-        int nextVersion = await db.SaleCorrections
-            .CountAsync(item => item.SaleId == sale.Id && item.OrganizationId == currentUser.OrganizationId, cancellationToken) + 1;
-        db.SaleCorrections.Add(new SaleCorrection
-        {
-            OrganizationId = currentUser.OrganizationId,
-            SaleId = sale.Id,
-            CorrectedByUserId = currentUser.UserId,
-            Reason = reason,
-            BeforeJson = before,
-            AfterJson = SnapshotSale(sale),
-            Version = nextVersion,
-        });
-    }
-
+    private Task AddCorrection(Sale sale, string before, string reason, CancellationToken cancellationToken) =>
+        SaleState.AddCorrectionAsync(sale, before, reason, cancellationToken);
 }
