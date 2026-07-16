@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using HaulScout.Api.Authorization;
 using HaulScout.Api.Mapping;
 using HaulScout.Api.Services;
+using HaulScout.Application.Common;
 using HaulScout.Application.Contracts;
 using HaulScout.Application.Services;
 using HaulScout.Domain;
@@ -21,9 +22,10 @@ public sealed class InventoryController(
     HaulScoutDbContext db,
     ICurrentUserContext currentUser,
     InventoryPhotoStorageService photoStorage,
-    InventoryReferenceDataService referenceData) : ControllerBase
+    InventoryReferenceDataService referenceData,
+    InventoryBundleWorkflowService? bundleWorkflow = null) : ControllerBase
 {
-    private static readonly SaleStatus[] ReleasedSaleStatuses = [SaleStatus.Returned, SaleStatus.Refunded, SaleStatus.Cancelled];
+    private InventoryBundleWorkflowService Bundles => bundleWorkflow ?? new InventoryBundleWorkflowService(db, currentUser);
 
     public sealed class UploadInventoryPhotoForm
     {
@@ -183,105 +185,15 @@ public sealed class InventoryController(
     [HttpPost("bundles")]
     public async Task<ActionResult<InventoryItemDto>> CreateBundle(CreateInventoryBundleRequest request, CancellationToken cancellationToken)
     {
-        string? validation = ValidateBundle(request);
-        if (validation is not null)
+        AppResult<InventoryItemDto> result = await Bundles.CreateAsync(request, cancellationToken);
+        return result.Status switch
         {
-            return BadRequest(validation);
-        }
-
-        Guid[] componentIds = request.ComponentInventoryItemIds.Distinct().ToArray();
-        List<InventoryItem> components = await db.InventoryItems
-            .Include(item => item.Sales)
-            .Where(item => componentIds.Contains(item.Id) && item.OrganizationId == currentUser.OrganizationId)
-            .ToListAsync(cancellationToken);
-
-        if (components.Count != componentIds.Length)
-        {
-            return NotFound("One or more bundle components were not found.");
-        }
-
-        string[] blocked = components
-            .Where(item => item.IsArchived
-                || item.IsBundle
-                || item.Status is InventoryStatus.Bundled
-                    or InventoryStatus.Sold
-                    or InventoryStatus.Packed
-                    or InventoryStatus.Shipped
-                    or InventoryStatus.Delivered
-                    or InventoryStatus.Returned
-                    or InventoryStatus.Donated
-                    or InventoryStatus.Disposed
-                || item.Sales.Any(sale => !ReleasedSaleStatuses.Contains(sale.Status)))
-            .Select(item => item.Title)
-            .ToArray();
-        if (blocked.Length > 0)
-        {
-            return Conflict($"These items cannot be bundled because they are unavailable, sold, archived, or already bundled: {string.Join(", ", blocked)}.");
-        }
-
-        InventoryStatus bundleStatus = request.Status ?? InventoryStatus.ReadyToList;
-        if (bundleStatus is InventoryStatus.Bundled
-            or InventoryStatus.Sold
-            or InventoryStatus.Packed
-            or InventoryStatus.Shipped
-            or InventoryStatus.Delivered
-            or InventoryStatus.Returned
-            or InventoryStatus.Donated
-            or InventoryStatus.Disposed)
-        {
-            return BadRequest("A new bundle must start in an unsold listing-prep stage.");
-        }
-
-        InventoryItem bundle = new()
-        {
-            OrganizationId = currentUser.OrganizationId,
-            Title = request.Title.Trim(),
-            Description = TrimToNull(request.Description),
-            Category = TrimToNull(request.Category) ?? components.Select(item => item.Category).FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)),
-            EstimatedSalePrice = request.EstimatedSalePrice,
-            PurchasePrice = components.Sum(item => item.PurchasePrice ?? 0),
-            Status = bundleStatus,
-            IsBundle = true,
-            PurchasedAt = components
-                .Where(item => item.PurchasedAt.HasValue)
-                .Select(item => item.PurchasedAt)
-                .OrderBy(item => item)
-                .FirstOrDefault(),
-            Notes = TrimToNull(request.Notes)
+            AppResultStatus.Ok when result.Value is not null => CreatedAtAction(nameof(Get), new { id = result.Value.Id }, result.Value),
+            AppResultStatus.NotFound => NotFound(result.Message),
+            AppResultStatus.Conflict => Conflict(result.Message),
+            AppResultStatus.Validation => BadRequest(result.Message),
+            _ => BadRequest(result.Message),
         };
-
-        db.InventoryItems.Add(bundle);
-        foreach (InventoryItem component in components.OrderBy(item => item.Title))
-        {
-            component.Status = InventoryStatus.Bundled;
-            db.InventoryBundleComponents.Add(new InventoryBundleComponent
-            {
-                OrganizationId = currentUser.OrganizationId,
-                BundleInventoryItem = bundle,
-                ComponentInventoryItemId = component.Id,
-                Quantity = Math.Max(1, component.Quantity),
-                CostSnapshot = component.PurchasePrice ?? 0,
-                TitleSnapshot = component.Title,
-            });
-        }
-
-        db.AuditLogs.Add(new AuditLog
-        {
-            OrganizationId = currentUser.OrganizationId,
-            ActorUserId = currentUser.UserId,
-            EntityName = nameof(InventoryItem),
-            Action = "BundleCreated",
-            DetailsJson = JsonSerializer.Serialize(new
-            {
-                BundleTitle = bundle.Title,
-                ComponentInventoryItemIds = componentIds,
-                ComponentCount = componentIds.Length,
-            })
-        });
-
-        await db.SaveChangesAsync(cancellationToken);
-        await db.Entry(bundle).Collection(item => item.BundleComponents).LoadAsync(cancellationToken);
-        return CreatedAtAction(nameof(Get), new { id = bundle.Id }, bundle.ToDto());
     }
 
     [HttpPost("{id:guid}/photos")]
@@ -1167,26 +1079,6 @@ public sealed class InventoryController(
             or InventoryStatus.NeedsRepair
             or InventoryStatus.NeedsPhotos
             or InventoryStatus.ReadyToList;
-
-    private static string? ValidateBundle(CreateInventoryBundleRequest request)
-    {
-        if (string.IsNullOrWhiteSpace(request.Title))
-        {
-            return "Bundle title is required.";
-        }
-
-        if (request.EstimatedSalePrice is < 0)
-        {
-            return "Estimated sale price cannot be negative.";
-        }
-
-        if (request.ComponentInventoryItemIds is null || request.ComponentInventoryItemIds.Distinct().Count() < 2)
-        {
-            return "Select at least two distinct inventory items to build a bundle.";
-        }
-
-        return null;
-    }
 
     private static void Apply(
         UpsertInventoryItemRequest request,
