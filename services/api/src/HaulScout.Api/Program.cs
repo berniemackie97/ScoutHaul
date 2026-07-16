@@ -67,6 +67,7 @@ builder.Services.AddScoped<MarketplaceRefundImportService>();
 builder.Services.AddScoped<PlatformOrderFeeEnrichmentService>();
 builder.Services.AddScoped<PlatformOrderSuggestionService>();
 builder.Services.AddScoped<PlatformOrderIngestionService>();
+builder.Services.AddScoped<SalesChannelWorkflowService>();
 builder.Services.AddHttpClient<SupabaseAdminInviteService>();
 builder.Services.AddAuthorization(options =>
 {

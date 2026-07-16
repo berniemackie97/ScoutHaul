@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using HaulScout.Api.Authorization;
 using HaulScout.Api.Mapping;
 using HaulScout.Api.Services;
+using HaulScout.Application.Common;
 using HaulScout.Application.Contracts;
 using HaulScout.Application.Services;
 using static HaulScout.Api.Helpers.StringHelpers;
@@ -16,81 +17,31 @@ namespace HaulScout.Api.Controllers;
 [ApiController]
 [Route("api/sales")]
 [RequireOrganizationPermission(HaulScoutPermissions.ManageListings)]
-public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext currentUser, OrderAssembler? orderAssembler = null) : ControllerBase
+public sealed class SalesController(
+    HaulScoutDbContext db,
+    ICurrentUserContext currentUser,
+    OrderAssembler? orderAssembler = null,
+    SalesChannelWorkflowService? salesChannels = null) : ControllerBase
 {
-    private static readonly SaleStatus[] ReleasedInventoryStatuses = [SaleStatus.Returned, SaleStatus.Refunded, SaleStatus.Cancelled];
     private OrderAssembler OrderWriter => orderAssembler ?? new OrderAssembler(db, currentUser);
+    private SalesChannelWorkflowService SalesChannels => salesChannels ?? new SalesChannelWorkflowService(db, currentUser);
 
     [HttpGet("reference-data")]
-    public async Task<ActionResult<SalesReferenceDataDto>> ReferenceData(CancellationToken cancellationToken)
-    {
-        List<string> existing = await ExistingChannels(cancellationToken);
-        List<SaleChannelOptionDto> channels = SalesChannelCatalog.Channels.ToList();
-        channels.AddRange(existing
-            .Where(value => channels.All(option => !string.Equals(option.Value, value, StringComparison.OrdinalIgnoreCase)))
-            .Select(value => new SaleChannelOptionDto(value, $"{value} (legacy — standardize)", "Legacy data", true, [])));
-        return new SalesReferenceDataDto(channels);
-    }
+    public async Task<ActionResult<SalesReferenceDataDto>> ReferenceData(CancellationToken cancellationToken) =>
+        await SalesChannels.ReferenceDataAsync(cancellationToken);
 
     [HttpPost("fee-estimate")]
     public async Task<ActionResult<ChannelFeeEstimateDto>> EstimateFees(EstimateChannelFeesRequest request, CancellationToken cancellationToken)
     {
-        string? channel = SalesChannelCatalog.CanonicalValue(request.Platform, await ExistingChannels(cancellationToken));
-        if (channel is null)
-        {
-            return BadRequest("Select a controlled sales channel.");
-        }
-
-        if (request.SoldPrice < 0)
-        {
-            return BadRequest("Sold price cannot be negative.");
-        }
-
-        ChannelFeeProfileDto? profile = SalesChannelCatalog.FindProfile(channel, request.FeeProfileId);
-        if (profile is null)
-        {
-            return BadRequest("Select a valid fee profile for this sales channel.");
-        }
-
-        return ChannelFeeCalculator.Estimate(channel, profile, request.SoldPrice);
+        AppResult<ChannelFeeEstimateDto> result = await SalesChannels.EstimateFeesAsync(request, cancellationToken);
+        return result.Status == AppResultStatus.Ok && result.Value is not null
+            ? result.Value
+            : BadRequest(result.Message);
     }
 
     [HttpGet("candidates")]
-    public async Task<ActionResult<IReadOnlyList<SaleCandidateDto>>> Candidates(CancellationToken cancellationToken)
-    {
-        List<SaleCandidateDto> items = await db.InventoryItems
-            .AsNoTracking()
-            .Where(item => item.OrganizationId == currentUser.OrganizationId
-                && !item.IsArchived
-                && item.Status != InventoryStatus.Bundled
-                && !item.Sales.Any(sale => !ReleasedInventoryStatuses.Contains(sale.Status)))
-            .OrderByDescending(item => item.UpdatedAt)
-            .Take(500)
-            .Select(item => new SaleCandidateDto(
-                item.Id,
-                item.Title,
-                item.Status,
-                item.PurchasePrice ?? 0,
-                item.EstimatedSalePrice ?? item.SellerAskingPrice,
-                item.Listings
-                    .Where(listing => listing.Status == ListingStatus.Active || listing.Status == ListingStatus.Draft)
-                    .OrderByDescending(listing => listing.UpdatedAt)
-                    .Select(listing => (Guid?)listing.Id)
-                    .FirstOrDefault(),
-                item.Listings
-                    .Where(listing => listing.Status == ListingStatus.Active || listing.Status == ListingStatus.Draft)
-                    .OrderByDescending(listing => listing.UpdatedAt)
-                    .Select(listing => listing.Platform)
-                    .FirstOrDefault(),
-                item.Listings
-                    .Where(listing => listing.Status == ListingStatus.Active || listing.Status == ListingStatus.Draft)
-                    .OrderByDescending(listing => listing.UpdatedAt)
-                    .Select(listing => (decimal?)listing.ListPrice)
-                    .FirstOrDefault()))
-            .ToListAsync(cancellationToken);
-
-        return items;
-    }
+    public async Task<ActionResult<IReadOnlyList<SaleCandidateDto>>> Candidates(CancellationToken cancellationToken) =>
+        Ok(await SalesChannels.CandidatesAsync(cancellationToken));
 
     /// <summary>Combine several already-recorded sales into one marketplace order — a shared SaleGroupId + order
     /// reference, the way eBay groups a multi-item order (one package, one tracking). Each sale keeps its own
@@ -394,7 +345,7 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
         {
             bool otherActiveSale = await db.Sales.AnyAsync(
                 other => other.InventoryItemId == sale.InventoryItemId && other.Id != id
-                    && other.OrganizationId == currentUser.OrganizationId && !ReleasedInventoryStatuses.Contains(other.Status),
+                    && other.OrganizationId == currentUser.OrganizationId && !SaleWorkflow.InventoryReleaseStatuses.Contains(other.Status),
                 cancellationToken);
             if (!otherActiveSale)
             {
@@ -471,7 +422,7 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
             return NotFound("Inventory item was not found.");
         }
 
-        string? channel = SalesChannelCatalog.CanonicalValue(request.Platform, await ExistingChannels(cancellationToken));
+        string? channel = await SalesChannels.CanonicalChannelAsync(request.Platform, cancellationToken);
         if (channel is null || request.SoldPrice <= 0)
         {
             return BadRequest("Select a controlled sales channel and enter a positive sold price.");
@@ -490,7 +441,7 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
         bool alreadySold = await db.Sales.AnyAsync(
             saleItem => saleItem.InventoryItemId == request.InventoryItemId
                         && saleItem.OrganizationId == currentUser.OrganizationId
-                        && !ReleasedInventoryStatuses.Contains(saleItem.Status),
+                        && !SaleWorkflow.InventoryReleaseStatuses.Contains(saleItem.Status),
             cancellationToken);
 
         if (alreadySold)
@@ -616,7 +567,7 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
             return BadRequest("A bundled sale needs at least two distinct items. Use a normal sale for one item.");
         }
 
-        string? channel = SalesChannelCatalog.CanonicalValue(request.Platform, await ExistingChannels(cancellationToken));
+        string? channel = await SalesChannels.CanonicalChannelAsync(request.Platform, cancellationToken);
         if (channel is null || request.TotalSoldPrice <= 0)
         {
             return BadRequest("Select a controlled sales channel and enter a positive order total.");
@@ -642,7 +593,7 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
         }
 
         bool anySold = await db.Sales.AnyAsync(
-            sale => itemIds.Contains(sale.InventoryItemId) && sale.OrganizationId == currentUser.OrganizationId && !ReleasedInventoryStatuses.Contains(sale.Status),
+            sale => itemIds.Contains(sale.InventoryItemId) && sale.OrganizationId == currentUser.OrganizationId && !SaleWorkflow.InventoryReleaseStatuses.Contains(sale.Status),
             cancellationToken);
         if (anySold)
         {
@@ -951,7 +902,7 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
             return BadRequest("A reason is required to correct a sale.");
         }
 
-        string? channel = SalesChannelCatalog.CanonicalValue(request.Platform, await ExistingChannels(cancellationToken));
+        string? channel = await SalesChannels.CanonicalChannelAsync(request.Platform, cancellationToken);
         if (channel is null || request.SoldPrice <= 0)
         {
             return BadRequest("Select a controlled sales channel and enter a positive sold price.");
@@ -997,7 +948,7 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
         sale.SoldAt = request.SoldAt;
         sale.Notes = TrimToNull(request.Notes);
         if (sale.InventoryItem is not null) sale.InventoryItem.SoldAt = request.SoldAt;
-        if (sale.InventoryItem is not null && !ReleasedInventoryStatuses.Contains(sale.Status))
+        if (sale.InventoryItem is not null && !SaleWorkflow.InventoryReleaseStatuses.Contains(sale.Status))
         {
             ApplyBundleComponentInventoryStatus(
                 sale.InventoryItem,
@@ -1540,23 +1491,6 @@ public sealed class SalesController(HaulScoutDbContext db, ICurrentUserContext c
                 ? soldAt
                 : null;
         }
-    }
-
-    private async Task<List<string>> ExistingChannels(CancellationToken cancellationToken)
-    {
-        List<string> saleChannels = await db.Sales
-            .AsNoTracking()
-            .Where(item => item.OrganizationId == currentUser.OrganizationId)
-            .Select(item => item.Platform)
-            .Distinct()
-            .ToListAsync(cancellationToken);
-        List<string> listingChannels = await db.Listings
-            .AsNoTracking()
-            .Where(item => item.OrganizationId == currentUser.OrganizationId)
-            .Select(item => item.Platform)
-            .Distinct()
-            .ToListAsync(cancellationToken);
-        return saleChannels.Concat(listingChannels).Distinct(StringComparer.OrdinalIgnoreCase).Order().ToList();
     }
 
 }
