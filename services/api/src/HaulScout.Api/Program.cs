@@ -70,6 +70,7 @@ builder.Services.AddScoped<PlatformOrderIngestionService>();
 builder.Services.AddScoped<SalesChannelWorkflowService>();
 builder.Services.AddScoped<SaleRecordingWorkflowService>();
 builder.Services.AddScoped<InventoryBundleWorkflowService>();
+builder.Services.AddScoped<InventoryDeletionWorkflowService>();
 builder.Services.AddHttpClient<SupabaseAdminInviteService>();
 builder.Services.AddAuthorization(options =>
 {
