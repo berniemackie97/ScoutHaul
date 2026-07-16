@@ -59,6 +59,12 @@ builder.Services
     });
 
 builder.Services.AddScoped<OrganizationAccessService>();
+builder.Services.AddScoped<OrganizationRoleGuard>();
+builder.Services.AddScoped<OrganizationWorkflowService>();
+builder.Services.AddScoped<OrganizationMemberWorkflowService>();
+builder.Services.AddScoped<OrganizationInviteCodeWorkflowService>();
+builder.Services.AddScoped<OrganizationRoleWorkflowService>();
+builder.Services.AddScoped<OrganizationTeamWorkflowService>();
 builder.Services.AddScoped<StoreSettingsWorkflowService>();
 builder.Services.AddScoped<SourcingTripQueryService>();
 builder.Services.AddScoped<SourcingTripWorkflowService>();
