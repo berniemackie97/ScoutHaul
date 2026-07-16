@@ -69,6 +69,8 @@ builder.Services.AddScoped<PlatformOrderSuggestionService>();
 builder.Services.AddScoped<PlatformOrderIngestionService>();
 builder.Services.AddScoped<SalesChannelWorkflowService>();
 builder.Services.AddScoped<SaleRecordingWorkflowService>();
+builder.Services.AddScoped<SaleFinancialStateService>();
+builder.Services.AddScoped<SaleReturnWorkflowService>();
 builder.Services.AddScoped<InventoryBundleWorkflowService>();
 builder.Services.AddScoped<InventoryDeletionWorkflowService>();
 builder.Services.AddScoped<InventoryUpsertWorkflowService>();
