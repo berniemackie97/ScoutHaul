@@ -2,6 +2,9 @@ namespace HaulScout.Domain;
 
 public static class SaleWorkflow
 {
+    public static readonly SaleStatus[] InventoryReleaseStatuses =
+        [SaleStatus.Returned, SaleStatus.Refunded, SaleStatus.Cancelled];
+
     private static readonly IReadOnlyDictionary<SaleStatus, SaleStatus[]> Allowed =
         new Dictionary<SaleStatus, SaleStatus[]>
         {
@@ -28,10 +31,10 @@ public static class SaleWorkflow
         || (from == SaleStatus.ReturnRequested && to == SaleStatus.Delivered);
 
     public static bool IsRealized(SaleStatus status) =>
-        status is not SaleStatus.Returned and not SaleStatus.Refunded and not SaleStatus.Cancelled;
+        !InventoryReleaseStatuses.Contains(status);
 
     public static bool ReleasesInventory(SaleStatus status) =>
-        status is SaleStatus.Returned or SaleStatus.Refunded or SaleStatus.Cancelled;
+        InventoryReleaseStatuses.Contains(status);
 
     public static InventoryStatus InventoryStatusFor(SaleStatus status, bool hasListing) => status switch
     {
