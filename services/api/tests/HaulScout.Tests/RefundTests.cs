@@ -87,7 +87,7 @@ public class RefundTests
         (HaulScoutDbContext db, Guid org, Guid user) = NewContext(nameof(Recording_a_partial_refund_recomputes_net_keeps_the_item_sold_and_audits));
         await using HaulScoutDbContext _ = db;
         Sale sale = SeedSale(db, org);
-        SalesController controller = new(db, new StubCurrentUser(org, user));
+        SalesController controller = SalesControllerFactory.Create(db, new StubCurrentUser(org, user));
 
         ActionResult<SaleDto> result = await controller.RecordRefund(sale.Id,
             new RecordRefundRequest(RefundType.Partial, ItemAmount: 40m, Reason: "Buyer kept it, partial refund", FeeCredit: 5m),
@@ -111,7 +111,7 @@ public class RefundTests
         (HaulScoutDbContext db, Guid org, Guid user) = NewContext(nameof(A_full_refund_with_return_releases_the_item_and_sets_returned));
         await using HaulScoutDbContext _ = db;
         Sale sale = SeedSale(db, org);
-        SalesController controller = new(db, new StubCurrentUser(org, user));
+        SalesController controller = SalesControllerFactory.Create(db, new StubCurrentUser(org, user));
 
         ActionResult<SaleDto> result = await controller.RecordRefund(sale.Id,
             new RecordRefundRequest(RefundType.Full, ItemAmount: 100m, Reason: "Returned, full refund",
@@ -131,7 +131,7 @@ public class RefundTests
         (HaulScoutDbContext db, Guid org, Guid user) = NewContext(nameof(Voiding_the_last_refund_restores_net_and_reverts_status));
         await using HaulScoutDbContext _ = db;
         Sale sale = SeedSale(db, org);
-        SalesController controller = new(db, new StubCurrentUser(org, user));
+        SalesController controller = SalesControllerFactory.Create(db, new StubCurrentUser(org, user));
 
         await controller.RecordRefund(sale.Id, new RecordRefundRequest(RefundType.Partial, 40m, "mistake", FeeCredit: 5m), CancellationToken.None);
         Refund refund = await db.Refunds.SingleAsync(r => r.SaleId == sale.Id);
@@ -152,7 +152,7 @@ public class RefundTests
         (HaulScoutDbContext db, Guid org, Guid user) = NewContext(nameof(A_refund_exceeding_the_sold_price_is_rejected));
         await using HaulScoutDbContext _ = db;
         Sale sale = SeedSale(db, org);
-        SalesController controller = new(db, new StubCurrentUser(org, user));
+        SalesController controller = SalesControllerFactory.Create(db, new StubCurrentUser(org, user));
 
         ActionResult<SaleDto> result = await controller.RecordRefund(sale.Id,
             new RecordRefundRequest(RefundType.Partial, ItemAmount: 150m, Reason: "too much"), CancellationToken.None);
@@ -167,7 +167,7 @@ public class RefundTests
         (HaulScoutDbContext db, Guid org, Guid user) = NewContext(nameof(A_refund_needs_a_reason_and_a_non_zero_amount));
         await using HaulScoutDbContext _ = db;
         Sale sale = SeedSale(db, org);
-        SalesController controller = new(db, new StubCurrentUser(org, user));
+        SalesController controller = SalesControllerFactory.Create(db, new StubCurrentUser(org, user));
 
         Assert.IsType<BadRequestObjectResult>((await controller.RecordRefund(sale.Id,
             new RecordRefundRequest(RefundType.Partial, 10m, "  "), CancellationToken.None)).Result);

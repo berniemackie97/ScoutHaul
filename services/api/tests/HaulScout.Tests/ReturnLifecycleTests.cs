@@ -39,7 +39,7 @@ public class ReturnLifecycleTests
     }
 
     private static SalesController NewSales(HaulScoutDbContext db, Guid org, Guid user) =>
-        new(db, new StubCurrentUser(org, user), new OrderAssembler(db, new StubCurrentUser(org, user)));
+        SalesControllerFactory.Create(db, new StubCurrentUser(org, user));
 
     private static async Task<Guid> SeedSale(HaulScoutDbContext db, Guid org, Guid user, SalesController sales)
     {

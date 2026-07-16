@@ -61,7 +61,7 @@ public class SaleGroupingTests
         await using HaulScoutDbContext _ = db;
         Sale a = SeedSale(db, org, "Item A");
         Sale b = SeedSale(db, org, "Item B");
-        SalesController controller = new(db, new StubCurrentUser(org, user));
+        SalesController controller = SalesControllerFactory.Create(db, new StubCurrentUser(org, user));
 
         ActionResult<SaleGroupResultDto> result = await controller.GroupIntoOrder(new GroupSalesRequest([a.Id, b.Id], "12-34567-89012"), CancellationToken.None);
 
@@ -81,7 +81,7 @@ public class SaleGroupingTests
         Sale a = SeedSale(db, org, "Item A");
         Sale b = SeedSale(db, org, "Item B");
         Sale c = SeedSale(db, org, "Item C");
-        SalesController controller = new(db, new StubCurrentUser(org, user));
+        SalesController controller = SalesControllerFactory.Create(db, new StubCurrentUser(org, user));
 
         ActionResult<SaleGroupResultDto> first = await controller.GroupIntoOrder(new GroupSalesRequest([a.Id, b.Id], "ORDER-1"), CancellationToken.None);
         Guid groupId = first.Value!.SaleGroupId;
@@ -101,7 +101,7 @@ public class SaleGroupingTests
         await using HaulScoutDbContext _ = db;
         Sale a = SeedSale(db, org, "Item A");
         Sale b = SeedSale(db, org, "Item B");
-        SalesController controller = new(db, new StubCurrentUser(org, user));
+        SalesController controller = SalesControllerFactory.Create(db, new StubCurrentUser(org, user));
         await controller.GroupIntoOrder(new GroupSalesRequest([a.Id, b.Id], "ORDER-1"), CancellationToken.None);
 
         await controller.RemoveFromOrder(new UngroupSalesRequest([a.Id]), CancellationToken.None);
@@ -119,7 +119,7 @@ public class SaleGroupingTests
         Sale a = SeedSale(db, org, "Item A");
         Sale b = SeedSale(db, org, "Item B");
         Sale c = SeedSale(db, org, "Item C");
-        SalesController controller = new(db, new StubCurrentUser(org, user));
+        SalesController controller = SalesControllerFactory.Create(db, new StubCurrentUser(org, user));
         Guid group = (await controller.GroupIntoOrder(new GroupSalesRequest([a.Id, b.Id, c.Id], "ORDER-1"), CancellationToken.None)).Value!.SaleGroupId;
 
         await controller.RemoveFromOrder(new UngroupSalesRequest([a.Id]), CancellationToken.None);
@@ -135,7 +135,7 @@ public class SaleGroupingTests
         (HaulScoutDbContext db, Guid org, Guid user) = NewContext(nameof(Combining_fewer_than_two_sales_is_rejected));
         await using HaulScoutDbContext _ = db;
         Sale a = SeedSale(db, org, "Item A");
-        SalesController controller = new(db, new StubCurrentUser(org, user));
+        SalesController controller = SalesControllerFactory.Create(db, new StubCurrentUser(org, user));
 
         ActionResult<SaleGroupResultDto> result = await controller.GroupIntoOrder(new GroupSalesRequest([a.Id], null), CancellationToken.None);
         Assert.IsType<BadRequestObjectResult>(result.Result);

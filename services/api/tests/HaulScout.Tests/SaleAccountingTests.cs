@@ -83,7 +83,7 @@ public class SaleAccountingTests
         (HaulScoutDbContext db, Guid org, Guid user) = NewContext(nameof(Editing_a_sale_recomputes_net_backdates_and_writes_a_correction));
         await using HaulScoutDbContext _ = db;
         Sale sale = SeedSale(db, org);
-        SalesController controller = new(db, new StubCurrentUser(org, user));
+        SalesController controller = SalesControllerFactory.Create(db, new StubCurrentUser(org, user));
 
         DateTimeOffset backdated = DateTimeOffset.UtcNow.AddDays(-30);
         ActionResult<SaleDto> result = await controller.Update(sale.Id, new UpdateSaleRequest(
@@ -112,7 +112,7 @@ public class SaleAccountingTests
         (HaulScoutDbContext db, Guid org, Guid user) = NewContext(nameof(A_second_edit_increments_the_correction_version));
         await using HaulScoutDbContext _ = db;
         Sale sale = SeedSale(db, org);
-        SalesController controller = new(db, new StubCurrentUser(org, user));
+        SalesController controller = SalesControllerFactory.Create(db, new StubCurrentUser(org, user));
         UpdateSaleRequest Req(string reason) => new("eBay", 120m, 0m, 16m, 3.80m, 8m, 0m, 0m, 9.90m, true, sale.SoldAt, null, reason);
 
         await controller.Update(sale.Id, Req("first fix"), CancellationToken.None);
@@ -129,7 +129,7 @@ public class SaleAccountingTests
         (HaulScoutDbContext db, Guid org, Guid user) = NewContext(nameof(Editing_requires_a_reason));
         await using HaulScoutDbContext _ = db;
         Sale sale = SeedSale(db, org);
-        SalesController controller = new(db, new StubCurrentUser(org, user));
+        SalesController controller = SalesControllerFactory.Create(db, new StubCurrentUser(org, user));
 
         ActionResult<SaleDto> result = await controller.Update(sale.Id, new UpdateSaleRequest(
             "eBay", 120m, 0m, 16m, 3.80m, 8m, 0m, 0m, 9.90m, true, sale.SoldAt, null, "  "), CancellationToken.None);
@@ -152,7 +152,7 @@ public class SaleAccountingTests
         };
         db.InventoryItems.Add(item);
         await db.SaveChangesAsync();
-        SalesController controller = new(db, new StubCurrentUser(org, user));
+        SalesController controller = SalesControllerFactory.Create(db, new StubCurrentUser(org, user));
 
         ActionResult<SaleDto> result = await controller.Record(new RecordSaleRequest(
             item.Id, null, "eBay", 240m, 31m, 7m, 20m, 2m, 0m,
@@ -172,7 +172,7 @@ public class SaleAccountingTests
         Sale sale = SeedSale(db, org);
         sale.InventoryItem!.Status = InventoryStatus.Sold;
         await db.SaveChangesAsync();
-        SalesController controller = new(db, new StubCurrentUser(org, user));
+        SalesController controller = SalesControllerFactory.Create(db, new StubCurrentUser(org, user));
 
         await controller.Transition(sale.Id, new SaleStatusTransitionRequest(SaleStatus.Packed, sale.SoldAt.AddDays(1), null, null, null), CancellationToken.None);
         await controller.Transition(sale.Id, new SaleStatusTransitionRequest(SaleStatus.Shipped, sale.SoldAt.AddDays(2), null, "USPS", "9400TEST"), CancellationToken.None);
@@ -194,7 +194,7 @@ public class SaleAccountingTests
         (HaulScoutDbContext db, Guid org, Guid user) = NewContext(nameof(Fulfillment_rejects_skipped_stages_and_requires_exception_reasons));
         await using HaulScoutDbContext _ = db;
         Sale sale = SeedSale(db, org);
-        SalesController controller = new(db, new StubCurrentUser(org, user));
+        SalesController controller = SalesControllerFactory.Create(db, new StubCurrentUser(org, user));
 
         ActionResult<SaleDto> skipped = await controller.Transition(sale.Id, new SaleStatusTransitionRequest(SaleStatus.Delivered, null, null, null, null), CancellationToken.None);
         await controller.Transition(sale.Id, new SaleStatusTransitionRequest(SaleStatus.Packed, sale.SoldAt.AddDays(2), null, null, null), CancellationToken.None);
@@ -215,7 +215,7 @@ public class SaleAccountingTests
         sale.Status = SaleStatus.Delivered;
         sale.InventoryItem!.Status = InventoryStatus.Delivered;
         await db.SaveChangesAsync();
-        SalesController controller = new(db, new StubCurrentUser(org, user));
+        SalesController controller = SalesControllerFactory.Create(db, new StubCurrentUser(org, user));
 
         await controller.Transition(sale.Id, new SaleStatusTransitionRequest(SaleStatus.ReturnRequested, null, "Customer reported damage", null, null), CancellationToken.None);
         await controller.Transition(sale.Id, new SaleStatusTransitionRequest(SaleStatus.Returned, null, "Return received and inspected", null, null), CancellationToken.None);
