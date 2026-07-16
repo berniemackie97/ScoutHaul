@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using HaulScout.Api.Mapping;
 using HaulScout.Application.Common;
+using HaulScout.Domain.Common;
 using HaulScout.Application.Contracts;
 using HaulScout.Domain;
 using HaulScout.Domain.Entities;
@@ -17,8 +18,12 @@ namespace HaulScout.Api.Services;
 public sealed class SaleReturnWorkflowService(
     HaulScoutDbContext db,
     ICurrentUserContext currentUser,
-    SaleFinancialStateService saleState)
+    SaleFinancialStateService saleState,
+    TimeProvider timeProvider)
 {
+    /// <summary>The Return aggregate enforces its own stages; this turns a broken rule into the HTTP shape.</summary>
+    private static AppResult<ReturnDto> Rule(DomainException e) => AppResult<ReturnDto>.Conflict(e.Message);
+
     public async Task<IReadOnlyList<ReturnDto>> ListAsync(Guid saleId, CancellationToken cancellationToken)
     {
         List<Return> items = await db.Returns
@@ -31,11 +36,6 @@ public sealed class SaleReturnWorkflowService(
 
     public async Task<AppResult<ReturnDto>> OpenAsync(Guid saleId, OpenReturnRequest request, CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(request.Reason))
-        {
-            return AppResult<ReturnDto>.Validation("A reason is required to open a return.");
-        }
-
         Sale? sale = await db.Sales
             .Include(item => item.InventoryItem)
             .SingleOrDefaultAsync(item => item.Id == saleId && item.OrganizationId == currentUser.OrganizationId, cancellationToken);
@@ -57,17 +57,16 @@ public sealed class SaleReturnWorkflowService(
             return AppResult<ReturnDto>.Conflict("This sale already has an open return.");
         }
 
-        Return rma = new()
+        Return rma;
+        try
         {
-            OrganizationId = currentUser.OrganizationId,
-            SaleId = sale.Id,
-            OrderId = sale.OrderId,
-            Status = ReturnStatus.Requested,
-            Reason = request.Reason.Trim(),
-            Notes = TrimToNull(request.Notes),
-            RequestedByUserId = currentUser.UserId,
-            Sale = sale,
-        };
+            rma = Return.Open(currentUser.OrganizationId, sale, request.Reason, request.Notes, currentUser.UserId, timeProvider.GetUtcNow());
+        }
+        catch (DomainException e)
+        {
+            return AppResult<ReturnDto>.Validation(e.Message);
+        }
+
         db.Returns.Add(rma);
         await db.SaveChangesAsync(cancellationToken);
         return AppResult<ReturnDto>.Ok(rma.ToDto());
@@ -84,20 +83,18 @@ public sealed class SaleReturnWorkflowService(
         {
             return AppResult<ReturnDto>.NotFound();
         }
-        if (rma.Status != ReturnStatus.Requested)
-        {
-            return AppResult<ReturnDto>.Conflict($"A return label can only be issued from Requested (it is {rma.Status}).");
-        }
 
         Sale sale = rma.Sale!;
         string before = SaleFinancialStateService.Snapshot(sale);
-        rma.ReturnShippingCost = request.ReturnShippingCost;
-        rma.Status = ReturnStatus.LabelIssued;
-        rma.LabelIssuedAt = DateTimeOffset.UtcNow;
-        if (request.Notes is not null)
+        try
         {
-            rma.Notes = TrimToNull(request.Notes);
+            rma.IssueLabel(request.ReturnShippingCost, request.Notes, timeProvider.GetUtcNow());
         }
+        catch (DomainException e)
+        {
+            return Rule(e);
+        }
+
         // The seller pays the return label now; book it as a shipping cost so net reflects it whatever the outcome.
         sale.ShippingCost += request.ReturnShippingCost;
         SaleFinancialStateService.RecomputeNet(sale);
@@ -113,13 +110,15 @@ public sealed class SaleReturnWorkflowService(
         {
             return AppResult<ReturnDto>.NotFound();
         }
-        if (rma.Status is not (ReturnStatus.Requested or ReturnStatus.LabelIssued))
+        try
         {
-            return AppResult<ReturnDto>.Conflict($"Only a Requested or LabelIssued return can be marked received (it is {rma.Status}).");
+            rma.Receive(timeProvider.GetUtcNow());
+        }
+        catch (DomainException e)
+        {
+            return Rule(e);
         }
 
-        rma.Status = ReturnStatus.Received;
-        rma.ReceivedAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync(cancellationToken);
         return AppResult<ReturnDto>.Ok(rma.ToDto());
     }
@@ -135,11 +134,6 @@ public sealed class SaleReturnWorkflowService(
         {
             return AppResult<ReturnDto>.NotFound();
         }
-        if (rma.Status != ReturnStatus.Received)
-        {
-            return AppResult<ReturnDto>.Conflict($"A refund is issued once the return is Received (it is {rma.Status}). Mark it received first.");
-        }
-
         Sale sale = rma.Sale!;
         decimal alreadyRefundedItem = sale.Refunds.Sum(refund => refund.ItemAmount);
         if (alreadyRefundedItem + request.ItemAmount > sale.SoldPrice + 0.01m)
@@ -160,18 +154,23 @@ public sealed class SaleReturnWorkflowService(
             ItemReturned = request.Restock,
             Reason = TrimToNull(request.Reason) ?? rma.Reason,
             Notes = TrimToNull(request.Notes),
-            RefundedAt = DateTimeOffset.UtcNow,
+            RefundedAt = timeProvider.GetUtcNow(),
             RecordedByUserId = currentUser.UserId,
             Sale = sale,
         };
+
+        try
+        {
+            // The aggregate decides whether a refund may be issued at all; only then is it booked.
+            rma.Resolve(refund, request.Restock, timeProvider.GetUtcNow());
+        }
+        catch (DomainException e)
+        {
+            return Rule(e);
+        }
+
         db.Refunds.Add(refund);
         SaleFinancialStateService.ApplyRefundState(sale);
-
-        rma.Status = ReturnStatus.Refunded;
-        rma.Refund = refund;
-        rma.RefundId = refund.Id;
-        rma.Restocked = request.Restock;
-        rma.ResolvedAt = DateTimeOffset.UtcNow;
 
         await saleState.AddCorrectionAsync(sale, before,
             $"Return refunded ({request.Type}): item {request.ItemAmount:C}{(request.Restock ? ", restocked" : ", item kept")} — {refund.Reason}",
@@ -191,15 +190,16 @@ public sealed class SaleReturnWorkflowService(
         {
             return AppResult<ReturnDto>.NotFound();
         }
-        if (!rma.IsOpen)
+
+        try
         {
-            return AppResult<ReturnDto>.Conflict($"This return is already resolved ({rma.Status}).");
+            rma.Reject(request.Reason, timeProvider.GetUtcNow());
+        }
+        catch (DomainException e)
+        {
+            return Rule(e);
         }
 
-        // The return shipping already paid stays booked — the seller ate that cost regardless.
-        rma.Status = ReturnStatus.Rejected;
-        rma.ResolvedAt = DateTimeOffset.UtcNow;
-        rma.Notes = TrimToNull(request.Reason);
         await db.SaveChangesAsync(cancellationToken);
         return AppResult<ReturnDto>.Ok(rma.ToDto());
     }
@@ -211,13 +211,15 @@ public sealed class SaleReturnWorkflowService(
         {
             return AppResult<ReturnDto>.NotFound();
         }
-        if (rma.Status is not (ReturnStatus.Requested or ReturnStatus.LabelIssued))
+        try
         {
-            return AppResult<ReturnDto>.Conflict($"Only a Requested or LabelIssued return can be cancelled (it is {rma.Status}).");
+            rma.Cancel(timeProvider.GetUtcNow());
+        }
+        catch (DomainException e)
+        {
+            return Rule(e);
         }
 
-        rma.Status = ReturnStatus.Cancelled;
-        rma.ResolvedAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync(cancellationToken);
         return AppResult<ReturnDto>.Ok(rma.ToDto());
     }
