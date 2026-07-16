@@ -58,6 +58,9 @@ builder.Services
         };
     });
 
+// Time is a dependency: services that make time-based decisions take TimeProvider so those rules can be
+// tested at the boundary instead of against the wall clock.
+builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<OrganizationAccessService>();
 builder.Services.AddScoped<OrganizationRoleGuard>();
 builder.Services.AddScoped<OrganizationWorkflowService>();
