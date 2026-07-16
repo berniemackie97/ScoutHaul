@@ -89,6 +89,18 @@ public class ArchitectureTests
         Assert.DoesNotContain(referenced, name => name is "HaulScout.Infrastructure" or "HaulScout.Api");
     }
 
+    /// <summary>
+    /// Application code may use neutral Microsoft.Extensions abstractions, but it must not take a dependency on
+    /// ASP.NET Core. HTTP types belong in Api adapters only.
+    /// </summary>
+    [Fact]
+    public void Application_does_not_depend_on_AspNetCore()
+    {
+        string[] referenced = ReferencedAssemblyNames(typeof(AppResult).Assembly);
+
+        Assert.DoesNotContain(referenced, name => name.StartsWith("Microsoft.AspNetCore", StringComparison.Ordinal));
+    }
+
     /// <summary>Infrastructure owns persistence; it must never depend on the web layer.</summary>
     [Fact]
     public void Infrastructure_does_not_depend_on_the_api()
