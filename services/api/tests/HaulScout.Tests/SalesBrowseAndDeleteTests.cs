@@ -62,7 +62,7 @@ public class SalesBrowseAndDeleteTests
         await using HaulScoutDbContext _ = db;
         DateTimeOffset now = DateTimeOffset.UtcNow;
         for (int i = 0; i < 5; i++) SeedSale(db, org, $"Item {i}", 100m, 40m, now.AddDays(-i));
-        SalesController controller = new(db, new StubCurrentUser(org, user));
+        SalesController controller = SalesControllerFactory.Create(db, new StubCurrentUser(org, user));
 
         ActionResult<SaleListDto> result = await controller.Browse(status: null, search: null, sort: null, desc: true, page: 1, pageSize: 2, CancellationToken.None);
 
@@ -83,7 +83,7 @@ public class SalesBrowseAndDeleteTests
         DateTimeOffset now = DateTimeOffset.UtcNow;
         SeedSale(db, org, "Brass Lamp", 100m, 40m, now);
         SeedSale(db, org, "Walnut Desk", 200m, 80m, now, platform: "Mercari");
-        SalesController controller = new(db, new StubCurrentUser(org, user));
+        SalesController controller = SalesControllerFactory.Create(db, new StubCurrentUser(org, user));
 
         ActionResult<SaleListDto> byTitle = await controller.Browse(null, "brass", null, true, 1, 25, CancellationToken.None);
         Assert.Single(byTitle.Value!.Items);
@@ -101,7 +101,7 @@ public class SalesBrowseAndDeleteTests
         DateTimeOffset now = DateTimeOffset.UtcNow;
         SeedSale(db, org, "Low", 100m, 10m, now);
         SeedSale(db, org, "High", 100m, 90m, now.AddSeconds(-1));
-        SalesController controller = new(db, new StubCurrentUser(org, user));
+        SalesController controller = SalesControllerFactory.Create(db, new StubCurrentUser(org, user));
 
         ActionResult<SaleListDto> result = await controller.Browse(null, null, "netProfit", desc: false, 1, 25, CancellationToken.None);
 
@@ -130,7 +130,7 @@ public class SalesBrowseAndDeleteTests
         });
         db.Refunds.Add(new Refund { OrganizationId = org, SaleId = sale.Id, ItemAmount = 5m, Reason = "partial", Sale = sale, RecordedByUserId = user });
         await db.SaveChangesAsync();
-        SalesController controller = new(db, new StubCurrentUser(org, user));
+        SalesController controller = SalesControllerFactory.Create(db, new StubCurrentUser(org, user));
 
         ActionResult result = await controller.Delete(sale.Id, CancellationToken.None);
 
@@ -149,7 +149,7 @@ public class SalesBrowseAndDeleteTests
     {
         (HaulScoutDbContext db, Guid org, Guid user) = NewContext(nameof(Deleting_a_missing_sale_returns_not_found));
         await using HaulScoutDbContext _ = db;
-        SalesController controller = new(db, new StubCurrentUser(org, user));
+        SalesController controller = SalesControllerFactory.Create(db, new StubCurrentUser(org, user));
 
         Assert.IsType<NotFoundResult>(await controller.Delete(Guid.NewGuid(), CancellationToken.None));
     }

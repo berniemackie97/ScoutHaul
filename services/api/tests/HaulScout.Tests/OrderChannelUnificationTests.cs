@@ -55,7 +55,7 @@ public class OrderChannelUnificationTests
     private static SalesController NewSales(HaulScoutDbContext db, Guid org, Guid user)
     {
         var currentUser = new StubCurrentUser(org, user);
-        return new SalesController(db, currentUser, new OrderAssembler(db, currentUser));
+        return SalesControllerFactory.Create(db, currentUser);
     }
 
     private static OrdersController NewOrders(HaulScoutDbContext db, Guid org, Guid user)
