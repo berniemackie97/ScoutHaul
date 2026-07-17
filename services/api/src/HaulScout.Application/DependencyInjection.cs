@@ -16,6 +16,7 @@ public static class DependencyInjection
         services.AddScoped<IConfidenceScorer, ConfidenceScorer>();
         services.AddScoped<OrganizationInviteCodeWorkflowService>();
         services.AddScoped<OrganizationMemberWorkflowService>();
+        services.AddScoped<OrganizationWorkflowService>();
         services.AddScoped<OrganizationRoleWorkflowService>();
         services.AddScoped<OrganizationTeamWorkflowService>();
         services.AddSingleton<IMarketplaceSearchLinkGenerator, MarketplaceSearchLinkGenerator>();

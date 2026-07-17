@@ -27,6 +27,7 @@ public static class DependencyInjection
         services.AddScoped<IOrganizationAuthorizer, EfOrganizationAuthorizer>();
         services.AddScoped<IOrganizationInviteCodeStore, EfOrganizationInviteCodeStore>();
         services.AddScoped<IOrganizationMemberStore, EfOrganizationMemberStore>();
+        services.AddScoped<IOrganizationStore, EfOrganizationStore>();
         services.AddScoped<IOrganizationRoleStore, EfOrganizationRoleStore>();
         services.AddScoped<IOrganizationTeamStore, EfOrganizationTeamStore>();
         services.AddHttpClient<IOrganizationInviteSender, SupabaseOrganizationInviteSender>();
