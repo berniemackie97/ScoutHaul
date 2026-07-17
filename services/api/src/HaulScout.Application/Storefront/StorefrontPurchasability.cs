@@ -16,9 +16,9 @@ public static class StorefrontPurchasability
     public static bool IsPurchasable(StoreListing? listing) =>
         listing?.Status == StoreListingStatus.Active && IsItemSellable(listing.InventoryItem);
 
-    /// <summary>Mirrors the catalog's sellable gate: present, not archived, and in a stage that means "on the shelf".</summary>
+    /// <summary>The shelf rule: present, not archived, and Listed — StorePublishing.IsOnShelf, null-tolerant.</summary>
     public static bool IsItemSellable(InventoryItem? item) =>
-        item is { IsArchived: false, Status: InventoryStatus.Listed or InventoryStatus.ReadyToList };
+        item is not null && StorePublishing.IsOnShelf(item);
 
     /// <summary>Why an add was refused, phrased for the shopper.</summary>
     public static string RefusalReason(StoreListing listing) =>

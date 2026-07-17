@@ -1,7 +1,7 @@
 using HaulScout.Application.Contracts;
 using HaulScout.Domain.Entities;
 
-namespace HaulScout.Api.Mapping;
+namespace HaulScout.Application.Storefront;
 
 public static class StoreMapping
 {

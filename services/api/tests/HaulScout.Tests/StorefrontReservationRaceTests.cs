@@ -14,7 +14,16 @@ public class StorefrontReservationRaceTests(PostgresFixture postgres)
 {
     private static async Task<StoreListing> SeedActiveListing(HaulScoutDbContext db, Guid org, string title = "Brass Lamp")
     {
-        InventoryItem item = new() { OrganizationId = org, Title = title, PurchasePrice = 40m, Status = InventoryStatus.Listed };
+        InventoryItem item = new()
+        {
+            OrganizationId = org,
+            Title = title,
+            PurchasePrice = 40m,
+            EstimatedSalePrice = 100m,
+            Status = InventoryStatus.Listed,
+            // Shoppable for real: the synchronizer would demote an imageless item's listing to Draft.
+            Photos = { new InventoryPhoto { OrganizationId = org, ContentType = "image/jpeg", OriginalBytes = [1], ThumbnailBytes = [1] } },
+        };
         db.InventoryItems.Add(item);
         StoreListing listing = new()
         {

@@ -1,15 +1,13 @@
-using Microsoft.EntityFrameworkCore;
 using HaulScout.Application.Common;
-using HaulScout.Infrastructure.Persistence;
+using HaulScout.Application.Storefront;
 
 namespace HaulScout.Api.Services;
 
 /// <summary>
-/// Resolves which store an anonymous storefront request belongs to from the X-HaulScout-Store header (domain, or a
-/// raw org id for tooling), and scopes the request's tenant to it. The same semantics as the catalog controller —
-/// extracted so the commerce controllers don't re-implement them.
+/// Resolves which store an anonymous storefront request belongs to from the X-HaulScout-Store header and scopes the
+/// request's tenant to it. Pure HTTP-to-application glue: header extraction here, the lookup behind the port.
 /// </summary>
-public sealed class StorefrontStoreResolver(HaulScoutDbContext db, ITenantContext tenant)
+public sealed class StorefrontStoreResolver(IStoreDirectory directory, ITenantContext tenant)
 {
     public const string StoreHeader = "X-HaulScout-Store";
 
@@ -21,41 +19,12 @@ public sealed class StorefrontStoreResolver(HaulScoutDbContext db, ITenantContex
             return null;
         }
 
-        Guid organizationId;
-        if (Guid.TryParse(raw, out Guid id))
+        Guid? organizationId = await directory.ResolveOrganizationIdAsync(raw, cancellationToken);
+        if (organizationId is Guid resolved)
         {
-            organizationId = await db.Organizations
-                .Where(org => org.Id == id)
-                .Select(org => org.Id)
-                .FirstOrDefaultAsync(cancellationToken);
-        }
-        else
-        {
-            string domain = NormalizeDomain(raw);
-            organizationId = await db.Organizations
-                .Where(org => org.StoreDomain != null && org.StoreDomain.ToLower() == domain)
-                .Select(org => org.Id)
-                .FirstOrDefaultAsync(cancellationToken);
+            tenant.SetOrganization(resolved);
         }
 
-        if (organizationId == Guid.Empty)
-        {
-            return null;
-        }
-
-        tenant.SetOrganization(organizationId);
         return organizationId;
-    }
-
-    private static string NormalizeDomain(string value)
-    {
-        string domain = value.ToLowerInvariant();
-        if (domain.StartsWith("www.", StringComparison.Ordinal))
-        {
-            domain = domain[4..];
-        }
-
-        int colon = domain.IndexOf(':');
-        return colon >= 0 ? domain[..colon] : domain;
     }
 }

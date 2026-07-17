@@ -174,5 +174,5 @@ public sealed class EfStorefrontCheckoutStore(HaulScoutDbContext db) : IStorefro
                 && listing.Status == StoreListingStatus.Active
                 && listing.InventoryItem != null
                 && !listing.InventoryItem.IsArchived
-                && (listing.InventoryItem.Status == InventoryStatus.Listed || listing.InventoryItem.Status == InventoryStatus.ReadyToList));
+                && listing.InventoryItem.Status == InventoryStatus.Listed);
 }

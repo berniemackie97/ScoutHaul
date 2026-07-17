@@ -131,7 +131,17 @@ public sealed record StorefrontListingDetailDto(
     decimal? Weight,
     WeightUnit WeightUnit,
     // All photos for the gallery, hero first (relative /api/storefront/photos/{id} URLs). Empty when none.
-    IReadOnlyList<string> ImageUrls = default!);
+    IReadOnlyList<string> ImageUrls = default!,
+    // "Available", "Reserved" (in someone's checkout), or "Sold" — the PDP renders the honest state instead of 404ing.
+    string Availability = "Available");
+
+/// <summary>What one reconcile pass did — the backfill/repair for shelf-vs-inventory drift.</summary>
+public sealed record ReconcileStoreCatalogResultDto(
+    int ItemsExamined,
+    int ListingsCreated,
+    int NowActive,
+    int AwaitingPhotos,
+    int Retired);
 
 public sealed record StorefrontPageDto<T>(
     IReadOnlyList<T> Items,
