@@ -38,6 +38,7 @@ public sealed class EbayListingQualityWorkbookImportTests
         Assert.Equal("Tops", row.CategoryName);
         Assert.Equal("Used", row.ListingCondition);
         Assert.Equal("$1 - $19", row.PriceRange);
+        Assert.Equal(TimeSpan.Zero, row.ReportGeneratedAt.Offset);
         Assert.Equal(93m, row.DailyImpressions);
         Assert.Equal(0.012143857m, row.ClickThroughRate);
         Assert.Null(row.SalesConversionRate);

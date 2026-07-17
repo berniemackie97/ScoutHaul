@@ -79,7 +79,7 @@ export default async function ImportsPage() {
           hint="Link imported listings to an inventory item, or seed a new draft."
         />
         <ReconcileCard
-          href="/analytics"
+          href="/imports/listing-quality"
           title="Quality snapshots"
           count={qualitySnapshots}
           hint="Imported eBay listing-quality observations available for reporting."
