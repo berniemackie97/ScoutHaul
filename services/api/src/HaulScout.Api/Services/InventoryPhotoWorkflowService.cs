@@ -7,6 +7,7 @@ using HaulScout.Application.Security;
 using HaulScout.Application.Services;
 using HaulScout.Domain.Entities;
 using HaulScout.Infrastructure.Persistence;
+using HaulScout.Application.Inventory;
 
 namespace HaulScout.Api.Services;
 
