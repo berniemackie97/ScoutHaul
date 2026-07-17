@@ -18,7 +18,11 @@ namespace HaulScout.Api.Services;
 /// conservative: only one exact sale match is allowed, ambiguous rows are skipped, and source fingerprints make
 /// re-imports idempotent.
 /// </summary>
-public sealed class MarketplaceRefundImportService(HaulScoutDbContext db, ICurrentUserContext currentUser, TimeProvider timeProvider)
+public sealed class MarketplaceRefundImportService(
+    HaulScoutDbContext db,
+    ICurrentUserContext currentUser,
+    TimeProvider timeProvider,
+    OrderAssembler orderAssembler)
 {
     public async Task<(ImportMarketplaceRefundsResultDto? Result, string? Error)> ImportCsvAsync(
         ImportMarketplaceRefundsCsvRequest request,
@@ -38,6 +42,7 @@ public sealed class MarketplaceRefundImportService(HaulScoutDbContext db, ICurre
         int imported = 0;
         int skipped = parsed.RowsSkipped;
         List<string> warnings = [];
+        HashSet<Guid> touchedOrderIds = [];
         foreach (MarketplaceRefundReportParser.MarketplaceRefundEvent item in parsed.Events)
         {
             List<Sale> matches = await FindRefundMatches(item, cancellationToken);
@@ -107,11 +112,26 @@ public sealed class MarketplaceRefundImportService(HaulScoutDbContext db, ICurre
             }
 
             SaleFinancialStateService.ApplyRefundState(sale);
+            if (sale.OrderId is Guid orderId)
+            {
+                touchedOrderIds.Add(orderId);
+            }
 
             await AddCorrection(sale, before,
                 $"Imported refund from {item.Source}: item {allocation.ItemAmount:C}, shipping {allocation.ShippingRefunded:C}, tax {allocation.TaxRefunded:C}, fee credit {allocation.FeeCredit:C}.{returnNote}",
                 cancellationToken);
             imported++;
+        }
+
+        foreach (Guid orderId in touchedOrderIds)
+        {
+            Order? order = await db.Orders.SingleOrDefaultAsync(
+                item => item.Id == orderId && item.OrganizationId == currentUser.OrganizationId,
+                cancellationToken);
+            if (order is not null)
+            {
+                await orderAssembler.SyncSalesOrderAsync(order, [], cancellationToken);
+            }
         }
 
         await db.SaveChangesAsync(cancellationToken);

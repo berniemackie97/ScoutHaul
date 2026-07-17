@@ -353,7 +353,7 @@ public sealed class OrderAssembler(HaulScoutDbContext db, ICurrentUserContext cu
     {
         if (sales.Count == 0) return current;
         if (sales.All(sale => sale.Status == SaleStatus.Cancelled)) return OrderStatus.Cancelled;
-        if (sales.All(sale => sale.Status == SaleStatus.Refunded)) return OrderStatus.Refunded;
+        if (sales.All(IsFullyRefundedState)) return OrderStatus.Refunded;
         // Keep the operator's fulfillment progress; only lift a pending/paid order to Paid.
         if (current is OrderStatus.Fulfilling or OrderStatus.Shipped or OrderStatus.Delivered) return current;
         return OrderStatus.Paid;
@@ -362,8 +362,11 @@ public sealed class OrderAssembler(HaulScoutDbContext db, ICurrentUserContext cu
     private static PaymentStatus ResolvePaymentStatus(IReadOnlyCollection<Sale> sales)
     {
         if (sales.Count == 0) return PaymentStatus.Paid;
-        if (sales.All(sale => sale.Status == SaleStatus.Refunded)) return PaymentStatus.Refunded;
+        if (sales.All(IsFullyRefundedState)) return PaymentStatus.Refunded;
         if (sales.Any(sale => sale.Status == SaleStatus.PartiallyRefunded)) return PaymentStatus.PartiallyRefunded;
         return PaymentStatus.Paid;
     }
+
+    private static bool IsFullyRefundedState(Sale sale) =>
+        sale.Status is SaleStatus.Refunded or SaleStatus.Returned;
 }

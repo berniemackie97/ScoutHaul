@@ -45,11 +45,12 @@ public class OrderChannelUnificationTests
     {
         var currentUser = new StubCurrentUser(org, user);
         var suggestionService = new PlatformOrderSuggestionService(new EfPlatformOrderSuggestionStore(db, currentUser));
+        var orderAssembler = new OrderAssembler(db, currentUser);
         return new PlatformOrdersController(
             db,
             currentUser,
-            new OrderAssembler(db, currentUser),
-            new MarketplaceRefundImportService(db, currentUser, TimeProvider.System),
+            orderAssembler,
+            new MarketplaceRefundImportService(db, currentUser, TimeProvider.System, orderAssembler),
             new PlatformOrderFeeEnrichmentService(db, currentUser),
             new PlatformOrderIngestionService(db, currentUser, suggestionService),
             suggestionService);

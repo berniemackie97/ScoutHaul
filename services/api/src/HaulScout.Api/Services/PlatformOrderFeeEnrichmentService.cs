@@ -17,8 +17,6 @@ namespace HaulScout.Api.Services;
 /// </summary>
 public sealed class PlatformOrderFeeEnrichmentService(HaulScoutDbContext db, ICurrentUserContext currentUser)
 {
-    private static readonly SaleStatus[] ReleasedInventoryStatuses = [SaleStatus.Returned, SaleStatus.Refunded, SaleStatus.Cancelled];
-
     public async Task<IngestPlatformOrdersResultDto> EnrichEbayListingSalesAsync(
         IReadOnlyList<EbayReportParser.EbayListingSalesMetric> metrics,
         CancellationToken cancellationToken)
@@ -127,7 +125,9 @@ public sealed class PlatformOrderFeeEnrichmentService(HaulScoutDbContext db, ICu
         List<Sale> sales = await db.Sales
             .Include(sale => sale.Refunds)
             .Include(sale => sale.InventoryItem)
-            .Where(sale => sale.OrganizationId == currentUser.OrganizationId && sale.OrderId == reconciledOrderId && !ReleasedInventoryStatuses.Contains(sale.Status))
+            .Where(sale => sale.OrganizationId == currentUser.OrganizationId
+                && sale.OrderId == reconciledOrderId
+                && sale.Status != SaleStatus.Cancelled)
             .ToListAsync(cancellationToken);
 
         int correctedSales = 0;
