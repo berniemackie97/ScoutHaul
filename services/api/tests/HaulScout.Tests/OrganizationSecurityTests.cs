@@ -65,7 +65,7 @@ public class OrganizationSecurityTests
 
         // Same composition DI builds in production — the controller owns no persistence of its own.
         return new OrganizationsController(
-            new OrganizationWorkflowService(db, currentUser, access),
+            new OrganizationWorkflowService(new EfOrganizationStore(db), currentUser, access),
             new OrganizationMemberWorkflowService(new EfOrganizationMemberStore(db), new EfOrganizationRoleStore(db), access, new StubInviteSender()),
             new OrganizationInviteCodeWorkflowService(new EfOrganizationInviteCodeStore(db), new EfOrganizationRoleStore(db), currentUser, access, timeProvider),
             new OrganizationRoleWorkflowService(new EfOrganizationRoleStore(db), access),
