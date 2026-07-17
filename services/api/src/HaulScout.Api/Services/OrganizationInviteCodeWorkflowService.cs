@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using HaulScout.Api.Mapping;
 using HaulScout.Application.Common;
 using HaulScout.Application.Contracts;
+using HaulScout.Application.Organizations;
 using HaulScout.Application.Security;
 using HaulScout.Domain.Entities;
 using HaulScout.Infrastructure.Persistence;
@@ -18,7 +19,7 @@ namespace HaulScout.Api.Services;
 public sealed class OrganizationInviteCodeWorkflowService(
     HaulScoutDbContext db,
     ICurrentUserContext currentUser,
-    OrganizationAccessService access,
+    IOrganizationAuthorizer access,
     OrganizationRoleGuard guard,
     TimeProvider timeProvider)
 {
@@ -81,7 +82,7 @@ public sealed class OrganizationInviteCodeWorkflowService(
                 return AppResult<OrganizationInviteCodeCreatedDto>.Validation("Role does not belong to this organization.");
             }
             // A code is a bearer token — owner access must never be obtainable by redeeming one.
-            if (OrganizationRoleGuard.RoleRequiresOwner(role))
+            if (OrganizationRoleRules.RoleRequiresOwner(role))
             {
                 return AppResult<OrganizationInviteCodeCreatedDto>.Validation("Invite codes cannot grant owner-level permissions.");
             }

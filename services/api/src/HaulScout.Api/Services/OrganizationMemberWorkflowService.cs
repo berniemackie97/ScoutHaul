@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using HaulScout.Api.Mapping;
 using HaulScout.Application.Common;
 using HaulScout.Application.Contracts;
+using HaulScout.Application.Organizations;
 using HaulScout.Application.Security;
 using HaulScout.Domain;
 using HaulScout.Domain.Entities;
@@ -15,7 +16,7 @@ namespace HaulScout.Api.Services;
 /// </summary>
 public sealed class OrganizationMemberWorkflowService(
     HaulScoutDbContext db,
-    OrganizationAccessService access,
+    IOrganizationAuthorizer access,
     OrganizationRoleGuard guard,
     SupabaseAdminInviteService inviteService)
 {
@@ -45,7 +46,7 @@ public sealed class OrganizationMemberWorkflowService(
         }
 
         bool ownerRoleRequested = request.Role == OrganizationRole.Owner || requestedRole?.IsOwnerRole == true;
-        if (ownerRoleRequested || OrganizationRoleGuard.RoleRequiresOwner(requestedRole))
+        if (ownerRoleRequested || OrganizationRoleRules.RoleRequiresOwner(requestedRole))
         {
             await access.RequireOwner(id, cancellationToken);
         }
@@ -142,7 +143,7 @@ public sealed class OrganizationMemberWorkflowService(
         }
 
         bool ownerRoleRequested = role?.IsOwnerRole == true || request.LegacyRole == OrganizationRole.Owner;
-        if (ownerRoleRequested || OrganizationRoleGuard.RoleRequiresOwner(role))
+        if (ownerRoleRequested || OrganizationRoleRules.RoleRequiresOwner(role))
         {
             await access.RequireOwner(id, cancellationToken);
         }

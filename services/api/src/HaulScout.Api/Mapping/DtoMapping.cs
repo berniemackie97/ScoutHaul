@@ -1,8 +1,8 @@
+using System.Text.Json;
 using HaulScout.Application.Contracts;
 using HaulScout.Application.Services;
 using HaulScout.Domain;
 using HaulScout.Domain.Entities;
-using System.Text.Json;
 using HaulScout.Domain.Services;
 
 namespace HaulScout.Api.Mapping;
@@ -21,14 +21,6 @@ public static class DtoMapping
         item.RoleDefinition?.Name,
         string.IsNullOrWhiteSpace(item.User?.ExternalSubject) ? "Pending" : "Active",
         item.JoinedAt);
-
-    public static OrganizationRoleDto ToDto(this OrganizationRoleDefinition item) => new(
-        item.Id,
-        item.Name,
-        item.Description,
-        item.IsSystem,
-        item.IsOwnerRole,
-        item.Permissions.Select(permission => permission.Permission).Order().ToArray());
 
     public static OrganizationTeamDto ToDto(this OrganizationTeam item) => new(
         item.Id,
