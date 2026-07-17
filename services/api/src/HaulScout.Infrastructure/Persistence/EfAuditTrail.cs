@@ -11,13 +11,14 @@ namespace HaulScout.Infrastructure.Persistence;
 /// </summary>
 public sealed class EfAuditTrail(HaulScoutDbContext db, ICurrentUserContext currentUser) : IAuditTrail
 {
-    public async Task RecordAsync(string entityName, string action, object details, CancellationToken cancellationToken) =>
+    public async Task RecordAsync(string entityName, Guid? entityId, string action, object details, CancellationToken cancellationToken) =>
         await db.AuditLogs.AddAsync(
             new AuditLog
             {
                 OrganizationId = currentUser.OrganizationId,
                 ActorUserId = currentUser.UserId,
                 EntityName = entityName,
+                EntityId = entityId,
                 Action = action,
                 DetailsJson = JsonSerializer.Serialize(details),
             },

@@ -23,6 +23,7 @@ public static class DependencyInjection
         services.AddScoped<InventoryReferenceDataService>();
         services.AddScoped<InventoryQueryService>();
         services.AddScoped<InventoryBundleWorkflowService>();
+        services.AddScoped<InventoryDeletionWorkflowService>();
         services.AddScoped<InventoryStatusWorkflowService>();
         services.AddScoped<InventoryIssueWorkflowService>();
         services.AddScoped<OrganizationInviteCodeWorkflowService>();

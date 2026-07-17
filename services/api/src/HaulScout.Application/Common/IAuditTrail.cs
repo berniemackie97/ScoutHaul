@@ -10,7 +10,8 @@ namespace HaulScout.Application.Common;
 public interface IAuditTrail
 {
     /// <param name="entityName">The type the action happened to, e.g. nameof(InventoryItem).</param>
+    /// <param name="entityId">Which one, where the action is about a specific row. Null when it is not.</param>
     /// <param name="action">What happened, in past tense, e.g. "BundleCreated".</param>
     /// <param name="details">Anything worth keeping; serialized by the implementation.</param>
-    Task RecordAsync(string entityName, string action, object details, CancellationToken cancellationToken);
+    Task RecordAsync(string entityName, Guid? entityId, string action, object details, CancellationToken cancellationToken);
 }

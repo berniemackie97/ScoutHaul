@@ -43,7 +43,7 @@ public class InventoryBrowseTests
         return new InventoryController(
             referenceData,
             new InventoryBundleWorkflowService(new EfInventoryStore(db), new EfAuditTrail(db, currentUser), currentUser),
-            new InventoryDeletionWorkflowService(db, currentUser),
+            new InventoryDeletionWorkflowService(new EfInventoryStore(db), new EfAuditTrail(db, currentUser), currentUser),
             new InventoryUpsertWorkflowService(db, currentUser, referenceData),
             new InventoryQueryService(new EfInventoryStore(db), currentUser),
             null!,

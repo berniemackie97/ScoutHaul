@@ -101,6 +101,7 @@ public sealed class InventoryBundleWorkflowService(
 
         await audit.RecordAsync(
             nameof(InventoryItem),
+            null,
             "BundleCreated",
             new
             {

@@ -83,6 +83,76 @@ public sealed class EfInventoryStore(HaulScoutDbContext db) : IInventoryStore
     public Task LoadBundleComponentsAsync(InventoryItem bundle, CancellationToken cancellationToken) =>
         db.Entry(bundle).Collection(item => item.BundleComponents).LoadAsync(cancellationToken);
 
+    public Task<InventoryItem?> FindWithBundleComponentsAsync(Guid organizationId, Guid id, CancellationToken cancellationToken) =>
+        db.InventoryItems
+            .Include(item => item.BundleComponents)
+                .ThenInclude(component => component.ComponentInventoryItem)
+            .SingleOrDefaultAsync(item => item.Id == id && item.OrganizationId == organizationId, cancellationToken);
+
+    public async Task<InventoryReferences> InspectReferencesAsync(
+        Guid organizationId,
+        Guid id,
+        CancellationToken cancellationToken) =>
+        new(
+            HasActiveSale: await db.Sales.AnyAsync(
+                sale => sale.InventoryItemId == id
+                    && sale.OrganizationId == organizationId
+                    && !SaleWorkflow.InventoryReleaseStatuses.Contains(sale.Status),
+                cancellationToken),
+            HasSaleHistory: await db.Sales.AnyAsync(
+                sale => sale.InventoryItemId == id && sale.OrganizationId == organizationId,
+                cancellationToken),
+            IsBundleComponent: await db.InventoryBundleComponents.AnyAsync(
+                component => component.ComponentInventoryItemId == id && component.OrganizationId == organizationId,
+                cancellationToken),
+            HasLiveChannelListing: await db.ChannelListings.AnyAsync(
+                listing => listing.InventoryItemId == id
+                    && listing.OrganizationId == organizationId
+                    && (listing.Status == ChannelListingStatus.Active || listing.Status == ChannelListingStatus.PendingDelist),
+                cancellationToken),
+            HasActiveMarketplaceListing: await db.Listings.AnyAsync(
+                listing => listing.InventoryItemId == id
+                    && listing.OrganizationId == organizationId
+                    && listing.Status == ListingStatus.Active,
+                cancellationToken),
+            HasActiveStorefrontListing: await db.StoreListings.AnyAsync(
+                listing => listing.InventoryItemId == id
+                    && listing.OrganizationId == organizationId
+                    && (listing.Status == StoreListingStatus.Active || listing.Status == StoreListingStatus.Reserved),
+                cancellationToken),
+            HasOrderHistory: await db.OrderLines.AnyAsync(
+                line => line.InventoryItemId == id && line.OrganizationId == organizationId,
+                cancellationToken));
+
+    /// <summary>
+    /// Channel listings and expenses exist only for this item, so they go with it. Market observations are research
+    /// that stands on its own — they are detached rather than destroyed, so the pricing history survives the item.
+    /// </summary>
+    public async Task RemoveWithDependentsAsync(InventoryItem item, CancellationToken cancellationToken)
+    {
+        Guid organizationId = item.OrganizationId;
+
+        List<ChannelListing> channelListings = await db.ChannelListings
+            .Where(listing => listing.InventoryItemId == item.Id && listing.OrganizationId == organizationId)
+            .ToListAsync(cancellationToken);
+        db.ChannelListings.RemoveRange(channelListings);
+
+        List<Expense> expenses = await db.Expenses
+            .Where(expense => expense.InventoryItemId == item.Id && expense.OrganizationId == organizationId)
+            .ToListAsync(cancellationToken);
+        db.Expenses.RemoveRange(expenses);
+
+        List<MarketObservation> observations = await db.MarketObservations
+            .Where(observation => observation.InventoryItemId == item.Id && observation.OrganizationId == organizationId)
+            .ToListAsync(cancellationToken);
+        foreach (MarketObservation observation in observations)
+        {
+            observation.InventoryItemId = null;
+        }
+
+        db.InventoryItems.Remove(item);
+    }
+
     public Task SaveChangesAsync(CancellationToken cancellationToken) => db.SaveChangesAsync(cancellationToken);
 
     private IQueryable<InventoryItem> Filtered(Guid organizationId, InventoryFilter filter)

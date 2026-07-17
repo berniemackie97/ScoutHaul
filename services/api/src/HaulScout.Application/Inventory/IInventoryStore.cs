@@ -61,5 +61,18 @@ public interface IInventoryStore
     /// <summary>Loads a bundle's components after it has been written, so the caller can return the whole thing.</summary>
     Task LoadBundleComponentsAsync(InventoryItem bundle, CancellationToken cancellationToken);
 
+    /// <summary>The item with its bundle components and their items — what removal needs in order to release them.</summary>
+    Task<InventoryItem?> FindWithBundleComponentsAsync(Guid organizationId, Guid id, CancellationToken cancellationToken);
+
+    /// <summary>Everything still pointing at this item, gathered in one call. See <see cref="InventoryReferences"/>.</summary>
+    Task<InventoryReferences> InspectReferencesAsync(Guid organizationId, Guid id, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Destroys the item along with the rows that only exist because of it, and detaches the ones that outlive it.
+    /// Which dependents are owned and which are merely linked is a persistence fact, so the decision lives with the
+    /// implementation rather than being restated by the use case.
+    /// </summary>
+    Task RemoveWithDependentsAsync(InventoryItem item, CancellationToken cancellationToken);
+
     Task SaveChangesAsync(CancellationToken cancellationToken);
 }
