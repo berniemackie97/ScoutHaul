@@ -300,7 +300,7 @@ public static partial class EbayListingQualityWorkbookParser
             }
         }
 
-        return new SheetMetadata(categoryName, condition, priceRange, ParseReportDate(reportLine) ?? fallbackReportDate);
+        return new SheetMetadata(categoryName, condition, priceRange, ParseReportDate(reportLine) ?? fallbackReportDate.ToUniversalTime());
     }
 
     private static DateTimeOffset? ParseReportDate(string? value)
@@ -321,7 +321,7 @@ public static partial class EbayListingQualityWorkbookParser
         int year = int.Parse(match.Groups["year"].Value, CultureInfo.InvariantCulture);
         int hour = int.Parse(match.Groups["hour"].Value, CultureInfo.InvariantCulture);
         int minute = int.Parse(match.Groups["minute"].Value, CultureInfo.InvariantCulture);
-        return new DateTimeOffset(year, month, day, hour, minute, 0, TimeSpan.FromHours(-8));
+        return new DateTimeOffset(year, month, day, hour, minute, 0, TimeSpan.FromHours(-8)).ToUniversalTime();
     }
 
     private static bool HasValue(WorksheetRow row, string value) =>
