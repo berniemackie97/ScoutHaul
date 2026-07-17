@@ -183,6 +183,33 @@ public class StorePublishingTests
         Assert.Equal(StoreListingStatus.Sold, (await db.StoreListings.SingleAsync(l => l.InventoryItemId == item.Id)).Status);
     }
 
+    /// <summary>
+    /// The empty-shop regression: rows that predate the synchronizer have no listings, and a deploy must not
+    /// depend on someone remembering a manual reconcile call. The startup sweep builds the shelf on boot.
+    /// </summary>
+    [Fact]
+    public async Task The_startup_sweep_builds_the_shelf_for_items_that_predate_the_synchronizer()
+    {
+        (HaulScoutDbContext db, StoreController _, Guid org) = NewContext(nameof(The_startup_sweep_builds_the_shelf_for_items_that_predate_the_synchronizer));
+        await using HaulScoutDbContext dbLifetime = db;
+        InventoryItem item = ShopReadyItem();
+        item.Status = InventoryStatus.Listed;
+        db.InventoryItems.Add(item);
+        await db.SaveChangesAsync();
+
+        // Simulate the pre-synchronizer world: the listing does not exist (out-of-band delete leaves the item
+        // untouched, so the change-driven sync has nothing to notice — exactly like rows created before it shipped).
+        db.StoreListings.RemoveRange(await db.StoreListings.ToListAsync());
+        await db.SaveChangesAsync();
+        Assert.False(await db.StoreListings.AnyAsync());
+
+        await StoreShelfBootstrap.ReconcileAllAsync(
+            db, TimeProvider.System, Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance);
+
+        StoreListing rebuilt = await db.StoreListings.SingleAsync(l => l.InventoryItemId == item.Id);
+        Assert.Equal(StoreListingStatus.Active, rebuilt.Status);
+    }
+
     /// <summary>The sweep rebuilds what drifted: rows the synchronizer never saw (it only sees changes).</summary>
     [Fact]
     public async Task The_reconcile_sweep_rebuilds_missing_listings_for_listed_items()
