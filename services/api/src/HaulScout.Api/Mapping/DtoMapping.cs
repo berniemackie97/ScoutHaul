@@ -11,17 +11,6 @@ public static class DtoMapping
 {
     public static OrganizationDto ToDto(this Organization item) => new(item.Id, item.Name, item.CreatedAt);
 
-    public static OrganizationMemberDto ToDto(this OrganizationMember item) => new(
-        item.Id,
-        item.UserId,
-        item.User?.Email ?? string.Empty,
-        item.User?.DisplayName ?? string.Empty,
-        item.Role,
-        item.RoleId,
-        item.RoleDefinition?.Name,
-        string.IsNullOrWhiteSpace(item.User?.ExternalSubject) ? "Pending" : "Active",
-        item.JoinedAt);
-
     public static OrganizationInviteCodeDto ToDto(this OrganizationInviteCode item) => new(
         item.Id,
         item.OrganizationId,

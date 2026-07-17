@@ -1,13 +1,15 @@
 using System.Net.Http.Json;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+using HaulScout.Application.Organizations;
 
-namespace HaulScout.Api.Services;
+namespace HaulScout.Infrastructure.Organizations;
 
-public sealed class SupabaseAdminInviteService(HttpClient httpClient, IConfiguration configuration, ILogger<SupabaseAdminInviteService> logger)
+public sealed class SupabaseOrganizationInviteSender(
+    HttpClient httpClient,
+    IConfiguration configuration,
+    ILogger<SupabaseOrganizationInviteSender> logger) : IOrganizationInviteSender
 {
-    public bool IsConfigured => !string.IsNullOrWhiteSpace(configuration["Authentication:Supabase:Url"])
-        && !string.IsNullOrWhiteSpace(configuration["Authentication:Supabase:ServiceRoleKey"]);
-
     public async Task<bool> SendInviteAsync(
         string email,
         string displayName,

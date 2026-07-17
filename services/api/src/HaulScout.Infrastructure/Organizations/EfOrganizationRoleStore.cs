@@ -20,6 +20,13 @@ public sealed class EfOrganizationRoleStore(HaulScoutDbContext db) : IOrganizati
             .Include(item => item.Permissions)
             .SingleOrDefaultAsync(item => item.Id == roleId && item.OrganizationId == organizationId, cancellationToken);
 
+    public Task<OrganizationRoleDefinition?> FindOwnerRoleAsync(Guid organizationId, CancellationToken cancellationToken) =>
+        db.OrganizationRoles
+            .Include(role => role.Permissions)
+            .Where(role => role.OrganizationId == organizationId && role.IsOwnerRole)
+            .OrderBy(role => role.CreatedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+
     public async Task AddAsync(OrganizationRoleDefinition role, CancellationToken cancellationToken) =>
         await db.OrganizationRoles.AddAsync(role, cancellationToken);
 

@@ -64,7 +64,6 @@ builder.Services
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<OrganizationRoleGuard>();
 builder.Services.AddScoped<OrganizationWorkflowService>();
-builder.Services.AddScoped<OrganizationMemberWorkflowService>();
 builder.Services.AddScoped<OrganizationInviteCodeWorkflowService>();
 builder.Services.AddScoped<StoreSettingsWorkflowService>();
 builder.Services.AddScoped<SourcingTripQueryService>();
@@ -98,7 +97,6 @@ builder.Services.AddScoped<InventoryQueryService>();
 builder.Services.AddScoped<InventoryPhotoWorkflowService>();
 builder.Services.AddScoped<InventoryIssueWorkflowService>();
 builder.Services.AddScoped<InventoryStatusWorkflowService>();
-builder.Services.AddHttpClient<SupabaseAdminInviteService>();
 builder.Services.AddAuthorization(options =>
 {
     options.FallbackPolicy = new AuthorizationPolicyBuilder()
