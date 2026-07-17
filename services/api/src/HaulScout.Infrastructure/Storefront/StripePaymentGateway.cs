@@ -10,8 +10,12 @@ public sealed class StripeOptions
 {
     public const string SectionName = "Stripe";
 
-    /// <summary>Restricted key preferred (rk_…, Checkout Sessions + Refunds write); a secret key also works.</summary>
-    public string SecretKey { get; set; } = string.Empty;
+    /// <summary>
+    /// The server-side key: a restricted key (rk_…, needs Checkout Sessions + Refunds + PaymentIntents read) or a
+    /// secret key (sk_…). Named ApiKey to match the other providers' config (Gemini__ApiKey, GoogleCloudVision__ApiKey).
+    /// Never the publishable key — hosted Checkout does not use one.
+    /// </summary>
+    public string ApiKey { get; set; } = string.Empty;
 
     /// <summary>The webhook endpoint's signing secret (whsec_…). Required before webhooks are trusted.</summary>
     public string WebhookSecret { get; set; } = string.Empty;
@@ -22,19 +26,24 @@ public sealed class StripeOptions
 /// appear. Hosted Checkout Sessions; dynamic payment methods (no payment_method_types, per Stripe guidance);
 /// signature-verified webhooks reduced to neutral <see cref="PaymentEvent"/>s.
 /// </summary>
-public sealed class StripePaymentGateway : IPaymentGateway
+public sealed class StripePaymentGateway(IOptions<StripeOptions> options) : IPaymentGateway
 {
     /// <summary>Tags sessions in the Stripe dashboard so this flow's conversion can be told apart from any other.</summary>
     private const string IntegrationIdentifier = "scouthaul-storefront-kqzmwrvt";
 
-    private readonly StripeClient _client;
-    private readonly StripeOptions _options;
+    private readonly StripeOptions _options = options.Value;
+    private StripeClient? _client;
 
-    public StripePaymentGateway(IOptions<StripeOptions> options)
-    {
-        _options = options.Value;
-        _client = new StripeClient(_options.SecretKey);
-    }
+    /// <summary>
+    /// Built on first use, not at construction. Stripe's client throws on an empty key, and this type is resolved by
+    /// the DI container the moment ANY storefront commerce endpoint is touched — so constructing it eagerly turned a
+    /// missing setting into an opaque 500 from the container, before a single line of our code ran. Now a missing key
+    /// fails where it is used, saying which setting is absent.
+    /// </summary>
+    private StripeClient Client => _client ??= string.IsNullOrWhiteSpace(_options.ApiKey)
+        ? throw new PaymentGatewayNotConfiguredException(
+            $"Stripe is not configured: set {StripeOptions.SectionName}__ApiKey (a sk_/rk_ server key) in the environment.")
+        : new StripeClient(_options.ApiKey);
 
     public async Task<HostedCheckout> CreateCheckoutAsync(HostedCheckoutRequest request, CancellationToken cancellationToken)
     {
@@ -120,7 +129,7 @@ public sealed class StripePaymentGateway : IPaymentGateway
         };
         options.AddExtraParam("integration_identifier", IntegrationIdentifier);
 
-        Session session = await new SessionService(_client).CreateAsync(options, cancellationToken: cancellationToken);
+        Session session = await new SessionService(Client).CreateAsync(options, cancellationToken: cancellationToken);
         return new HostedCheckout(session.Id, session.Url);
     }
 
@@ -128,7 +137,7 @@ public sealed class StripePaymentGateway : IPaymentGateway
     {
         try
         {
-            Session session = await new SessionService(_client).GetAsync(sessionId, cancellationToken: cancellationToken);
+            Session session = await new SessionService(Client).GetAsync(sessionId, cancellationToken: cancellationToken);
             return session.Status == "open" ? session.Url : null;
         }
         catch (StripeException)
@@ -139,7 +148,7 @@ public sealed class StripePaymentGateway : IPaymentGateway
 
     public async Task<PaymentCapture> GetCaptureAsync(string paymentIntentId, CancellationToken cancellationToken)
     {
-        PaymentIntent intent = await new PaymentIntentService(_client).GetAsync(
+        PaymentIntent intent = await new PaymentIntentService(Client).GetAsync(
             paymentIntentId,
             new PaymentIntentGetOptions { Expand = ["latest_charge.balance_transaction"] },
             cancellationToken: cancellationToken);
@@ -151,7 +160,7 @@ public sealed class StripePaymentGateway : IPaymentGateway
     }
 
     public async Task RefundAsync(string paymentIntentId, string reason, CancellationToken cancellationToken) =>
-        await new RefundService(_client).CreateAsync(
+        await new RefundService(Client).CreateAsync(
             new RefundCreateOptions
             {
                 PaymentIntent = paymentIntentId,
@@ -161,13 +170,23 @@ public sealed class StripePaymentGateway : IPaymentGateway
 
     public async Task<PaymentEvent> ParseEventAsync(string payload, string signatureHeader, CancellationToken cancellationToken)
     {
+        // No secret means we CANNOT verify, which is not the same as failing verification. Failing would drop the
+        // event; this is a misconfiguration, so it must be loud and retryable — Stripe redelivers, and the event
+        // lands once the secret is set.
+        if (string.IsNullOrWhiteSpace(_options.WebhookSecret))
+        {
+            throw new PaymentGatewayNotConfiguredException(
+                $"Cannot verify Stripe webhooks: set {StripeOptions.SectionName}__WebhookSecret (whsec_…) from the endpoint's signing secret.");
+        }
+
         Event stripeEvent;
         try
         {
             stripeEvent = EventUtility.ConstructEvent(payload, signatureHeader, _options.WebhookSecret);
         }
-        catch (StripeException exception)
+        catch (Exception exception) when (exception is StripeException or ArgumentException or FormatException)
         {
+            // A malformed or absent signature header is a rejected request, never a server fault.
             throw new PaymentEventVerificationException("Webhook signature verification failed.", exception);
         }
 
@@ -192,7 +211,7 @@ public sealed class StripePaymentGateway : IPaymentGateway
         if (session.ShippingCost?.ShippingRateId is string rateId)
         {
             // The chosen rate arrives as an id; its metadata says whether it was the pickup option.
-            ShippingRate rate = await new ShippingRateService(_client).GetAsync(rateId, cancellationToken: cancellationToken);
+            ShippingRate rate = await new ShippingRateService(Client).GetAsync(rateId, cancellationToken: cancellationToken);
             localPickup = rate.Metadata.TryGetValue("local_pickup", out string? flag) && flag == "true";
         }
 
