@@ -62,13 +62,12 @@ public class OrganizationSecurityTests
         TimeProvider timeProvider = clock ?? TimeProvider.System;
         StubCurrentUser currentUser = new(org, user);
         IOrganizationAuthorizer access = new EfOrganizationAuthorizer(db, currentUser);
-        OrganizationRoleGuard guard = new(db);
 
         // Same composition DI builds in production — the controller owns no persistence of its own.
         return new OrganizationsController(
             new OrganizationWorkflowService(db, currentUser, access),
             new OrganizationMemberWorkflowService(new EfOrganizationMemberStore(db), new EfOrganizationRoleStore(db), access, new StubInviteSender()),
-            new OrganizationInviteCodeWorkflowService(db, currentUser, access, guard, timeProvider),
+            new OrganizationInviteCodeWorkflowService(new EfOrganizationInviteCodeStore(db), new EfOrganizationRoleStore(db), currentUser, access, timeProvider),
             new OrganizationRoleWorkflowService(new EfOrganizationRoleStore(db), access),
             new OrganizationTeamWorkflowService(new EfOrganizationTeamStore(db), new EfOrganizationRoleStore(db), access));
     }

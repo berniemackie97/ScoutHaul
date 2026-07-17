@@ -10,6 +10,8 @@ public interface IOrganizationRoleStore
 
     Task<OrganizationRoleDefinition?> FindOwnerRoleAsync(Guid organizationId, CancellationToken cancellationToken);
 
+    Task<OrganizationRoleDefinition?> FindDefaultInviteRoleAsync(Guid organizationId, CancellationToken cancellationToken);
+
     Task AddAsync(OrganizationRoleDefinition role, CancellationToken cancellationToken);
 
     void Remove(OrganizationRoleDefinition role);

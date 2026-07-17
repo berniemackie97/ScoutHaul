@@ -11,21 +11,6 @@ public static class DtoMapping
 {
     public static OrganizationDto ToDto(this Organization item) => new(item.Id, item.Name, item.CreatedAt);
 
-    public static OrganizationInviteCodeDto ToDto(this OrganizationInviteCode item) => new(
-        item.Id,
-        item.OrganizationId,
-        item.TeamId,
-        item.Team?.Name,
-        item.RoleId,
-        item.RoleDefinition?.Name,
-        item.Name,
-        item.CodePrefix,
-        item.IsActive,
-        item.ExpiresAt,
-        item.MaxUses,
-        item.UseCount,
-        item.CreatedAt);
-
     public static ProductIdentityDto ToDto(this ProductIdentity item) => new(
         item.Id,
         item.Title,

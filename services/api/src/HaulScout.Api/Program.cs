@@ -62,9 +62,7 @@ builder.Services
 // Time is a dependency: services that make time-based decisions take TimeProvider so those rules can be
 // tested at the boundary instead of against the wall clock.
 builder.Services.AddSingleton(TimeProvider.System);
-builder.Services.AddScoped<OrganizationRoleGuard>();
 builder.Services.AddScoped<OrganizationWorkflowService>();
-builder.Services.AddScoped<OrganizationInviteCodeWorkflowService>();
 builder.Services.AddScoped<StoreSettingsWorkflowService>();
 builder.Services.AddScoped<SourcingTripQueryService>();
 builder.Services.AddScoped<SourcingTripWorkflowService>();
