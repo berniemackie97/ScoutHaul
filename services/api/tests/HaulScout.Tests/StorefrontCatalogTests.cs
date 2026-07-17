@@ -2,11 +2,14 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using HaulScout.Api.Controllers;
+using HaulScout.Api.Services;
 using HaulScout.Application.Common;
 using HaulScout.Application.Contracts;
+using HaulScout.Application.Storefront;
 using HaulScout.Domain;
 using HaulScout.Domain.Entities;
 using HaulScout.Infrastructure.Persistence;
+using HaulScout.Infrastructure.Storefront;
 
 namespace HaulScout.Tests;
 
@@ -14,7 +17,9 @@ public class StorefrontCatalogTests
 {
     private static StorefrontController NewController(HaulScoutDbContext db, ITenantContext tenant, Guid? storeHeader)
     {
-        StorefrontController controller = new(db, tenant);
+        StorefrontController controller = new(
+            new StorefrontStoreResolver(new EfStoreDirectory(db), tenant),
+            new StorefrontCatalogService(new EfStorefrontCatalogStore(db)));
         DefaultHttpContext httpContext = new();
         if (storeHeader is Guid id)
         {
@@ -26,11 +31,11 @@ public class StorefrontCatalogTests
     }
 
     [Fact]
-    public async Task Browse_returns_only_sellable_inventory_for_the_resolved_store()
+    public async Task Browse_returns_only_shoppable_listings_for_the_resolved_store()
     {
         Guid org = Guid.NewGuid();
         DbContextOptions<HaulScoutDbContext> options = new DbContextOptionsBuilder<HaulScoutDbContext>()
-            .UseInMemoryDatabase(nameof(Browse_returns_only_sellable_inventory_for_the_resolved_store))
+            .UseInMemoryDatabase(nameof(Browse_returns_only_shoppable_listings_for_the_resolved_store))
             .Options;
 
         TenantContext seedTenant = new();
@@ -39,9 +44,9 @@ public class StorefrontCatalogTests
         {
             seed.Organizations.Add(new Organization { Id = org, Name = "Overhaul Trading" });
             // Sellable: listed + priced.
-            seed.InventoryItems.Add(new InventoryItem { Title = "Listed item", Status = InventoryStatus.Listed, Quantity = 1, EstimatedSalePrice = 25m });
+            seed.InventoryItems.Add(new InventoryItem { Title = "Listed item", Status = InventoryStatus.Listed, Quantity = 1, EstimatedSalePrice = 25m, Photos = { new InventoryPhoto { ContentType = "image/jpeg", OriginalBytes = [1], ThumbnailBytes = [1] } } });
             // Sellable: listed + priced even at Quantity 0 (operators use 0 for single, untracked items).
-            seed.InventoryItems.Add(new InventoryItem { Title = "Listed single", Status = InventoryStatus.Listed, Quantity = 0, EstimatedSalePrice = 30m });
+            seed.InventoryItems.Add(new InventoryItem { Title = "Listed single", Status = InventoryStatus.Listed, Quantity = 0, EstimatedSalePrice = 30m, Photos = { new InventoryPhoto { ContentType = "image/jpeg", OriginalBytes = [1], ThumbnailBytes = [1] } } });
             // Not sellable: still a draft.
             seed.InventoryItems.Add(new InventoryItem { Title = "Draft item", Status = InventoryStatus.Draft, Quantity = 1, EstimatedSalePrice = 20m });
             // Not sellable: listed but unpriced.
@@ -94,6 +99,7 @@ public class StorefrontCatalogTests
                 SerialNumber = "PRIVATE-SERIAL",
                 Weight = 3.2m,
                 WeightUnit = WeightUnit.Pounds,
+                Photos = { new InventoryPhoto { ContentType = "image/jpeg", OriginalBytes = [1], ThumbnailBytes = [1] } },
             });
             await seed.SaveChangesAsync();
         }

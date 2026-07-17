@@ -5,12 +5,19 @@ using HaulScout.Api.Services;
 using HaulScout.Application.Common;
 using HaulScout.Application.Contracts;
 using HaulScout.Application.Security;
+using HaulScout.Application.Storefront;
 using HaulScout.Domain;
 using HaulScout.Domain.Entities;
 using HaulScout.Infrastructure.Persistence;
+using HaulScout.Infrastructure.Storefront;
 
 namespace HaulScout.Tests;
 
+/// <summary>
+/// The shelf model: Listed IS the storefront switch. These exercise the real SaveChanges synchronizer (publishing
+/// creates the listing, unlisting retires it, photos gate activation) plus the manual-publish gate — the contract
+/// the admin and mobile app both rely on.
+/// </summary>
 public class StorePublishingTests
 {
     private sealed class StubCurrentUser(Guid organizationId) : ICurrentUserContext
@@ -21,7 +28,7 @@ public class StorePublishingTests
         public Task ResolveAsync() => Task.CompletedTask;
     }
 
-    private static (HaulScoutDbContext Db, Guid Org) NewContext(string store)
+    private static (HaulScoutDbContext Db, StoreController Controller, Guid Org) NewContext(string store)
     {
         Guid org = Guid.NewGuid();
         DbContextOptions<HaulScoutDbContext> options = new DbContextOptionsBuilder<HaulScoutDbContext>()
@@ -29,37 +36,44 @@ public class StorePublishingTests
             .Options;
         TenantContext tenant = new();
         tenant.SetOrganization(org);
-        return (new HaulScoutDbContext(options, tenant), org);
+        HaulScoutDbContext db = new(options, tenant);
+        StubCurrentUser user = new(org);
+        StorePublishingWorkflowService publishing = new(new EfStoreListingStore(db, TimeProvider.System), user, TimeProvider.System);
+        return (db, new StoreController(publishing), org);
     }
 
-    [Fact]
-    public async Task Publishing_an_inventory_item_creates_a_listing_and_advances_the_item()
+    private static InventoryItem ShopReadyItem(string title = "Vintage Brass Lamp") => new()
     {
-        (HaulScoutDbContext db, Guid org) = NewContext(nameof(Publishing_an_inventory_item_creates_a_listing_and_advances_the_item));
-        await using HaulScoutDbContext _ = db;
+        Title = title,
+        EstimatedSalePrice = 49.99m,
+        Status = InventoryStatus.ReadyToList,
+        Photos = { NewPhoto() },
+    };
 
-        InventoryItem item = new() { Title = "Vintage Brass Lamp" };
+    private static InventoryPhoto NewPhoto() => new()
+    {
+        ContentType = "image/jpeg",
+        OriginalBytes = [1],
+        ThumbnailBytes = [1],
+    };
+
+    private static PublishListingRequest Publish(Guid itemId, decimal price = 49.99m) =>
+        new(itemId, price, null, null, null, null, null, false, null, null);
+
+    [Fact]
+    public async Task Publishing_marks_the_item_listed_and_the_synchronizer_creates_the_active_listing()
+    {
+        (HaulScoutDbContext db, StoreController controller, _) = NewContext(nameof(Publishing_marks_the_item_listed_and_the_synchronizer_creates_the_active_listing));
+        await using HaulScoutDbContext dbLifetime = db;
+        InventoryItem item = ShopReadyItem();
         db.InventoryItems.Add(item);
         await db.SaveChangesAsync();
 
-        StoreController controller = new(db, new StubCurrentUser(org));
-        PublishListingRequest request = new(
-            InventoryItemId: item.Id,
-            ListPrice: 49.99m,
-            StoreCategoryId: null,
-            Title: null,
-            Subtitle: null,
-            Description: null,
-            CompareAtPrice: null,
-            IsFeatured: false,
-            MetaTitle: null,
-            MetaDescription: null);
-
-        ActionResult<StoreListingDto> result = await controller.Publish(request, CancellationToken.None);
+        ActionResult<StoreListingDto> result = await controller.Publish(Publish(item.Id), CancellationToken.None);
 
         CreatedAtActionResult created = Assert.IsType<CreatedAtActionResult>(result.Result);
         StoreListingDto dto = Assert.IsType<StoreListingDto>(created.Value);
-        Assert.Equal("vintage-brass-lamp", dto.Slug);
+        Assert.StartsWith("vintage-brass-lamp-", dto.Slug);   // id-suffixed: unique by construction
         Assert.Equal(49.99m, dto.ListPrice);
         Assert.Equal(StoreListingStatus.Active, dto.Status);
         Assert.Equal(item.Id, dto.InventoryItemId);
@@ -69,46 +83,128 @@ public class StorePublishingTests
         Assert.NotNull(reloaded.ListedAt);
     }
 
+    /// <summary>The listing gate: an operator cannot hand-publish what a shopper couldn't buy.</summary>
     [Fact]
-    public async Task Publishing_the_same_item_twice_is_rejected()
+    public async Task Publishing_an_item_without_photos_is_refused_and_says_why()
     {
-        (HaulScoutDbContext db, Guid org) = NewContext(nameof(Publishing_the_same_item_twice_is_rejected));
-        await using HaulScoutDbContext _ = db;
-
-        InventoryItem item = new() { Title = "Record Player" };
+        (HaulScoutDbContext db, StoreController controller, _) = NewContext(nameof(Publishing_an_item_without_photos_is_refused_and_says_why));
+        await using HaulScoutDbContext dbLifetime = db;
+        InventoryItem item = new() { Title = "Record Player", EstimatedSalePrice = 120m };
         db.InventoryItems.Add(item);
         await db.SaveChangesAsync();
 
-        StoreController controller = new(db, new StubCurrentUser(org));
-        PublishListingRequest Request() => new(item.Id, 120m, null, null, null, null, null, false, null, null);
+        ActionResult<StoreListingDto> result = await controller.Publish(Publish(item.Id, 120m), CancellationToken.None);
 
-        ActionResult<StoreListingDto> first = await controller.Publish(Request(), CancellationToken.None);
-        Assert.IsType<CreatedAtActionResult>(first.Result);
+        BadRequestObjectResult refused = Assert.IsType<BadRequestObjectResult>(result.Result);
+        Assert.Contains("photo", refused.Value!.ToString(), StringComparison.OrdinalIgnoreCase);
+        Assert.False(await db.StoreListings.AnyAsync(l => l.InventoryItemId == item.Id));
+    }
 
-        ActionResult<StoreListingDto> second = await controller.Publish(Request(), CancellationToken.None);
-        Assert.IsType<ConflictObjectResult>(second.Result);
+    /// <summary>Republishing is idempotent — one item, one listing, forever.</summary>
+    [Fact]
+    public async Task Publishing_twice_updates_the_one_listing_instead_of_creating_a_second()
+    {
+        (HaulScoutDbContext db, StoreController controller, _) = NewContext(nameof(Publishing_twice_updates_the_one_listing_instead_of_creating_a_second));
+        await using HaulScoutDbContext dbLifetime = db;
+        InventoryItem item = ShopReadyItem("Record Player");
+        db.InventoryItems.Add(item);
+        await db.SaveChangesAsync();
+
+        Assert.IsType<CreatedAtActionResult>((await controller.Publish(Publish(item.Id, 120m), CancellationToken.None)).Result);
+        Assert.IsType<CreatedAtActionResult>((await controller.Publish(Publish(item.Id, 135m), CancellationToken.None)).Result);
+
+        StoreListing listing = Assert.Single(await db.StoreListings.Where(l => l.InventoryItemId == item.Id).ToListAsync());
+        Assert.Equal(135m, listing.ListPrice);   // the second publish edited, not duplicated
     }
 
     [Fact]
-    public async Task Listing_slugs_are_unique_within_the_store()
+    public async Task Unpublishing_returns_the_item_to_ready_and_retires_the_listing()
     {
-        (HaulScoutDbContext db, Guid org) = NewContext(nameof(Listing_slugs_are_unique_within_the_store));
-        await using HaulScoutDbContext _ = db;
+        (HaulScoutDbContext db, StoreController controller, _) = NewContext(nameof(Unpublishing_returns_the_item_to_ready_and_retires_the_listing));
+        await using HaulScoutDbContext dbLifetime = db;
+        InventoryItem item = ShopReadyItem();
+        db.InventoryItems.Add(item);
+        await db.SaveChangesAsync();
+        await controller.Publish(Publish(item.Id), CancellationToken.None);
+        StoreListing listing = await db.StoreListings.SingleAsync(l => l.InventoryItemId == item.Id);
 
-        InventoryItem itemA = new() { Title = "Oak Chair" };
-        InventoryItem itemB = new() { Title = "Oak Chair" };
-        db.InventoryItems.AddRange(itemA, itemB);
+        ActionResult<StoreListingDto> result = await controller.Unpublish(listing.Id, CancellationToken.None);
+
+        StoreListingDto dto = Assert.IsType<StoreListingDto>(result.Value);
+        Assert.Equal(StoreListingStatus.Draft, dto.Status);
+        Assert.Equal(InventoryStatus.ReadyToList, (await db.InventoryItems.FirstAsync(i => i.Id == item.Id)).Status);
+    }
+
+    /// <summary>
+    /// The import path: an item arrives already Listed (a marketplace CSV said so) with no photos. It must NOT be
+    /// blocked — but it must land as Draft, invisible to shoppers, and activate itself when its first photo lands.
+    /// </summary>
+    [Fact]
+    public async Task An_imported_listed_item_without_photos_waits_as_draft_and_activates_on_first_photo()
+    {
+        (HaulScoutDbContext db, StoreController _, Guid org) = NewContext(nameof(An_imported_listed_item_without_photos_waits_as_draft_and_activates_on_first_photo));
+        await using HaulScoutDbContext dbLifetime = db;
+
+        // What the eBay import produces: Listed, priced, titled, imageless.
+        InventoryItem item = new() { Title = "eBay Import", EstimatedSalePrice = 60m, Status = InventoryStatus.Listed };
+        db.InventoryItems.Add(item);
         await db.SaveChangesAsync();
 
-        StoreController controller = new(db, new StubCurrentUser(org));
+        StoreListing listing = await db.StoreListings.SingleAsync(l => l.InventoryItemId == item.Id);
+        Assert.Equal(StoreListingStatus.Draft, listing.Status);   // exists for the operator, invisible to shoppers
 
-        ActionResult<StoreListingDto> a = await controller.Publish(new PublishListingRequest(itemA.Id, 30m, null, null, null, null, null, false, null, null), CancellationToken.None);
-        ActionResult<StoreListingDto> b = await controller.Publish(new PublishListingRequest(itemB.Id, 30m, null, null, null, null, null, false, null, null), CancellationToken.None);
+        db.InventoryPhotos.Add(new InventoryPhoto
+        {
+            OrganizationId = org,
+            InventoryItemId = item.Id,
+            ContentType = "image/jpeg",
+            OriginalBytes = [1],
+            ThumbnailBytes = [1],
+        });
+        await db.SaveChangesAsync();
 
-        string slugA = ((StoreListingDto)((CreatedAtActionResult)a.Result!).Value!).Slug;
-        string slugB = ((StoreListingDto)((CreatedAtActionResult)b.Result!).Value!).Slug;
+        Assert.Equal(StoreListingStatus.Active, (await db.StoreListings.SingleAsync(l => l.InventoryItemId == item.Id)).Status);
+        Assert.NotNull((await db.StoreListings.SingleAsync(l => l.InventoryItemId == item.Id)).PublishedAt);
+    }
 
-        Assert.Equal("oak-chair", slugA);
-        Assert.Equal("oak-chair-2", slugB);
+    [Fact]
+    public async Task Selling_the_item_on_any_channel_marks_its_listing_sold()
+    {
+        (HaulScoutDbContext db, StoreController controller, _) = NewContext(nameof(Selling_the_item_on_any_channel_marks_its_listing_sold));
+        await using HaulScoutDbContext dbLifetime = db;
+        InventoryItem item = ShopReadyItem();
+        db.InventoryItems.Add(item);
+        await db.SaveChangesAsync();
+        await controller.Publish(Publish(item.Id), CancellationToken.None);
+
+        item.Status = InventoryStatus.Sold;   // an eBay sale, a manual sale — any path that writes the item
+        await db.SaveChangesAsync();
+
+        Assert.Equal(StoreListingStatus.Sold, (await db.StoreListings.SingleAsync(l => l.InventoryItemId == item.Id)).Status);
+    }
+
+    /// <summary>The sweep rebuilds what drifted: rows the synchronizer never saw (it only sees changes).</summary>
+    [Fact]
+    public async Task The_reconcile_sweep_rebuilds_missing_listings_for_listed_items()
+    {
+        (HaulScoutDbContext db, StoreController controller, _) = NewContext(nameof(The_reconcile_sweep_rebuilds_missing_listings_for_listed_items));
+        await using HaulScoutDbContext dbLifetime = db;
+        InventoryItem item = ShopReadyItem();
+        item.Status = InventoryStatus.Listed;
+        db.InventoryItems.Add(item);
+        await db.SaveChangesAsync();
+
+        // Drift: the listing vanishes out-of-band (a raw delete, a bug, a manual edit). The item is untouched in
+        // the next save, so the change-driven synchronizer has nothing to notice.
+        db.StoreListings.RemoveRange(await db.StoreListings.Where(l => l.InventoryItemId == item.Id).ToListAsync());
+        await db.SaveChangesAsync();
+        Assert.False(await db.StoreListings.AnyAsync(l => l.InventoryItemId == item.Id));
+
+        ActionResult<ReconcileStoreCatalogResultDto> result = await controller.Reconcile(CancellationToken.None);
+
+        OkObjectResult ok = Assert.IsType<OkObjectResult>(result.Result);
+        ReconcileStoreCatalogResultDto dto = Assert.IsType<ReconcileStoreCatalogResultDto>(ok.Value);
+        Assert.Equal(1, dto.ListingsCreated);
+        Assert.Equal(StoreListingStatus.Active, (await db.StoreListings.SingleAsync(l => l.InventoryItemId == item.Id)).Status);
     }
 }

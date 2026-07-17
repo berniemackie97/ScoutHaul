@@ -50,6 +50,16 @@ public sealed class InventoryStatusWorkflowService(
             return AppResult<InventoryItemDto>.Conflict("Bundle, sale, and fulfillment stages must be changed through their dedicated workflows.");
         }
 
+        // Listed is public: the moment it is set, the item is on the storefront shelf. An operator flipping the
+        // switch by hand must therefore have the item shopper-ready — the same gate the admin publish action uses.
+        // (Marketplace imports do not pass through here; an imported photo-less item lands as awaiting-photos.)
+        if (request.Status == InventoryStatus.Listed
+            && StorePublishing.ReasonsItCannotBeListed(item) is { Count: > 0 } reasons)
+        {
+            return AppResult<InventoryItemDto>.Validation(
+                $"This item is not ready to be listed: {string.Join(" ", reasons)}");
+        }
+
         item.Status = request.Status;
         DateTimeOffset now = timeProvider.GetUtcNow();
         item.PurchasedAt ??= request.Status == InventoryStatus.Purchased ? now : null;

@@ -9,7 +9,11 @@ using HaulScout.Domain.Entities;
 
 namespace HaulScout.Infrastructure.Persistence;
 
-public sealed class HaulScoutDbContext(DbContextOptions<HaulScoutDbContext> options, ITenantContext? tenant = null) : DbContext(options)
+/// <param name="clock">Injected in production; defaults to the system clock so hand-built test contexts need no ceremony.</param>
+public sealed class HaulScoutDbContext(
+    DbContextOptions<HaulScoutDbContext> options,
+    ITenantContext? tenant = null,
+    TimeProvider? clock = null) : DbContext(options)
 {
     // Per-request tenant. Null at design-time (migrations) and in unit tests that construct
     // the context directly — in those cases org-scoping filters are left off (see ConfigureOrgFilter).
@@ -68,15 +72,23 @@ public sealed class HaulScoutDbContext(DbContextOptions<HaulScoutDbContext> opti
     public DbSet<PlatformListingQualitySnapshot> PlatformListingQualitySnapshots => Set<PlatformListingQualitySnapshot>();
     public DbSet<PlatformOrderLine> PlatformOrderLines => Set<PlatformOrderLine>();
 
-    public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+    private TimeProvider Clock => clock ?? TimeProvider.System;
+
+    public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
+        // The storefront shelf follows the inventory automatically. SaveChanges is the one doorway every write
+        // passes through, so the sync cannot be forgotten by a new code path the way a per-call-site sync would be.
+        await Storefront.StoreListingSynchronizer.ApplyAsync(
+            this, Storefront.StoreListingSynchronizer.CollectAffectedItemIds(ChangeTracker), Clock.GetUtcNow(), cancellationToken);
         ApplyTenantToNewEntities();
         StampEntities(ChangeTracker.Entries<EntityBase>());
-        return base.SaveChangesAsync(cancellationToken);
+        return await base.SaveChangesAsync(cancellationToken);
     }
 
     public override int SaveChanges()
     {
+        Storefront.StoreListingSynchronizer.Apply(
+            this, Storefront.StoreListingSynchronizer.CollectAffectedItemIds(ChangeTracker), Clock.GetUtcNow());
         ApplyTenantToNewEntities();
         StampEntities(ChangeTracker.Entries<EntityBase>());
         return base.SaveChanges();

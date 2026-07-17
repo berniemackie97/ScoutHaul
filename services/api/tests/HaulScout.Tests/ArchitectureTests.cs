@@ -32,8 +32,6 @@ public class ArchitectureTests
         "PlatformOrdersController",
         "ProductIdentitiesController",
         "ReportsController",
-        "StoreController",
-        "StorefrontController",
         "TasksController",
     ];
 
