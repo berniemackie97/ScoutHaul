@@ -81,7 +81,6 @@ builder.Services.AddScoped<SaleDeletionWorkflowService>();
 builder.Services.AddScoped<SaleTransitionWorkflowService>();
 builder.Services.AddScoped<SaleCorrectionWorkflowService>();
 builder.Services.AddScoped<SaleRefundWorkflowService>();
-builder.Services.AddScoped<InventoryUpsertWorkflowService>();
 builder.Services.AddScoped<InventoryPhotoWorkflowService>();
 builder.Services.AddAuthorization(options =>
 {

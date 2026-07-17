@@ -44,7 +44,7 @@ public class InventoryBrowseTests
             referenceData,
             new InventoryBundleWorkflowService(new EfInventoryStore(db), new EfAuditTrail(db, currentUser), currentUser),
             new InventoryDeletionWorkflowService(new EfInventoryStore(db), new EfAuditTrail(db, currentUser), currentUser),
-            new InventoryUpsertWorkflowService(db, currentUser, referenceData),
+            new InventoryUpsertWorkflowService(new EfInventoryStore(db), currentUser, referenceData, TimeProvider.System),
             new InventoryQueryService(new EfInventoryStore(db), currentUser),
             null!,
             new InventoryIssueWorkflowService(new EfInventoryStore(db), new EfInventoryIssueStore(db), currentUser),

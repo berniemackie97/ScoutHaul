@@ -153,6 +153,77 @@ public sealed class EfInventoryStore(HaulScoutDbContext db) : IInventoryStore
         db.InventoryItems.Remove(item);
     }
 
+    public async Task<bool> SourcingReferencesValidAsync(
+        Guid organizationId,
+        Guid? sourcingTripId,
+        Guid? sourcingTripStopId,
+        CancellationToken cancellationToken)
+    {
+        if (sourcingTripStopId.HasValue)
+        {
+            var stop = await db.SourcingTripStops
+                .Where(item => item.Id == sourcingTripStopId.Value && item.OrganizationId == organizationId)
+                .Select(item => new { item.SourcingTripId })
+                .SingleOrDefaultAsync(cancellationToken);
+
+            if (stop is null)
+            {
+                return false;
+            }
+
+            // A stop belonging to a different trip would misattribute the item's cost to the wrong sourcing run.
+            if (sourcingTripId.HasValue && stop.SourcingTripId != sourcingTripId.Value)
+            {
+                return false;
+            }
+        }
+
+        if (sourcingTripId.HasValue
+            && !await db.SourcingTrips.AnyAsync(
+                item => item.Id == sourcingTripId.Value && item.OrganizationId == organizationId,
+                cancellationToken))
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    public Task<Expense?> FindPurchaseExpenseAsync(Guid organizationId, Guid inventoryItemId, CancellationToken cancellationToken) =>
+        db.Expenses.SingleOrDefaultAsync(
+            expense => expense.OrganizationId == organizationId
+                && expense.InventoryItemId == inventoryItemId
+                && expense.Category == ExpenseCategory.InventoryPurchase,
+            cancellationToken);
+
+    public async Task AddExpenseAsync(Expense expense, CancellationToken cancellationToken) =>
+        await db.Expenses.AddAsync(expense, cancellationToken);
+
+    public void RemoveExpense(Expense expense) => db.Expenses.Remove(expense);
+
+    public Task<Budget?> FindActiveBudgetAsync(Guid organizationId, CancellationToken cancellationToken) =>
+        db.Budgets
+            .Where(item => item.OrganizationId == organizationId && item.IsActive)
+            .OrderByDescending(item => item.StartsAt)
+            .FirstOrDefaultAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<Sale>> ListSalesWithRefundsAsync(
+        Guid organizationId,
+        Guid inventoryItemId,
+        CancellationToken cancellationToken) =>
+        await db.Sales
+            .Include(sale => sale.Refunds)
+            .Where(sale => sale.InventoryItemId == inventoryItemId && sale.OrganizationId == organizationId)
+            .ToListAsync(cancellationToken);
+
+    public async Task<int> NextSaleCorrectionVersionAsync(Guid organizationId, Guid saleId, CancellationToken cancellationToken) =>
+        await db.SaleCorrections.CountAsync(
+            correction => correction.SaleId == saleId && correction.OrganizationId == organizationId,
+            cancellationToken) + 1;
+
+    public async Task AddSaleCorrectionAsync(SaleCorrection correction, CancellationToken cancellationToken) =>
+        await db.SaleCorrections.AddAsync(correction, cancellationToken);
+
     public Task SaveChangesAsync(CancellationToken cancellationToken) => db.SaveChangesAsync(cancellationToken);
 
     private IQueryable<InventoryItem> Filtered(Guid organizationId, InventoryFilter filter)

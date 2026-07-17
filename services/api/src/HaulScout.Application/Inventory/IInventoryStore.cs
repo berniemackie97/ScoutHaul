@@ -74,5 +74,34 @@ public interface IInventoryStore
     /// </summary>
     Task RemoveWithDependentsAsync(InventoryItem item, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Whether the sourcing trip/stop an item is being filed under exist in this organization, and whether the stop
+    /// actually belongs to the trip. Both halves matter: a stop from another trip would silently misattribute the
+    /// item's cost to the wrong sourcing run.
+    /// </summary>
+    Task<bool> SourcingReferencesValidAsync(
+        Guid organizationId,
+        Guid? sourcingTripId,
+        Guid? sourcingTripStopId,
+        CancellationToken cancellationToken);
+
+    /// <summary>The expense that mirrors this item's purchase price, if one has been booked.</summary>
+    Task<Expense?> FindPurchaseExpenseAsync(Guid organizationId, Guid inventoryItemId, CancellationToken cancellationToken);
+
+    Task AddExpenseAsync(Expense expense, CancellationToken cancellationToken);
+
+    void RemoveExpense(Expense expense);
+
+    /// <summary>The budget a purchase draws against — the newest active one.</summary>
+    Task<Budget?> FindActiveBudgetAsync(Guid organizationId, CancellationToken cancellationToken);
+
+    /// <summary>This item's sales with their refunds loaded, so net can be re-derived when its cost basis changes.
+    /// Refunds are required: deriving net without them is exactly the bug the Sale aggregate exists to prevent.</summary>
+    Task<IReadOnlyList<Sale>> ListSalesWithRefundsAsync(Guid organizationId, Guid inventoryItemId, CancellationToken cancellationToken);
+
+    Task<int> NextSaleCorrectionVersionAsync(Guid organizationId, Guid saleId, CancellationToken cancellationToken);
+
+    Task AddSaleCorrectionAsync(SaleCorrection correction, CancellationToken cancellationToken);
+
     Task SaveChangesAsync(CancellationToken cancellationToken);
 }

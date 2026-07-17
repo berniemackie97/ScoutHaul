@@ -1,39 +1,49 @@
 using System.Text.Json;
-using Microsoft.EntityFrameworkCore;
-using static HaulScout.Api.Helpers.StringHelpers;
-using HaulScout.Api.Mapping;
 using HaulScout.Application.Common;
 using HaulScout.Application.Contracts;
-using HaulScout.Application.Inventory;
 using HaulScout.Application.Security;
-using HaulScout.Application.Services;
 using HaulScout.Domain;
 using HaulScout.Domain.Entities;
-using HaulScout.Domain.Services;
-using HaulScout.Infrastructure.Persistence;
+using static HaulScout.Application.Common.Text;
 
-namespace HaulScout.Api.Services;
+namespace HaulScout.Application.Inventory;
 
 /// <summary>
-/// Owns inventory create/update rules and their financial side effects.
-/// Controllers keep HTTP shape; this service owns validation, reference checks, purchase expense sync, and COGS corrections.
+/// Creating and editing an item, and the money that follows from it. An item's purchase price is not just a field: it
+/// is mirrored by an expense, drawn against the active budget, and — if the item has already sold — it is the cost
+/// basis of those sales. Editing it in isolation would leave the books disagreeing with the item.
 /// </summary>
 public sealed class InventoryUpsertWorkflowService(
-    HaulScoutDbContext db,
+    IInventoryStore inventory,
     ICurrentUserContext currentUser,
-    InventoryReferenceDataService referenceData)
+    InventoryReferenceDataService referenceData,
+    TimeProvider timeProvider)
 {
+    /// <summary>The stages an item may be created in — everything before it is committed to a channel or a buyer.</summary>
+    private static readonly InventoryStatus[] CreatableStatuses =
+    [
+        InventoryStatus.Draft,
+        InventoryStatus.Researching,
+        InventoryStatus.Watchlist,
+        InventoryStatus.Purchased,
+        InventoryStatus.NeedsCleaning,
+        InventoryStatus.NeedsTesting,
+        InventoryStatus.NeedsRepair,
+        InventoryStatus.NeedsPhotos,
+        InventoryStatus.ReadyToList,
+    ];
+
     public async Task<AppResult<InventoryItemDto>> CreateAsync(
         UpsertInventoryItemRequest request,
         CancellationToken cancellationToken)
     {
-        string? validation = Validate(request);
-        if (validation is not null)
+        if (Validate(request) is string validation)
         {
             return AppResult<InventoryItemDto>.Validation(validation);
         }
 
-        if (!await ReferencesBelongToOrganizationAsync(request, cancellationToken))
+        if (!await inventory.SourcingReferencesValidAsync(
+                currentUser.OrganizationId, request.SourcingTripId, request.SourcingTripStopId, cancellationToken))
         {
             return AppResult<InventoryItemDto>.Validation("One or more inventory references do not belong to this organization.");
         }
@@ -46,7 +56,7 @@ public sealed class InventoryUpsertWorkflowService(
         }
 
         InventoryStatus startingStatus = request.Status ?? (request.PurchasePrice.HasValue ? InventoryStatus.Purchased : InventoryStatus.Draft);
-        if (!CanCreateInStatus(startingStatus))
+        if (!CreatableStatuses.Contains(startingStatus))
         {
             return AppResult<InventoryItemDto>.Validation("A new inventory item must start in a pre-sale intake, prep, or ready-to-list stage.");
         }
@@ -56,13 +66,15 @@ public sealed class InventoryUpsertWorkflowService(
             OrganizationId = currentUser.OrganizationId,
             Title = request.Title.Trim(),
             Status = startingStatus,
-            PurchasedAt = startingStatus == InventoryStatus.Purchased || request.PurchasePrice.HasValue ? DateTimeOffset.UtcNow : null
+            PurchasedAt = startingStatus == InventoryStatus.Purchased || request.PurchasePrice.HasValue
+                ? timeProvider.GetUtcNow()
+                : null,
         };
 
         Apply(request, controlledValues!, item);
-        db.InventoryItems.Add(item);
-        await SyncInventoryPurchaseExpenseAsync(item, previousPurchasePrice: null, cancellationToken);
-        await db.SaveChangesAsync(cancellationToken);
+        await inventory.AddAsync(item, cancellationToken);
+        await SyncPurchaseExpenseAsync(item, previousPurchasePrice: null, cancellationToken);
+        await inventory.SaveChangesAsync(cancellationToken);
 
         return AppResult<InventoryItemDto>.Ok(item.ToDto());
     }
@@ -72,19 +84,19 @@ public sealed class InventoryUpsertWorkflowService(
         UpsertInventoryItemRequest request,
         CancellationToken cancellationToken)
     {
-        InventoryItem? item = await FindItemAsync(id, cancellationToken);
+        InventoryItem? item = await inventory.FindDetailAsync(currentUser.OrganizationId, id, cancellationToken);
         if (item is null)
         {
             return AppResult<InventoryItemDto>.NotFound();
         }
 
-        string? validation = Validate(request);
-        if (validation is not null)
+        if (Validate(request) is string validation)
         {
             return AppResult<InventoryItemDto>.Validation(validation);
         }
 
-        if (!await ReferencesBelongToOrganizationAsync(request, cancellationToken))
+        if (!await inventory.SourcingReferencesValidAsync(
+                currentUser.OrganizationId, request.SourcingTripId, request.SourcingTripStopId, cancellationToken))
         {
             return AppResult<InventoryItemDto>.Validation("One or more inventory references do not belong to this organization.");
         }
@@ -98,26 +110,18 @@ public sealed class InventoryUpsertWorkflowService(
 
         decimal? previousPurchasePrice = item.PurchasePrice;
         Apply(request, controlledValues!, item);
-        await SyncInventoryPurchaseExpenseAsync(item, previousPurchasePrice, cancellationToken);
-        // Correcting cost on an already-sold legacy item flows through to sale COGS and true net, audited.
+        await SyncPurchaseExpenseAsync(item, previousPurchasePrice, cancellationToken);
+        // Correcting cost on an already-sold item flows through to sale COGS and true net, audited.
         await SyncSaleCostBasisAsync(item, previousPurchasePrice, cancellationToken);
-        await db.SaveChangesAsync(cancellationToken);
+        await inventory.SaveChangesAsync(cancellationToken);
 
         return AppResult<InventoryItemDto>.Ok(item.ToDto());
     }
 
-    private Task<InventoryItem?> FindItemAsync(Guid id, CancellationToken cancellationToken) =>
-        db.InventoryItems
-            .Include(item => item.Photos)
-            .Include(item => item.Issues)
-            .Include(item => item.AcquisitionLotItems)
-                .ThenInclude(item => item.AcquisitionLot)
-            .Include(item => item.BundleComponents)
-                .ThenInclude(item => item.ComponentInventoryItem)
-            .SingleOrDefaultAsync(
-                item => item.Id == id && item.OrganizationId == currentUser.OrganizationId,
-                cancellationToken);
-
+    /// <summary>
+    /// A sold item whose acquisition cost is corrected must have that flow through to what the sale actually earned,
+    /// with a correction row recording the before/after. Net is re-derived by the sale itself, from its refunds too.
+    /// </summary>
     private async Task SyncSaleCostBasisAsync(
         InventoryItem item,
         decimal? previousPurchasePrice,
@@ -129,10 +133,9 @@ public sealed class InventoryUpsertWorkflowService(
             return;
         }
 
-        List<Sale> sales = await db.Sales
-            .Include(sale => sale.Refunds)
-            .Where(sale => sale.InventoryItemId == item.Id && sale.OrganizationId == currentUser.OrganizationId)
-            .ToListAsync(cancellationToken);
+        IReadOnlyList<Sale> sales = await inventory.ListSalesWithRefundsAsync(
+            currentUser.OrganizationId, item.Id, cancellationToken);
+
         foreach (Sale sale in sales)
         {
             if (sale.CostOfGoods == newCost)
@@ -144,22 +147,27 @@ public sealed class InventoryUpsertWorkflowService(
             sale.CostOfGoods = newCost;
             sale.RecomputeNet();
 
-            int version = await db.SaleCorrections.CountAsync(
-                correction => correction.SaleId == sale.Id && correction.OrganizationId == currentUser.OrganizationId,
-                cancellationToken) + 1;
-            db.SaleCorrections.Add(new SaleCorrection
-            {
-                OrganizationId = currentUser.OrganizationId,
-                SaleId = sale.Id,
-                CorrectedByUserId = currentUser.UserId,
-                Reason = "Acquisition cost corrected on the item.",
-                BeforeJson = before,
-                AfterJson = SnapshotSale(sale),
-                Version = version,
-            });
+            await inventory.AddSaleCorrectionAsync(
+                new SaleCorrection
+                {
+                    OrganizationId = currentUser.OrganizationId,
+                    SaleId = sale.Id,
+                    CorrectedByUserId = currentUser.UserId,
+                    Reason = "Acquisition cost corrected on the item.",
+                    BeforeJson = before,
+                    AfterJson = SnapshotSale(sale),
+                    Version = await inventory.NextSaleCorrectionVersionAsync(currentUser.OrganizationId, sale.Id, cancellationToken),
+                },
+                cancellationToken);
         }
     }
 
+    /// <summary>
+    /// NOTE: this is one of six identical copies of the sale snapshot in the codebase — the same duplication class as
+    /// the net-profit bug, where five callers had independently forgotten refunds. It is reproduced verbatim here so
+    /// this move changes no behaviour; it is deduplicated when the sales module moves and SaleFinancialStateService
+    /// becomes the single owner.
+    /// </summary>
     private static string SnapshotSale(Sale sale) => JsonSerializer.Serialize(new
     {
         sale.Platform,
@@ -179,7 +187,12 @@ public sealed class InventoryUpsertWorkflowService(
         sale.Notes,
     });
 
-    private async Task SyncInventoryPurchaseExpenseAsync(
+    /// <summary>
+    /// Keeps the purchase expense and the budget in step with the item's price. The expense mirrors the item, so it is
+    /// created, updated or withdrawn as the price appears, changes or goes away; the budget moves by the difference,
+    /// never by the whole amount, so repeated edits cannot drain it.
+    /// </summary>
+    private async Task SyncPurchaseExpenseAsync(
         InventoryItem item,
         decimal? previousPurchasePrice,
         CancellationToken cancellationToken)
@@ -190,11 +203,8 @@ public sealed class InventoryUpsertWorkflowService(
             return;
         }
 
-        Expense? existingExpense = await db.Expenses.SingleOrDefaultAsync(expense =>
-            expense.OrganizationId == currentUser.OrganizationId
-            && expense.InventoryItemId == item.Id
-            && expense.Category == ExpenseCategory.InventoryPurchase,
-            cancellationToken);
+        Expense? existingExpense = await inventory.FindPurchaseExpenseAsync(
+            currentUser.OrganizationId, item.Id, cancellationToken);
 
         decimal previousAmount = existingExpense?.Amount ?? previousPurchasePrice ?? 0;
         decimal nextAmount = currentPurchasePrice ?? 0;
@@ -204,7 +214,7 @@ public sealed class InventoryUpsertWorkflowService(
         {
             if (existingExpense is not null)
             {
-                db.Expenses.Remove(existingExpense);
+                inventory.RemoveExpense(existingExpense);
             }
 
             await ApplyBudgetDeltaAsync(budgetDelta, cancellationToken);
@@ -213,17 +223,19 @@ public sealed class InventoryUpsertWorkflowService(
 
         if (existingExpense is null)
         {
-            db.Expenses.Add(new Expense
-            {
-                OrganizationId = currentUser.OrganizationId,
-                InventoryItemId = item.Id,
-                SourcingTripId = item.SourcingTripId,
-                SourcingTripStopId = item.SourcingTripStopId,
-                Category = ExpenseCategory.InventoryPurchase,
-                Description = $"Inventory purchase: {item.Title}",
-                Amount = currentPurchasePrice.Value,
-                OccurredAt = item.PurchasedAt ?? DateTimeOffset.UtcNow
-            });
+            await inventory.AddExpenseAsync(
+                new Expense
+                {
+                    OrganizationId = currentUser.OrganizationId,
+                    InventoryItemId = item.Id,
+                    SourcingTripId = item.SourcingTripId,
+                    SourcingTripStopId = item.SourcingTripStopId,
+                    Category = ExpenseCategory.InventoryPurchase,
+                    Description = $"Inventory purchase: {item.Title}",
+                    Amount = currentPurchasePrice.Value,
+                    OccurredAt = item.PurchasedAt ?? timeProvider.GetUtcNow(),
+                },
+                cancellationToken);
         }
         else
         {
@@ -234,7 +246,7 @@ public sealed class InventoryUpsertWorkflowService(
             existingExpense.OccurredAt = item.PurchasedAt ?? existingExpense.OccurredAt;
         }
 
-        item.PurchasedAt ??= DateTimeOffset.UtcNow;
+        item.PurchasedAt ??= timeProvider.GetUtcNow();
         await ApplyBudgetDeltaAsync(budgetDelta, cancellationToken);
     }
 
@@ -245,52 +257,11 @@ public sealed class InventoryUpsertWorkflowService(
             return;
         }
 
-        Budget? budget = await db.Budgets
-            .Where(item => item.OrganizationId == currentUser.OrganizationId && item.IsActive)
-            .OrderByDescending(item => item.StartsAt)
-            .FirstOrDefaultAsync(cancellationToken);
-
+        Budget? budget = await inventory.FindActiveBudgetAsync(currentUser.OrganizationId, cancellationToken);
         if (budget is not null)
         {
             budget.CurrentAmount -= delta;
         }
-    }
-
-    private async Task<bool> ReferencesBelongToOrganizationAsync(
-        UpsertInventoryItemRequest request,
-        CancellationToken cancellationToken)
-    {
-        if (request.SourcingTripStopId.HasValue)
-        {
-            var stop = await db.SourcingTripStops
-                .Where(item => item.Id == request.SourcingTripStopId.Value && item.OrganizationId == currentUser.OrganizationId)
-                .Select(item => new { item.SourcingTripId })
-                .SingleOrDefaultAsync(cancellationToken);
-
-            if (stop is null)
-            {
-                return false;
-            }
-
-            if (request.SourcingTripId.HasValue && stop.SourcingTripId != request.SourcingTripId.Value)
-            {
-                return false;
-            }
-        }
-
-        if (request.SourcingTripId.HasValue)
-        {
-            bool tripExists = await db.SourcingTrips.AnyAsync(
-                item => item.Id == request.SourcingTripId.Value && item.OrganizationId == currentUser.OrganizationId,
-                cancellationToken);
-
-            if (!tripExists)
-            {
-                return false;
-            }
-        }
-
-        return true;
     }
 
     private static string? Validate(UpsertInventoryItemRequest request)
@@ -317,17 +288,6 @@ public sealed class InventoryUpsertWorkflowService(
 
         return null;
     }
-
-    private static bool CanCreateInStatus(InventoryStatus status) =>
-        status is InventoryStatus.Draft
-            or InventoryStatus.Researching
-            or InventoryStatus.Watchlist
-            or InventoryStatus.Purchased
-            or InventoryStatus.NeedsCleaning
-            or InventoryStatus.NeedsTesting
-            or InventoryStatus.NeedsRepair
-            or InventoryStatus.NeedsPhotos
-            or InventoryStatus.ReadyToList;
 
     private static void Apply(
         UpsertInventoryItemRequest request,
@@ -377,6 +337,8 @@ public sealed class InventoryUpsertWorkflowService(
         item.Notes = TrimToNull(request.Notes);
     }
 
+    /// <summary>Anything that is not a JSON object — including malformed text — is stored as nothing rather than as
+    /// a value that would later fail to parse.</summary>
     private static string? NormalizeJsonObject(string? value)
     {
         if (string.IsNullOrWhiteSpace(value))
