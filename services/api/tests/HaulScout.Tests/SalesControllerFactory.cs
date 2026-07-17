@@ -1,5 +1,6 @@
 using HaulScout.Api.Controllers;
 using HaulScout.Api.Services;
+using HaulScout.Application.Security;
 using HaulScout.Infrastructure.Persistence;
 
 namespace HaulScout.Tests;

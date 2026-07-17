@@ -9,6 +9,7 @@ using HaulScout.Api.Configuration;
 using HaulScout.Api.Middleware;
 using HaulScout.Api.Services;
 using HaulScout.Application;
+using HaulScout.Application.Security;
 using HaulScout.Infrastructure;
 using HaulScout.Infrastructure.Persistence;
 

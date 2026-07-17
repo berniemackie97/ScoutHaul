@@ -5,11 +5,11 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
-using HaulScout.Api.Authorization;
 using HaulScout.Api.Controllers;
 using HaulScout.Api.Services;
 using HaulScout.Application.Common;
 using HaulScout.Application.Contracts;
+using HaulScout.Application.Security;
 using HaulScout.Domain;
 using HaulScout.Domain.Entities;
 using HaulScout.Infrastructure.Persistence;
@@ -63,7 +63,7 @@ public class OrganizationSecurityTests
             new OrganizationWorkflowService(db, currentUser, access),
             new OrganizationMemberWorkflowService(db, access, guard, invites),
             new OrganizationInviteCodeWorkflowService(db, currentUser, access, guard, timeProvider),
-            new OrganizationRoleWorkflowService(db, access, guard),
+            new OrganizationRoleWorkflowService(db, access),
             new OrganizationTeamWorkflowService(db, access, guard));
     }
 

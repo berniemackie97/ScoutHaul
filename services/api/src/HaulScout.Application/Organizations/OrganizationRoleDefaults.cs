@@ -1,7 +1,8 @@
-using HaulScout.Api.Authorization;
+using HaulScout.Application.Security;
+using HaulScout.Application.Organizations;
 using HaulScout.Domain.Entities;
 
-namespace HaulScout.Api.Services;
+namespace HaulScout.Application.Organizations;
 
 public static class OrganizationRoleDefaults
 {

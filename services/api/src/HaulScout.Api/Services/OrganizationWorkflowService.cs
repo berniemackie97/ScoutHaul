@@ -1,8 +1,9 @@
 using Microsoft.EntityFrameworkCore;
-using HaulScout.Api.Authorization;
 using HaulScout.Api.Mapping;
 using HaulScout.Application.Common;
 using HaulScout.Application.Contracts;
+using HaulScout.Application.Organizations;
+using HaulScout.Application.Security;
 using HaulScout.Domain.Entities;
 using HaulScout.Infrastructure.Persistence;
 

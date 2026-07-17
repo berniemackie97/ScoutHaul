@@ -1,9 +1,10 @@
+using System.Text;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Primitives;
 using HaulScout.Api.Services;
+using HaulScout.Application.Security;
 using HaulScout.Domain.Entities;
 using HaulScout.Infrastructure.Persistence;
-using System.Text;
-using Microsoft.Extensions.Primitives;
 
 namespace HaulScout.Api.Middleware;
 

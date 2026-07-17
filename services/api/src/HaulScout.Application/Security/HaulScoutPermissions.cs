@@ -1,4 +1,4 @@
-namespace HaulScout.Api.Authorization;
+namespace HaulScout.Application.Security;
 
 public static class HaulScoutPermissions
 {
