@@ -25,6 +25,7 @@ public static class DependencyInjection
 
         services.AddScoped<IChannelAccountService, EfChannelAccountService>();
         services.AddScoped<IOrganizationAuthorizer, EfOrganizationAuthorizer>();
+        services.AddScoped<IOrganizationInviteCodeStore, EfOrganizationInviteCodeStore>();
         services.AddScoped<IOrganizationMemberStore, EfOrganizationMemberStore>();
         services.AddScoped<IOrganizationRoleStore, EfOrganizationRoleStore>();
         services.AddScoped<IOrganizationTeamStore, EfOrganizationTeamStore>();

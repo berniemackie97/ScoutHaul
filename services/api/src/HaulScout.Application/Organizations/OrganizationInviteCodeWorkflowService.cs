@@ -1,15 +1,12 @@
 using System.Security.Cryptography;
 using System.Text;
-using Microsoft.EntityFrameworkCore;
-using HaulScout.Api.Mapping;
 using HaulScout.Application.Common;
 using HaulScout.Application.Contracts;
-using HaulScout.Application.Organizations;
 using HaulScout.Application.Security;
+using HaulScout.Domain;
 using HaulScout.Domain.Entities;
-using HaulScout.Infrastructure.Persistence;
 
-namespace HaulScout.Api.Services;
+namespace HaulScout.Application.Organizations;
 
 /// <summary>
 /// Shareable invite codes. The plaintext code is shown exactly once at creation and only its hash is stored, so a
@@ -17,25 +14,19 @@ namespace HaulScout.Api.Services;
 /// operator type it in any case or spacing. A code may never grant owner-level access — that always needs a person.
 /// </summary>
 public sealed class OrganizationInviteCodeWorkflowService(
-    HaulScoutDbContext db,
+    IOrganizationInviteCodeStore inviteCodes,
+    IOrganizationRoleStore roles,
     ICurrentUserContext currentUser,
-    IOrganizationAuthorizer access,
-    OrganizationRoleGuard guard,
+    IOrganizationAuthorizer authorizer,
     TimeProvider timeProvider)
 {
     public async Task<IReadOnlyList<OrganizationInviteCodeDto>> ListAsync(Guid id, CancellationToken cancellationToken)
     {
-        await access.RequirePermission(id, HaulScoutPermissions.ManageMembers, cancellationToken);
+        await authorizer.RequirePermission(id, HaulScoutPermissions.ManageMembers, cancellationToken);
 
-        List<OrganizationInviteCode> inviteCodes = await db.OrganizationInviteCodes
-            .Include(item => item.Team)
-            .Include(item => item.RoleDefinition)
-            .Where(item => item.OrganizationId == id)
-            .OrderByDescending(item => item.IsActive)
-            .ThenByDescending(item => item.CreatedAt)
-            .ToListAsync(cancellationToken);
+        IReadOnlyList<OrganizationInviteCode> records = await inviteCodes.ListAsync(id, cancellationToken);
 
-        return inviteCodes.Select(item => item.ToDto()).ToArray();
+        return records.Select(item => item.ToDto()).ToArray();
     }
 
     public async Task<AppResult<OrganizationInviteCodeCreatedDto>> CreateAsync(
@@ -43,7 +34,7 @@ public sealed class OrganizationInviteCodeWorkflowService(
         CreateOrganizationInviteCodeRequest request,
         CancellationToken cancellationToken)
     {
-        await access.RequirePermission(id, HaulScoutPermissions.ManageMembers, cancellationToken);
+        await authorizer.RequirePermission(id, HaulScoutPermissions.ManageMembers, cancellationToken);
 
         if (string.IsNullOrWhiteSpace(request.Name))
         {
@@ -57,7 +48,7 @@ public sealed class OrganizationInviteCodeWorkflowService(
         {
             return AppResult<OrganizationInviteCodeCreatedDto>.Validation("Expiration must be in the future.");
         }
-        if (!await db.Organizations.AnyAsync(item => item.Id == id, cancellationToken))
+        if (!await inviteCodes.OrganizationExistsAsync(id, cancellationToken))
         {
             return AppResult<OrganizationInviteCodeCreatedDto>.NotFound();
         }
@@ -65,8 +56,7 @@ public sealed class OrganizationInviteCodeWorkflowService(
         OrganizationTeam? team = null;
         if (request.TeamId is not null)
         {
-            team = await db.OrganizationTeams.SingleOrDefaultAsync(
-                item => item.Id == request.TeamId.Value && item.OrganizationId == id, cancellationToken);
+            team = await inviteCodes.FindTeamAsync(id, request.TeamId.Value, cancellationToken);
             if (team is null)
             {
                 return AppResult<OrganizationInviteCodeCreatedDto>.Validation("Team does not belong to this organization.");
@@ -76,7 +66,7 @@ public sealed class OrganizationInviteCodeWorkflowService(
         OrganizationRoleDefinition? role;
         if (request.RoleId is not null)
         {
-            role = await guard.LoadRoleAsync(id, request.RoleId.Value, cancellationToken);
+            role = await roles.FindAsync(id, request.RoleId.Value, cancellationToken);
             if (role is null)
             {
                 return AppResult<OrganizationInviteCodeCreatedDto>.Validation("Role does not belong to this organization.");
@@ -89,7 +79,7 @@ public sealed class OrganizationInviteCodeWorkflowService(
         }
         else
         {
-            role = await guard.LoadDefaultInviteRoleAsync(id, cancellationToken);
+            role = await roles.FindDefaultInviteRoleAsync(id, cancellationToken);
             if (role is null)
             {
                 return AppResult<OrganizationInviteCodeCreatedDto>.Validation(
@@ -104,7 +94,7 @@ public sealed class OrganizationInviteCodeWorkflowService(
         {
             code = GenerateInviteCode();
             codeHash = HashInviteCode(code);
-            codeAlreadyExists = await db.OrganizationInviteCodes.AnyAsync(item => item.CodeHash == codeHash, cancellationToken);
+            codeAlreadyExists = await inviteCodes.CodeHashExistsAsync(codeHash, cancellationToken);
             if (!codeAlreadyExists) break;
         }
 
@@ -128,8 +118,8 @@ public sealed class OrganizationInviteCodeWorkflowService(
             MaxUses = request.MaxUses
         };
 
-        db.OrganizationInviteCodes.Add(inviteCode);
-        await db.SaveChangesAsync(cancellationToken);
+        await inviteCodes.AddAsync(inviteCode, cancellationToken);
+        await inviteCodes.SaveChangesAsync(cancellationToken);
 
         inviteCode.Team = team;
         inviteCode.RoleDefinition = role;
@@ -140,19 +130,16 @@ public sealed class OrganizationInviteCodeWorkflowService(
 
     public async Task<AppResult<OrganizationInviteCodeDto>> DeactivateAsync(Guid id, Guid inviteCodeId, CancellationToken cancellationToken)
     {
-        await access.RequirePermission(id, HaulScoutPermissions.ManageMembers, cancellationToken);
+        await authorizer.RequirePermission(id, HaulScoutPermissions.ManageMembers, cancellationToken);
 
-        OrganizationInviteCode? inviteCode = await db.OrganizationInviteCodes
-            .Include(item => item.Team)
-            .Include(item => item.RoleDefinition)
-            .SingleOrDefaultAsync(item => item.Id == inviteCodeId && item.OrganizationId == id, cancellationToken);
+        OrganizationInviteCode? inviteCode = await inviteCodes.FindAsync(id, inviteCodeId, cancellationToken);
         if (inviteCode is null)
         {
             return AppResult<OrganizationInviteCodeDto>.NotFound();
         }
 
         inviteCode.IsActive = false;
-        await db.SaveChangesAsync(cancellationToken);
+        await inviteCodes.SaveChangesAsync(cancellationToken);
         return AppResult<OrganizationInviteCodeDto>.Ok(inviteCode.ToDto());
     }
 
@@ -165,11 +152,7 @@ public sealed class OrganizationInviteCodeWorkflowService(
         }
 
         string codeHash = HashInviteCode(request.Code);
-        OrganizationInviteCode? inviteCode = await db.OrganizationInviteCodes
-            .Include(item => item.Organization)
-            .Include(item => item.Team)
-            .Include(item => item.RoleDefinition)
-            .SingleOrDefaultAsync(item => item.CodeHash == codeHash, cancellationToken);
+        OrganizationInviteCode? inviteCode = await inviteCodes.FindByCodeHashAsync(codeHash, cancellationToken);
 
         // Same message whether the code never existed or belongs to a dead organization — no probing.
         if (inviteCode?.Organization is null)
@@ -184,13 +167,10 @@ public sealed class OrganizationInviteCodeWorkflowService(
             return AppResult<OrganizationJoinResultDto>.Validation("Invite code is expired or inactive.");
         }
 
-        AppUser user = await db.Users.FindAsync([currentUser.UserId], cancellationToken)
+        AppUser user = await inviteCodes.FindUserAsync(currentUser.UserId, cancellationToken)
                        ?? throw new InvalidOperationException("User must be resolved before creating an organization.");
 
-        OrganizationMember? member = await db.OrganizationMembers
-            .Include(item => item.User)
-            .Include(item => item.RoleDefinition)
-            .SingleOrDefaultAsync(item => item.OrganizationId == inviteCode.OrganizationId && item.UserId == user.Id, cancellationToken);
+        OrganizationMember? member = await inviteCodes.FindMemberAsync(inviteCode.OrganizationId, user.Id, cancellationToken);
 
         if (member is null)
         {
@@ -199,36 +179,35 @@ public sealed class OrganizationInviteCodeWorkflowService(
                 OrganizationId = inviteCode.OrganizationId,
                 UserId = user.Id,
                 RoleId = inviteCode.RoleId,
-                Role = Domain.OrganizationRole.Member,
+                Role = OrganizationRole.Member,
                 JoinedAt = timeProvider.GetUtcNow()
             };
-            db.OrganizationMembers.Add(member);
+            await inviteCodes.AddMemberAsync(member, cancellationToken);
         }
 
         if (inviteCode.TeamId is not null)
         {
-            bool hasTeamMembership = await db.OrganizationTeamMembers.AnyAsync(
-                item => item.TeamId == inviteCode.TeamId.Value && item.UserId == user.Id, cancellationToken);
+            bool hasTeamMembership = await inviteCodes.TeamMembershipExistsAsync(inviteCode.TeamId.Value, user.Id, cancellationToken);
             if (!hasTeamMembership)
             {
-                db.OrganizationTeamMembers.Add(new OrganizationTeamMember
+                await inviteCodes.AddTeamMemberAsync(new OrganizationTeamMember
                 {
                     TeamId = inviteCode.TeamId.Value,
                     UserId = user.Id,
                     RoleId = inviteCode.RoleId,
                     JoinedAt = timeProvider.GetUtcNow()
-                });
+                }, cancellationToken);
             }
         }
 
         inviteCode.UseCount++;
-        await db.SaveChangesAsync(cancellationToken);
+        await inviteCodes.SaveChangesAsync(cancellationToken);
 
         member.User = user;
         member.RoleDefinition ??= inviteCode.RoleDefinition;
 
         return AppResult<OrganizationJoinResultDto>.Ok(new OrganizationJoinResultDto(
-            inviteCode.Organization.ToDto(),
+            new OrganizationDto(inviteCode.Organization.Id, inviteCode.Organization.Name, inviteCode.Organization.CreatedAt),
             member.ToDto(),
             inviteCode.TeamId));
     }

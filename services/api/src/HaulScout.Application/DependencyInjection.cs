@@ -14,6 +14,7 @@ public static class DependencyInjection
 
         services.AddScoped<IDealAnalyzer, DealAnalyzer>();
         services.AddScoped<IConfidenceScorer, ConfidenceScorer>();
+        services.AddScoped<OrganizationInviteCodeWorkflowService>();
         services.AddScoped<OrganizationMemberWorkflowService>();
         services.AddScoped<OrganizationRoleWorkflowService>();
         services.AddScoped<OrganizationTeamWorkflowService>();
