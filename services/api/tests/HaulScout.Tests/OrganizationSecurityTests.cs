@@ -2,8 +2,6 @@ using System.Security.Cryptography;
 using System.Text;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 using HaulScout.Api.Controllers;
 using HaulScout.Api.Services;
@@ -26,6 +24,16 @@ namespace HaulScout.Tests;
 /// </summary>
 public class OrganizationSecurityTests
 {
+    private sealed class StubInviteSender : IOrganizationInviteSender
+    {
+        public Task<bool> SendInviteAsync(
+            string email,
+            string displayName,
+            Guid organizationId,
+            string organizationName,
+            CancellationToken cancellationToken) => Task.FromResult(false);
+    }
+
     private sealed class StubCurrentUser(Guid organizationId, Guid userId) : ICurrentUserContext
     {
         public Guid OrganizationId => organizationId;
@@ -55,15 +63,11 @@ public class OrganizationSecurityTests
         StubCurrentUser currentUser = new(org, user);
         IOrganizationAuthorizer access = new EfOrganizationAuthorizer(db, currentUser);
         OrganizationRoleGuard guard = new(db);
-        SupabaseAdminInviteService invites = new(
-            new HttpClient(),
-            new ConfigurationBuilder().Build(),
-            NullLogger<SupabaseAdminInviteService>.Instance);
 
         // Same composition DI builds in production — the controller owns no persistence of its own.
         return new OrganizationsController(
             new OrganizationWorkflowService(db, currentUser, access),
-            new OrganizationMemberWorkflowService(db, access, guard, invites),
+            new OrganizationMemberWorkflowService(new EfOrganizationMemberStore(db), new EfOrganizationRoleStore(db), access, new StubInviteSender()),
             new OrganizationInviteCodeWorkflowService(db, currentUser, access, guard, timeProvider),
             new OrganizationRoleWorkflowService(new EfOrganizationRoleStore(db), access),
             new OrganizationTeamWorkflowService(new EfOrganizationTeamStore(db), new EfOrganizationRoleStore(db), access));

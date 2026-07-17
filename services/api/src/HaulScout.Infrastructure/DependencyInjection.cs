@@ -25,8 +25,10 @@ public static class DependencyInjection
 
         services.AddScoped<IChannelAccountService, EfChannelAccountService>();
         services.AddScoped<IOrganizationAuthorizer, EfOrganizationAuthorizer>();
+        services.AddScoped<IOrganizationMemberStore, EfOrganizationMemberStore>();
         services.AddScoped<IOrganizationRoleStore, EfOrganizationRoleStore>();
         services.AddScoped<IOrganizationTeamStore, EfOrganizationTeamStore>();
+        services.AddHttpClient<IOrganizationInviteSender, SupabaseOrganizationInviteSender>();
 
         // In-memory cache (resale estimates, etc.) — protects the shared Gemini free-tier quota.
         services.AddMemoryCache();
