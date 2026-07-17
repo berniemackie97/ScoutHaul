@@ -662,6 +662,9 @@ public sealed class HaulScoutDbContext(DbContextOptions<HaulScoutDbContext> opti
             entity.Property(item => item.FulfillmentStatus).HasConversion<string>().HasMaxLength(24);
             entity.Property(item => item.StripeCheckoutSessionId).HasMaxLength(120);
             entity.Property(item => item.StripePaymentIntentId).HasMaxLength(120);
+            // The webhook's only lookup key, and the resume path's — both hit these cold.
+            entity.HasIndex(item => item.StripeCheckoutSessionId);
+            entity.HasIndex(item => item.SourceCartId);
             entity.Property(item => item.ShipToName).HasMaxLength(160);
             entity.Property(item => item.ShipToLine1).HasMaxLength(240);
             entity.Property(item => item.ShipToLine2).HasMaxLength(240);
