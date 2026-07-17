@@ -173,6 +173,14 @@ if (app.Configuration.GetValue("Database:ApplyMigrationsOnStartup", false))
     using IServiceScope scope = app.Services.CreateScope();
     HaulScoutDbContext db = scope.ServiceProvider.GetRequiredService<HaulScoutDbContext>();
     db.Database.Migrate();
+
+    // The storefront shelf self-heals on every boot: rows that predate the save-time synchronizer (or were
+    // written around EF) get their listings built here, so a deploy never depends on someone remembering a
+    // manual reconcile call.
+    await StoreShelfBootstrap.ReconcileAllAsync(
+        db,
+        scope.ServiceProvider.GetRequiredService<TimeProvider>(),
+        app.Logger);
 }
 
 // ── Swagger (dev only) ───────────────────────────────────────────
