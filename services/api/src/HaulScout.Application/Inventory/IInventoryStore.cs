@@ -17,6 +17,13 @@ public interface IInventoryStore
 
     Task<bool> ExistsAsync(Guid organizationId, Guid id, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Whether a sale still holds this item — i.e. one that has not released it back (returned/refunded/cancelled).
+    /// Inventory has to ask because an item under an active sale may only change stage through the sales workflow;
+    /// the question is answered here rather than by handing the use case a Sales query.
+    /// </summary>
+    Task<bool> HasActiveSaleAsync(Guid organizationId, Guid inventoryItemId, CancellationToken cancellationToken);
+
     Task<IReadOnlyList<InventoryItem>> ListAsync(
         Guid organizationId,
         InventoryFilter filter,

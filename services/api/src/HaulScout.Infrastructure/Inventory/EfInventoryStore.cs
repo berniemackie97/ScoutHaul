@@ -28,6 +28,13 @@ public sealed class EfInventoryStore(HaulScoutDbContext db) : IInventoryStore
     public Task<bool> ExistsAsync(Guid organizationId, Guid id, CancellationToken cancellationToken) =>
         db.InventoryItems.AnyAsync(item => item.Id == id && item.OrganizationId == organizationId, cancellationToken);
 
+    public Task<bool> HasActiveSaleAsync(Guid organizationId, Guid inventoryItemId, CancellationToken cancellationToken) =>
+        db.Sales.AnyAsync(
+            sale => sale.InventoryItemId == inventoryItemId
+                && sale.OrganizationId == organizationId
+                && !SaleWorkflow.InventoryReleaseStatuses.Contains(sale.Status),
+            cancellationToken);
+
     public async Task<IReadOnlyList<InventoryItem>> ListAsync(
         Guid organizationId,
         InventoryFilter filter,

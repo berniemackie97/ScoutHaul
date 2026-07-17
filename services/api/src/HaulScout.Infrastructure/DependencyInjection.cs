@@ -38,6 +38,7 @@ public static class DependencyInjection
         services.AddScoped<IChannelAccountService, EfChannelAccountService>();
         services.AddScoped<IInventoryReferenceDataStore, EfInventoryReferenceDataStore>();
         services.AddScoped<IInventoryStore, EfInventoryStore>();
+        services.AddScoped<IInventoryIssueStore, EfInventoryIssueStore>();
         services.AddScoped<IOrganizationAuthorizer, EfOrganizationAuthorizer>();
         services.AddScoped<IOrganizationInviteCodeStore, EfOrganizationInviteCodeStore>();
         services.AddScoped<IOrganizationMemberStore, EfOrganizationMemberStore>();
