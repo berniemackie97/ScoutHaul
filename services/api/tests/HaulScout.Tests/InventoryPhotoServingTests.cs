@@ -3,8 +3,10 @@ using Microsoft.EntityFrameworkCore;
 using HaulScout.Api.Controllers;
 using HaulScout.Api.Services;
 using HaulScout.Application.Common;
+using HaulScout.Application.Inventory;
 using HaulScout.Domain.Entities;
 using HaulScout.Infrastructure.Persistence;
+using HaulScout.Infrastructure.Inventory;
 
 namespace HaulScout.Tests;
 
@@ -48,7 +50,7 @@ public class InventoryPhotoServingTests
             null!,
             null!,
             null!,
-            new InventoryPhotoWorkflowService(db, null!, null!),
+            new InventoryPhotoWorkflowService(new EfInventoryPhotoStore(db), null!, null!),
             null!,
             null!);
 

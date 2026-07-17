@@ -13,6 +13,7 @@ using HaulScout.Domain;
 using HaulScout.Domain.Entities;
 using HaulScout.Domain.Services;
 using HaulScout.Infrastructure.Persistence;
+using HaulScout.Application.Inventory;
 
 namespace HaulScout.Api.Controllers;
 

@@ -1,25 +1,21 @@
 using System.Text.Json;
-using Microsoft.EntityFrameworkCore;
-using HaulScout.Api.Mapping;
 using HaulScout.Application.Common;
 using HaulScout.Application.Contracts;
 using HaulScout.Application.Security;
-using HaulScout.Application.Services;
 using HaulScout.Domain.Entities;
-using HaulScout.Infrastructure.Persistence;
 
-namespace HaulScout.Api.Services;
+namespace HaulScout.Application.Inventory;
 
 public sealed class InventoryPhotoWorkflowService(
-    HaulScoutDbContext db,
+    IInventoryPhotoStore photos,
     ICurrentUserContext currentUser,
-    InventoryPhotoStorageService photoStorage)
+    IInventoryPhotoProcessor photoStorage)
 {
     public sealed record InventoryPhotoFile(byte[] Bytes, string ContentType);
 
     public async Task<AppResult<InventoryPhotoUploadResultDto>> UploadAsync(
         Guid id,
-        IFormFile? file,
+        PhotoUpload? file,
         bool isHero,
         CancellationToken cancellationToken)
     {
@@ -34,7 +30,7 @@ public sealed class InventoryPhotoWorkflowService(
             return AppResult<InventoryPhotoUploadResultDto>.Validation("Photo file is required.");
         }
 
-        InventoryPhotoStorageService.ProcessedInventoryPhoto processed;
+        ProcessedPhoto processed;
         try
         {
             processed = await photoStorage.ProcessAsync(file, cancellationToken);
@@ -68,7 +64,7 @@ public sealed class InventoryPhotoWorkflowService(
             Height = processed.Height
         };
 
-        db.InventoryPhotos.Add(photo);
+        await photos.AddAsync(photo, cancellationToken);
 
         List<string> photoUrls = ParsePhotoUrls(item.PhotoLocalReferencesJson);
         string uploadedUrl = PhotoOriginalUrl(item.Id, photo.Id);
@@ -83,9 +79,9 @@ public sealed class InventoryPhotoWorkflowService(
         }
 
         item.PhotoLocalReferencesJson = JsonSerializer.Serialize(photoUrls);
-        await db.SaveChangesAsync(cancellationToken);
+        await photos.SaveChangesAsync(cancellationToken);
 
-        await db.Entry(item).Collection(existing => existing.Photos).LoadAsync(cancellationToken);
+        await photos.LoadPhotosAsync(item, cancellationToken);
         return AppResult<InventoryPhotoUploadResultDto>.Ok(
             new InventoryPhotoUploadResultDto(item.Id, photoUrls, uploadedUrl, OrderedPhotos(item).Select(item => item.ToDto()).ToArray()));
     }
@@ -109,7 +105,7 @@ public sealed class InventoryPhotoWorkflowService(
         InventoryPhoto? photo = ResolvePhotoByUrl(item, url);
         if (photo is not null)
         {
-            db.InventoryPhotos.Remove(photo);
+            photos.Remove(photo);
         }
 
         List<string> photoUrls = ParsePhotoUrls(item.PhotoLocalReferencesJson);
@@ -145,7 +141,7 @@ public sealed class InventoryPhotoWorkflowService(
             }
         }
 
-        await db.SaveChangesAsync(cancellationToken);
+        await photos.SaveChangesAsync(cancellationToken);
 
         return AppResult<InventoryPhotoUploadResultDto>.Ok(
             new InventoryPhotoUploadResultDto(item.Id, photoUrls, UploadedUrl: null, OrderedPhotos(item).Where(candidate => candidate.Id != photo?.Id).Select(candidate => candidate.ToDto()).ToArray()));
@@ -197,7 +193,7 @@ public sealed class InventoryPhotoWorkflowService(
         photoUrls.RemoveAt(index);
         photoUrls.Insert(0, url);
         item.PhotoLocalReferencesJson = JsonSerializer.Serialize(photoUrls);
-        await db.SaveChangesAsync(cancellationToken);
+        await photos.SaveChangesAsync(cancellationToken);
 
         return AppResult<InventoryPhotoUploadResultDto>.Ok(
             new InventoryPhotoUploadResultDto(item.Id, photoUrls, UploadedUrl: null, OrderedPhotos(item).Select(item => item.ToDto()).ToArray()));
@@ -220,7 +216,7 @@ public sealed class InventoryPhotoWorkflowService(
             return AppResult<InventoryPhotoUploadResultDto>.NotFound("Photo was not found on this inventory item.");
         }
 
-        db.InventoryPhotos.Remove(photo);
+        photos.Remove(photo);
         List<string> photoUrls = ParsePhotoUrls(item.PhotoLocalReferencesJson);
         photoUrls.RemoveAll(existing =>
             string.Equals(existing, PhotoOriginalUrl(item.Id, photo.Id), StringComparison.OrdinalIgnoreCase)
@@ -240,7 +236,7 @@ public sealed class InventoryPhotoWorkflowService(
             }
         }
 
-        await db.SaveChangesAsync(cancellationToken);
+        await photos.SaveChangesAsync(cancellationToken);
         return AppResult<InventoryPhotoUploadResultDto>.Ok(
             new InventoryPhotoUploadResultDto(item.Id, photoUrls, UploadedUrl: null, OrderedPhotos(item).Where(candidate => candidate.Id != photo.Id).Select(candidate => candidate.ToDto()).ToArray()));
     }
@@ -258,23 +254,10 @@ public sealed class InventoryPhotoWorkflowService(
     }
 
     private Task<InventoryItem?> FindItemAsync(Guid id, CancellationToken cancellationToken) =>
-        db.InventoryItems
-            .Include(item => item.Photos)
-            .Include(item => item.Issues)
-            .Include(item => item.AcquisitionLotItems)
-                .ThenInclude(item => item.AcquisitionLot)
-            .Include(item => item.BundleComponents)
-                .ThenInclude(item => item.ComponentInventoryItem)
-            .SingleOrDefaultAsync(
-                item => item.Id == id && item.OrganizationId == currentUser.OrganizationId,
-                cancellationToken);
+        photos.FindItemWithPhotosAsync(currentUser.OrganizationId, id, cancellationToken);
 
     private Task<InventoryPhoto?> FindPhotoUnscopedAsync(Guid itemId, Guid photoId, CancellationToken cancellationToken) =>
-        db.InventoryPhotos
-            .IgnoreQueryFilters()
-            .SingleOrDefaultAsync(
-                item => item.Id == photoId && item.InventoryItemId == itemId,
-                cancellationToken);
+        photos.FindPhotoUnscopedAsync(itemId, photoId, cancellationToken);
 
     private static IReadOnlyList<InventoryPhoto> OrderedPhotos(InventoryItem item) =>
         item.Photos

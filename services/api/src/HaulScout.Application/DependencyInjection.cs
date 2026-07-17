@@ -21,6 +21,13 @@ public static class DependencyInjection
         services.AddScoped<IDealAnalyzer, DealAnalyzer>();
         services.AddScoped<IConfidenceScorer, ConfidenceScorer>();
         services.AddScoped<InventoryReferenceDataService>();
+        services.AddScoped<InventoryQueryService>();
+        services.AddScoped<InventoryBundleWorkflowService>();
+        services.AddScoped<InventoryDeletionWorkflowService>();
+        services.AddScoped<InventoryUpsertWorkflowService>();
+        services.AddScoped<InventoryPhotoWorkflowService>();
+        services.AddScoped<InventoryStatusWorkflowService>();
+        services.AddScoped<InventoryIssueWorkflowService>();
         services.AddScoped<OrganizationInviteCodeWorkflowService>();
         services.AddScoped<OrganizationMemberWorkflowService>();
         services.AddScoped<OrganizationWorkflowService>();

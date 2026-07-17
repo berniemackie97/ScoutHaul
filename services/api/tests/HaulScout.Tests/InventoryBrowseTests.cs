@@ -42,13 +42,13 @@ public class InventoryBrowseTests
         InventoryReferenceDataService referenceData = new(new EfInventoryReferenceDataStore(db, currentUser));
         return new InventoryController(
             referenceData,
-            new InventoryBundleWorkflowService(db, currentUser),
-            new InventoryDeletionWorkflowService(db, currentUser),
-            new InventoryUpsertWorkflowService(db, currentUser, referenceData),
-            new InventoryQueryService(db, currentUser),
+            new InventoryBundleWorkflowService(new EfInventoryStore(db), new EfAuditTrail(db, currentUser), currentUser),
+            new InventoryDeletionWorkflowService(new EfInventoryStore(db), new EfAuditTrail(db, currentUser), currentUser),
+            new InventoryUpsertWorkflowService(new EfInventoryStore(db), currentUser, referenceData, TimeProvider.System),
+            new InventoryQueryService(new EfInventoryStore(db), currentUser),
             null!,
-            new InventoryIssueWorkflowService(db, currentUser),
-            new InventoryStatusWorkflowService(db, currentUser));
+            new InventoryIssueWorkflowService(new EfInventoryStore(db), new EfInventoryIssueStore(db), currentUser),
+            new InventoryStatusWorkflowService(new EfInventoryStore(db), currentUser, TimeProvider.System));
     }
 
     private static void SeedItem(HaulScoutDbContext db, Guid org, string title, InventoryStatus status, decimal cost, string? brand = null)
