@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using HaulScout.Api.Mapping;
 using HaulScout.Application.Common;
 using HaulScout.Application.Contracts;
+using HaulScout.Application.Organizations;
 using HaulScout.Application.Security;
 using HaulScout.Domain.Entities;
 using HaulScout.Infrastructure.Persistence;
@@ -14,7 +15,7 @@ namespace HaulScout.Api.Services;
 /// </summary>
 public sealed class OrganizationTeamWorkflowService(
     HaulScoutDbContext db,
-    OrganizationAccessService access,
+    IOrganizationAuthorizer access,
     OrganizationRoleGuard guard)
 {
     public async Task<IReadOnlyList<OrganizationTeamDto>> ListAsync(Guid id, CancellationToken cancellationToken)
@@ -129,7 +130,7 @@ public sealed class OrganizationTeamWorkflowService(
             }
         }
 
-        if (OrganizationRoleGuard.RoleRequiresOwner(role))
+        if (OrganizationRoleRules.RoleRequiresOwner(role))
         {
             await access.RequireOwner(id, cancellationToken);
         }

@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using HaulScout.Application.Common;
+using HaulScout.Application.Organizations;
 using HaulScout.Application.Services;
 
 namespace HaulScout.Application;
@@ -13,6 +14,7 @@ public static class DependencyInjection
 
         services.AddScoped<IDealAnalyzer, DealAnalyzer>();
         services.AddScoped<IConfidenceScorer, ConfidenceScorer>();
+        services.AddScoped<OrganizationRoleWorkflowService>();
         services.AddSingleton<IMarketplaceSearchLinkGenerator, MarketplaceSearchLinkGenerator>();
 
         return services;

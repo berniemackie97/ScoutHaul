@@ -16,7 +16,7 @@ namespace HaulScout.Api.Services;
 public sealed class OrganizationWorkflowService(
     HaulScoutDbContext db,
     ICurrentUserContext currentUser,
-    OrganizationAccessService access)
+    IOrganizationAuthorizer access)
 {
     public async Task<IReadOnlyList<OrganizationDto>> ListMineAsync(CancellationToken cancellationToken)
     {

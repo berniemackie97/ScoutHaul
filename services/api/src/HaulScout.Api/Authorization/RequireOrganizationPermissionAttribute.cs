@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 using HaulScout.Api.Services;
+using HaulScout.Application.Organizations;
 using HaulScout.Application.Security;
 
 namespace HaulScout.Api.Authorization;
@@ -29,7 +30,7 @@ public sealed class RequireOrganizationPermissionAttribute(string permission) : 
             return;
         }
 
-        OrganizationAccessService access = context.HttpContext.RequestServices.GetRequiredService<OrganizationAccessService>();
+        IOrganizationAuthorizer access = context.HttpContext.RequestServices.GetRequiredService<IOrganizationAuthorizer>();
         await access.RequirePermission(organizationId, permission, context.HttpContext.RequestAborted);
     }
 }

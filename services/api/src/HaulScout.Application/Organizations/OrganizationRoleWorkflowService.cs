@@ -1,32 +1,23 @@
-using Microsoft.EntityFrameworkCore;
-using HaulScout.Api.Mapping;
 using HaulScout.Application.Common;
 using HaulScout.Application.Contracts;
 using HaulScout.Application.Security;
 using HaulScout.Domain.Entities;
-using HaulScout.Infrastructure.Persistence;
 
-namespace HaulScout.Api.Services;
+namespace HaulScout.Application.Organizations;
 
 /// <summary>
 /// Custom roles and the permissions they carry. Anything that would grant owner-level power demands an owner —
 /// otherwise a member with roles.manage could quietly promote themselves. System and owner roles are protected.
 /// </summary>
 public sealed class OrganizationRoleWorkflowService(
-    HaulScoutDbContext db,
-    OrganizationAccessService access)
+    IOrganizationRoleStore roles,
+    IOrganizationAuthorizer authorizer)
 {
     public async Task<IReadOnlyList<OrganizationRoleDto>> ListAsync(Guid id, CancellationToken cancellationToken)
     {
-        await access.RequirePermission(id, HaulScoutPermissions.ManageRoles, cancellationToken);
-        List<OrganizationRoleDefinition> roles = await db.OrganizationRoles
-            .Include(role => role.Permissions)
-            .Where(role => role.OrganizationId == id)
-            .OrderByDescending(role => role.IsOwnerRole)
-            .ThenBy(role => role.Name)
-            .ToListAsync(cancellationToken);
-
-        return roles.Select(role => role.ToDto()).ToArray();
+        await authorizer.RequirePermission(id, HaulScoutPermissions.ManageRoles, cancellationToken);
+        IReadOnlyList<OrganizationRoleDefinition> records = await roles.ListAsync(id, cancellationToken);
+        return records.Select(role => role.ToDto()).ToArray();
     }
 
     public async Task<AppResult<OrganizationRoleDto>> CreateAsync(Guid id, UpsertOrganizationRoleRequest request, CancellationToken cancellationToken)
@@ -34,7 +25,7 @@ public sealed class OrganizationRoleWorkflowService(
         string[] permissions;
         try
         {
-            permissions = OrganizationRoleGuard.ValidatePermissions(
+            permissions = OrganizationRoleRules.ValidatePermissions(
                 request.GrantsOwnerAccess ? HaulScoutPermissions.All : request.Permissions);
         }
         catch (ArgumentException e)
@@ -50,13 +41,13 @@ public sealed class OrganizationRoleWorkflowService(
             return AppResult<OrganizationRoleDto>.Validation("Role name is required.");
         }
 
-        if (request.GrantsOwnerAccess || OrganizationRoleGuard.ContainsOwnerGuardedPermission(permissions))
+        if (request.GrantsOwnerAccess || OrganizationRoleRules.ContainsOwnerGuardedPermission(permissions))
         {
-            await access.RequireOwner(id, cancellationToken);
+            await authorizer.RequireOwner(id, cancellationToken);
         }
         else
         {
-            await access.RequirePermission(id, HaulScoutPermissions.ManageRoles, cancellationToken);
+            await authorizer.RequirePermission(id, HaulScoutPermissions.ManageRoles, cancellationToken);
         }
 
         OrganizationRoleDefinition role = new()
@@ -68,17 +59,15 @@ public sealed class OrganizationRoleWorkflowService(
             IsSystem = false
         };
 
-        OrganizationRoleGuard.ReplacePermissions(role, permissions);
-        db.OrganizationRoles.Add(role);
-        await db.SaveChangesAsync(cancellationToken);
+        OrganizationRoleRules.ReplacePermissions(role, permissions);
+        await roles.AddAsync(role, cancellationToken);
+        await roles.SaveChangesAsync(cancellationToken);
         return AppResult<OrganizationRoleDto>.Ok(role.ToDto());
     }
 
     public async Task<AppResult<OrganizationRoleDto>> UpdateAsync(Guid id, Guid roleId, UpsertOrganizationRoleRequest request, CancellationToken cancellationToken)
     {
-        OrganizationRoleDefinition? role = await db.OrganizationRoles
-            .Include(item => item.Permissions)
-            .SingleOrDefaultAsync(item => item.Id == roleId && item.OrganizationId == id, cancellationToken);
+        OrganizationRoleDefinition? role = await roles.FindAsync(id, roleId, cancellationToken);
 
         if (role is null)
         {
@@ -92,7 +81,7 @@ public sealed class OrganizationRoleWorkflowService(
         string[] permissions;
         try
         {
-            permissions = OrganizationRoleGuard.ValidatePermissions(
+            permissions = OrganizationRoleRules.ValidatePermissions(
                 request.GrantsOwnerAccess ? HaulScoutPermissions.All : request.Permissions);
         }
         catch (ArgumentException e)
@@ -109,29 +98,27 @@ public sealed class OrganizationRoleWorkflowService(
         }
 
         // Editing an owner role is itself owner-only, even when the new permission set looks ordinary.
-        if (request.GrantsOwnerAccess || role.IsOwnerRole || OrganizationRoleGuard.ContainsOwnerGuardedPermission(permissions))
+        if (request.GrantsOwnerAccess || role.IsOwnerRole || OrganizationRoleRules.ContainsOwnerGuardedPermission(permissions))
         {
-            await access.RequireOwner(id, cancellationToken);
+            await authorizer.RequireOwner(id, cancellationToken);
         }
         else
         {
-            await access.RequirePermission(id, HaulScoutPermissions.ManageRoles, cancellationToken);
+            await authorizer.RequirePermission(id, HaulScoutPermissions.ManageRoles, cancellationToken);
         }
 
         role.Name = request.Name.Trim();
         role.Description = request.Description?.Trim();
         role.IsOwnerRole = request.GrantsOwnerAccess;
-        OrganizationRoleGuard.ReplacePermissions(role, permissions);
+        OrganizationRoleRules.ReplacePermissions(role, permissions);
 
-        await db.SaveChangesAsync(cancellationToken);
+        await roles.SaveChangesAsync(cancellationToken);
         return AppResult<OrganizationRoleDto>.Ok(role.ToDto());
     }
 
     public async Task<AppResult> DeleteAsync(Guid id, Guid roleId, CancellationToken cancellationToken)
     {
-        OrganizationRoleDefinition? role = await db.OrganizationRoles
-            .Include(item => item.Permissions)
-            .SingleOrDefaultAsync(item => item.Id == roleId && item.OrganizationId == id, cancellationToken);
+        OrganizationRoleDefinition? role = await roles.FindAsync(id, roleId, cancellationToken);
 
         if (role is null)
         {
@@ -141,17 +128,16 @@ public sealed class OrganizationRoleWorkflowService(
         {
             return AppResult.Validation("System and owner roles cannot be deleted.");
         }
-        await access.RequirePermission(id, HaulScoutPermissions.ManageRoles, cancellationToken);
+        await authorizer.RequirePermission(id, HaulScoutPermissions.ManageRoles, cancellationToken);
 
-        bool isAssigned = await db.OrganizationMembers.AnyAsync(item => item.RoleId == roleId, cancellationToken)
-            || await db.OrganizationTeamMembers.AnyAsync(item => item.RoleId == roleId, cancellationToken);
+        bool isAssigned = await roles.IsAssignedAsync(roleId, cancellationToken);
         if (isAssigned)
         {
             return AppResult.Validation("Role is assigned to members or teams. Reassign them before deleting it.");
         }
 
-        db.OrganizationRoles.Remove(role);
-        await db.SaveChangesAsync(cancellationToken);
+        roles.Remove(role);
+        await roles.SaveChangesAsync(cancellationToken);
         return AppResult.Ok();
     }
 }

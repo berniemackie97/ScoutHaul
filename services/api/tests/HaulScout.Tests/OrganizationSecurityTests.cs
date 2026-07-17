@@ -9,9 +9,11 @@ using HaulScout.Api.Controllers;
 using HaulScout.Api.Services;
 using HaulScout.Application.Common;
 using HaulScout.Application.Contracts;
+using HaulScout.Application.Organizations;
 using HaulScout.Application.Security;
 using HaulScout.Domain;
 using HaulScout.Domain.Entities;
+using HaulScout.Infrastructure.Organizations;
 using HaulScout.Infrastructure.Persistence;
 
 namespace HaulScout.Tests;
@@ -51,7 +53,7 @@ public class OrganizationSecurityTests
     {
         TimeProvider timeProvider = clock ?? TimeProvider.System;
         StubCurrentUser currentUser = new(org, user);
-        OrganizationAccessService access = new(db, currentUser);
+        IOrganizationAuthorizer access = new EfOrganizationAuthorizer(db, currentUser);
         OrganizationRoleGuard guard = new(db);
         SupabaseAdminInviteService invites = new(
             new HttpClient(),
@@ -63,7 +65,7 @@ public class OrganizationSecurityTests
             new OrganizationWorkflowService(db, currentUser, access),
             new OrganizationMemberWorkflowService(db, access, guard, invites),
             new OrganizationInviteCodeWorkflowService(db, currentUser, access, guard, timeProvider),
-            new OrganizationRoleWorkflowService(db, access),
+            new OrganizationRoleWorkflowService(new EfOrganizationRoleStore(db), access),
             new OrganizationTeamWorkflowService(db, access, guard));
     }
 
