@@ -45,7 +45,7 @@ public class InventoryBrowseTests
             new InventoryBundleWorkflowService(db, currentUser),
             new InventoryDeletionWorkflowService(db, currentUser),
             new InventoryUpsertWorkflowService(db, currentUser, referenceData),
-            new InventoryQueryService(db, currentUser),
+            new InventoryQueryService(new EfInventoryStore(db), currentUser),
             null!,
             new InventoryIssueWorkflowService(db, currentUser),
             new InventoryStatusWorkflowService(db, currentUser));
