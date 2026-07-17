@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using HaulScout.Api.Services;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
+using HaulScout.Application.Inventory;
 
 namespace HaulScout.Tests;
 
@@ -34,13 +35,10 @@ public sealed class InventoryPhotoStorageServiceTests
         }
 
         await using MemoryStream stream = new(pngBytes);
-        FormFile file = new(stream, 0, pngBytes.Length, "file", "item.png")
-        {
-            Headers = new HeaderDictionary(),
-            ContentType = "image/png"
-        };
+        // No ASP.NET FormFile needed any more: the processor takes a plain description of the upload.
+        PhotoUpload upload = new(stream, "item.png", "image/png", pngBytes.Length);
 
-        InventoryPhotoStorageService.ProcessedInventoryPhoto result = await service.ProcessAsync(file, CancellationToken.None);
+        ProcessedPhoto result = await service.ProcessAsync(upload, CancellationToken.None);
 
         Assert.Equal("image/png", result.ContentType);
         Assert.Equal("item.png", result.OriginalFileName);

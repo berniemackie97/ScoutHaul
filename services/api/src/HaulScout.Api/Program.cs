@@ -12,6 +12,7 @@ using HaulScout.Application;
 using HaulScout.Application.Security;
 using HaulScout.Infrastructure;
 using HaulScout.Infrastructure.Persistence;
+using HaulScout.Application.Inventory;
 
 // Load .env into environment variables for local dev BEFORE the config builder reads them.
 // No-op in production (no .env file present); never overrides platform-provided vars.
@@ -66,7 +67,7 @@ builder.Services.AddScoped<SourcingTripQueryService>();
 builder.Services.AddScoped<SourcingTripWorkflowService>();
 builder.Services.AddScoped<SourcingTripStopWorkflowService>();
 builder.Services.AddScoped<MarketplaceLookupPersistenceService>();
-builder.Services.AddScoped<InventoryPhotoStorageService>();
+builder.Services.AddScoped<IInventoryPhotoProcessor, InventoryPhotoStorageService>();
 builder.Services.AddScoped<OrderAssembler>();
 builder.Services.AddScoped<OrdersWorkflowService>();
 builder.Services.AddScoped<MarketplaceRefundImportService>();
@@ -81,7 +82,6 @@ builder.Services.AddScoped<SaleDeletionWorkflowService>();
 builder.Services.AddScoped<SaleTransitionWorkflowService>();
 builder.Services.AddScoped<SaleCorrectionWorkflowService>();
 builder.Services.AddScoped<SaleRefundWorkflowService>();
-builder.Services.AddScoped<InventoryPhotoWorkflowService>();
 builder.Services.AddAuthorization(options =>
 {
     options.FallbackPolicy = new AuthorizationPolicyBuilder()

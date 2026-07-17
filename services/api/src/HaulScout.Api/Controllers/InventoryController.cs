@@ -83,7 +83,12 @@ public sealed class InventoryController(
         [FromForm] UploadInventoryPhotoForm request,
         CancellationToken cancellationToken)
     {
-        AppResult<InventoryPhotoUploadResultDto> result = await photos.UploadAsync(id, request.File, request.IsHero, cancellationToken);
+        // The web boundary ends here: IFormFile is adapted into the framework-free PhotoUpload the use case takes.
+        PhotoUpload? upload = request.File is null
+            ? null
+            : new PhotoUpload(request.File.OpenReadStream(), request.File.FileName, request.File.ContentType, request.File.Length);
+
+        AppResult<InventoryPhotoUploadResultDto> result = await photos.UploadAsync(id, upload, request.IsHero, cancellationToken);
         return ToActionResult(result);
     }
 

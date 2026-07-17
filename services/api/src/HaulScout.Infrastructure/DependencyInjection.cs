@@ -41,6 +41,7 @@ public static class DependencyInjection
         services.AddScoped<IAuditTrail, EfAuditTrail>();
         services.AddScoped<IInventoryStore, EfInventoryStore>();
         services.AddScoped<IInventoryIssueStore, EfInventoryIssueStore>();
+        services.AddScoped<IInventoryPhotoStore, EfInventoryPhotoStore>();
         services.AddScoped<IOrganizationAuthorizer, EfOrganizationAuthorizer>();
         services.AddScoped<IOrganizationInviteCodeStore, EfOrganizationInviteCodeStore>();
         services.AddScoped<IOrganizationMemberStore, EfOrganizationMemberStore>();
