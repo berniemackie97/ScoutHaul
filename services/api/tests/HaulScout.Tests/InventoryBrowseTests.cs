@@ -42,7 +42,7 @@ public class InventoryBrowseTests
         InventoryReferenceDataService referenceData = new(new EfInventoryReferenceDataStore(db, currentUser));
         return new InventoryController(
             referenceData,
-            new InventoryBundleWorkflowService(db, currentUser),
+            new InventoryBundleWorkflowService(new EfInventoryStore(db), new EfAuditTrail(db, currentUser), currentUser),
             new InventoryDeletionWorkflowService(db, currentUser),
             new InventoryUpsertWorkflowService(db, currentUser, referenceData),
             new InventoryQueryService(new EfInventoryStore(db), currentUser),

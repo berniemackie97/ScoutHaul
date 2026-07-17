@@ -65,6 +65,24 @@ public sealed class EfInventoryStore(HaulScoutDbContext db) : IInventoryStore
             .Select(item => new InventoryScalars(item.Status, item.PurchasePrice, item.EstimatedSalePrice, item.SellerAskingPrice))
             .ToListAsync(cancellationToken);
 
+    public async Task<IReadOnlyList<InventoryItem>> ListBundleCandidatesAsync(
+        Guid organizationId,
+        IReadOnlyCollection<Guid> ids,
+        CancellationToken cancellationToken) =>
+        await db.InventoryItems
+            .Include(item => item.Sales)
+            .Where(item => ids.Contains(item.Id) && item.OrganizationId == organizationId)
+            .ToListAsync(cancellationToken);
+
+    public async Task AddAsync(InventoryItem item, CancellationToken cancellationToken) =>
+        await db.InventoryItems.AddAsync(item, cancellationToken);
+
+    public async Task AddBundleComponentAsync(InventoryBundleComponent component, CancellationToken cancellationToken) =>
+        await db.InventoryBundleComponents.AddAsync(component, cancellationToken);
+
+    public Task LoadBundleComponentsAsync(InventoryItem bundle, CancellationToken cancellationToken) =>
+        db.Entry(bundle).Collection(item => item.BundleComponents).LoadAsync(cancellationToken);
+
     public Task SaveChangesAsync(CancellationToken cancellationToken) => db.SaveChangesAsync(cancellationToken);
 
     private IQueryable<InventoryItem> Filtered(Guid organizationId, InventoryFilter filter)

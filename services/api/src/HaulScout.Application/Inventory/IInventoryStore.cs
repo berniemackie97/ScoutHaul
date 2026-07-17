@@ -45,5 +45,21 @@ public interface IInventoryStore
         InventoryFilter filter,
         CancellationToken cancellationToken);
 
+    /// <summary>
+    /// The candidate components for a bundle, each with its sales loaded — an item still held by a live sale cannot be
+    /// bundled, and that has to be decided from the item's sales rather than from its status alone.
+    /// </summary>
+    Task<IReadOnlyList<InventoryItem>> ListBundleCandidatesAsync(
+        Guid organizationId,
+        IReadOnlyCollection<Guid> ids,
+        CancellationToken cancellationToken);
+
+    Task AddAsync(InventoryItem item, CancellationToken cancellationToken);
+
+    Task AddBundleComponentAsync(InventoryBundleComponent component, CancellationToken cancellationToken);
+
+    /// <summary>Loads a bundle's components after it has been written, so the caller can return the whole thing.</summary>
+    Task LoadBundleComponentsAsync(InventoryItem bundle, CancellationToken cancellationToken);
+
     Task SaveChangesAsync(CancellationToken cancellationToken);
 }

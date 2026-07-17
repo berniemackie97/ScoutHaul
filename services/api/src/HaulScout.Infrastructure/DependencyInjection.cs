@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using HaulScout.Application.Common;
 using HaulScout.Application.Inventory;
 using HaulScout.Application.Organizations;
 using HaulScout.Application.PlatformOrders;
@@ -37,6 +38,7 @@ public static class DependencyInjection
 
         services.AddScoped<IChannelAccountService, EfChannelAccountService>();
         services.AddScoped<IInventoryReferenceDataStore, EfInventoryReferenceDataStore>();
+        services.AddScoped<IAuditTrail, EfAuditTrail>();
         services.AddScoped<IInventoryStore, EfInventoryStore>();
         services.AddScoped<IInventoryIssueStore, EfInventoryIssueStore>();
         services.AddScoped<IOrganizationAuthorizer, EfOrganizationAuthorizer>();
