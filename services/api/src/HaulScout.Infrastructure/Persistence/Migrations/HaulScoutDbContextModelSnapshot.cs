@@ -2132,6 +2132,135 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                     b.ToTable("PlatformListings", (string)null);
                 });
 
+            modelBuilder.Entity("HaulScout.Domain.Entities.PlatformListingQualitySnapshot", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<bool?>("AcceptsReturns")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Action")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<bool?>("BestOffer")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Brand")
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)");
+
+                    b.Property<string>("CategoryName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<decimal?>("ClickThroughRate")
+                        .HasPrecision(9, 6)
+                        .HasColumnType("numeric(9,6)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal?>("DailyImpressions")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<int?>("EstimatedHandlingDays")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ExternalListingId")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<bool?>("FreeShipping")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTimeOffset>("ImportedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ListingCondition")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<string>("Mpn")
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("PhotoCount")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Platform")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
+                    b.Property<Guid?>("PlatformListingId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("PriceRange")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<bool?>("PromotedListings")
+                        .HasColumnType("boolean");
+
+                    b.Property<decimal?>("PromotedListingsAdRate")
+                        .HasPrecision(9, 6)
+                        .HasColumnType("numeric(9,6)");
+
+                    b.Property<string>("RawJson")
+                        .HasColumnType("jsonb");
+
+                    b.Property<int?>("RecommendedItemSpecificsFilled")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("RecommendedItemSpecificsToAdd")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTimeOffset>("ReportGeneratedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal?>("SalesConversionRate")
+                        .HasPrecision(9, 6)
+                        .HasColumnType("numeric(9,6)");
+
+                    b.Property<bool?>("SellerPaidReturns")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(400)
+                        .HasColumnType("character varying(400)");
+
+                    b.Property<int?>("TitleKeywordCount")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Upc")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PlatformListingId");
+
+                    b.HasIndex("OrganizationId", "PlatformListingId", "ReportGeneratedAt");
+
+                    b.HasIndex("OrganizationId", "Platform", "ExternalListingId", "ReportGeneratedAt")
+                        .IsUnique();
+
+                    b.ToTable("PlatformListingQualitySnapshots", (string)null);
+                });
+
             modelBuilder.Entity("HaulScout.Domain.Entities.PlatformOrder", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3839,6 +3968,24 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                     b.Navigation("Organization");
 
                     b.Navigation("ReconciledInventoryItem");
+                });
+
+            modelBuilder.Entity("HaulScout.Domain.Entities.PlatformListingQualitySnapshot", b =>
+                {
+                    b.HasOne("HaulScout.Domain.Entities.Organization", "Organization")
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("HaulScout.Domain.Entities.PlatformListing", "PlatformListing")
+                        .WithMany()
+                        .HasForeignKey("PlatformListingId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Organization");
+
+                    b.Navigation("PlatformListing");
                 });
 
             modelBuilder.Entity("HaulScout.Domain.Entities.PlatformOrder", b =>

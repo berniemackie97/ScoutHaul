@@ -1,16 +1,22 @@
 import Link from "next/link";
 import { ArrowRight, FileSpreadsheet } from "lucide-react";
-import { getApiClient } from "@/lib/api";
+import { getApiAccessToken, getApiBaseUrl, getApiClient } from "@/lib/api";
 import { CsvUploader } from "./csv-uploader";
-import { importEbayOrders, importEbayListings, importMarketplaceRefunds } from "./actions";
+import {
+  importEbayOrders,
+  importEbayListings,
+  importEbayListingQuality,
+  importMarketplaceRefunds,
+} from "./actions";
 
 export const dynamic = "force-dynamic";
 
 export default async function ImportsPage() {
   const api = await getApiClient();
-  const [orders, listings] = await Promise.all([
+  const [orders, listings, qualitySnapshots] = await Promise.all([
     api.GET("/api/platform-orders", { params: { query: { status: "Imported" } } }),
     api.GET("/api/platform-listings", { params: { query: { reconcileStatus: "Pending" } } }),
+    getQualitySnapshotsCount(),
   ]);
   const ordersToReconcile = orders.data?.length ?? 0;
   const listingsToReconcile = listings.data?.length ?? 0;
@@ -29,7 +35,7 @@ export default async function ImportsPage() {
         </p>
       </header>
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid gap-4 lg:grid-cols-4">
         <CsvUploader
           title="eBay orders"
           description="Seller Hub → Orders (All Orders report) for buyers + tracking, or Performance → Sales for exact fees. The importer detects which and merges them."
@@ -43,6 +49,15 @@ export default async function ImportsPage() {
           buttonLabel="Import eBay listings"
         />
         <CsvUploader
+          title="eBay listing quality"
+          description="Seller Hub → Performance → Listing Quality Report (.xlsx). Imports impressions, CTR, conversion, photo counts, and recommendation gaps by listing."
+          action={importEbayListingQuality}
+          accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          fileLabel="XLSX workbook"
+          buttonLabel="Import quality"
+          allowPaste={false}
+        />
+        <CsvUploader
           title="Marketplace refunds"
           description="Depop Sales refund columns or eBay Listing Sales fee-credit refund rows. Only exact sale matches are posted."
           action={importMarketplaceRefunds}
@@ -50,7 +65,7 @@ export default async function ImportsPage() {
         />
       </div>
 
-      <section className="grid gap-4 sm:grid-cols-2">
+      <section className="grid gap-4 sm:grid-cols-3">
         <ReconcileCard
           href="/imports/orders"
           title="Orders to reconcile"
@@ -63,9 +78,28 @@ export default async function ImportsPage() {
           count={listingsToReconcile}
           hint="Link imported listings to an inventory item, or seed a new draft."
         />
+        <ReconcileCard
+          href="/analytics"
+          title="Quality snapshots"
+          count={qualitySnapshots}
+          hint="Imported eBay listing-quality observations available for reporting."
+        />
       </section>
     </div>
   );
+}
+
+async function getQualitySnapshotsCount(): Promise<number> {
+  const token = await getApiAccessToken();
+  const response = await fetch(`${getApiBaseUrl()}/api/platform-listings/quality-snapshots?take=500`, {
+    cache: "no-store",
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+  if (!response.ok) return 0;
+  const rows = (await response.json()) as unknown[];
+  return rows.length;
 }
 
 function ReconcileCard({

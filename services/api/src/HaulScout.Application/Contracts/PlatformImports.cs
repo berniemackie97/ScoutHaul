@@ -129,6 +129,9 @@ public sealed record ImportPlatformOrdersCsvRequest(string Platform, string Csv)
 /// same idempotent listing ingest, so legacy listings seed/link inventory without re-entry.</summary>
 public sealed record ImportPlatformListingsCsvRequest(string Platform, string Csv);
 
+/// <summary>Import eBay's Listing Quality workbook (.xlsx). The workbook is binary, so admin sends it as base64.</summary>
+public sealed record ImportPlatformListingQualityWorkbookRequest(string Platform, string FileName, string ContentBase64);
+
 /// <summary>Import marketplace refund rows from seller exports. The importer posts only exact sale matches and
 /// reports ambiguous rows as skipped warnings.</summary>
 public sealed record ImportMarketplaceRefundsCsvRequest(string Platform, string Csv);
@@ -199,6 +202,44 @@ public sealed record PlatformListingDto(
     DateTimeOffset ScrapedAt);
 
 public sealed record IngestPlatformListingsResultDto(int Created, int Updated, int Skipped, IReadOnlyList<PlatformListingDto> Listings);
+
+public sealed record PlatformListingQualitySnapshotDto(
+    Guid Id,
+    string Platform,
+    string ExternalListingId,
+    string Title,
+    string? CategoryName,
+    string? ListingCondition,
+    string? PriceRange,
+    DateTimeOffset ReportGeneratedAt,
+    DateTimeOffset ImportedAt,
+    Guid? PlatformListingId,
+    string? Action,
+    decimal? DailyImpressions,
+    decimal? ClickThroughRate,
+    decimal? SalesConversionRate,
+    decimal? PromotedListingsAdRate,
+    int? RecommendedItemSpecificsFilled,
+    string? RecommendedItemSpecificsToAdd,
+    string? Brand,
+    string? Mpn,
+    string? Upc,
+    int? PhotoCount,
+    int? TitleKeywordCount,
+    bool? FreeShipping,
+    int? EstimatedHandlingDays,
+    bool? AcceptsReturns,
+    bool? SellerPaidReturns,
+    bool? PromotedListings,
+    bool? BestOffer);
+
+public sealed record ImportPlatformListingQualityResultDto(
+    int Imported,
+    int Updated,
+    int MatchedListings,
+    int UnmatchedListings,
+    IReadOnlyList<string> Warnings,
+    IReadOnlyList<PlatformListingQualitySnapshotDto> Snapshots);
 
 /// <summary>Turn an imported listing into ScoutHaul inventory: link it to an existing item, or create a new draft
 /// item seeded from the listing. Either way a <c>ChannelListing</c> is created/updated so the item shows on eBay.</summary>
