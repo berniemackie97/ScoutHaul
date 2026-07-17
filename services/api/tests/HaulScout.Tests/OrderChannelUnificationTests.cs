@@ -4,9 +4,11 @@ using HaulScout.Api.Controllers;
 using HaulScout.Api.Services;
 using HaulScout.Application.Common;
 using HaulScout.Application.Contracts;
+using HaulScout.Application.PlatformOrders;
 using HaulScout.Application.Security;
 using HaulScout.Domain;
 using HaulScout.Domain.Entities;
+using HaulScout.Infrastructure.PlatformOrders;
 using HaulScout.Infrastructure.Persistence;
 
 namespace HaulScout.Tests;
@@ -42,7 +44,7 @@ public class OrderChannelUnificationTests
     private static PlatformOrdersController NewPlatformOrders(HaulScoutDbContext db, Guid org, Guid user)
     {
         var currentUser = new StubCurrentUser(org, user);
-        var suggestionService = new PlatformOrderSuggestionService(db, currentUser);
+        var suggestionService = new PlatformOrderSuggestionService(new EfPlatformOrderSuggestionStore(db, currentUser));
         return new PlatformOrdersController(
             db,
             currentUser,

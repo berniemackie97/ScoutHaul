@@ -1,19 +1,16 @@
-using Microsoft.EntityFrameworkCore;
-using static HaulScout.Api.Helpers.StringHelpers;
 using HaulScout.Application.Common;
 using HaulScout.Application.Contracts;
 using HaulScout.Application.Security;
 using HaulScout.Application.Services;
 using HaulScout.Domain.Entities;
-using HaulScout.Infrastructure.Persistence;
 
-namespace HaulScout.Api.Services;
+namespace HaulScout.Application.Storefront;
 
 /// <summary>
 /// The organization's storefront identity — most importantly the public store domain the storefront resolves the org
 /// by. Because that domain is the resolution key it must be unique across every organization, not just this one.
 /// </summary>
-public sealed class StoreSettingsWorkflowService(HaulScoutDbContext db, ICurrentUserContext currentUser)
+public sealed class StoreSettingsWorkflowService(IStoreSettingsStore stores, ICurrentUserContext currentUser)
 {
     public async Task<AppResult<StoreSettingsDto>> GetAsync(CancellationToken cancellationToken)
     {
@@ -41,9 +38,10 @@ public sealed class StoreSettingsWorkflowService(HaulScoutDbContext db, ICurrent
 
             // The domain is the storefront's resolution key, so it must be unique across ALL
             // organizations, not just this one. Bypass the tenant filter for the check.
-            bool alreadyConnected = await db.Organizations
-                .IgnoreQueryFilters()
-                .AnyAsync(o => o.StoreDomain == domain && o.Id != currentUser.OrganizationId, cancellationToken);
+            bool alreadyConnected = await stores.StoreDomainExistsForAnotherOrganizationAsync(
+                domain,
+                currentUser.OrganizationId,
+                cancellationToken);
             if (alreadyConnected)
             {
                 return AppResult<StoreSettingsDto>.Conflict("That domain is already connected to another organization.");
@@ -58,13 +56,15 @@ public sealed class StoreSettingsWorkflowService(HaulScoutDbContext db, ICurrent
 
         org.Name = name;
         org.StoreDomain = domain;
-        await db.SaveChangesAsync(cancellationToken);
+        await stores.SaveChangesAsync(cancellationToken);
         return AppResult<StoreSettingsDto>.Ok(ToDto(org));
     }
 
     private Task<Organization?> LoadAsync(CancellationToken cancellationToken) =>
-        db.Organizations.FirstOrDefaultAsync(o => o.Id == currentUser.OrganizationId, cancellationToken);
+        stores.FindAsync(currentUser.OrganizationId, cancellationToken);
 
     private static StoreSettingsDto ToDto(Organization org) =>
         new(org.Name, org.StoreDomain, org.StoreDomain is not null);
+
+    private static string? TrimToNull(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }

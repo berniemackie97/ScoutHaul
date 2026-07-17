@@ -1,10 +1,11 @@
 using Microsoft.EntityFrameworkCore;
-using HaulScout.Api.Services;
+using HaulScout.Application.Sales;
 using HaulScout.Application.Common;
 using HaulScout.Application.Contracts;
 using HaulScout.Application.Security;
 using HaulScout.Domain;
 using HaulScout.Domain.Entities;
+using HaulScout.Infrastructure.Sales;
 using HaulScout.Infrastructure.Persistence;
 
 namespace HaulScout.Tests;
@@ -33,7 +34,8 @@ public class SalesChannelWorkflowServiceTests
         db.Organizations.Add(new Organization { Id = org, Name = "Overhaul Trading Company" });
         db.Users.Add(new AppUser { Id = user, Email = "op@x.com", DisplayName = "Operator" });
         db.SaveChanges();
-        return (db, new SalesChannelWorkflowService(db, new StubCurrentUser(org, user)), org);
+        StubCurrentUser currentUser = new(org, user);
+        return (db, new SalesChannelWorkflowService(new EfSalesChannelStore(db, currentUser)), org);
     }
 
     [Fact]

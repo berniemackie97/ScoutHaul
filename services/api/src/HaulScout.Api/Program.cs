@@ -62,22 +62,16 @@ builder.Services
 // Time is a dependency: services that make time-based decisions take TimeProvider so those rules can be
 // tested at the boundary instead of against the wall clock.
 builder.Services.AddSingleton(TimeProvider.System);
-builder.Services.AddScoped<StoreSettingsWorkflowService>();
 builder.Services.AddScoped<SourcingTripQueryService>();
 builder.Services.AddScoped<SourcingTripWorkflowService>();
 builder.Services.AddScoped<SourcingTripStopWorkflowService>();
-builder.Services.AddScoped<SessionBootstrapService>();
-builder.Services.AddScoped<ReferenceOverrideWorkflowService>();
 builder.Services.AddScoped<MarketplaceLookupPersistenceService>();
 builder.Services.AddScoped<InventoryPhotoStorageService>();
-builder.Services.AddScoped<InventoryReferenceDataService>();
 builder.Services.AddScoped<OrderAssembler>();
 builder.Services.AddScoped<OrdersWorkflowService>();
 builder.Services.AddScoped<MarketplaceRefundImportService>();
 builder.Services.AddScoped<PlatformOrderFeeEnrichmentService>();
-builder.Services.AddScoped<PlatformOrderSuggestionService>();
 builder.Services.AddScoped<PlatformOrderIngestionService>();
-builder.Services.AddScoped<SalesChannelWorkflowService>();
 builder.Services.AddScoped<SaleRecordingWorkflowService>();
 builder.Services.AddScoped<SaleFinancialStateService>();
 builder.Services.AddScoped<SaleReturnWorkflowService>();

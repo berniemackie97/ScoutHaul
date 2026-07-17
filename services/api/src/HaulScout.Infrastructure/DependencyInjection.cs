@@ -1,12 +1,24 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using HaulScout.Application.Inventory;
 using HaulScout.Application.Organizations;
+using HaulScout.Application.PlatformOrders;
+using HaulScout.Application.ReferenceData;
+using HaulScout.Application.Sales;
+using HaulScout.Application.Sessions;
 using HaulScout.Application.Services;
+using HaulScout.Application.Storefront;
 using HaulScout.Infrastructure.Channels;
+using HaulScout.Infrastructure.Inventory;
 using HaulScout.Infrastructure.Marketplace;
 using HaulScout.Infrastructure.Organizations;
 using HaulScout.Infrastructure.Persistence;
+using HaulScout.Infrastructure.PlatformOrders;
+using HaulScout.Infrastructure.ReferenceData;
+using HaulScout.Infrastructure.Sales;
+using HaulScout.Infrastructure.Sessions;
+using HaulScout.Infrastructure.Storefront;
 using HaulScout.Infrastructure.Vision;
 
 namespace HaulScout.Infrastructure;
@@ -24,12 +36,18 @@ public static class DependencyInjection
         services.AddDbContext<HaulScoutDbContext>(options => options.UseNpgsql(connectionString));
 
         services.AddScoped<IChannelAccountService, EfChannelAccountService>();
+        services.AddScoped<IInventoryReferenceDataStore, EfInventoryReferenceDataStore>();
         services.AddScoped<IOrganizationAuthorizer, EfOrganizationAuthorizer>();
         services.AddScoped<IOrganizationInviteCodeStore, EfOrganizationInviteCodeStore>();
         services.AddScoped<IOrganizationMemberStore, EfOrganizationMemberStore>();
         services.AddScoped<IOrganizationStore, EfOrganizationStore>();
         services.AddScoped<IOrganizationRoleStore, EfOrganizationRoleStore>();
         services.AddScoped<IOrganizationTeamStore, EfOrganizationTeamStore>();
+        services.AddScoped<IPlatformOrderSuggestionStore, EfPlatformOrderSuggestionStore>();
+        services.AddScoped<IReferenceOverrideStore, EfReferenceOverrideStore>();
+        services.AddScoped<ISalesChannelStore, EfSalesChannelStore>();
+        services.AddScoped<ISessionBootstrapStore, EfSessionBootstrapStore>();
+        services.AddScoped<IStoreSettingsStore, EfStoreSettingsStore>();
         services.AddHttpClient<IOrganizationInviteSender, SupabaseOrganizationInviteSender>();
 
         // In-memory cache (resale estimates, etc.) — protects the shared Gemini free-tier quota.

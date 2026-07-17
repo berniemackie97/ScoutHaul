@@ -1,11 +1,12 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using HaulScout.Api.Controllers;
-using HaulScout.Api.Services;
 using HaulScout.Application.Common;
 using HaulScout.Application.Contracts;
 using HaulScout.Application.Security;
+using HaulScout.Application.Storefront;
 using HaulScout.Domain.Entities;
+using HaulScout.Infrastructure.Storefront;
 using HaulScout.Infrastructure.Persistence;
 
 namespace HaulScout.Tests;
@@ -43,7 +44,7 @@ public class StoreSettingsTests
         existing.StoreDomain = "overhaultrading.com";
         await db.SaveChangesAsync();
 
-        StoreSettingsController controller = new(new StoreSettingsWorkflowService(db, new StubCurrentUser(org)));
+        StoreSettingsController controller = new(new StoreSettingsWorkflowService(new EfStoreSettingsStore(db), new StubCurrentUser(org)));
         ActionResult<StoreSettingsDto> result = await controller.Get(CancellationToken.None);
 
         Assert.Null(result.Result);
@@ -63,7 +64,7 @@ public class StoreSettingsTests
         (HaulScoutDbContext db, Guid org) = NewContext($"normalize-{expected}-{input.GetHashCode()}");
         await using HaulScoutDbContext _ = db;
 
-        StoreSettingsController controller = new(new StoreSettingsWorkflowService(db, new StubCurrentUser(org)));
+        StoreSettingsController controller = new(new StoreSettingsWorkflowService(new EfStoreSettingsStore(db), new StubCurrentUser(org)));
         ActionResult<StoreSettingsDto> result = await controller.Update(
             new UpdateStoreSettingsRequest("Overhaul Trading Company", input), CancellationToken.None);
 
@@ -85,7 +86,7 @@ public class StoreSettingsTests
         (HaulScoutDbContext db, Guid org) = NewContext($"invalid-{input.GetHashCode()}");
         await using HaulScoutDbContext _ = db;
 
-        StoreSettingsController controller = new(new StoreSettingsWorkflowService(db, new StubCurrentUser(org)));
+        StoreSettingsController controller = new(new StoreSettingsWorkflowService(new EfStoreSettingsStore(db), new StubCurrentUser(org)));
         ActionResult<StoreSettingsDto> result = await controller.Update(
             new UpdateStoreSettingsRequest("Overhaul Trading Company", input), CancellationToken.None);
 
@@ -100,7 +101,7 @@ public class StoreSettingsTests
         db.Organizations.Add(new Organization { Id = Guid.NewGuid(), Name = "Another Co", StoreDomain = "overhaultrading.com" });
         await db.SaveChangesAsync();
 
-        StoreSettingsController controller = new(new StoreSettingsWorkflowService(db, new StubCurrentUser(org)));
+        StoreSettingsController controller = new(new StoreSettingsWorkflowService(new EfStoreSettingsStore(db), new StubCurrentUser(org)));
         ActionResult<StoreSettingsDto> result = await controller.Update(
             new UpdateStoreSettingsRequest("Overhaul Trading Company", "overhaultrading.com"), CancellationToken.None);
 
@@ -116,7 +117,7 @@ public class StoreSettingsTests
         existing.StoreDomain = "overhaultrading.com";
         await db.SaveChangesAsync();
 
-        StoreSettingsController controller = new(new StoreSettingsWorkflowService(db, new StubCurrentUser(org)));
+        StoreSettingsController controller = new(new StoreSettingsWorkflowService(new EfStoreSettingsStore(db), new StubCurrentUser(org)));
         ActionResult<StoreSettingsDto> result = await controller.Update(
             new UpdateStoreSettingsRequest("Overhaul Trading Company", "   "), CancellationToken.None);
 
@@ -131,7 +132,7 @@ public class StoreSettingsTests
         (HaulScoutDbContext db, Guid org) = NewContext(nameof(Update_requires_a_store_name));
         await using HaulScoutDbContext _ = db;
 
-        StoreSettingsController controller = new(new StoreSettingsWorkflowService(db, new StubCurrentUser(org)));
+        StoreSettingsController controller = new(new StoreSettingsWorkflowService(new EfStoreSettingsStore(db), new StubCurrentUser(org)));
         ActionResult<StoreSettingsDto> result = await controller.Update(
             new UpdateStoreSettingsRequest("  ", "overhaultrading.com"), CancellationToken.None);
 
