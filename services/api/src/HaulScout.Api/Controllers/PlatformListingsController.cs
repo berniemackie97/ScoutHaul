@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 using HaulScout.Api.Authorization;
 using static HaulScout.Api.Helpers.StringHelpers;
 using HaulScout.Api.Mapping;
@@ -54,6 +55,22 @@ public sealed class PlatformListingsController(HaulScoutDbContext db, ICurrentUs
         return listings.Select(listing => listing.ToDto(Suggestion(suggestions, listing))).ToList();
     }
 
+    [HttpGet("quality-snapshots")]
+    public async Task<ActionResult<IReadOnlyList<PlatformListingQualitySnapshotDto>>> ListQualitySnapshots(
+        [FromQuery] int take = 200,
+        CancellationToken cancellationToken = default)
+    {
+        int safeTake = Math.Clamp(take, 1, 500);
+        List<PlatformListingQualitySnapshot> snapshots = await db.PlatformListingQualitySnapshots
+            .Where(snapshot => snapshot.OrganizationId == currentUser.OrganizationId)
+            .OrderByDescending(snapshot => snapshot.ReportGeneratedAt)
+            .ThenByDescending(snapshot => snapshot.DailyImpressions ?? 0)
+            .Take(safeTake)
+            .ToListAsync(cancellationToken);
+
+        return snapshots.Select(snapshot => snapshot.ToDto()).ToList();
+    }
+
     /// <summary>Import eBay's own Active Listings export (Seller Hub → Listings → Download) — parsed server-side
     /// into the same idempotent ingest, so legacy listings seed/link inventory without re-entry.</summary>
     [HttpPost("import/ebay-csv")]
@@ -73,6 +90,103 @@ public sealed class PlatformListingsController(HaulScoutDbContext db, ICurrentUs
         return await Ingest(
             new IngestPlatformListingsRequest(string.IsNullOrWhiteSpace(request.Platform) ? "eBay" : request.Platform, parsed.Listings, null),
             cancellationToken);
+    }
+
+    /// <summary>Import eBay's Listing Quality workbook (.xlsx). eBay stores item ids in title hyperlinks, so rows
+    /// are matched back to imported active listings by durable item id and stored as historical quality snapshots.</summary>
+    [HttpPost("import/ebay-listing-quality-workbook")]
+    public async Task<ActionResult<ImportPlatformListingQualityResultDto>> ImportEbayListingQualityWorkbook(
+        ImportPlatformListingQualityWorkbookRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(request.ContentBase64))
+        {
+            return BadRequest("Choose the eBay Listing Quality workbook (.xlsx).");
+        }
+
+        byte[] workbookBytes;
+        try
+        {
+            workbookBytes = Convert.FromBase64String(request.ContentBase64);
+        }
+        catch (FormatException)
+        {
+            return BadRequest("The Listing Quality workbook payload was not valid base64.");
+        }
+
+        EbayListingQualityWorkbookParser.ParseResult parsed = EbayListingQualityWorkbookParser.Parse(workbookBytes, DateTimeOffset.UtcNow);
+        if (parsed.Rows.Count == 0)
+        {
+            return BadRequest(parsed.Warnings.FirstOrDefault() ?? "No listing-level recommendations were found in the eBay Listing Quality workbook.");
+        }
+
+        List<string> existingChannels = await ExistingChannels(cancellationToken);
+        string platform = SalesChannelCatalog.CanonicalValue(request.Platform, existingChannels) ?? "eBay";
+        List<string> externalIds = parsed.Rows.Select(row => row.ExternalListingId).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+
+        List<PlatformListing> listings = await db.PlatformListings
+            .Where(listing => listing.OrganizationId == currentUser.OrganizationId
+                && listing.Platform == platform
+                && externalIds.Contains(listing.ExternalListingId))
+            .ToListAsync(cancellationToken);
+
+        List<PlatformListingQualitySnapshot> existingSnapshots = await db.PlatformListingQualitySnapshots
+            .Where(snapshot => snapshot.OrganizationId == currentUser.OrganizationId
+                && snapshot.Platform == platform
+                && externalIds.Contains(snapshot.ExternalListingId))
+            .ToListAsync(cancellationToken);
+
+        int imported = 0, updated = 0, matched = 0, unmatched = 0;
+        List<PlatformListingQualitySnapshot> touched = [];
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+
+        foreach (EbayListingQualityWorkbookParser.ListingQualityRow row in parsed.Rows)
+        {
+            PlatformListing? listing = listings.FirstOrDefault(candidate =>
+                candidate.ExternalListingId.Equals(row.ExternalListingId, StringComparison.OrdinalIgnoreCase));
+            if (listing is null)
+            {
+                unmatched++;
+            }
+            else
+            {
+                matched++;
+            }
+
+            PlatformListingQualitySnapshot? snapshot = existingSnapshots.FirstOrDefault(candidate =>
+                candidate.ExternalListingId.Equals(row.ExternalListingId, StringComparison.OrdinalIgnoreCase)
+                && candidate.ReportGeneratedAt == row.ReportGeneratedAt);
+            if (snapshot is null)
+            {
+                snapshot = new PlatformListingQualitySnapshot
+                {
+                    OrganizationId = currentUser.OrganizationId,
+                    Platform = platform,
+                    ExternalListingId = row.ExternalListingId,
+                    Title = row.Title,
+                    ReportGeneratedAt = row.ReportGeneratedAt,
+                };
+                db.PlatformListingQualitySnapshots.Add(snapshot);
+                existingSnapshots.Add(snapshot);
+                imported++;
+            }
+            else
+            {
+                updated++;
+            }
+
+            ApplyQualitySnapshot(snapshot, row, listing?.Id, now);
+            touched.Add(snapshot);
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+        return new ImportPlatformListingQualityResultDto(
+            imported,
+            updated,
+            matched,
+            unmatched,
+            parsed.Warnings,
+            touched.OrderByDescending(snapshot => snapshot.DailyImpressions ?? 0).Take(100).Select(snapshot => snapshot.ToDto()).ToList());
     }
 
     /// <summary>Idempotent batch upsert of imported/captured listings. Re-ingesting a listing that is not yet linked
@@ -361,6 +475,39 @@ public sealed class PlatformListingsController(HaulScoutDbContext db, ICurrentUs
         listing.EndsAt = input.EndsAt;
         listing.RawJson = TrimToNull(input.RawJson);
         listing.ScrapedAt = DateTimeOffset.UtcNow;
+    }
+
+    private static void ApplyQualitySnapshot(
+        PlatformListingQualitySnapshot snapshot,
+        EbayListingQualityWorkbookParser.ListingQualityRow row,
+        Guid? platformListingId,
+        DateTimeOffset importedAt)
+    {
+        snapshot.PlatformListingId = platformListingId;
+        snapshot.Title = row.Title;
+        snapshot.CategoryName = TrimToNull(row.CategoryName);
+        snapshot.ListingCondition = TrimToNull(row.ListingCondition);
+        snapshot.PriceRange = TrimToNull(row.PriceRange);
+        snapshot.ImportedAt = importedAt;
+        snapshot.Action = TrimToNull(row.Action);
+        snapshot.DailyImpressions = row.DailyImpressions;
+        snapshot.ClickThroughRate = row.ClickThroughRate;
+        snapshot.SalesConversionRate = row.SalesConversionRate;
+        snapshot.PromotedListingsAdRate = row.PromotedListingsAdRate;
+        snapshot.RecommendedItemSpecificsFilled = row.RecommendedItemSpecificsFilled;
+        snapshot.RecommendedItemSpecificsToAdd = TrimToNull(row.RecommendedItemSpecificsToAdd);
+        snapshot.Brand = TrimToNull(row.Brand);
+        snapshot.Mpn = TrimToNull(row.Mpn);
+        snapshot.Upc = TrimToNull(row.Upc);
+        snapshot.PhotoCount = row.PhotoCount;
+        snapshot.TitleKeywordCount = row.TitleKeywordCount;
+        snapshot.FreeShipping = row.FreeShipping;
+        snapshot.EstimatedHandlingDays = row.EstimatedHandlingDays;
+        snapshot.AcceptsReturns = row.AcceptsReturns;
+        snapshot.SellerPaidReturns = row.SellerPaidReturns;
+        snapshot.PromotedListings = row.PromotedListings;
+        snapshot.BestOffer = row.BestOffer;
+        snapshot.RawJson = JsonSerializer.Serialize(row.RawFields);
     }
 
     private static (Guid Id, string Title, bool AlreadySold)? Suggestion(

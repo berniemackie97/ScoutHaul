@@ -236,6 +236,36 @@ public static class DtoMapping
         suggestion?.AlreadySold ?? false,
         listing.ScrapedAt);
 
+    public static PlatformListingQualitySnapshotDto ToDto(this PlatformListingQualitySnapshot snapshot) => new(
+        snapshot.Id,
+        snapshot.Platform,
+        snapshot.ExternalListingId,
+        snapshot.Title,
+        snapshot.CategoryName,
+        snapshot.ListingCondition,
+        snapshot.PriceRange,
+        snapshot.ReportGeneratedAt,
+        snapshot.ImportedAt,
+        snapshot.PlatformListingId,
+        snapshot.Action,
+        snapshot.DailyImpressions,
+        snapshot.ClickThroughRate,
+        snapshot.SalesConversionRate,
+        snapshot.PromotedListingsAdRate,
+        snapshot.RecommendedItemSpecificsFilled,
+        snapshot.RecommendedItemSpecificsToAdd,
+        snapshot.Brand,
+        snapshot.Mpn,
+        snapshot.Upc,
+        snapshot.PhotoCount,
+        snapshot.TitleKeywordCount,
+        snapshot.FreeShipping,
+        snapshot.EstimatedHandlingDays,
+        snapshot.AcceptsReturns,
+        snapshot.SellerPaidReturns,
+        snapshot.PromotedListings,
+        snapshot.BestOffer);
+
     public static PlatformOrderDto ToDto(this PlatformOrder order, IReadOnlyDictionary<Guid, (Guid Id, string Title, bool AlreadySold)>? lineSuggestions = null)
     {
         decimal expectedPayout = order.ExpectedPayout();

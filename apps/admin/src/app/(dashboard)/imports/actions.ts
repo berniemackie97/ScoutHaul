@@ -1,5 +1,6 @@
 "use server";
 
+import { Buffer } from "node:buffer";
 import { revalidatePath } from "next/cache";
 import { getApiAccessToken, getApiBaseUrl, getApiClient } from "@/lib/api";
 
@@ -21,6 +22,13 @@ async function readCsv(formData: FormData): Promise<string> {
   if (file instanceof File && file.size > 0) return file.text();
   const pasted = (formData.get("csv") as string)?.trim();
   return pasted ?? "";
+}
+
+async function readWorkbook(formData: FormData): Promise<{ fileName: string; contentBase64: string } | null> {
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size <= 0) return null;
+  const bytes = Buffer.from(await file.arrayBuffer());
+  return { fileName: file.name, contentBase64: bytes.toString("base64") };
 }
 
 /** eBay orders/sales report → platform orders (the endpoint auto-detects All Orders vs the Sales report). */
@@ -117,5 +125,50 @@ export async function importEbayListings(
   return {
     ok: true,
     message: `${created} new · ${updated} updated · ${skipped} skipped. Reconcile below.`,
+  };
+}
+
+/** eBay Listing Quality workbook → historical quality snapshots matched by eBay item id hyperlink. */
+export async function importEbayListingQuality(
+  _previous: ImportResult,
+  formData: FormData
+): Promise<ImportResult> {
+  const workbook = await readWorkbook(formData);
+  if (!workbook)
+    return { ok: false, message: "Choose the eBay Listing Quality workbook (.xlsx)." };
+
+  const token = await getApiAccessToken();
+  const response = await fetch(
+    `${getApiBaseUrl()}/api/platform-listings/import/ebay-listing-quality-workbook`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ platform: "eBay", ...workbook }),
+    }
+  );
+
+  if (!response.ok) {
+    const text = await response.text();
+    return { ok: false, message: text || "That did not look like an eBay Listing Quality workbook." };
+  }
+
+  const result = (await response.json()) as {
+    imported: number;
+    updated: number;
+    matchedListings: number;
+    unmatchedListings: number;
+    warnings?: string[];
+  };
+
+  revalidatePath("/imports");
+  revalidatePath("/inventory");
+  revalidatePath("/analytics");
+  const warningText = result.warnings?.length ? ` ${result.warnings.length} warning(s).` : "";
+  return {
+    ok: true,
+    message: `${result.imported} new · ${result.updated} updated · ${result.matchedListings} matched · ${result.unmatchedListings} unmatched.${warningText}`,
   };
 }
