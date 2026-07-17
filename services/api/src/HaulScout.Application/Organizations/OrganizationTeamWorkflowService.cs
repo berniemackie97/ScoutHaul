@@ -1,38 +1,29 @@
-using Microsoft.EntityFrameworkCore;
-using HaulScout.Api.Mapping;
 using HaulScout.Application.Common;
 using HaulScout.Application.Contracts;
-using HaulScout.Application.Organizations;
 using HaulScout.Application.Security;
 using HaulScout.Domain.Entities;
-using HaulScout.Infrastructure.Persistence;
 
-namespace HaulScout.Api.Services;
+namespace HaulScout.Application.Organizations;
 
 /// <summary>
 /// Teams and their membership. A team is a grouping inside one organization, so you must already belong to the
 /// organization to join one — and a team role that would grant owner-level power still needs an owner.
 /// </summary>
 public sealed class OrganizationTeamWorkflowService(
-    HaulScoutDbContext db,
-    IOrganizationAuthorizer access,
-    OrganizationRoleGuard guard)
+    IOrganizationTeamStore teams,
+    IOrganizationRoleStore roles,
+    IOrganizationAuthorizer authorizer)
 {
     public async Task<IReadOnlyList<OrganizationTeamDto>> ListAsync(Guid id, CancellationToken cancellationToken)
     {
-        await access.RequirePermission(id, HaulScoutPermissions.ManageTeams, cancellationToken);
-        List<OrganizationTeam> teams = await db.OrganizationTeams
-            .Include(team => team.Members)
-            .Where(team => team.OrganizationId == id)
-            .OrderBy(team => team.Name)
-            .ToListAsync(cancellationToken);
-
-        return teams.Select(team => team.ToDto()).ToArray();
+        await authorizer.RequirePermission(id, HaulScoutPermissions.ManageTeams, cancellationToken);
+        IReadOnlyList<OrganizationTeam> records = await teams.ListAsync(id, cancellationToken);
+        return records.Select(team => team.ToDto()).ToArray();
     }
 
     public async Task<AppResult<OrganizationTeamDto>> CreateAsync(Guid id, UpsertOrganizationTeamRequest request, CancellationToken cancellationToken)
     {
-        await access.RequirePermission(id, HaulScoutPermissions.ManageTeams, cancellationToken);
+        await authorizer.RequirePermission(id, HaulScoutPermissions.ManageTeams, cancellationToken);
         if (string.IsNullOrWhiteSpace(request.Name))
         {
             return AppResult<OrganizationTeamDto>.Validation("Team name is required.");
@@ -45,22 +36,20 @@ public sealed class OrganizationTeamWorkflowService(
             Description = request.Description?.Trim()
         };
 
-        db.OrganizationTeams.Add(team);
-        await db.SaveChangesAsync(cancellationToken);
+        await teams.AddAsync(team, cancellationToken);
+        await teams.SaveChangesAsync(cancellationToken);
         return AppResult<OrganizationTeamDto>.Ok(team.ToDto());
     }
 
     public async Task<AppResult<OrganizationTeamDto>> UpdateAsync(Guid id, Guid teamId, UpsertOrganizationTeamRequest request, CancellationToken cancellationToken)
     {
-        await access.RequirePermission(id, HaulScoutPermissions.ManageTeams, cancellationToken);
+        await authorizer.RequirePermission(id, HaulScoutPermissions.ManageTeams, cancellationToken);
         if (string.IsNullOrWhiteSpace(request.Name))
         {
             return AppResult<OrganizationTeamDto>.Validation("Team name is required.");
         }
 
-        OrganizationTeam? team = await db.OrganizationTeams
-            .Include(item => item.Members)
-            .SingleOrDefaultAsync(item => item.Id == teamId && item.OrganizationId == id, cancellationToken);
+        OrganizationTeam? team = await teams.FindWithMembersAsync(id, teamId, cancellationToken);
         if (team is null)
         {
             return AppResult<OrganizationTeamDto>.NotFound();
@@ -68,53 +57,45 @@ public sealed class OrganizationTeamWorkflowService(
 
         team.Name = request.Name.Trim();
         team.Description = request.Description?.Trim();
-        await db.SaveChangesAsync(cancellationToken);
+        await teams.SaveChangesAsync(cancellationToken);
         return AppResult<OrganizationTeamDto>.Ok(team.ToDto());
     }
 
     public async Task<AppResult> DeleteAsync(Guid id, Guid teamId, CancellationToken cancellationToken)
     {
-        await access.RequirePermission(id, HaulScoutPermissions.ManageTeams, cancellationToken);
-        OrganizationTeam? team = await db.OrganizationTeams
-            .SingleOrDefaultAsync(item => item.Id == teamId && item.OrganizationId == id, cancellationToken);
+        await authorizer.RequirePermission(id, HaulScoutPermissions.ManageTeams, cancellationToken);
+        OrganizationTeam? team = await teams.FindAsync(id, teamId, cancellationToken);
         if (team is null)
         {
             return AppResult.NotFound();
         }
 
-        db.OrganizationTeams.Remove(team);
-        await db.SaveChangesAsync(cancellationToken);
+        teams.Remove(team);
+        await teams.SaveChangesAsync(cancellationToken);
         return AppResult.Ok();
     }
 
     public async Task<AppResult<IReadOnlyList<OrganizationTeamMemberDto>>> ListMembersAsync(Guid id, Guid teamId, CancellationToken cancellationToken)
     {
-        await access.RequirePermission(id, HaulScoutPermissions.ManageTeams, cancellationToken);
-        if (!await guard.TeamBelongsToOrganizationAsync(id, teamId, cancellationToken))
+        await authorizer.RequirePermission(id, HaulScoutPermissions.ManageTeams, cancellationToken);
+        if (!await teams.ExistsAsync(id, teamId, cancellationToken))
         {
             return AppResult<IReadOnlyList<OrganizationTeamMemberDto>>.NotFound();
         }
 
-        List<OrganizationTeamMember> members = await db.OrganizationTeamMembers
-            .Include(item => item.User)
-            .Include(item => item.RoleDefinition)
-            .Where(item => item.TeamId == teamId)
-            .OrderBy(item => item.User!.DisplayName)
-            .ToListAsync(cancellationToken);
-
+        IReadOnlyList<OrganizationTeamMember> members = await teams.ListMembersAsync(teamId, cancellationToken);
         return AppResult<IReadOnlyList<OrganizationTeamMemberDto>>.Ok(members.Select(item => item.ToDto()).ToArray());
     }
 
     public async Task<AppResult<OrganizationTeamMemberDto>> AddMemberAsync(Guid id, Guid teamId, AddTeamMemberRequest request, CancellationToken cancellationToken)
     {
-        await access.RequirePermission(id, HaulScoutPermissions.ManageTeams, cancellationToken);
-        if (!await guard.TeamBelongsToOrganizationAsync(id, teamId, cancellationToken))
+        await authorizer.RequirePermission(id, HaulScoutPermissions.ManageTeams, cancellationToken);
+        if (!await teams.ExistsAsync(id, teamId, cancellationToken))
         {
             return AppResult<OrganizationTeamMemberDto>.NotFound();
         }
 
-        bool userBelongsToOrg = await db.OrganizationMembers.AnyAsync(
-            item => item.OrganizationId == id && item.UserId == request.UserId, cancellationToken);
+        bool userBelongsToOrg = await teams.UserBelongsToOrganizationAsync(id, request.UserId, cancellationToken);
         if (!userBelongsToOrg)
         {
             return AppResult<OrganizationTeamMemberDto>.Validation("User must belong to the organization before joining a team.");
@@ -123,7 +104,7 @@ public sealed class OrganizationTeamWorkflowService(
         OrganizationRoleDefinition? role = null;
         if (request.RoleId is not null)
         {
-            role = await guard.LoadRoleAsync(id, request.RoleId.Value, cancellationToken);
+            role = await roles.FindAsync(id, request.RoleId.Value, cancellationToken);
             if (role is null)
             {
                 return AppResult<OrganizationTeamMemberDto>.Validation("Role does not belong to this organization.");
@@ -132,7 +113,7 @@ public sealed class OrganizationTeamWorkflowService(
 
         if (OrganizationRoleRules.RoleRequiresOwner(role))
         {
-            await access.RequireOwner(id, cancellationToken);
+            await authorizer.RequireOwner(id, cancellationToken);
         }
 
         OrganizationTeamMember member = new()
@@ -142,31 +123,28 @@ public sealed class OrganizationTeamWorkflowService(
             RoleId = role?.Id
         };
 
-        db.OrganizationTeamMembers.Add(member);
-        await db.SaveChangesAsync(cancellationToken);
-
-        member.User = await db.Users.FindAsync([request.UserId], cancellationToken);
-        member.RoleDefinition = role;
+        await teams.AddMemberAsync(member, cancellationToken);
+        await teams.SaveChangesAsync(cancellationToken);
+        await teams.LoadMemberReferencesAsync(member, cancellationToken);
         return AppResult<OrganizationTeamMemberDto>.Ok(member.ToDto());
     }
 
     public async Task<AppResult> RemoveMemberAsync(Guid id, Guid teamId, Guid memberId, CancellationToken cancellationToken)
     {
-        await access.RequirePermission(id, HaulScoutPermissions.ManageTeams, cancellationToken);
-        if (!await guard.TeamBelongsToOrganizationAsync(id, teamId, cancellationToken))
+        await authorizer.RequirePermission(id, HaulScoutPermissions.ManageTeams, cancellationToken);
+        if (!await teams.ExistsAsync(id, teamId, cancellationToken))
         {
             return AppResult.NotFound();
         }
 
-        OrganizationTeamMember? member = await db.OrganizationTeamMembers
-            .SingleOrDefaultAsync(item => item.Id == memberId && item.TeamId == teamId, cancellationToken);
+        OrganizationTeamMember? member = await teams.FindMemberAsync(teamId, memberId, cancellationToken);
         if (member is null)
         {
             return AppResult.NotFound();
         }
 
-        db.OrganizationTeamMembers.Remove(member);
-        await db.SaveChangesAsync(cancellationToken);
+        teams.RemoveMember(member);
+        await teams.SaveChangesAsync(cancellationToken);
         return AppResult.Ok();
     }
 }

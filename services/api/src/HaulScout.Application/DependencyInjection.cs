@@ -15,6 +15,7 @@ public static class DependencyInjection
         services.AddScoped<IDealAnalyzer, DealAnalyzer>();
         services.AddScoped<IConfidenceScorer, ConfidenceScorer>();
         services.AddScoped<OrganizationRoleWorkflowService>();
+        services.AddScoped<OrganizationTeamWorkflowService>();
         services.AddSingleton<IMarketplaceSearchLinkGenerator, MarketplaceSearchLinkGenerator>();
 
         return services;
