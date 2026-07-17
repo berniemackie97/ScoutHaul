@@ -22,24 +22,6 @@ public static class DtoMapping
         string.IsNullOrWhiteSpace(item.User?.ExternalSubject) ? "Pending" : "Active",
         item.JoinedAt);
 
-    public static OrganizationTeamDto ToDto(this OrganizationTeam item) => new(
-        item.Id,
-        item.OrganizationId,
-        item.Name,
-        item.Description,
-        item.Members.Count,
-        item.CreatedAt);
-
-    public static OrganizationTeamMemberDto ToDto(this OrganizationTeamMember item) => new(
-        item.Id,
-        item.TeamId,
-        item.UserId,
-        item.User?.Email ?? string.Empty,
-        item.User?.DisplayName ?? string.Empty,
-        item.RoleId,
-        item.RoleDefinition?.Name,
-        item.JoinedAt);
-
     public static OrganizationInviteCodeDto ToDto(this OrganizationInviteCode item) => new(
         item.Id,
         item.OrganizationId,

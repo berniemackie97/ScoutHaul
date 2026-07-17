@@ -26,6 +26,4 @@ public sealed class OrganizationRoleGuard(HaulScoutDbContext db)
             .OrderBy(role => role.Name)
             .FirstOrDefaultAsync(cancellationToken);
 
-    public Task<bool> TeamBelongsToOrganizationAsync(Guid organizationId, Guid teamId, CancellationToken cancellationToken) =>
-        db.OrganizationTeams.AnyAsync(team => team.Id == teamId && team.OrganizationId == organizationId, cancellationToken);
 }

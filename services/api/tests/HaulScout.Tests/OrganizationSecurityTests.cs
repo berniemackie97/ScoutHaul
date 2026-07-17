@@ -66,7 +66,7 @@ public class OrganizationSecurityTests
             new OrganizationMemberWorkflowService(db, access, guard, invites),
             new OrganizationInviteCodeWorkflowService(db, currentUser, access, guard, timeProvider),
             new OrganizationRoleWorkflowService(new EfOrganizationRoleStore(db), access),
-            new OrganizationTeamWorkflowService(db, access, guard));
+            new OrganizationTeamWorkflowService(new EfOrganizationTeamStore(db), new EfOrganizationRoleStore(db), access));
     }
 
     /// <summary>Mirrors the controller's private hashing so a code can be seeded the way redemption will look it up.</summary>
