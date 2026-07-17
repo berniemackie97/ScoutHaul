@@ -42,11 +42,12 @@ public class PlatformOrderIngestionTests
     {
         var currentUser = new StubCurrentUser(org, user);
         var suggestionService = new PlatformOrderSuggestionService(new EfPlatformOrderSuggestionStore(db, currentUser));
+        var orderAssembler = new OrderAssembler(db, currentUser);
         return new PlatformOrdersController(
             db,
             currentUser,
-            new OrderAssembler(db, currentUser),
-            new MarketplaceRefundImportService(db, currentUser, TimeProvider.System),
+            orderAssembler,
+            new MarketplaceRefundImportService(db, currentUser, TimeProvider.System, orderAssembler),
             new PlatformOrderFeeEnrichmentService(db, currentUser),
             new PlatformOrderIngestionService(db, currentUser, suggestionService),
             suggestionService);
@@ -535,6 +536,127 @@ Brass Lamp,377251318593,1,$0.00,$0.00,$0.00,$0.00,$0.00,$12.34,$0.00,$0.00,$16.9
         Assert.Equal(InventoryStatus.Returned, (await db.InventoryItems.SingleAsync(i => i.Id == item.Id)).Status);
         // Item back on the shelf: COGS released; the original outbound label stays spent.
         Assert.Equal(-5.97m, sale.NetProfit);
+    }
+
+    [Fact]
+    public async Task Reimporting_a_returned_order_corrects_the_returned_sale_instead_of_creating_a_duplicate()
+    {
+        var (db, org, user) = NewContext(nameof(Reimporting_a_returned_order_corrects_the_returned_sale_instead_of_creating_a_duplicate));
+        await using var _ = db;
+        var controller = NewController(db, org, user);
+        var item = SeedItem(db, org, "Brass Lamp", 40m);
+
+        await controller.ImportEbayCsv(new ImportPlatformOrdersCsvRequest("eBay", EbayAllOrdersCsv), CancellationToken.None);
+        await controller.ImportEbayCsv(new ImportPlatformOrdersCsvRequest("eBay", EbayListingSalesCsv), CancellationToken.None);
+        PlatformOrder order = await db.PlatformOrders.Include(o => o.Lines).SingleAsync();
+        await controller.Reconcile(order.Id,
+            new ReconcilePlatformOrderRequest([new ReconcilePlatformOrderLineMap(order.Lines.First().Id, item.Id)]), CancellationToken.None);
+
+        Sale saleBefore = await db.Sales.SingleAsync();
+        Return rma = Return.Open(org, saleBefore, "damage", null, user, DateTimeOffset.UtcNow.AddDays(-2));
+        rma.IssueLabel(11.94m, null, DateTimeOffset.UtcNow.AddDays(-2));
+        rma.Receive(DateTimeOffset.UtcNow.AddDays(-1));
+        db.Returns.Add(rma);
+        await db.SaveChangesAsync();
+
+        await controller.ImportMarketplaceRefundsCsv(
+            new ImportMarketplaceRefundsCsvRequest("eBay", EbayRefundListingSalesCsv), CancellationToken.None);
+
+        Sale returnedSale = await db.Sales.Include(sale => sale.Refunds).Include(sale => sale.Returns).SingleAsync();
+        Assert.Equal(SaleStatus.Returned, returnedSale.Status);
+
+        // Simulates the bad production state caused by the previous reconcile rule: the same eBay order also has a
+        // fresh recorded sale for the same inventory item. Shipment evidence is moved to the surviving returned sale.
+        Order salesOrder = await db.Orders.SingleAsync();
+        Sale duplicate = new()
+        {
+            OrganizationId = org,
+            InventoryItemId = item.Id,
+            Platform = "eBay",
+            SoldPrice = 77.28m,
+            ShippingCharged = 3.69m,
+            CostOfGoods = 40m,
+            SalesTaxCollected = 7.15m,
+            TaxRemittedByPlatform = true,
+            SoldAt = OrderedAt,
+            Status = SaleStatus.Recorded,
+            OrderId = salesOrder.Id,
+        };
+        duplicate.RecomputeNet();
+        db.Sales.Add(duplicate);
+        db.Shipments.Add(new Shipment
+        {
+            OrganizationId = org,
+            SaleId = duplicate.Id,
+            Carrier = "USPS Ground Advantage",
+            TrackingNumber = "9400111100000000000000",
+            ShippedAt = DateTimeOffset.UtcNow.AddDays(-1),
+        });
+        await db.SaveChangesAsync();
+        Assert.Equal(2, await db.Sales.CountAsync());
+
+        await controller.ImportEbayCsv(new ImportPlatformOrdersCsvRequest("eBay", EbayAllOrdersCsv), CancellationToken.None);
+        PlatformOrder refreshed = await db.PlatformOrders.Include(o => o.Lines).SingleAsync();
+        ActionResult<PlatformOrderReconcileResultDto> result = await controller.Reconcile(refreshed.Id, new ReconcilePlatformOrderRequest([]), CancellationToken.None);
+
+        Assert.Equal(0, result.Value!.CreatedSaleCount);
+        Assert.Equal(1, result.Value.CorrectedSaleCount);
+        Sale surviving = Assert.Single(await db.Sales.Include(sale => sale.Refunds).Include(sale => sale.Returns).ToListAsync());
+        Assert.Equal(returnedSale.Id, surviving.Id);
+        Assert.Equal(SaleStatus.Returned, surviving.Status);
+        Assert.Single(surviving.Refunds);
+        Assert.Single(surviving.Returns);
+
+        Shipment shipment = await db.Shipments.SingleAsync();
+        Assert.Equal(surviving.Id, shipment.SaleId);
+
+        Order repairedOrder = await db.Orders.Include(item => item.Lines).SingleAsync();
+        Assert.Equal(77.28m, repairedOrder.Subtotal);
+        Assert.Equal(3.69m, repairedOrder.ShippingTotal);
+        Assert.Equal(7.15m, repairedOrder.TaxTotal);
+        Assert.Equal(88.12m, repairedOrder.GrandTotal);
+        Assert.Equal(OrderStatus.Refunded, repairedOrder.Status);
+        Assert.Equal(PaymentStatus.Refunded, repairedOrder.PaymentStatus);
+        Assert.Single(repairedOrder.Lines);
+    }
+
+    [Fact]
+    public async Task A_returned_item_can_be_reconciled_to_a_later_different_order_as_a_true_resale()
+    {
+        var (db, org, user) = NewContext(nameof(A_returned_item_can_be_reconciled_to_a_later_different_order_as_a_true_resale));
+        await using var _ = db;
+        var controller = NewController(db, org, user);
+        var item = SeedItem(db, org, "Brass Lamp", 40m);
+
+        await controller.ImportEbayCsv(new ImportPlatformOrdersCsvRequest("eBay", EbayAllOrdersCsv), CancellationToken.None);
+        await controller.ImportEbayCsv(new ImportPlatformOrdersCsvRequest("eBay", EbayListingSalesCsv), CancellationToken.None);
+        PlatformOrder firstOrder = await db.PlatformOrders.Include(o => o.Lines).SingleAsync();
+        await controller.Reconcile(firstOrder.Id,
+            new ReconcilePlatformOrderRequest([new ReconcilePlatformOrderLineMap(firstOrder.Lines.First().Id, item.Id)]), CancellationToken.None);
+
+        Sale firstSale = await db.Sales.SingleAsync();
+        Return rma = Return.Open(org, firstSale, "damage", null, user, DateTimeOffset.UtcNow.AddDays(-2));
+        rma.IssueLabel(11.94m, null, DateTimeOffset.UtcNow.AddDays(-2));
+        rma.Receive(DateTimeOffset.UtcNow.AddDays(-1));
+        db.Returns.Add(rma);
+        await db.SaveChangesAsync();
+        await controller.ImportMarketplaceRefundsCsv(
+            new ImportMarketplaceRefundsCsvRequest("eBay", EbayRefundListingSalesCsv), CancellationToken.None);
+
+        IngestPlatformOrderLineInput[] resaleLines = [new("Brass Lamp", 110m, ExternalItemId: "377251318593")];
+        await controller.Ingest(new IngestPlatformOrdersRequest("eBay", [Order("ORD-RESOLD", resaleLines, shipping: 5.97m, tax: 8.53m, fee: 14m)]), CancellationToken.None);
+        PlatformOrder resaleOrder = await db.PlatformOrders.Include(o => o.Lines).SingleAsync(item => item.ExternalOrderId == "ORD-RESOLD");
+        ActionResult<PlatformOrderReconcileResultDto> result = await controller.Reconcile(resaleOrder.Id,
+            new ReconcilePlatformOrderRequest([new ReconcilePlatformOrderLineMap(resaleOrder.Lines.First().Id, item.Id)]), CancellationToken.None);
+
+        Assert.Equal(1, result.Value!.CreatedSaleCount);
+        Assert.Equal(0, result.Value.CorrectedSaleCount);
+        List<Sale> sales = await db.Sales.OrderBy(sale => sale.SoldAt).ToListAsync();
+        Assert.Equal(2, sales.Count);
+        Assert.Equal(SaleStatus.Returned, sales[0].Status);
+        Assert.Equal(SaleStatus.Recorded, sales[1].Status);
+        Assert.NotEqual(sales[0].OrderId, sales[1].OrderId);
+        Assert.Equal(InventoryStatus.Sold, (await db.InventoryItems.SingleAsync(i => i.Id == item.Id)).Status);
     }
 
     /// <summary>An early marketplace refund — item still with the buyer — closes the return WITHOUT restocking:
