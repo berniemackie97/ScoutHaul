@@ -1,9 +1,10 @@
 using Microsoft.EntityFrameworkCore;
-using HaulScout.Api.Services;
+using HaulScout.Application.Inventory;
 using HaulScout.Application.Common;
 using HaulScout.Application.Contracts;
 using HaulScout.Application.Security;
 using HaulScout.Domain.Entities;
+using HaulScout.Infrastructure.Inventory;
 using HaulScout.Infrastructure.Persistence;
 
 namespace HaulScout.Tests;
@@ -33,7 +34,8 @@ public sealed class InventoryReferenceDataServiceTests
         });
         await db.SaveChangesAsync();
 
-        InventoryReferenceDataService service = new(db, new StubCurrentUser(organizationId));
+        StubCurrentUser currentUser = new(organizationId);
+        InventoryReferenceDataService service = new(new EfInventoryReferenceDataStore(db, currentUser));
         InventoryReferenceDataDto data = await service.GetAsync(CancellationToken.None);
 
         Assert.Contains(data.Categories, option => option.Value == "Collectibles" && option.IsLegacy == false);
@@ -56,7 +58,8 @@ public sealed class InventoryReferenceDataServiceTests
         db.ProductIdentities.Add(new ProductIdentity { Title = "Console", Brand = "Nintendo", Model = "Switch OLED" });
         await db.SaveChangesAsync();
 
-        InventoryReferenceDataService service = new(db, new StubCurrentUser(organizationId));
+        StubCurrentUser currentUser = new(organizationId);
+        InventoryReferenceDataService service = new(new EfInventoryReferenceDataStore(db, currentUser));
         (InventoryReferenceDataService.ControlledValues? Values, string? Error) accepted = await service.ResolveAsync(Request(category: "video games", brand: "nintendo", model: "switch oled"), CancellationToken.None);
         (InventoryReferenceDataService.ControlledValues? Values, string? Error) corrected = await service.ResolveAsync(Request(category: "Collectibels", brand: "Nintenndo", model: "Switch-ish"), CancellationToken.None);
 

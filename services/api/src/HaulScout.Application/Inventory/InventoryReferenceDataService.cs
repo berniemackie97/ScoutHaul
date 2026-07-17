@@ -1,13 +1,10 @@
-using Microsoft.EntityFrameworkCore;
 using HaulScout.Application.Contracts;
-using HaulScout.Application.Security;
 using HaulScout.Application.Services;
 using HaulScout.Domain.Entities;
-using HaulScout.Infrastructure.Persistence;
 
-namespace HaulScout.Api.Services;
+namespace HaulScout.Application.Inventory;
 
-public sealed class InventoryReferenceDataService(HaulScoutDbContext db, ICurrentUserContext currentUser)
+public sealed class InventoryReferenceDataService(IInventoryReferenceDataStore referenceData)
 {
     public sealed record ControlledValues(
         string? Category,
@@ -21,16 +18,8 @@ public sealed class InventoryReferenceDataService(HaulScoutDbContext db, ICurren
 
     public async Task<InventoryReferenceDataDto> GetAsync(CancellationToken cancellationToken)
     {
-        Guid organizationId = currentUser.OrganizationId;
-        IQueryable<HaulScout.Domain.Entities.InventoryItem> inventoryQuery = db.InventoryItems
-            .AsNoTracking()
-            .Where(item => item.OrganizationId == organizationId);
-
-        List<string?> storageValues = await inventoryQuery.Select(item => item.StorageLocation).Distinct().ToListAsync(cancellationToken);
-        List<HaulScout.Domain.Entities.OrgReferenceOverride> overrides = await db.OrgReferenceOverrides
-            .AsNoTracking()
-            .Where(item => item.OrganizationId == organizationId)
-            .ToListAsync(cancellationToken);
+        IReadOnlyList<string?> storageValues = await referenceData.ListStorageLocationValuesAsync(cancellationToken);
+        IReadOnlyList<OrgReferenceOverride> overrides = await referenceData.ListOverridesAsync(cancellationToken);
 
         return new InventoryReferenceDataDto(
             ApplyOverrides("Category", InventoryReferenceCatalog.Categories, overrides),
@@ -51,7 +40,7 @@ public sealed class InventoryReferenceDataService(HaulScoutDbContext db, ICurren
     private static InventoryReferenceOptionDto[] ApplyOverrides(
         string kind,
         IReadOnlyList<InventoryReferenceOptionDto> options,
-        List<HaulScout.Domain.Entities.OrgReferenceOverride> overrides)
+        IReadOnlyList<OrgReferenceOverride> overrides)
     {
         List<OrgReferenceOverride> forKind = overrides.Where(item => string.Equals(item.Kind, kind, StringComparison.OrdinalIgnoreCase)).ToList();
         if (forKind.Count == 0)

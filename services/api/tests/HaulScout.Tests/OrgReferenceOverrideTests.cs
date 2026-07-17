@@ -1,9 +1,10 @@
 using Microsoft.EntityFrameworkCore;
-using HaulScout.Api.Services;
+using HaulScout.Application.Inventory;
 using HaulScout.Application.Common;
 using HaulScout.Application.Contracts;
 using HaulScout.Application.Security;
 using HaulScout.Domain.Entities;
+using HaulScout.Infrastructure.Inventory;
 using HaulScout.Infrastructure.Persistence;
 
 namespace HaulScout.Tests;
@@ -27,7 +28,8 @@ public class OrgReferenceOverrideTests
         HaulScoutDbContext db = new(options, tenant);
         db.Organizations.Add(new Organization { Id = org, Name = "Overhaul Trading Company" });
         db.SaveChanges();
-        return (db, new InventoryReferenceDataService(db, new StubCurrentUser(org)), org);
+        StubCurrentUser currentUser = new(org);
+        return (db, new InventoryReferenceDataService(new EfInventoryReferenceDataStore(db, currentUser)), org);
     }
 
     [Fact]

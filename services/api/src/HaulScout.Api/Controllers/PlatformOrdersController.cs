@@ -6,6 +6,7 @@ using static HaulScout.Api.Helpers.StringHelpers;
 using HaulScout.Api.Mapping;
 using HaulScout.Api.Services;
 using HaulScout.Application.Contracts;
+using HaulScout.Application.PlatformOrders;
 using HaulScout.Application.Security;
 using HaulScout.Application.Services;
 using HaulScout.Domain;

@@ -1,18 +1,15 @@
-using Microsoft.EntityFrameworkCore;
-using static HaulScout.Api.Helpers.StringHelpers;
 using HaulScout.Application.Common;
 using HaulScout.Application.Contracts;
 using HaulScout.Application.Security;
 using HaulScout.Domain.Entities;
-using HaulScout.Infrastructure.Persistence;
 
-namespace HaulScout.Api.Services;
+namespace HaulScout.Application.ReferenceData;
 
 /// <summary>
 /// An organization's own reference options — adding a custom one or disabling a catalog one. Keyed on
 /// kind + value + parent, so the same call both creates and edits.
 /// </summary>
-public sealed class ReferenceOverrideWorkflowService(HaulScoutDbContext db, ICurrentUserContext currentUser)
+public sealed class ReferenceOverrideWorkflowService(IReferenceOverrideStore overrides, ICurrentUserContext currentUser)
 {
     private static readonly HashSet<string> Kinds = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -21,10 +18,7 @@ public sealed class ReferenceOverrideWorkflowService(HaulScoutDbContext db, ICur
 
     public async Task<IReadOnlyList<OrgReferenceOverrideDto>> ListAsync(CancellationToken cancellationToken)
     {
-        List<OrgReferenceOverride> rows = await db.OrgReferenceOverrides
-            .Where(item => item.OrganizationId == currentUser.OrganizationId)
-            .OrderBy(item => item.Kind).ThenBy(item => item.Value)
-            .ToListAsync(cancellationToken);
+        IReadOnlyList<OrgReferenceOverride> rows = await overrides.ListAsync(currentUser.OrganizationId, cancellationToken);
         return rows.Select(ToDto).ToList();
     }
 
@@ -43,39 +37,35 @@ public sealed class ReferenceOverrideWorkflowService(HaulScoutDbContext db, ICur
         }
         string? parent = TrimToNull(request.ParentValue);
 
-        OrgReferenceOverride? row = await db.OrgReferenceOverrides.SingleOrDefaultAsync(
-            item => item.OrganizationId == currentUser.OrganizationId
-                && item.Kind == kind
-                && item.Value == value
-                && item.ParentValue == parent,
-            cancellationToken);
+        OrgReferenceOverride? row = await overrides.FindByKeyAsync(currentUser.OrganizationId, kind, value, parent, cancellationToken);
         if (row is null)
         {
             row = new OrgReferenceOverride { OrganizationId = currentUser.OrganizationId, Kind = kind, Value = value, ParentValue = parent };
-            db.OrgReferenceOverrides.Add(row);
+            await overrides.AddAsync(row, cancellationToken);
         }
 
         row.Label = TrimToNull(request.Label);
         row.IsCustom = request.IsCustom;
         row.IsDisabled = request.IsDisabled;
-        await db.SaveChangesAsync(cancellationToken);
+        await overrides.SaveChangesAsync(cancellationToken);
         return AppResult<OrgReferenceOverrideDto>.Ok(ToDto(row));
     }
 
     public async Task<AppResult> DeleteAsync(Guid id, CancellationToken cancellationToken)
     {
-        OrgReferenceOverride? row = await db.OrgReferenceOverrides.SingleOrDefaultAsync(
-            item => item.Id == id && item.OrganizationId == currentUser.OrganizationId, cancellationToken);
+        OrgReferenceOverride? row = await overrides.FindAsync(currentUser.OrganizationId, id, cancellationToken);
         if (row is null)
         {
             return AppResult.NotFound();
         }
 
-        db.OrgReferenceOverrides.Remove(row);
-        await db.SaveChangesAsync(cancellationToken);
+        overrides.Remove(row);
+        await overrides.SaveChangesAsync(cancellationToken);
         return AppResult.Ok();
     }
 
     private static OrgReferenceOverrideDto ToDto(OrgReferenceOverride item) =>
         new(item.Id, item.Kind, item.Value, item.ParentValue, item.Label, item.IsCustom, item.IsDisabled);
+
+    private static string? TrimToNull(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }

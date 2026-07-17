@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
 using HaulScout.Api.Authorization;
-using HaulScout.Api.Services;
 using HaulScout.Application.Common;
 using HaulScout.Application.Contracts;
+using HaulScout.Application.ReferenceData;
 using HaulScout.Application.Security;
 
 namespace HaulScout.Api.Controllers;

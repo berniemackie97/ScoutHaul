@@ -1,6 +1,8 @@
 using HaulScout.Api.Controllers;
 using HaulScout.Api.Services;
+using HaulScout.Application.Sales;
 using HaulScout.Application.Security;
+using HaulScout.Infrastructure.Sales;
 using HaulScout.Infrastructure.Persistence;
 
 namespace HaulScout.Tests;
@@ -14,7 +16,7 @@ internal static class SalesControllerFactory
     public static SalesController Create(HaulScoutDbContext db, ICurrentUserContext currentUser)
     {
         OrderAssembler assembler = new(db, currentUser);
-        SalesChannelWorkflowService channels = new(db, currentUser);
+        SalesChannelWorkflowService channels = new(new EfSalesChannelStore(db, currentUser));
         SaleFinancialStateService saleState = new(db, currentUser);
         return new SalesController(
             channels,

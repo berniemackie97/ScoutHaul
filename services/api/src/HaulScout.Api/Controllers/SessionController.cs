@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
-using HaulScout.Api.Services;
 using HaulScout.Application.Contracts;
+using HaulScout.Application.Sessions;
 
 namespace HaulScout.Api.Controllers;
 
