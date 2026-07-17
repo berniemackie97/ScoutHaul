@@ -11,7 +11,10 @@ namespace HaulScout.Api.Controllers;
 [ApiController]
 [Route("api/storefront")]
 [AllowAnonymous]
-public sealed class StorefrontCheckoutController(StorefrontStoreResolver resolver, CheckoutWorkflowService checkout) : ControllerBase
+public sealed class StorefrontCheckoutController(
+    StorefrontStoreResolver resolver,
+    CheckoutWorkflowService checkout,
+    ILogger<StorefrontCheckoutController> logger) : ControllerBase
 {
     private const string CartHeader = "X-HaulScout-Cart";
 
@@ -24,7 +27,16 @@ public sealed class StorefrontCheckoutController(StorefrontStoreResolver resolve
         }
 
         string? cartToken = Request.Headers[CartHeader].FirstOrDefault()?.Trim() is { Length: > 0 } token ? token : null;
-        return ToActionResult(await checkout.CheckoutAsync(organizationId, cartToken, cancellationToken));
+        try
+        {
+            return ToActionResult(await checkout.CheckoutAsync(organizationId, cartToken, cancellationToken));
+        }
+        catch (PaymentGatewayNotConfiguredException exception)
+        {
+            // The shopper did nothing wrong and retrying will not help until someone sets the key.
+            logger.LogError(exception, "Storefront checkout attempted while payments are unconfigured.");
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, "Checkout is temporarily unavailable. Please try again shortly.");
+        }
     }
 
     /// <summary>The session id is the lookup credential: unguessable, known only to the shopper Stripe redirected.</summary>

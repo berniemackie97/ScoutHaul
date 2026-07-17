@@ -34,6 +34,13 @@ public sealed class StorefrontStripeWebhookController(
             logger.LogWarning(exception, "Rejected a webhook whose signature did not verify.");
             return BadRequest();
         }
+        catch (PaymentGatewayNotConfiguredException exception)
+        {
+            // Never acknowledge an event we could not verify: 500 makes Stripe redeliver, so nothing is lost between
+            // the endpoint going live and its signing secret being set.
+            logger.LogError(exception, "A Stripe webhook arrived before the signing secret was configured.");
+            return StatusCode(StatusCodes.Status500InternalServerError);
+        }
 
         PaymentEventOutcome outcome = await orders.HandleAsync(paymentEvent, cancellationToken);
         logger.LogInformation(
