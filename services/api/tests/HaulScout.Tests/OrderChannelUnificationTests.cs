@@ -49,7 +49,7 @@ public class OrderChannelUnificationTests
             db,
             currentUser,
             new OrderAssembler(db, currentUser),
-            new MarketplaceRefundImportService(db, currentUser),
+            new MarketplaceRefundImportService(db, currentUser, TimeProvider.System),
             new PlatformOrderFeeEnrichmentService(db, currentUser),
             new PlatformOrderIngestionService(db, currentUser, suggestionService),
             suggestionService);

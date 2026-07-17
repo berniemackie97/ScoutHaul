@@ -128,6 +128,30 @@ public sealed class Return : EntityBase, IOrganizationScoped
         ResolvedAt = at;
     }
 
+    /// <summary>
+    /// Closes an open return with a refund that already happened OUTSIDE this workflow — the marketplace refunded
+    /// the buyer and the money event arrived by import. Reality outranks the staging discipline here: refusing the
+    /// event would leave the return open forever against money that has already moved. The item is only claimed as
+    /// restocked when it was actually received; an early marketplace refund closes the return with the item still
+    /// out, and the operator restocks on arrival.
+    /// </summary>
+    /// <returns>Whether the item returned to sellable inventory — the caller stamps the refund with it.</returns>
+    public bool ResolveFromExternalRefund(Refund refund, DateTimeOffset at)
+    {
+        if (!IsOpen)
+        {
+            throw new DomainException($"This return is already resolved ({Status}).");
+        }
+
+        bool restocked = Status == ReturnStatus.Received;
+        Status = ReturnStatus.Refunded;
+        Refund = refund;
+        RefundId = refund.Id;
+        Restocked = restocked;
+        ResolvedAt = at;
+        return restocked;
+    }
+
     /// <summary>Refused after inspection. Any label already paid for stays booked — the seller ate that regardless.</summary>
     public void Reject(string reason, DateTimeOffset at)
     {

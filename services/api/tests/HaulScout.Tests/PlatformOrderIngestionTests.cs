@@ -46,7 +46,7 @@ public class PlatformOrderIngestionTests
             db,
             currentUser,
             new OrderAssembler(db, currentUser),
-            new MarketplaceRefundImportService(db, currentUser),
+            new MarketplaceRefundImportService(db, currentUser, TimeProvider.System),
             new PlatformOrderFeeEnrichmentService(db, currentUser),
             new PlatformOrderIngestionService(db, currentUser, suggestionService),
             suggestionService);
@@ -490,6 +490,86 @@ Brass Lamp,377251318593,1,$0.00,$0.00,$0.00,$0.00,$0.00,$12.34,$0.00,$0.00,$16.9
             new ImportMarketplaceRefundsCsvRequest("eBay", EbayRefundListingSalesCsv), CancellationToken.None);
         Assert.Equal(0, second.Value!.Imported);
         Assert.Single(await db.Refunds.ToListAsync());
+    }
+
+    /// <summary>
+    /// The screenshot bug: eBay refunded the buyer, the refund imported, and the return sat open at Received
+    /// forever — with the sale badge saying Refunded while the item and the return disagreed. An imported refund
+    /// IS the open return's resolution: one event, every status derived from it by the one rule.
+    /// </summary>
+    [Fact]
+    public async Task Refund_import_resolves_a_received_return_and_restocks_the_item()
+    {
+        var (db, org, user) = NewContext(nameof(Refund_import_resolves_a_received_return_and_restocks_the_item));
+        await using var _ = db;
+        var controller = NewController(db, org, user);
+        var item = SeedItem(db, org, "Brass Lamp", 40m);
+
+        await controller.ImportEbayCsv(new ImportPlatformOrdersCsvRequest("eBay", EbayAllOrdersCsv), CancellationToken.None);
+        await controller.ImportEbayCsv(new ImportPlatformOrdersCsvRequest("eBay", EbayListingSalesCsv), CancellationToken.None);
+        PlatformOrder order = await db.PlatformOrders.Include(o => o.Lines).SingleAsync();
+        await controller.Reconcile(order.Id,
+            new ReconcilePlatformOrderRequest([new ReconcilePlatformOrderLineMap(order.Lines.First().Id, item.Id)]), CancellationToken.None);
+
+        // The operator ran the return workflow: requested, label sent, item received back — then eBay's refund
+        // landed in the next Listing Sales export instead of being issued from our workflow.
+        Sale saleBefore = await db.Sales.SingleAsync();
+        Return rma = Return.Open(org, saleBefore, "damage", null, user, DateTimeOffset.UtcNow.AddDays(-2));
+        rma.IssueLabel(11.94m, null, DateTimeOffset.UtcNow.AddDays(-2));
+        rma.Receive(DateTimeOffset.UtcNow.AddDays(-1));
+        db.Returns.Add(rma);
+        await db.SaveChangesAsync();
+
+        await controller.ImportMarketplaceRefundsCsv(
+            new ImportMarketplaceRefundsCsvRequest("eBay", EbayRefundListingSalesCsv), CancellationToken.None);
+
+        // One truth, everywhere it is read.
+        Return resolved = await db.Returns.SingleAsync();
+        Assert.Equal(ReturnStatus.Refunded, resolved.Status);
+        Assert.True(resolved.Restocked);
+        Assert.NotNull(resolved.RefundId);
+        Refund refund = Assert.Single(await db.Refunds.ToListAsync());
+        Assert.True(refund.ItemReturned);
+        Sale sale = await db.Sales.SingleAsync();
+        Assert.Equal(SaleStatus.Returned, sale.Status);
+        Assert.Equal(InventoryStatus.Returned, (await db.InventoryItems.SingleAsync(i => i.Id == item.Id)).Status);
+        // Item back on the shelf: COGS released; the original outbound label stays spent.
+        Assert.Equal(-5.97m, sale.NetProfit);
+    }
+
+    /// <summary>An early marketplace refund — item still with the buyer — closes the return WITHOUT restocking:
+    /// claiming the item is back would be a lie the books repeat forever.</summary>
+    [Fact]
+    public async Task Refund_import_resolves_an_unreceived_return_without_restocking()
+    {
+        var (db, org, user) = NewContext(nameof(Refund_import_resolves_an_unreceived_return_without_restocking));
+        await using var _ = db;
+        var controller = NewController(db, org, user);
+        var item = SeedItem(db, org, "Brass Lamp", 40m);
+
+        await controller.ImportEbayCsv(new ImportPlatformOrdersCsvRequest("eBay", EbayAllOrdersCsv), CancellationToken.None);
+        await controller.ImportEbayCsv(new ImportPlatformOrdersCsvRequest("eBay", EbayListingSalesCsv), CancellationToken.None);
+        PlatformOrder order = await db.PlatformOrders.Include(o => o.Lines).SingleAsync();
+        await controller.Reconcile(order.Id,
+            new ReconcilePlatformOrderRequest([new ReconcilePlatformOrderLineMap(order.Lines.First().Id, item.Id)]), CancellationToken.None);
+
+        Sale saleBefore = await db.Sales.SingleAsync();
+        Return rma = Return.Open(org, saleBefore, "damage", null, user, DateTimeOffset.UtcNow.AddDays(-1));
+        rma.IssueLabel(11.94m, null, DateTimeOffset.UtcNow.AddDays(-1));   // label out, item still with the buyer
+        db.Returns.Add(rma);
+        await db.SaveChangesAsync();
+
+        await controller.ImportMarketplaceRefundsCsv(
+            new ImportMarketplaceRefundsCsvRequest("eBay", EbayRefundListingSalesCsv), CancellationToken.None);
+
+        Return resolved = await db.Returns.SingleAsync();
+        Assert.Equal(ReturnStatus.Refunded, resolved.Status);
+        Assert.False(resolved.Restocked);
+        Assert.False((await db.Refunds.SingleAsync()).ItemReturned);
+        Sale sale = await db.Sales.SingleAsync();
+        Assert.Equal(SaleStatus.Refunded, sale.Status);   // refunded, not returned — the item is still out
+        Assert.NotEqual(InventoryStatus.Returned, (await db.InventoryItems.SingleAsync(i => i.Id == item.Id)).Status);
+        Assert.Equal(-45.97m, sale.NetProfit);   // COGS stays consumed until the item actually comes back
     }
 
     private const string DepopRefundCsv = """"
