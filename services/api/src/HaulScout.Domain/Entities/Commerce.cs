@@ -190,6 +190,10 @@ public sealed class Order : EntityBase, IOrganizationScoped
     public string? StripeCheckoutSessionId { get; set; }
     public string? StripePaymentIntentId { get; set; }
 
+    /// <summary>The cart this order was checked out from. Lets a shopper who abandons the payment page resume
+    /// their own pending checkout instead of being blocked by their own reservation.</summary>
+    public Guid? SourceCartId { get; set; }
+
     public string? ShipToName { get; set; }
     public string? ShipToLine1 { get; set; }
     public string? ShipToLine2 { get; set; }

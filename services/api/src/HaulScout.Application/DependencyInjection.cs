@@ -22,6 +22,9 @@ public static class DependencyInjection
         services.AddScoped<IConfidenceScorer, ConfidenceScorer>();
         services.AddScoped<InventoryReferenceDataService>();
         services.AddScoped<InventoryQueryService>();
+        services.AddScoped<CartWorkflowService>();
+        services.AddScoped<CheckoutWorkflowService>();
+        services.AddScoped<StorefrontOrderService>();
         services.AddScoped<InventoryBundleWorkflowService>();
         services.AddScoped<InventoryDeletionWorkflowService>();
         services.AddScoped<InventoryUpsertWorkflowService>();

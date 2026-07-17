@@ -1,3 +1,5 @@
+using HaulScout.Application.Storefront;
+using HaulScout.Infrastructure.Storefront;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -63,6 +65,9 @@ builder.Services
 // Time is a dependency: services that make time-based decisions take TimeProvider so those rules can be
 // tested at the boundary instead of against the wall clock.
 builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddScoped<StorefrontStoreResolver>();
+builder.Services.Configure<StorefrontCheckoutOptions>(builder.Configuration.GetSection(StorefrontCheckoutOptions.SectionName));
+builder.Services.Configure<StripeOptions>(builder.Configuration.GetSection(StripeOptions.SectionName));
 builder.Services.AddScoped<SourcingTripQueryService>();
 builder.Services.AddScoped<SourcingTripWorkflowService>();
 builder.Services.AddScoped<SourcingTripStopWorkflowService>();

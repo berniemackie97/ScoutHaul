@@ -1572,6 +1572,9 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                         .HasPrecision(12, 2)
                         .HasColumnType("numeric(12,2)");
 
+                    b.Property<Guid?>("SourceCartId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(24)
@@ -1609,6 +1612,10 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                     b.HasIndex("ChannelAccountId");
 
                     b.HasIndex("CustomerId");
+
+                    b.HasIndex("SourceCartId");
+
+                    b.HasIndex("StripeCheckoutSessionId");
 
                     b.HasIndex("OrganizationId", "Channel");
 

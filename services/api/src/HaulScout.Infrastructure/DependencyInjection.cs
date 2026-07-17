@@ -40,6 +40,9 @@ public static class DependencyInjection
         services.AddScoped<IInventoryReferenceDataStore, EfInventoryReferenceDataStore>();
         services.AddScoped<IAuditTrail, EfAuditTrail>();
         services.AddScoped<IInventoryStore, EfInventoryStore>();
+        services.AddScoped<IStorefrontCartStore, EfStorefrontCartStore>();
+        services.AddScoped<IStorefrontCheckoutStore, EfStorefrontCheckoutStore>();
+        services.AddScoped<IPaymentGateway, StripePaymentGateway>();
         services.AddScoped<IInventoryIssueStore, EfInventoryIssueStore>();
         services.AddScoped<IInventoryPhotoStore, EfInventoryPhotoStore>();
         services.AddScoped<IOrganizationAuthorizer, EfOrganizationAuthorizer>();
