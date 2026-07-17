@@ -18,7 +18,7 @@ namespace HaulScout.Api.Services;
 /// conservative: only one exact sale match is allowed, ambiguous rows are skipped, and source fingerprints make
 /// re-imports idempotent.
 /// </summary>
-public sealed class MarketplaceRefundImportService(HaulScoutDbContext db, ICurrentUserContext currentUser)
+public sealed class MarketplaceRefundImportService(HaulScoutDbContext db, ICurrentUserContext currentUser, TimeProvider timeProvider)
 {
     public async Task<(ImportMarketplaceRefundsResultDto? Result, string? Error)> ImportCsvAsync(
         ImportMarketplaceRefundsCsvRequest request,
@@ -86,14 +86,30 @@ public sealed class MarketplaceRefundImportService(HaulScoutDbContext db, ICurre
                 ItemReturned = false,
                 Reason = $"Imported from {item.Source}",
                 Notes = notes,
-                RefundedAt = DateTimeOffset.UtcNow,
+                RefundedAt = timeProvider.GetUtcNow(),
                 RecordedByUserId = currentUser.UserId,
             };
             db.Refunds.Add(refund);
-            ApplyRefundState(sale);
+
+            // The marketplace already moved the money. If a return is open for this sale, this refund IS its
+            // resolution — leaving it open would strand the workflow at a step reality has already passed. The
+            // aggregate decides what "resolved" means at its current stage (restock only if actually received),
+            // and the refund is stamped with the outcome BEFORE the state rule derives from it.
+            Return? openReturn = sale.Returns.FirstOrDefault(rma => rma.IsOpen);
+            string returnNote = string.Empty;
+            if (openReturn is not null)
+            {
+                bool restocked = openReturn.ResolveFromExternalRefund(refund, timeProvider.GetUtcNow());
+                refund.ItemReturned = restocked;
+                returnNote = restocked
+                    ? " Resolved the open return; item restocked."
+                    : " Resolved the open return; item not yet received, so nothing was restocked.";
+            }
+
+            SaleFinancialStateService.ApplyRefundState(sale);
 
             await AddCorrection(sale, before,
-                $"Imported refund from {item.Source}: item {allocation.ItemAmount:C}, shipping {allocation.ShippingRefunded:C}, tax {allocation.TaxRefunded:C}, fee credit {allocation.FeeCredit:C}.",
+                $"Imported refund from {item.Source}: item {allocation.ItemAmount:C}, shipping {allocation.ShippingRefunded:C}, tax {allocation.TaxRefunded:C}, fee credit {allocation.FeeCredit:C}.{returnNote}",
                 cancellationToken);
             imported++;
         }
@@ -153,6 +169,7 @@ public sealed class MarketplaceRefundImportService(HaulScoutDbContext db, ICurre
                 .ThenInclude(inv => inv!.BundleComponents)
                     .ThenInclude(component => component.ComponentInventoryItem)
             .Include(sale => sale.Refunds)
+            .Include(sale => sale.Returns)
             .Where(sale => sale.OrganizationId == currentUser.OrganizationId
                 && sale.OrderId.HasValue
                 && orderIds.Contains(sale.OrderId.Value)
@@ -173,6 +190,7 @@ public sealed class MarketplaceRefundImportService(HaulScoutDbContext db, ICurre
                 .ThenInclude(inv => inv!.BundleComponents)
                     .ThenInclude(component => component.ComponentInventoryItem)
             .Include(sale => sale.Refunds)
+            .Include(sale => sale.Returns)
             .Where(sale => sale.OrganizationId == currentUser.OrganizationId && sale.Platform == "Depop");
 
         if (item.SoldAt.HasValue)
@@ -295,39 +313,6 @@ public sealed class MarketplaceRefundImportService(HaulScoutDbContext db, ICurre
         return builder.ToString();
     }
 
-    private static void ApplyRefundState(Sale sale)
-    {
-        ICollection<Refund> refunds = sale.Refunds;
-        decimal itemRefunded = refunds.Sum(refund => refund.ItemAmount);
-        bool restocked = refunds.Any(refund => refund.ItemReturned);
-        ResaleFinancialCalculator.SaleRefundImpact impact = new(
-            itemRefunded,
-            refunds.Sum(refund => refund.ShippingRefunded),
-            refunds.Sum(refund => refund.TaxRefunded),
-            refunds.Sum(refund => refund.FeeCredit),
-            restocked);
-        sale.RecomputeNet();
-
-        if (refunds.Count == 0)
-        {
-            sale.Status = SaleStatus.Delivered;
-            if (sale.InventoryItem is not null && sale.InventoryItem.Status == InventoryStatus.Returned)
-            {
-                sale.InventoryItem.Status = InventoryStatus.Delivered;
-                InventoryStatePropagation.ApplyBundleComponentInventoryStatus(sale.InventoryItem, InventoryStatus.Delivered, sale.InventoryItem.SoldAt);
-            }
-            return;
-        }
-
-        bool isFull = refunds.Any(refund => refund.Type == RefundType.Full) || (sale.SoldPrice > 0 && itemRefunded >= sale.SoldPrice - 0.01m);
-        sale.Status = restocked ? SaleStatus.Returned : isFull ? SaleStatus.Refunded : SaleStatus.PartiallyRefunded;
-
-        if (sale.InventoryItem is not null && restocked)
-        {
-            sale.InventoryItem.Status = InventoryStatus.Returned;
-            InventoryStatePropagation.ApplyBundleComponentInventoryStatus(sale.InventoryItem, InventoryStatus.Returned, sale.InventoryItem.SoldAt);
-        }
-    }
 
     private static string SnapshotSale(Sale sale) => JsonSerializer.Serialize(new
     {
