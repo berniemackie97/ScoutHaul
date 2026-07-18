@@ -5,6 +5,7 @@ using HaulScout.Application.Common;
 using HaulScout.Application.Contracts;
 using HaulScout.Application.Security;
 using HaulScout.Domain.Entities;
+using HaulScout.Infrastructure.Orders;
 using HaulScout.Infrastructure.Persistence;
 
 namespace HaulScout.Api.Services;

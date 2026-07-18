@@ -6,6 +6,7 @@ using HaulScout.Application.Contracts;
 using HaulScout.Application.Security;
 using HaulScout.Domain;
 using HaulScout.Domain.Entities;
+using HaulScout.Infrastructure.Orders;
 using HaulScout.Infrastructure.Persistence;
 
 namespace HaulScout.Tests;

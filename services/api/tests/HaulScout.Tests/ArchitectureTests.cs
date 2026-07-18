@@ -29,7 +29,6 @@ public class ArchitectureTests
         "MarketAnalysisController",
         "MarketObservationsController",
         "PlatformListingsController",
-        "PlatformOrdersController",
         "ProductIdentitiesController",
         "ReportsController",
         "TasksController",
@@ -55,6 +54,7 @@ public class ArchitectureTests
     [InlineData(typeof(SalesController))]
     [InlineData(typeof(InventoryController))]
     [InlineData(typeof(OrdersController))]
+    [InlineData(typeof(PlatformOrdersController))]
     public void De_persisted_controllers_stay_pure_http_adapters(Type controller)
     {
         ParameterInfo[] dependencies = controller.GetConstructors()

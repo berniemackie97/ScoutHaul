@@ -2,6 +2,7 @@ using HaulScout.Api.Controllers;
 using HaulScout.Api.Services;
 using HaulScout.Application.Sales;
 using HaulScout.Application.Security;
+using HaulScout.Infrastructure.Orders;
 using HaulScout.Infrastructure.Sales;
 using HaulScout.Infrastructure.Persistence;
 
