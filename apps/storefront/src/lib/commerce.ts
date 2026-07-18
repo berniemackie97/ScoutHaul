@@ -13,6 +13,8 @@ export type Cart = {
   cartToken: string;
   lines: CartLine[];
   subtotal: number;
+  estimatedShippingAmount?: number;
+  shippingSummary?: string | null;
   freeShippingThreshold?: number | null;
   qualifiesForFreeShipping: boolean;
 };

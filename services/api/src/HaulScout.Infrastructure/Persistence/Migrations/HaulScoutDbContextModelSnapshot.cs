@@ -415,6 +415,9 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("OrganizationId", "CartId");
 
+                    b.HasIndex("OrganizationId", "CartId", "StoreListingId")
+                        .IsUnique();
+
                     b.ToTable("CartLines", (string)null);
                 });
 
@@ -3342,6 +3345,11 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<bool>("AcceptsOffers")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
                     b.Property<decimal?>("CompareAtPrice")
                         .HasPrecision(12, 2)
                         .HasColumnType("numeric(12,2)");
@@ -3362,6 +3370,10 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                         .HasPrecision(12, 2)
                         .HasColumnType("numeric(12,2)");
 
+                    b.Property<decimal?>("MaximumOfferAmount")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
+
                     b.Property<string>("MetaDescription")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
@@ -3370,11 +3382,26 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
+                    b.Property<decimal?>("MinimumOfferAmount")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
+
                     b.Property<Guid>("OrganizationId")
                         .HasColumnType("uuid");
 
                     b.Property<DateTimeOffset?>("PublishedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal?>("ShippingAmountOverride")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
+
+                    b.Property<string>("ShippingPolicy")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasDefaultValue("StoreDefault");
 
                     b.Property<string>("Slug")
                         .IsRequired()
@@ -3426,12 +3453,10 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<string>("BuyerEmail")
-                        .IsRequired()
                         .HasMaxLength(320)
                         .HasColumnType("character varying(320)");
 
                     b.Property<string>("BuyerName")
-                        .IsRequired()
                         .HasMaxLength(160)
                         .HasColumnType("character varying(160)");
 

@@ -40,6 +40,7 @@ public sealed class EfStorefrontCartStore(HaulScoutDbContext db) : IStorefrontCa
     /// <summary>The listing with its item + photos loaded; StorefrontPurchasability decides what it means.</summary>
     public Task<StoreListing?> FindListingAsync(Guid organizationId, Guid storeListingId, CancellationToken cancellationToken) =>
         db.StoreListings
+            .AsNoTracking()
             .Include(listing => listing.InventoryItem)
                 .ThenInclude(item => item!.Photos)
             .SingleOrDefaultAsync(

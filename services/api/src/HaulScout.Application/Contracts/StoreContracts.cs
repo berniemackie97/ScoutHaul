@@ -14,6 +14,11 @@ public sealed record StoreListingDto(
     string? Description,
     decimal ListPrice,
     decimal? CompareAtPrice,
+    bool AcceptsOffers,
+    decimal? MinimumOfferAmount,
+    decimal? MaximumOfferAmount,
+    StoreShippingPolicy ShippingPolicy,
+    decimal? ShippingAmountOverride,
     StoreListingStatus Status,
     bool IsFeatured,
     string? MetaTitle,
@@ -47,6 +52,13 @@ public sealed record UpdateStoreListingRequest(
     string? MetaTitle,
     string? MetaDescription,
     StoreListingStatus Status);
+
+public sealed record UpdateStoreListingCommerceRequest(
+    bool AcceptsOffers,
+    decimal? MinimumOfferAmount,
+    decimal? MaximumOfferAmount,
+    StoreShippingPolicy ShippingPolicy,
+    decimal? ShippingAmountOverride);
 
 // ── Store connection / settings (operator onboarding) ────────────
 
@@ -90,6 +102,11 @@ public sealed record StorefrontListingDto(
     string? Subtitle,
     decimal ListPrice,
     decimal? CompareAtPrice,
+    bool AcceptsOffers,
+    decimal? MinimumOfferAmount,
+    decimal? MaximumOfferAmount,
+    StoreShippingPolicy ShippingPolicy,
+    decimal? ShippingAmountOverride,
     bool IsFeatured,
     Guid? StoreCategoryId,
     string? Condition,
@@ -107,6 +124,11 @@ public sealed record StorefrontListingDetailDto(
     string? Description,
     decimal ListPrice,
     decimal? CompareAtPrice,
+    bool AcceptsOffers,
+    decimal? MinimumOfferAmount,
+    decimal? MaximumOfferAmount,
+    StoreShippingPolicy ShippingPolicy,
+    decimal? ShippingAmountOverride,
     string? Brand,
     string? Condition,
     string? MetaTitle,

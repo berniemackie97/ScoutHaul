@@ -16,6 +16,7 @@ import { ListingGenerator } from "./listing-generator";
 import { ChannelPresencePanel } from "./cross-list-panel";
 import { RecordSaleCard } from "./record-sale-card";
 import { DeleteInventoryCard } from "./delete-inventory-card";
+import { StorefrontPolicyCard } from "./storefront-policy-card";
 
 export const dynamic = "force-dynamic";
 
@@ -30,12 +31,20 @@ const date = (value: string | null | undefined) =>
 export default async function InventoryDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const api = await getApiClient();
-  const [{ data: item }, { data: referenceData }, { data: channelAccounts }, { data: channelListings }, { data: salesReference }] = await Promise.all([
+  const [
+    { data: item },
+    { data: referenceData },
+    { data: channelAccounts },
+    { data: channelListings },
+    { data: salesReference },
+    { data: storeListing },
+  ] = await Promise.all([
     api.GET("/api/inventory/{id}", { params: { path: { id } } }),
     api.GET("/api/inventory/reference-data"),
     api.GET("/api/channel-accounts", {}),
     api.GET("/api/inventory/{itemId}/channel-listings", { params: { path: { itemId: id } } }),
     api.GET("/api/sales/reference-data", {}),
+    api.GET("/api/store/listings/by-item/{inventoryItemId}", { params: { path: { inventoryItemId: id } } }),
   ]);
   const inventoryItem = item as InventoryItem | undefined;
   if (!inventoryItem?.id || !inventoryItem.status) notFound();
@@ -75,6 +84,7 @@ export default async function InventoryDetailPage({ params }: { params: Promise<
 
         <aside className="space-y-6">
           <PhotoManager id={inventoryItem.id} photos={photos} />
+          <StorefrontPolicyCard itemId={inventoryItem.id} listing={storeListing} />
           <ListingGenerator item={inventoryItem} />
           <StatusControl item={inventoryItem} />
           {!inventoryItem.isSold && (

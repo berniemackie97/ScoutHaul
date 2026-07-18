@@ -15,6 +15,7 @@ public sealed class CheckoutWorkflowService(
     IStorefrontCartStore carts,
     IStorefrontCheckoutStore checkout,
     IPaymentGateway payments,
+    StorefrontShippingCalculator shipping,
     IOptions<StorefrontCheckoutOptions> options,
     TimeProvider timeProvider)
 {
@@ -173,7 +174,7 @@ public sealed class CheckoutWorkflowService(
                         ToCents(line.UnitPrice),
                         HeroImageUrl(line.StoreListingId, cart)))
                     .ToArray(),
-                ShippingFor(order.Subtotal),
+                shipping.ChoiceFor(order.Subtotal, cart.Lines.Select(line => line.StoreListing)),
                 _options.LocalPickupEnabled,
                 _options.AutomaticTaxEnabled,
                 _options.AllowedShipCountries,
@@ -188,12 +189,6 @@ public sealed class CheckoutWorkflowService(
 
         return AppResult<StorefrontCheckoutResultDto>.Ok(new StorefrontCheckoutResultDto(session.Url));
     }
-
-    /// <summary>Free at/above the threshold, the flat rate below it — the two options never show together.</summary>
-    private ShippingChoice ShippingFor(decimal subtotal) =>
-        _options.FreeShippingThreshold is decimal threshold && subtotal >= threshold
-            ? new ShippingChoice("Free shipping", 0, _options.ShippingEstimateMinDays, _options.ShippingEstimateMaxDays)
-            : new ShippingChoice("Standard shipping", ToCents(_options.FlatShippingAmount), _options.ShippingEstimateMinDays, _options.ShippingEstimateMaxDays);
 
     private string? HeroImageUrl(Guid? storeListingId, Cart cart)
     {

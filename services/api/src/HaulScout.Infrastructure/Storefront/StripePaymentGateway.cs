@@ -55,6 +55,7 @@ public sealed class StripePaymentGateway(IOptions<StripeOptions> options) : IPay
                 {
                     Type = "fixed_amount",
                     DisplayName = request.Shipping.Label,
+                    TaxBehavior = "exclusive",
                     FixedAmount = new SessionShippingOptionShippingRateDataFixedAmountOptions
                     {
                         Amount = request.Shipping.AmountCents,
@@ -85,6 +86,7 @@ public sealed class StripePaymentGateway(IOptions<StripeOptions> options) : IPay
                 {
                     Type = "fixed_amount",
                     DisplayName = "Local pickup (free)",
+                    TaxBehavior = "exclusive",
                     FixedAmount = new SessionShippingOptionShippingRateDataFixedAmountOptions { Amount = 0, Currency = "usd" },
                     // The webhook reads this back to set Order.IsLocalPickup — display names are not contracts.
                     Metadata = new Dictionary<string, string> { ["local_pickup"] = "true" },
@@ -129,8 +131,15 @@ public sealed class StripePaymentGateway(IOptions<StripeOptions> options) : IPay
         };
         options.AddExtraParam("integration_identifier", IntegrationIdentifier);
 
-        Session session = await new SessionService(Client).CreateAsync(options, cancellationToken: cancellationToken);
-        return new HostedCheckout(session.Id, session.Url);
+        try
+        {
+            Session session = await new SessionService(Client).CreateAsync(options, cancellationToken: cancellationToken);
+            return new HostedCheckout(session.Id, session.Url);
+        }
+        catch (StripeException exception)
+        {
+            throw new PaymentGatewayUnavailableException("Stripe could not create the checkout session.", exception);
+        }
     }
 
     public async Task<string?> FindOpenCheckoutUrlAsync(string sessionId, CancellationToken cancellationToken)

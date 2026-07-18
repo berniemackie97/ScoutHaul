@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import { CheckCircle2, Loader2 } from "lucide-react";
 import { money, type OfferResult } from "@/lib/commerce";
 
@@ -9,9 +9,22 @@ type Props = {
   title: string;
   price: number;
   availability?: string;
+  acceptsOffers?: boolean;
+  minimumOfferAmount?: number | null;
+  maximumOfferAmount?: number | null;
 };
 
-export function ProductCommercePanel({ listingId, title, price, availability = "Available" }: Props) {
+export function ProductCommercePanel({
+  listingId,
+  title,
+  price,
+  availability = "Available",
+  acceptsOffers = true,
+  minimumOfferAmount,
+  maximumOfferAmount,
+}: Props) {
+  const addInFlight = useRef(false);
+  const checkoutInFlight = useRef(false);
   const [adding, setAdding] = useState(false);
   const [checkingOut, setCheckingOut] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -21,8 +34,13 @@ export function ProductCommercePanel({ listingId, title, price, availability = "
   const [offerResult, setOfferResult] = useState<string | null>(null);
 
   const isAvailable = availability === "Available";
+  const offerFloor = minimumOfferAmount ?? 1;
+  const suggestedOffer = Math.max(offerFloor, Math.floor(price * 0.85));
+  const defaultOffer = maximumOfferAmount == null ? suggestedOffer : Math.min(suggestedOffer, maximumOfferAmount);
 
   async function addToCart() {
+    if (addInFlight.current || checkoutInFlight.current) return;
+    addInFlight.current = true;
     setAdding(true);
     setError(null);
     setMessage(null);
@@ -39,10 +57,13 @@ export function ProductCommercePanel({ listingId, title, price, availability = "
       setError(cleanError(err));
     } finally {
       setAdding(false);
+      addInFlight.current = false;
     }
   }
 
   async function buyNow() {
+    if (checkoutInFlight.current || addInFlight.current) return;
+    checkoutInFlight.current = true;
     setCheckingOut(true);
     setError(null);
     try {
@@ -62,12 +83,14 @@ export function ProductCommercePanel({ listingId, title, price, availability = "
     } catch (err) {
       setError(cleanError(err));
       setCheckingOut(false);
+      checkoutInFlight.current = false;
     }
   }
 
   async function submitOffer(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     setOfferSending(true);
     setOfferResult(null);
     setError(null);
@@ -77,17 +100,13 @@ export function ProductCommercePanel({ listingId, title, price, availability = "
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           storeListingId: listingId,
-          buyerName: form.get("buyerName"),
-          buyerEmail: form.get("buyerEmail"),
-          buyerPhone: form.get("buyerPhone"),
           offerAmount: Number(form.get("offerAmount")),
-          message: form.get("message"),
         }),
       });
       if (!response.ok) throw new Error(await response.text());
       const result = (await response.json()) as OfferResult;
       setOfferResult(result.message || "Offer received.");
-      event.currentTarget.reset();
+      formElement.reset();
     } catch (err) {
       setError(cleanError(err));
     } finally {
@@ -122,13 +141,15 @@ export function ProductCommercePanel({ listingId, title, price, availability = "
         </div>
       )}
 
-      <button
-        type="button"
-        onClick={() => setOfferOpen(value => !value)}
-        className="w-full border border-rule px-6 py-3 text-sm font-semibold uppercase tracking-[0.12em] text-ink transition-colors hover:border-copper hover:text-copper"
-      >
-        {offerOpen ? "Close offer form" : "Make an offer"}
-      </button>
+      {acceptsOffers && isAvailable ? (
+        <button
+          type="button"
+          onClick={() => setOfferOpen(value => !value)}
+          className="w-full border border-rule px-6 py-3 text-sm font-semibold uppercase tracking-[0.12em] text-ink transition-colors hover:border-copper hover:text-copper"
+        >
+          {offerOpen ? "Close offer form" : "Make an offer"}
+        </button>
+      ) : null}
 
       {message ? (
         <div className="flex items-center gap-2 border border-emerald-500/25 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-800">
@@ -148,21 +169,23 @@ export function ProductCommercePanel({ listingId, title, price, availability = "
             <p className="mt-1 font-heading text-lg text-ink">{title}</p>
             <p className="text-sm text-slate">Current price: {money(price)}</p>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Name" name="buyerName" autoComplete="name" required />
-            <Field label="Email" name="buyerEmail" type="email" autoComplete="email" required />
-            <Field label="Phone optional" name="buyerPhone" type="tel" autoComplete="tel" />
-            <Field label="Offer amount" name="offerAmount" type="number" min="1" step="0.01" defaultValue={String(Math.max(1, Math.floor(price * 0.85)))} required />
-          </div>
-          <label className="block">
-            <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-slate/70">Message optional</span>
-            <textarea
-              name="message"
-              rows={3}
-              placeholder="Pickup timing, bundle request, or anything useful…"
-              className="mt-1 w-full border border-rule bg-background px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-copper"
+          <div>
+            <Field
+              label="Offer amount"
+              name="offerAmount"
+              type="number"
+              min={String(offerFloor)}
+              max={maximumOfferAmount == null ? undefined : String(maximumOfferAmount)}
+              step="0.01"
+              defaultValue={String(defaultOffer)}
+              required
             />
-          </label>
+            <p className="mt-1 text-xs text-slate">
+              {minimumOfferAmount != null ? `Minimum ${money(minimumOfferAmount)}. ` : null}
+              {maximumOfferAmount != null ? `Maximum ${money(maximumOfferAmount)}. ` : null}
+              Contact details are handled after acceptance.
+            </p>
+          </div>
           <button
             type="submit"
             disabled={offerSending}
@@ -184,6 +207,7 @@ function Field({
   required,
   autoComplete,
   min,
+  max,
   step,
   defaultValue,
 }: {
@@ -193,6 +217,7 @@ function Field({
   required?: boolean;
   autoComplete?: string;
   min?: string;
+  max?: string;
   step?: string;
   defaultValue?: string;
 }) {
@@ -205,6 +230,7 @@ function Field({
         required={required}
         autoComplete={autoComplete}
         min={min}
+        max={max}
         step={step}
         defaultValue={defaultValue}
         className="mt-1 w-full border border-rule bg-background px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-copper"

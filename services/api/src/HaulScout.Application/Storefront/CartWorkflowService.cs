@@ -15,6 +15,7 @@ namespace HaulScout.Application.Storefront;
 public sealed class CartWorkflowService(
     IStorefrontCartStore carts,
     IStorefrontCheckoutStore checkout,
+    StorefrontShippingCalculator shipping,
     IOptions<StorefrontCheckoutOptions> options)
 {
     private readonly StorefrontCheckoutOptions _options = options.Value;
@@ -67,12 +68,12 @@ public sealed class CartWorkflowService(
                 InventoryItemId = listing.InventoryItemId,
                 Quantity = 1,
                 UnitPriceSnapshot = listing.ListPrice,
-                StoreListing = listing,
             });
         }
 
         await carts.SaveChangesAsync(cancellationToken);
-        return AppResult<StorefrontCartDto>.Ok(BuildDto(cart.AnonymousId!, cart, []));
+        Cart reloaded = await carts.FindActiveAsync(organizationId, cart.AnonymousId!, cancellationToken) ?? cart;
+        return AppResult<StorefrontCartDto>.Ok(BuildDto(cart.AnonymousId!, reloaded, []));
     }
 
     public async Task<AppResult<StorefrontCartDto>> RemoveLineAsync(
@@ -115,10 +116,19 @@ public sealed class CartWorkflowService(
 
         // Unavailable lines are shown but never counted — the shopper removes them; totals stay honest.
         decimal subtotal = lines.Where(line => line.IsAvailable).Sum(line => line.UnitPrice);
+        ShippingQuote shippingQuote = shipping.Quote(
+            subtotal,
+            cart?.Lines.Where(line => StorefrontPurchasability.IsPurchasable(line.StoreListing)
+                    || heldByThisCart.Contains(line.StoreListingId))
+                .Select(line => line.StoreListing)
+                ?? []);
+
         return new StorefrontCartDto(
             token,
             lines,
             subtotal,
+            shippingQuote.Amount,
+            shippingQuote.Summary,
             _options.FreeShippingThreshold,
             _options.FreeShippingThreshold is decimal threshold && subtotal >= threshold);
     }

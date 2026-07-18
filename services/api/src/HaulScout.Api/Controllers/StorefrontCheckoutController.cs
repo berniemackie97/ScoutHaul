@@ -37,6 +37,11 @@ public sealed class StorefrontCheckoutController(
             logger.LogError(exception, "Storefront checkout attempted while payments are unconfigured.");
             return StatusCode(StatusCodes.Status503ServiceUnavailable, "Checkout is temporarily unavailable. Please try again shortly.");
         }
+        catch (PaymentGatewayUnavailableException exception)
+        {
+            logger.LogError(exception, "Storefront checkout provider failed while creating a payment session.");
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, "Checkout is temporarily unavailable. Please try again shortly.");
+        }
     }
 
     /// <summary>The session id is the lookup credential: unguessable, known only to the shopper Stripe redirected.</summary>

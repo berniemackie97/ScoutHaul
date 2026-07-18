@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, ArrowRight, Loader2, ShieldCheck, ShoppingBag, Trash2, Truck } from "lucide-react";
+import { AlertTriangle, ArrowRight, CreditCard, Loader2, MapPin, ShieldCheck, ShoppingBag, Trash2, Truck } from "lucide-react";
 import { imageUrl, money, type Cart } from "@/lib/commerce";
 
 type Props = {
@@ -25,8 +25,9 @@ export function CartWorkspace({ mode }: Props) {
 
   const unavailableLines = useMemo(() => cart?.lines.filter((line) => !line.isAvailable) ?? [], [cart]);
   const canCheckout = Boolean(cart && cart.lines.length > 0 && unavailableLines.length === 0);
+  const hasFreeShipping = cart?.estimatedShippingAmount === 0;
   const remainingForFreeShipping =
-    cart?.freeShippingThreshold && !cart.qualifiesForFreeShipping
+    cart?.freeShippingThreshold && !hasFreeShipping
       ? Math.max(0, cart.freeShippingThreshold - cart.subtotal)
       : 0;
 
@@ -79,7 +80,7 @@ export function CartWorkspace({ mode }: Props) {
   const eyebrow = mode === "checkout" ? "Secure checkout" : "Cart";
   const body =
     mode === "checkout"
-      ? "Confirm the items below, then continue to Stripe's hosted checkout. Your card data never touches Overhaul Trading."
+      ? "Next you will enter email, shipping address, delivery method, tax, and payment on Stripe's hosted checkout."
       : "One-of-one items stay available until checkout reserves them. If a line becomes unavailable, remove it and continue.";
 
   return (
@@ -106,6 +107,26 @@ export function CartWorkspace({ mode }: Props) {
         </div>
       ) : cart && cart.lines.length > 0 ? (
         <div className="mt-10 grid gap-8 lg:grid-cols-[1fr_24rem]">
+          {mode === "checkout" ? (
+            <section className="border border-copper/30 bg-copper/[0.06] p-5 lg:col-span-2">
+              <h2 className="font-heading text-2xl font-semibold text-ink">Secure checkout handoff</h2>
+              <div className="mt-4 grid gap-3 text-sm text-slate md:grid-cols-3">
+                <div className="flex gap-2">
+                  <CreditCard className="mt-0.5 h-4 w-4 shrink-0 text-copper" aria-hidden />
+                  <span>Stripe collects payment details. Card data never touches this site.</span>
+                </div>
+                <div className="flex gap-2">
+                  <Truck className="mt-0.5 h-4 w-4 shrink-0 text-copper" aria-hidden />
+                  <span>Shipping address and delivery option are selected before payment.</span>
+                </div>
+                <div className="flex gap-2">
+                  <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-copper" aria-hidden />
+                  <span>Local pickup appears when available. Tax is calculated by Stripe.</span>
+                </div>
+              </div>
+            </section>
+          ) : null}
+
           <section className="divide-y divide-rule border border-rule bg-background">
             {cart.lines.map((line) => (
               <article key={line.storeListingId} className="grid gap-4 p-4 sm:grid-cols-[7rem_1fr_auto] sm:p-5">
@@ -163,9 +184,7 @@ export function CartWorkspace({ mode }: Props) {
               </div>
               <div className="flex justify-between gap-4">
                 <dt className="text-slate">Shipping</dt>
-                <dd className="text-right text-slate">
-                  {cart.qualifiesForFreeShipping ? "Free" : "Calculated at checkout"}
-                </dd>
+                <dd className="text-right text-slate">{cart.shippingSummary ?? "Confirmed before payment"}</dd>
               </div>
               <div className="flex justify-between gap-4">
                 <dt className="text-slate">Tax</dt>
@@ -173,7 +192,7 @@ export function CartWorkspace({ mode }: Props) {
               </div>
             </dl>
             <div className="mt-5 flex justify-between gap-4 font-heading text-xl font-semibold text-ink">
-              <span>Due before tax/shipping</span>
+              <span>{mode === "checkout" ? "Item subtotal" : "Due before tax"}</span>
               <span>{money(cart.subtotal)}</span>
             </div>
 
@@ -181,9 +200,9 @@ export function CartWorkspace({ mode }: Props) {
               <p className="mt-4 border border-copper/25 bg-copper/[0.06] px-3 py-2 text-sm text-slate">
                 Add {money(remainingForFreeShipping)} more for free shipping.
               </p>
-            ) : cart.qualifiesForFreeShipping ? (
+            ) : hasFreeShipping ? (
               <p className="mt-4 border border-emerald-500/25 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-800">
-                This order qualifies for free shipping.
+                This order has free shipping.
               </p>
             ) : null}
 

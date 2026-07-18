@@ -49,8 +49,8 @@ public class StorefrontCheckoutTests
     private sealed class FakeCartStore(World world) : IStorefrontCartStore
     {
         public Task<Cart?> FindActiveAsync(Guid organizationId, string anonymousToken, CancellationToken cancellationToken) =>
-            Task.FromResult(world.Carts.FirstOrDefault(cart =>
-                cart.AnonymousId == anonymousToken && cart.OrganizationId == organizationId && cart.Status == CartStatus.Active));
+            Task.FromResult(Hydrate(world.Carts.FirstOrDefault(cart =>
+                cart.AnonymousId == anonymousToken && cart.OrganizationId == organizationId && cart.Status == CartStatus.Active)));
 
         public Task<Cart?> FindActiveByIdAsync(Guid organizationId, Guid cartId, CancellationToken cancellationToken) =>
             Task.FromResult(world.Carts.FirstOrDefault(cart => cart.Id == cartId && cart.Status == CartStatus.Active));
@@ -67,6 +67,17 @@ public class StorefrontCheckoutTests
             Task.FromResult(world.Listings.FirstOrDefault(listing => listing.Id == storeListingId));
 
         public Task SaveChangesAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+        private Cart? Hydrate(Cart? cart)
+        {
+            if (cart is null) return null;
+            foreach (CartLine line in cart.Lines)
+            {
+                line.StoreListing ??= world.Listings.FirstOrDefault(listing => listing.Id == line.StoreListingId);
+            }
+
+            return cart;
+        }
     }
 
     private sealed class FakeCheckoutStore(World world) : IStorefrontCheckoutStore
@@ -198,10 +209,12 @@ public class StorefrontCheckoutTests
         FakeTimeProvider clock = new(T0);
         FakeCheckoutStore checkoutStore = new(world);
         FakeCartStore cartStore = new(world);
+        IOptions<StorefrontCheckoutOptions> options = Options();
+        StorefrontShippingCalculator shipping = new(options);
         return (
             world,
-            new CartWorkflowService(cartStore, checkoutStore, Options()),
-            new CheckoutWorkflowService(cartStore, checkoutStore, gateway, Options(), clock),
+            new CartWorkflowService(cartStore, checkoutStore, shipping, options),
+            new CheckoutWorkflowService(cartStore, checkoutStore, gateway, shipping, options, clock),
             new StorefrontOrderService(checkoutStore, gateway, clock),
             gateway,
             clock);
@@ -324,6 +337,22 @@ public class StorefrontCheckoutTests
         await harness.Checkout.CheckoutAsync(Org, bigToken, CancellationToken.None);
         Assert.Equal(0, harness.Gateway.Created[1].Shipping.AmountCents);
         Assert.Equal("Free shipping", harness.Gateway.Created[1].Shipping.Label);
+    }
+
+    [Fact]
+    public async Task Listing_shipping_policy_overrides_the_global_flat_rate_for_single_item_checkout()
+    {
+        var harness = NewHarness();
+        (string token, StoreListing listing) = await AddToCart(harness, price: 100m);
+        listing.ShippingPolicy = StoreShippingPolicy.FixedAmount;
+        listing.ShippingAmountOverride = 4.50m;
+
+        StorefrontCartDto cart = await harness.Cart.GetAsync(Org, token, CancellationToken.None);
+        await harness.Checkout.CheckoutAsync(Org, token, CancellationToken.None);
+
+        Assert.Equal(4.50m, cart.EstimatedShippingAmount);
+        Assert.Equal("$4.50 before tax", cart.ShippingSummary);
+        Assert.Equal(450, harness.Gateway.Created[0].Shipping.AmountCents);
     }
 
     // ── webhook: the money paths ───────────────────────────────────────────

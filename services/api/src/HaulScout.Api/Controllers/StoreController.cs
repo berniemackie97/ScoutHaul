@@ -36,6 +36,10 @@ public sealed class StoreController(StorePublishingWorkflowService publishing) :
     public async Task<ActionResult<StoreListingDto>> GetListing(Guid id, CancellationToken cancellationToken) =>
         ToActionResult(await publishing.GetListingAsync(id, cancellationToken));
 
+    [HttpGet("listings/by-item/{inventoryItemId:guid}")]
+    public async Task<ActionResult<StoreListingDto>> GetListingByItem(Guid inventoryItemId, CancellationToken cancellationToken) =>
+        ToActionResult(await publishing.GetListingByItemAsync(inventoryItemId, cancellationToken));
+
     [HttpPost("listings")]
     public async Task<ActionResult<StoreListingDto>> Publish(PublishListingRequest request, CancellationToken cancellationToken)
     {
@@ -48,6 +52,10 @@ public sealed class StoreController(StorePublishingWorkflowService publishing) :
     [HttpPut("listings/{id:guid}")]
     public async Task<ActionResult<StoreListingDto>> UpdateListing(Guid id, UpdateStoreListingRequest request, CancellationToken cancellationToken) =>
         ToActionResult(await publishing.UpdateListingAsync(id, request, cancellationToken));
+
+    [HttpPut("listings/{id:guid}/commerce")]
+    public async Task<ActionResult<StoreListingDto>> UpdateCommerce(Guid id, UpdateStoreListingCommerceRequest request, CancellationToken cancellationToken) =>
+        ToActionResult(await publishing.UpdateCommerceAsync(id, request, cancellationToken));
 
     [HttpPost("listings/{id:guid}/unpublish")]
     public async Task<ActionResult<StoreListingDto>> Unpublish(Guid id, CancellationToken cancellationToken) =>
