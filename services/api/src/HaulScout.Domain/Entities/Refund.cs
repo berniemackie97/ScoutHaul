@@ -38,6 +38,14 @@ public sealed class Refund : EntityBase, IOrganizationScoped
     public required string Reason { get; set; }
     public string? Notes { get; set; }
 
+    /// <summary>
+    /// The stable identity of this refund in its source, for refunds that come from an import rather than an
+    /// operator's hand — e.g. "ebay:{order}:{item}". It makes re-importing the same marketplace report an
+    /// idempotent UPSERT (find this key, refresh its amounts to the latest facts) instead of a duplicate or a
+    /// skip. Null for refunds entered manually, which have no external source. Unique per organization.
+    /// </summary>
+    public string? ExternalRefundKey { get; set; }
+
     public DateTimeOffset RefundedAt { get; set; } = DateTimeOffset.UtcNow;
 
     public Guid RecordedByUserId { get; set; }

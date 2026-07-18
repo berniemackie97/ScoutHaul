@@ -487,10 +487,132 @@ Brass Lamp,377251318593,1,$0.00,$0.00,$0.00,$0.00,$0.00,$12.34,$0.00,$0.00,$16.9
         Assert.Equal(SaleStatus.Refunded, sale.Status);
         Assert.Equal(-45.97m, sale.NetProfit);
 
+        // Re-import is an idempotent upsert: it refreshes the one refund from the same facts (so it counts as
+        // processed), and the state does not drift — still one refund, same amounts, same net.
         ActionResult<ImportMarketplaceRefundsResultDto> second = await controller.ImportMarketplaceRefundsCsv(
             new ImportMarketplaceRefundsCsvRequest("eBay", EbayRefundListingSalesCsv), CancellationToken.None);
-        Assert.Equal(0, second.Value!.Imported);
-        Assert.Single(await db.Refunds.ToListAsync());
+        Assert.Equal(1, second.Value!.Imported);
+        Refund afterReimport = Assert.Single(await db.Refunds.ToListAsync());
+        Assert.Equal(12.08m, afterReimport.FeeCredit);
+        Assert.Equal(-45.97m, (await db.Sales.SingleAsync()).NetProfit);
+    }
+
+    /// <summary>
+    /// Legacy adoption: a refund imported before ExternalRefundKey existed (its dedupe id lived in Notes, key null)
+    /// must be UPGRADED in place on the next re-import, never duplicated — otherwise the projection would double
+    /// every already-imported prod refund.
+    /// </summary>
+    [Fact]
+    public async Task Reimporting_adopts_a_legacy_keyless_refund_instead_of_duplicating_it()
+    {
+        var (db, org, user) = NewContext(nameof(Reimporting_adopts_a_legacy_keyless_refund_instead_of_duplicating_it));
+        await using var _ = db;
+        var controller = NewController(db, org, user);
+        var item = SeedItem(db, org, "Brass Lamp", 40m);
+
+        await controller.ImportEbayCsv(new ImportPlatformOrdersCsvRequest("eBay", EbayAllOrdersCsv), CancellationToken.None);
+        PlatformOrder order = await db.PlatformOrders.Include(o => o.Lines).SingleAsync();
+        await controller.Reconcile(order.Id,
+            new ReconcilePlatformOrderRequest([new ReconcilePlatformOrderLineMap(order.Lines.First().Id, item.Id)]), CancellationToken.None);
+        await controller.ImportEbayCsv(new ImportPlatformOrdersCsvRequest("eBay", EbayListingSalesCsv), CancellationToken.None);
+
+        // Simulate a pre-migration prod refund: imported, but with the OLD shape — no key, fingerprint in Notes.
+        Sale seeded = await db.Sales.SingleAsync();
+        db.Refunds.Add(new Refund
+        {
+            OrganizationId = org,
+            SaleId = seeded.Id,
+            Type = RefundType.Full,
+            ItemAmount = 77.28m,
+            ShippingRefunded = 3.69m,
+            TaxRefunded = 7.15m,
+            FeeCredit = 0m,                                  // was capped before fees; should heal on re-import
+            Reason = "Imported from eBay Listing Sales",
+            Notes = "legacy [import:deadbeef]",
+            ExternalRefundKey = null,
+            RecordedByUserId = user,
+        });
+        await db.SaveChangesAsync();
+
+        await controller.ImportMarketplaceRefundsCsv(new ImportMarketplaceRefundsCsvRequest("eBay", EbayRefundListingSalesCsv), CancellationToken.None);
+
+        Refund refund = Assert.Single(await db.Refunds.ToListAsync());   // adopted, not duplicated
+        Assert.NotNull(refund.ExternalRefundKey);                        // stamped with the real key
+        Assert.Equal(12.08m, refund.FeeCredit);                          // and healed in the same pass
+    }
+
+    /// <summary>
+    /// The convergence property, on the exact bug from the screenshots: the refund report imported BEFORE the fee
+    /// report, so the fee credit capped against zero fees and net was wrong. The credit figure lives in the refund
+    /// report, so re-importing it after the fees land heals the credit to the truth. Same single refund throughout;
+    /// end state is eBay's figure to the cent, reached by the operator's natural habit of re-importing.
+    /// </summary>
+    [Fact]
+    public async Task Reimporting_a_refund_after_fees_land_heals_the_capped_credit()
+    {
+        var (db, org, user) = NewContext(nameof(Reimporting_a_refund_after_fees_land_heals_the_capped_credit));
+        await using var _ = db;
+        var controller = NewController(db, org, user);
+        var item = SeedItem(db, org, "Brass Lamp", 40m);
+
+        // All Orders + reconcile: the sale exists but its fees are still zero (the fee report has not arrived).
+        await controller.ImportEbayCsv(new ImportPlatformOrdersCsvRequest("eBay", EbayAllOrdersCsv), CancellationToken.None);
+        PlatformOrder order = await db.PlatformOrders.Include(o => o.Lines).SingleAsync();
+        await controller.Reconcile(order.Id,
+            new ReconcilePlatformOrderRequest([new ReconcilePlatformOrderLineMap(order.Lines.First().Id, item.Id)]), CancellationToken.None);
+
+        // Refund imports first — fee exposure is zero, so the credit caps at zero.
+        await controller.ImportMarketplaceRefundsCsv(new ImportMarketplaceRefundsCsvRequest("eBay", EbayRefundListingSalesCsv), CancellationToken.None);
+        Assert.Equal(0m, (await db.Refunds.SingleAsync()).FeeCredit);
+
+        // The fee report lands; the refunded sale's fees are corrected, but the refund's stored credit is still zero.
+        await controller.ImportEbayCsv(new ImportPlatformOrdersCsvRequest("eBay", EbayListingSalesCsv), CancellationToken.None);
+        Assert.Equal(0m, (await db.Refunds.SingleAsync()).FeeCredit);   // not yet healed
+
+        // Re-import the refund report — the upsert refreshes the one refund against the now-known fees.
+        await controller.ImportMarketplaceRefundsCsv(new ImportMarketplaceRefundsCsvRequest("eBay", EbayRefundListingSalesCsv), CancellationToken.None);
+
+        Refund refund = Assert.Single(await db.Refunds.ToListAsync());   // never duplicated
+        Assert.Equal(12.08m, refund.FeeCredit);                          // healed to the sale's true exposure
+        Assert.Equal(-45.97m, (await db.Sales.SingleAsync()).NetProfit); // eBay parity
+    }
+
+    /// <summary>
+    /// A return opened AFTER the refund already imported used to stay stuck forever: the old dedupe skipped the
+    /// re-import, so the resolution never ran. The upsert re-runs the resolution against the open return every
+    /// import, so re-importing the refund report closes it.
+    /// </summary>
+    [Fact]
+    public async Task Reimporting_a_refund_resolves_a_return_opened_after_the_first_import()
+    {
+        var (db, org, user) = NewContext(nameof(Reimporting_a_refund_resolves_a_return_opened_after_the_first_import));
+        await using var _ = db;
+        var controller = NewController(db, org, user);
+        var item = SeedItem(db, org, "Brass Lamp", 40m);
+
+        await controller.ImportEbayCsv(new ImportPlatformOrdersCsvRequest("eBay", EbayAllOrdersCsv), CancellationToken.None);
+        PlatformOrder order = await db.PlatformOrders.Include(o => o.Lines).SingleAsync();
+        await controller.Reconcile(order.Id,
+            new ReconcilePlatformOrderRequest([new ReconcilePlatformOrderLineMap(order.Lines.First().Id, item.Id)]), CancellationToken.None);
+        await controller.ImportEbayCsv(new ImportPlatformOrdersCsvRequest("eBay", EbayListingSalesCsv), CancellationToken.None);
+        await controller.ImportMarketplaceRefundsCsv(new ImportMarketplaceRefundsCsvRequest("eBay", EbayRefundListingSalesCsv), CancellationToken.None);
+
+        // The operator opens and receives the return AFTER the refund already imported.
+        Sale saleMid = await db.Sales.Include(s => s.Returns).SingleAsync();
+        Return rma = Return.Open(org, saleMid, "damage", null, user, DateTimeOffset.UtcNow.AddDays(-1));
+        rma.Receive(DateTimeOffset.UtcNow);
+        db.Returns.Add(rma);
+        await db.SaveChangesAsync();
+
+        // Re-import the refund report — the stuck return resolves.
+        await controller.ImportMarketplaceRefundsCsv(new ImportMarketplaceRefundsCsvRequest("eBay", EbayRefundListingSalesCsv), CancellationToken.None);
+
+        Return resolved = await db.Returns.SingleAsync();
+        Assert.Equal(ReturnStatus.Refunded, resolved.Status);
+        Assert.True(resolved.Restocked);
+        Assert.Single(await db.Refunds.ToListAsync());   // still one refund — the resolution reused it
+        Assert.Equal(SaleStatus.Returned, (await db.Sales.SingleAsync()).Status);
+        Assert.Equal(InventoryStatus.Returned, (await db.InventoryItems.SingleAsync(i => i.Id == item.Id)).Status);
     }
 
     /// <summary>
