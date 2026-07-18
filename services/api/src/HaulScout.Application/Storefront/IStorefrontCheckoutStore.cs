@@ -37,9 +37,17 @@ public interface IStorefrontCheckoutStore
     /// <summary>The customer this email already is on this org, or null.</summary>
     Task<Customer?> FindCustomerByEmailAsync(Guid organizationId, string email, CancellationToken cancellationToken);
 
+    Task<Customer?> FindCustomerByIdAsync(Guid organizationId, Guid customerId, CancellationToken cancellationToken);
+
     Task AddCustomerAsync(Customer customer, CancellationToken cancellationToken);
 
     Task AddSaleAsync(Sale sale, CancellationToken cancellationToken);
+
+    Task MarkOffersConvertedAsync(
+        Guid organizationId,
+        IReadOnlyCollection<Guid> storefrontOfferIds,
+        DateTimeOffset convertedAt,
+        CancellationToken cancellationToken);
 
     /// <summary>Inventory items backing these listings, for the sold-state transition and COGS snapshots.</summary>
     Task<IReadOnlyList<InventoryItem>> ListItemsForListingsAsync(Guid organizationId, IReadOnlyCollection<Guid> storeListingIds, CancellationToken cancellationToken);

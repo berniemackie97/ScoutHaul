@@ -352,6 +352,7 @@ public enum StorefrontOfferStatus
 {
     New,
     Accepted,
+    Countered,
     Declined,
     Expired,
     Converted

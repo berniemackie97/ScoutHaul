@@ -50,6 +50,22 @@ export type OfferResult = {
   message: string;
 };
 
+export type CustomerOffer = {
+  id: string;
+  storeListingId: string;
+  listingTitle: string;
+  slug: string;
+  status: string;
+  offerAmount: number;
+  listingPriceSnapshot: number;
+  responseAmount?: number | null;
+  responseMessage?: string | null;
+  offeredAt: string;
+  respondedAt?: string | null;
+  expiresAt?: string | null;
+  canCheckout: boolean;
+};
+
 export function imageUrl(url?: string | null) {
   if (!url) return undefined;
   return url.startsWith("http") ? url : `${STORE.apiBaseUrl}${url}`;

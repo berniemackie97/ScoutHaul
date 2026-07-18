@@ -17,6 +17,8 @@ public sealed class EfStorefrontCartStore(HaulScoutDbContext db) : IStorefrontCa
     public Task<Cart?> FindActiveAsync(Guid organizationId, string anonymousToken, CancellationToken cancellationToken) =>
         db.Carts
             .Include(cart => cart.Lines)
+                .ThenInclude(line => line.StorefrontOffer)
+            .Include(cart => cart.Lines)
                 .ThenInclude(line => line.StoreListing)
                     .ThenInclude(listing => listing!.InventoryItem)
                         .ThenInclude(item => item!.Photos)
@@ -29,6 +31,9 @@ public sealed class EfStorefrontCartStore(HaulScoutDbContext db) : IStorefrontCa
     public Task<Cart?> FindActiveByIdAsync(Guid organizationId, Guid cartId, CancellationToken cancellationToken) =>
         db.Carts
             .Include(cart => cart.Lines)
+                .ThenInclude(line => line.StorefrontOffer)
+            .Include(cart => cart.Lines)
+                .ThenInclude(line => line.StoreListing)
             .SingleOrDefaultAsync(
                 cart => cart.Id == cartId && cart.OrganizationId == organizationId && cart.Status == CartStatus.Active,
                 cancellationToken);

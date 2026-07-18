@@ -44,27 +44,20 @@ builder.Services.AddHttpContextAccessor();
 // ── Authentication ───────────────────────────────────────────────
 SupabaseAuthOptions supabaseAuth = SupabaseAuthOptions.FromConfiguration(builder.Configuration)
     ?? throw new InvalidOperationException("Authentication:Supabase:Url is required.");
+SupabaseAuthOptions storefrontSupabaseAuth =
+    SupabaseAuthOptions.FromConfiguration(builder.Configuration, "Authentication:StorefrontSupabase")
+    ?? supabaseAuth;
 
 SupabaseSigningKeyResolver signingKeyResolver = new(supabaseAuth);
+SupabaseSigningKeyResolver storefrontSigningKeyResolver = new(storefrontSupabaseAuth);
 builder.Services.AddSingleton(supabaseAuth);
 builder.Services.AddSingleton(signingKeyResolver);
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options =>
-    {
-        options.TokenValidationParameters = new TokenValidationParameters
-        {
-            ValidateIssuer = true,
-            ValidIssuer = supabaseAuth.Issuer,
-            ValidateAudience = true,
-            ValidAudience = supabaseAuth.Audience,
-            ValidateLifetime = true,
-            ValidateIssuerSigningKey = true,
-            ClockSkew = TimeSpan.FromSeconds(30),
-            NameClaimType = "name",
-            IssuerSigningKeyResolver = signingKeyResolver.ResolveSigningKeys
-        };
-    });
+    .AddJwtBearer(options => ConfigureSupabaseBearer(options, supabaseAuth, signingKeyResolver))
+    .AddJwtBearer(
+        StorefrontAuthDefaults.Scheme,
+        options => ConfigureSupabaseBearer(options, storefrontSupabaseAuth, storefrontSigningKeyResolver));
 
 builder.Services.AddApiAdapters(builder.Configuration);
 builder.Services.AddAuthorization(options =>
@@ -208,3 +201,22 @@ app.UseMiddleware<IdempotencyMiddleware>();
 app.MapHealthChecks("/health").AllowAnonymous();
 app.MapControllers();
 app.Run();
+
+static void ConfigureSupabaseBearer(
+    JwtBearerOptions options,
+    SupabaseAuthOptions authOptions,
+    SupabaseSigningKeyResolver signingKeyResolver)
+{
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuer = true,
+        ValidIssuer = authOptions.Issuer,
+        ValidateAudience = true,
+        ValidAudience = authOptions.Audience,
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
+        ClockSkew = TimeSpan.FromSeconds(30),
+        NameClaimType = "name",
+        IssuerSigningKeyResolver = signingKeyResolver.ResolveSigningKeys
+    };
+}

@@ -16,6 +16,7 @@ public static class ApiAdapterServiceCollectionExtensions
     {
         services.AddSingleton(TimeProvider.System);
         services.AddScoped<StorefrontStoreResolver>();
+        services.AddScoped<StorefrontCustomerIdentityResolver>();
         services.Configure<StorefrontCheckoutOptions>(configuration.GetSection(StorefrontCheckoutOptions.SectionName));
         services.Configure<StripeOptions>(configuration.GetSection(StripeOptions.SectionName));
         services.AddScoped<SourcingTripQueryService>();

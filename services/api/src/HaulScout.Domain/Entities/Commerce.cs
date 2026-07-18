@@ -148,6 +148,8 @@ public sealed class CartLine : EntityBase, IOrganizationScoped
     public Guid StoreListingId { get; set; }
     public StoreListing? StoreListing { get; set; }
     public Guid InventoryItemId { get; set; }
+    public Guid? StorefrontOfferId { get; set; }
+    public StorefrontOffer? StorefrontOffer { get; set; }
     public int Quantity { get; set; } = 1;
     public decimal UnitPriceSnapshot { get; set; }
 }
@@ -229,6 +231,8 @@ public sealed class OrderLine : EntityBase, IOrganizationScoped
     public Guid InventoryItemId { get; set; }
     public InventoryItem? InventoryItem { get; set; }
     public Guid? StoreListingId { get; set; }
+    public Guid? StorefrontOfferId { get; set; }
+    public StorefrontOffer? StorefrontOffer { get; set; }
 
     public required string TitleSnapshot { get; set; }
     public string? SkuSnapshot { get; set; }
@@ -272,6 +276,8 @@ public sealed class Review : EntityBase, IOrganizationScoped
 public sealed class StorefrontOffer : EntityBase, IOrganizationScoped
 {
     public Guid OrganizationId { get; set; }
+    public Guid? CustomerId { get; set; }
+    public Customer? Customer { get; set; }
     public Guid StoreListingId { get; set; }
     public StoreListing? StoreListing { get; set; }
     public Guid InventoryItemId { get; set; }
@@ -279,11 +285,16 @@ public sealed class StorefrontOffer : EntityBase, IOrganizationScoped
     public StorefrontOfferStatus Status { get; set; } = StorefrontOfferStatus.New;
     public decimal OfferAmount { get; set; }
     public decimal ListingPriceSnapshot { get; set; }
+    public decimal? ResponseAmount { get; set; }
     public string? BuyerName { get; set; }
     public string? BuyerEmail { get; set; }
     public string? BuyerPhone { get; set; }
     public string? Message { get; set; }
     public DateTimeOffset OfferedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset? RespondedAt { get; set; }
+    public DateTimeOffset? ExpiresAt { get; set; }
+    public DateTimeOffset? ConvertedAt { get; set; }
+    /// <summary>Buyer-visible response text. Internal notes belong in audit/activity later, not here.</summary>
+    public string? ResponseMessage { get; set; }
     public string? ResponseNotes { get; set; }
 }

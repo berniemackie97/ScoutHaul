@@ -7,6 +7,7 @@ type ProxyOptions = {
   method?: string;
   path: string;
   body?: unknown;
+  accessToken?: string | null;
 };
 
 export async function storefrontProxy(request: NextRequest, options: ProxyOptions) {
@@ -18,6 +19,9 @@ export async function storefrontProxy(request: NextRequest, options: ProxyOption
 
   if (token) {
     headers.set("X-HaulScout-Cart", token);
+  }
+  if (options.accessToken) {
+    headers.set("Authorization", `Bearer ${options.accessToken}`);
   }
 
   const init: RequestInit = {

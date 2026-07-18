@@ -14,6 +14,7 @@ public sealed class EfStorefrontOfferStore(HaulScoutDbContext db) : IStorefrontO
         CancellationToken cancellationToken)
     {
         IQueryable<StorefrontOffer> query = db.StorefrontOffers
+            .Include(offer => offer.Customer)
             .Include(offer => offer.StoreListing)
             .Include(offer => offer.InventoryItem)
             .Where(offer => offer.OrganizationId == organizationId);
@@ -29,6 +30,29 @@ public sealed class EfStorefrontOfferStore(HaulScoutDbContext db) : IStorefrontO
             .ToListAsync(cancellationToken);
     }
 
+    public Task<StorefrontOffer?> FindOfferAsync(Guid organizationId, Guid offerId, CancellationToken cancellationToken) =>
+        OfferQuery(organizationId)
+            .SingleOrDefaultAsync(offer => offer.Id == offerId, cancellationToken);
+
+    public async Task<IReadOnlyList<StorefrontOffer>> ListCustomerOffersAsync(
+        Guid organizationId,
+        Guid customerId,
+        CancellationToken cancellationToken) =>
+        await OfferQuery(organizationId)
+            .Where(offer => offer.CustomerId == customerId)
+            .OrderByDescending(offer => offer.OfferedAt)
+            .ToListAsync(cancellationToken);
+
+    public Task<StorefrontOffer?> FindCustomerOfferAsync(
+        Guid organizationId,
+        Guid customerId,
+        Guid offerId,
+        CancellationToken cancellationToken) =>
+        OfferQuery(organizationId)
+            .SingleOrDefaultAsync(
+                offer => offer.Id == offerId && offer.CustomerId == customerId,
+                cancellationToken);
+
     public Task<StoreListing?> FindListingAsync(Guid organizationId, Guid storeListingId, CancellationToken cancellationToken) =>
         db.StoreListings
             .Include(listing => listing.InventoryItem)
@@ -40,4 +64,11 @@ public sealed class EfStorefrontOfferStore(HaulScoutDbContext db) : IStorefrontO
         await db.StorefrontOffers.AddAsync(offer, cancellationToken);
 
     public Task SaveChangesAsync(CancellationToken cancellationToken) => db.SaveChangesAsync(cancellationToken);
+
+    private IQueryable<StorefrontOffer> OfferQuery(Guid organizationId) =>
+        db.StorefrontOffers
+            .Include(offer => offer.Customer)
+            .Include(offer => offer.StoreListing)
+            .Include(offer => offer.InventoryItem)
+            .Where(offer => offer.OrganizationId == organizationId);
 }

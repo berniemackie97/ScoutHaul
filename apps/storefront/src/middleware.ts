@@ -1,10 +1,8 @@
-import { NextResponse } from "next/server";
+import { updateSession } from "@/lib/supabase/middleware";
 
-// Public storefront — no auth gate. Customer auth (Supabase) is added with checkout/account.
-export function middleware() {
-  return NextResponse.next();
-}
+// Public storefront: refresh buyer auth cookies without gating browse/cart/checkout pages.
+export const middleware = updateSession;
 
 export const config = {
-  matcher: [],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
 };

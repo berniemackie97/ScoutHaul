@@ -129,8 +129,17 @@ public sealed class EfStorefrontCheckoutStore(HaulScoutDbContext db) : IStorefro
     public Task<Customer?> FindCustomerByEmailAsync(Guid organizationId, string email, CancellationToken cancellationToken) =>
         db.Customers
             .IgnoreQueryFilters()
+            .Include(customer => customer.ChannelIdentities)
             .SingleOrDefaultAsync(
                 customer => customer.OrganizationId == organizationId && customer.Email != null && customer.Email.ToLower() == email.ToLower(),
+                cancellationToken);
+
+    public Task<Customer?> FindCustomerByIdAsync(Guid organizationId, Guid customerId, CancellationToken cancellationToken) =>
+        db.Customers
+            .IgnoreQueryFilters()
+            .Include(customer => customer.ChannelIdentities)
+            .SingleOrDefaultAsync(
+                customer => customer.OrganizationId == organizationId && customer.Id == customerId,
                 cancellationToken);
 
     public async Task AddCustomerAsync(Customer customer, CancellationToken cancellationToken) =>
@@ -138,6 +147,30 @@ public sealed class EfStorefrontCheckoutStore(HaulScoutDbContext db) : IStorefro
 
     public async Task AddSaleAsync(Sale sale, CancellationToken cancellationToken) =>
         await db.Sales.AddAsync(sale, cancellationToken);
+
+    public async Task MarkOffersConvertedAsync(
+        Guid organizationId,
+        IReadOnlyCollection<Guid> storefrontOfferIds,
+        DateTimeOffset convertedAt,
+        CancellationToken cancellationToken)
+    {
+        if (storefrontOfferIds.Count == 0)
+        {
+            return;
+        }
+
+        await db.StorefrontOffers
+            .IgnoreQueryFilters()
+            .Where(offer => storefrontOfferIds.Contains(offer.Id)
+                && offer.OrganizationId == organizationId
+                && (offer.Status == StorefrontOfferStatus.Accepted || offer.Status == StorefrontOfferStatus.Countered))
+            .ExecuteUpdateAsync(
+                setters => setters
+                    .SetProperty(offer => offer.Status, StorefrontOfferStatus.Converted)
+                    .SetProperty(offer => offer.ConvertedAt, convertedAt)
+                    .SetProperty(offer => offer.UpdatedAt, convertedAt),
+                cancellationToken);
+    }
 
     public async Task<IReadOnlyList<InventoryItem>> ListItemsForListingsAsync(
         Guid organizationId,

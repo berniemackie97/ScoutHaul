@@ -15,8 +15,11 @@ namespace HaulScout.Application.Storefront;
 public sealed class CartWorkflowService(
     IStorefrontCartStore carts,
     IStorefrontCheckoutStore checkout,
+    IStorefrontCustomerStore customers,
+    IStorefrontOfferStore offers,
     StorefrontShippingCalculator shipping,
-    IOptions<StorefrontCheckoutOptions> options)
+    IOptions<StorefrontCheckoutOptions> options,
+    TimeProvider timeProvider)
 {
     private readonly StorefrontCheckoutOptions _options = options.Value;
 
@@ -92,6 +95,100 @@ public sealed class CartWorkflowService(
         return AppResult<StorefrontCartDto>.Ok(BuildDto(cart.AnonymousId!, reloaded, []));
     }
 
+    public async Task<AppResult<StorefrontCartDto>> AddOfferLineAsync(
+        Guid organizationId,
+        string? cartToken,
+        Guid offerId,
+        StorefrontCustomerIdentity identity,
+        CancellationToken cancellationToken)
+    {
+        DateTimeOffset now = timeProvider.GetUtcNow();
+        Customer customer = await customers.GetOrCreateAsync(organizationId, identity, now, cancellationToken);
+        StorefrontOffer? offer = await offers.FindCustomerOfferAsync(organizationId, customer.Id, offerId, cancellationToken);
+        if (offer is null)
+        {
+            return AppResult<StorefrontCartDto>.NotFound("Offer was not found.");
+        }
+
+        decimal? approvedAmount = ApprovedOfferAmount(offer, now);
+        if (approvedAmount is null)
+        {
+            return AppResult<StorefrontCartDto>.Conflict("This offer is not approved for checkout.");
+        }
+        StoreListing? listing = offer.StoreListing;
+        if (!StorefrontPurchasability.IsPurchasable(listing))
+        {
+            return AppResult<StorefrontCartDto>.Conflict(
+                listing is null ? "This item is no longer available." : StorefrontPurchasability.RefusalReason(listing));
+        }
+
+        Cart? cart = cartToken is null ? null : await carts.FindActiveAsync(organizationId, cartToken, cancellationToken);
+        if (cart is null)
+        {
+            cart = new Cart
+            {
+                OrganizationId = organizationId,
+                CustomerId = customer.Id,
+                Customer = customer,
+                AnonymousId = Convert.ToHexString(RandomNumberGenerator.GetBytes(32)),
+                Status = CartStatus.Active,
+            };
+            await carts.AddAsync(cart, cancellationToken);
+        }
+        else if (cart.CustomerId is Guid existingCustomerId && existingCustomerId != customer.Id)
+        {
+            return AppResult<StorefrontCartDto>.Conflict("This cart belongs to a different signed-in customer.");
+        }
+        else
+        {
+            cart.CustomerId = customer.Id;
+            cart.Customer = customer;
+        }
+
+        CartLine? existing = cart.Lines.FirstOrDefault(line => line.StoreListingId == offer.StoreListingId);
+        if (existing is null)
+        {
+            cart.Lines.Add(new CartLine
+            {
+                OrganizationId = organizationId,
+                CartId = cart.Id,
+                StoreListingId = offer.StoreListingId,
+                StoreListing = offer.StoreListing,
+                InventoryItemId = offer.InventoryItemId,
+                Quantity = 1,
+                UnitPriceSnapshot = approvedAmount.Value,
+                StorefrontOfferId = offer.Id,
+                StorefrontOffer = offer,
+            });
+        }
+        else
+        {
+            existing.StorefrontOfferId = offer.Id;
+            existing.StorefrontOffer = offer;
+            existing.UnitPriceSnapshot = approvedAmount.Value;
+        }
+
+        try
+        {
+            await carts.SaveChangesAsync(cancellationToken);
+        }
+        catch (CartMutationConflictException)
+        {
+            Cart? current = cart.AnonymousId is null
+                ? null
+                : await carts.FindActiveAsync(organizationId, cart.AnonymousId, cancellationToken);
+            if (current is null)
+            {
+                return AppResult<StorefrontCartDto>.Conflict("Your cart changed while updating. Refresh and try again.");
+            }
+
+            return AppResult<StorefrontCartDto>.Ok(BuildDto(current.AnonymousId!, current, []));
+        }
+
+        Cart reloaded = await carts.FindActiveAsync(organizationId, cart.AnonymousId!, cancellationToken) ?? cart;
+        return AppResult<StorefrontCartDto>.Ok(BuildDto(cart.AnonymousId!, reloaded, []));
+    }
+
     public async Task<AppResult<StorefrontCartDto>> RemoveLineAsync(
         Guid organizationId,
         string? cartToken,
@@ -125,17 +222,16 @@ public sealed class CartWorkflowService(
                     line.StoreListingId,
                     line.StoreListing?.Slug ?? string.Empty,
                     line.StoreListing?.Title ?? "Item",
-                    line.StoreListing?.ListPrice ?? line.UnitPriceSnapshot,
+                    EffectiveUnitPrice(line),
                     HeroPhotoUrl(line.StoreListing),
-                    StorefrontPurchasability.IsPurchasable(line.StoreListing) || heldByThisCart.Contains(line.StoreListingId)))
+                    IsLineAvailable(line, heldByThisCart)))
                 .ToArray();
 
         // Unavailable lines are shown but never counted — the shopper removes them; totals stay honest.
         decimal subtotal = lines.Where(line => line.IsAvailable).Sum(line => line.UnitPrice);
         ShippingQuote shippingQuote = shipping.Quote(
             subtotal,
-            cart?.Lines.Where(line => StorefrontPurchasability.IsPurchasable(line.StoreListing)
-                    || heldByThisCart.Contains(line.StoreListingId))
+            cart?.Lines.Where(line => IsLineAvailable(line, heldByThisCart))
                 .Select(line => line.StoreListing)
                 ?? []);
 
@@ -174,4 +270,33 @@ public sealed class CartWorkflowService(
                 .Select(line => line.StoreListingId!.Value)
                 .ToHashSet();
     }
+
+    internal static decimal? ApprovedOfferAmount(StorefrontOffer offer, DateTimeOffset now)
+    {
+        if (offer.ExpiresAt is DateTimeOffset expiresAt && expiresAt <= now)
+        {
+            return null;
+        }
+
+        return offer.Status switch
+        {
+            StorefrontOfferStatus.Accepted => offer.ResponseAmount ?? offer.OfferAmount,
+            StorefrontOfferStatus.Countered => offer.ResponseAmount,
+            _ => null,
+        };
+    }
+
+    private bool IsLineAvailable(CartLine line, HashSet<Guid> heldByThisCart)
+    {
+        if (line.StorefrontOfferId is not null
+            && ApprovedOfferAmount(line.StorefrontOffer!, timeProvider.GetUtcNow()) is null)
+        {
+            return false;
+        }
+
+        return StorefrontPurchasability.IsPurchasable(line.StoreListing) || heldByThisCart.Contains(line.StoreListingId);
+    }
+
+    internal static decimal EffectiveUnitPrice(CartLine line) =>
+        line.StorefrontOfferId is not null ? line.UnitPriceSnapshot : line.StoreListing?.ListPrice ?? line.UnitPriceSnapshot;
 }

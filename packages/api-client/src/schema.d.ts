@@ -6776,6 +6776,45 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/storefront/cart/offers/{offerId}/line": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    offerId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["StorefrontCartDto"];
+                        "application/json": components["schemas"]["StorefrontCartDto"];
+                        "text/json": components["schemas"]["StorefrontCartDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/storefront/cart/lines/{storeListingId}": {
         parameters: {
             query?: never;
@@ -6891,7 +6930,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/storefront/offers": {
+    "/api/admin/storefront/offers": {
         parameters: {
             query?: never;
             header?: never;
@@ -6918,6 +6957,88 @@ export interface paths {
                         "text/plain": components["schemas"]["StorefrontOfferDto"][];
                         "application/json": components["schemas"]["StorefrontOfferDto"][];
                         "text/json": components["schemas"]["StorefrontOfferDto"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/storefront/offers/{offerId}/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    offerId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["StorefrontOfferDecisionRequest"];
+                    "text/json": components["schemas"]["StorefrontOfferDecisionRequest"];
+                    "application/*+json": components["schemas"]["StorefrontOfferDecisionRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["StorefrontOfferDto"];
+                        "application/json": components["schemas"]["StorefrontOfferDto"];
+                        "text/json": components["schemas"]["StorefrontOfferDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/storefront/offers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["StorefrontCustomerOfferDto"][];
+                        "application/json": components["schemas"]["StorefrontCustomerOfferDto"][];
+                        "text/json": components["schemas"]["StorefrontCustomerOfferDto"][];
                     };
                 };
             };
@@ -9531,6 +9652,29 @@ export interface components {
             publishableKey?: string | null;
             mode?: string | null;
         };
+        StorefrontCustomerOfferDto: {
+            /** Format: uuid */
+            id?: string;
+            /** Format: uuid */
+            storeListingId?: string;
+            listingTitle?: string | null;
+            slug?: string | null;
+            status?: string | null;
+            /** Format: double */
+            offerAmount?: number;
+            /** Format: double */
+            listingPriceSnapshot?: number;
+            /** Format: double */
+            responseAmount?: number | null;
+            responseMessage?: string | null;
+            /** Format: date-time */
+            offeredAt?: string;
+            /** Format: date-time */
+            respondedAt?: string | null;
+            /** Format: date-time */
+            expiresAt?: string | null;
+            canCheckout?: boolean;
+        };
         StorefrontListingDetailDto: {
             /** Format: uuid */
             id?: string;
@@ -9614,9 +9758,17 @@ export interface components {
             /** Format: int32 */
             total?: number;
         };
+        StorefrontOfferDecisionRequest: {
+            decision?: string | null;
+            /** Format: double */
+            responseAmount?: number | null;
+            responseMessage?: string | null;
+        };
         StorefrontOfferDto: {
             /** Format: uuid */
             id?: string;
+            /** Format: uuid */
+            customerId?: string | null;
             /** Format: uuid */
             storeListingId?: string;
             /** Format: uuid */
@@ -9627,6 +9779,8 @@ export interface components {
             offerAmount?: number;
             /** Format: double */
             listingPriceSnapshot?: number;
+            /** Format: double */
+            responseAmount?: number | null;
             buyerName?: string | null;
             buyerEmail?: string | null;
             buyerPhone?: string | null;
@@ -9635,14 +9789,16 @@ export interface components {
             offeredAt?: string;
             /** Format: date-time */
             respondedAt?: string | null;
+            /** Format: date-time */
+            expiresAt?: string | null;
+            /** Format: date-time */
+            convertedAt?: string | null;
+            responseMessage?: string | null;
             responseNotes?: string | null;
         };
         StorefrontOfferRequest: {
             /** Format: uuid */
             storeListingId?: string;
-            buyerName?: string | null;
-            buyerEmail?: string | null;
-            buyerPhone?: string | null;
             /** Format: double */
             offerAmount?: number;
             message?: string | null;
@@ -9654,7 +9810,7 @@ export interface components {
             message?: string | null;
         };
         /** @enum {string} */
-        StorefrontOfferStatus: "New" | "Accepted" | "Declined" | "Expired" | "Converted";
+        StorefrontOfferStatus: "New" | "Accepted" | "Countered" | "Declined" | "Expired" | "Converted";
         StorefrontOrderSummaryDto: {
             orderNumber?: string | null;
             status?: string | null;

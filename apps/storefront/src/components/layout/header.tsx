@@ -3,7 +3,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
-import { Search, ShoppingBag } from "lucide-react";
+import { Search, ShoppingBag, UserRound } from "lucide-react";
 import type { Cart } from "@/lib/commerce";
 
 const navigation = [
@@ -117,6 +117,13 @@ export function Header() {
                 }`}
               />
             </form>
+            <Link
+              href="/account"
+              aria-label="Account"
+              className={`p-2 transition-colors ${solid ? "text-ink hover:text-copper" : "text-background hover:text-copper"}`}
+            >
+              <UserRound className="h-5 w-5" aria-hidden />
+            </Link>
             <Link
               href="/cart"
               aria-label="Cart"

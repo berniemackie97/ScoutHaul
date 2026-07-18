@@ -50,26 +50,48 @@ public sealed record StorefrontOrderSummaryLineDto(string Title, decimal UnitPri
 
 public sealed record StorefrontOfferRequest(
     Guid StoreListingId,
-    string? BuyerName,
-    string? BuyerEmail,
-    string? BuyerPhone,
     decimal OfferAmount,
     string? Message);
 
 public sealed record StorefrontOfferResultDto(Guid Id, string Status, string Message);
 
+public sealed record StorefrontOfferDecisionRequest(
+    string Decision,
+    decimal? ResponseAmount,
+    string? ResponseMessage);
+
+public sealed record StorefrontCustomerOfferDto(
+    Guid Id,
+    Guid StoreListingId,
+    string ListingTitle,
+    string Slug,
+    string Status,
+    decimal OfferAmount,
+    decimal ListingPriceSnapshot,
+    decimal? ResponseAmount,
+    string? ResponseMessage,
+    DateTimeOffset OfferedAt,
+    DateTimeOffset? RespondedAt,
+    DateTimeOffset? ExpiresAt,
+    bool CanCheckout);
+
 public sealed record StorefrontOfferDto(
     Guid Id,
+    Guid? CustomerId,
     Guid StoreListingId,
     Guid InventoryItemId,
     string ListingTitle,
     string Status,
     decimal OfferAmount,
     decimal ListingPriceSnapshot,
+    decimal? ResponseAmount,
     string? BuyerName,
     string? BuyerEmail,
     string? BuyerPhone,
     string? Message,
     DateTimeOffset OfferedAt,
     DateTimeOffset? RespondedAt,
+    DateTimeOffset? ExpiresAt,
+    DateTimeOffset? ConvertedAt,
+    string? ResponseMessage,
     string? ResponseNotes);
