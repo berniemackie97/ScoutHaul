@@ -9,6 +9,7 @@ import {
   Users,
   Wrench,
   HandCoins,
+  Handshake,
   Truck,
   BarChart3,
   Settings,
@@ -36,6 +37,7 @@ const navGroups = [
     label: "Commerce",
     items: [
       { name: "Orders", href: "/orders", icon: ShoppingCart },
+      { name: "Offers", href: "/offers", icon: Handshake },
       { name: "Customers", href: "/customers", icon: Users },
       { name: "Channels", href: "/channels", icon: Radio },
     ],

@@ -341,6 +341,15 @@ public enum ReviewStatus
     Rejected
 }
 
+public enum StorefrontOfferStatus
+{
+    New,
+    Accepted,
+    Declined,
+    Expired,
+    Converted
+}
+
 /// <summary>State of an inventory item on a single channel account (the manual channel-presence ledger).</summary>
 public enum ChannelListingStatus
 {

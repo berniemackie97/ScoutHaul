@@ -197,10 +197,11 @@ public class StorefrontCheckoutTests
         FakeGateway gateway = new();
         FakeTimeProvider clock = new(T0);
         FakeCheckoutStore checkoutStore = new(world);
+        FakeCartStore cartStore = new(world);
         return (
             world,
-            new CartWorkflowService(new FakeCartStore(world), Options()),
-            new CheckoutWorkflowService(new FakeCartStore(world), checkoutStore, gateway, Options(), clock),
+            new CartWorkflowService(cartStore, checkoutStore, Options()),
+            new CheckoutWorkflowService(cartStore, checkoutStore, gateway, Options(), clock),
             new StorefrontOrderService(checkoutStore, gateway, clock),
             gateway,
             clock);
@@ -281,6 +282,20 @@ public class StorefrontCheckoutTests
         Assert.Equal(40m, line.UnitCostSnapshot);   // specific-identification COGS frozen at checkout
         Assert.Equal("cs_test_1", order.StripeCheckoutSessionId);
         Assert.Equal(100m, order.Subtotal);
+    }
+
+    [Fact]
+    public async Task Cart_read_treats_this_carts_pending_checkout_hold_as_available()
+    {
+        var harness = NewHarness();
+        (string token, _) = await AddToCart(harness);
+        await harness.Checkout.CheckoutAsync(Org, token, CancellationToken.None);
+
+        StorefrontCartDto cart = await harness.Cart.GetAsync(Org, token, CancellationToken.None);
+
+        StorefrontCartLineDto line = Assert.Single(cart.Lines);
+        Assert.True(line.IsAvailable);
+        Assert.Equal(100m, cart.Subtotal);
     }
 
     [Fact]

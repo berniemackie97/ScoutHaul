@@ -4,6 +4,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Search, ShoppingBag } from "lucide-react";
+import type { Cart } from "@/lib/commerce";
 
 const navigation = [
   { name: "Shop", href: "/products" },
@@ -18,6 +19,7 @@ export function Header() {
   const router = useRouter();
   const [scrolled, setScrolled] = useState(false);
   const [query, setQuery] = useState("");
+  const [cartCount, setCartCount] = useState(0);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 16);
@@ -25,6 +27,31 @@ export function Header() {
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const loadCartCount = async () => {
+      try {
+        const response = await fetch("/api/cart", {
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        if (!response.ok) return;
+        const cart = (await response.json()) as Cart;
+        setCartCount(cart.lines.length);
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        setCartCount(0);
+      }
+    };
+
+    void loadCartCount();
+    window.addEventListener("haulscout:cart-changed", loadCartCount);
+    return () => {
+      controller.abort();
+      window.removeEventListener("haulscout:cart-changed", loadCartCount);
+    };
+  }, [pathname]);
 
   const onHome = pathname === "/";
   const solid = scrolled || !onHome;
@@ -97,7 +124,7 @@ export function Header() {
             >
               <ShoppingBag className="h-5 w-5" aria-hidden />
               <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center bg-copper px-1 font-mono text-[10px] font-semibold text-ink">
-                0
+                {cartCount}
               </span>
             </Link>
           </div>

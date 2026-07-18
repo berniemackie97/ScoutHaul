@@ -2607,6 +2607,88 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/organizations/{id}/members/{memberId}/role": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                    memberId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["UpdateOrganizationMemberRoleRequest"];
+                    "text/json": components["schemas"]["UpdateOrganizationMemberRoleRequest"];
+                    "application/*+json": components["schemas"]["UpdateOrganizationMemberRoleRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["OrganizationMemberDto"];
+                        "application/json": components["schemas"]["OrganizationMemberDto"];
+                        "text/json": components["schemas"]["OrganizationMemberDto"];
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/api/organizations/{id}/members/{memberId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                    memberId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/organizations/{id}/invite-codes": {
         parameters: {
             query?: never;
@@ -2753,88 +2835,6 @@ export interface paths {
             };
         };
         delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/organizations/{id}/members/{memberId}/role": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    id: string;
-                    memberId: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: {
-                content: {
-                    "application/json": components["schemas"]["UpdateOrganizationMemberRoleRequest"];
-                    "text/json": components["schemas"]["UpdateOrganizationMemberRoleRequest"];
-                    "application/*+json": components["schemas"]["UpdateOrganizationMemberRoleRequest"];
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["OrganizationMemberDto"];
-                        "application/json": components["schemas"]["OrganizationMemberDto"];
-                        "text/json": components["schemas"]["OrganizationMemberDto"];
-                    };
-                };
-            };
-        };
-        trace?: never;
-    };
-    "/api/organizations/{id}/members/{memberId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    id: string;
-                    memberId: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
         options?: never;
         head?: never;
         patch?: never;
@@ -3255,6 +3255,45 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/platform-listings/quality-snapshots": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    take?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["PlatformListingQualitySnapshotDto"][];
+                        "application/json": components["schemas"]["PlatformListingQualitySnapshotDto"][];
+                        "text/json": components["schemas"]["PlatformListingQualitySnapshotDto"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/platform-listings/import/ebay-csv": {
         parameters: {
             query?: never;
@@ -3288,6 +3327,49 @@ export interface paths {
                         "text/plain": components["schemas"]["IngestPlatformListingsResultDto"];
                         "application/json": components["schemas"]["IngestPlatformListingsResultDto"];
                         "text/json": components["schemas"]["IngestPlatformListingsResultDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/platform-listings/import/ebay-listing-quality-workbook": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["ImportPlatformListingQualityWorkbookRequest"];
+                    "text/json": components["schemas"]["ImportPlatformListingQualityWorkbookRequest"];
+                    "application/*+json": components["schemas"]["ImportPlatformListingQualityWorkbookRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ImportPlatformListingQualityResultDto"];
+                        "application/json": components["schemas"]["ImportPlatformListingQualityResultDto"];
+                        "text/json": components["schemas"]["ImportPlatformListingQualityResultDto"];
                     };
                 };
             };
@@ -3618,6 +3700,49 @@ export interface paths {
                         "text/plain": components["schemas"]["IngestPlatformOrdersResultDto"];
                         "application/json": components["schemas"]["IngestPlatformOrdersResultDto"];
                         "text/json": components["schemas"]["IngestPlatformOrdersResultDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/platform-orders/import/refunds-csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["ImportMarketplaceRefundsCsvRequest"];
+                    "text/json": components["schemas"]["ImportMarketplaceRefundsCsvRequest"];
+                    "application/*+json": components["schemas"]["ImportMarketplaceRefundsCsvRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ImportMarketplaceRefundsResultDto"];
+                        "application/json": components["schemas"]["ImportMarketplaceRefundsResultDto"];
+                        "text/json": components["schemas"]["ImportMarketplaceRefundsResultDto"];
                     };
                 };
             };
@@ -4157,92 +4282,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/sales/group": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: {
-                content: {
-                    "application/json": components["schemas"]["GroupSalesRequest"];
-                    "text/json": components["schemas"]["GroupSalesRequest"];
-                    "application/*+json": components["schemas"]["GroupSalesRequest"];
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["SaleGroupResultDto"];
-                        "application/json": components["schemas"]["SaleGroupResultDto"];
-                        "text/json": components["schemas"]["SaleGroupResultDto"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/sales/ungroup": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: {
-                content: {
-                    "application/json": components["schemas"]["UngroupSalesRequest"];
-                    "text/json": components["schemas"]["UngroupSalesRequest"];
-                    "application/*+json": components["schemas"]["UngroupSalesRequest"];
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["SaleDto"][];
-                        "application/json": components["schemas"]["SaleDto"][];
-                        "text/json": components["schemas"]["SaleDto"][];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/sales": {
         parameters: {
             query?: never;
@@ -4440,6 +4479,191 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/sales/{id}/profit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["RealizedProfitDto"];
+                        "application/json": components["schemas"]["RealizedProfitDto"];
+                        "text/json": components["schemas"]["RealizedProfitDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sales/{id}/shipment": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SaleShipmentDto"];
+                        "application/json": components["schemas"]["SaleShipmentDto"];
+                        "text/json": components["schemas"]["SaleShipmentDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sales/{id}/corrections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SaleCorrectionDto"][];
+                        "application/json": components["schemas"]["SaleCorrectionDto"][];
+                        "text/json": components["schemas"]["SaleCorrectionDto"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sales/{id}/refunds": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["RefundDto"][];
+                        "application/json": components["schemas"]["RefundDto"][];
+                        "text/json": components["schemas"]["RefundDto"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["RecordRefundRequest"];
+                    "text/json": components["schemas"]["RecordRefundRequest"];
+                    "application/*+json": components["schemas"]["RecordRefundRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SaleDto"];
+                        "application/json": components["schemas"]["SaleDto"];
+                        "text/json": components["schemas"]["SaleDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/sales/bundled": {
         parameters: {
             query?: never;
@@ -4483,23 +4707,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/sales/{id}/profit": {
+    "/api/sales/group": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: {
+        get?: never;
+        put?: never;
+        post: {
             parameters: {
                 query?: never;
                 header?: never;
-                path: {
-                    id: string;
-                };
+                path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["GroupSalesRequest"];
+                    "text/json": components["schemas"]["GroupSalesRequest"];
+                    "application/*+json": components["schemas"]["GroupSalesRequest"];
+                };
+            };
             responses: {
                 /** @description OK */
                 200: {
@@ -4507,15 +4737,56 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "text/plain": components["schemas"]["RealizedProfitDto"];
-                        "application/json": components["schemas"]["RealizedProfitDto"];
-                        "text/json": components["schemas"]["RealizedProfitDto"];
+                        "text/plain": components["schemas"]["SaleGroupResultDto"];
+                        "application/json": components["schemas"]["SaleGroupResultDto"];
+                        "text/json": components["schemas"]["SaleGroupResultDto"];
                     };
                 };
             };
         };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sales/ungroup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
         put?: never;
-        post?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["UngroupSalesRequest"];
+                    "text/json": components["schemas"]["UngroupSalesRequest"];
+                    "application/*+json": components["schemas"]["UngroupSalesRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SaleDto"][];
+                        "application/json": components["schemas"]["SaleDto"][];
+                        "text/json": components["schemas"]["SaleDto"][];
+                    };
+                };
+            };
+        };
         delete?: never;
         options?: never;
         head?: never;
@@ -4639,45 +4910,6 @@ export interface paths {
         };
         trace?: never;
     };
-    "/api/sales/{id}/shipment": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    id: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["SaleShipmentDto"];
-                        "application/json": components["schemas"]["SaleShipmentDto"];
-                        "text/json": components["schemas"]["SaleShipmentDto"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/sales/{id}/status": {
         parameters: {
             query?: never;
@@ -4721,113 +4953,6 @@ export interface paths {
                 };
             };
         };
-        trace?: never;
-    };
-    "/api/sales/{id}/corrections": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    id: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["SaleCorrectionDto"][];
-                        "application/json": components["schemas"]["SaleCorrectionDto"][];
-                        "text/json": components["schemas"]["SaleCorrectionDto"][];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/sales/{id}/refunds": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    id: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["RefundDto"][];
-                        "application/json": components["schemas"]["RefundDto"][];
-                        "text/json": components["schemas"]["RefundDto"][];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    id: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: {
-                content: {
-                    "application/json": components["schemas"]["RecordRefundRequest"];
-                    "text/json": components["schemas"]["RecordRefundRequest"];
-                    "application/*+json": components["schemas"]["RecordRefundRequest"];
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["SaleDto"];
-                        "application/json": components["schemas"]["SaleDto"];
-                        "text/json": components["schemas"]["SaleDto"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
         trace?: never;
     };
     "/api/sales/{id}/refunds/{refundId}": {
@@ -6295,6 +6420,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/store/reconcile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ReconcileStoreCatalogResultDto"];
+                        "application/json": components["schemas"]["ReconcileStoreCatalogResultDto"];
+                        "text/json": components["schemas"]["ReconcileStoreCatalogResultDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/storefront/listings": {
         parameters: {
             query?: never;
@@ -6444,6 +6606,300 @@ export interface paths {
         };
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/storefront/cart": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["StorefrontCartDto"];
+                        "application/json": components["schemas"]["StorefrontCartDto"];
+                        "text/json": components["schemas"]["StorefrontCartDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/storefront/cart/lines": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["AddCartLineRequest"];
+                    "text/json": components["schemas"]["AddCartLineRequest"];
+                    "application/*+json": components["schemas"]["AddCartLineRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["StorefrontCartDto"];
+                        "application/json": components["schemas"]["StorefrontCartDto"];
+                        "text/json": components["schemas"]["StorefrontCartDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/storefront/cart/lines/{storeListingId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    storeListingId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["StorefrontCartDto"];
+                        "application/json": components["schemas"]["StorefrontCartDto"];
+                        "text/json": components["schemas"]["StorefrontCartDto"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/storefront/checkout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["StorefrontCheckoutResultDto"];
+                        "application/json": components["schemas"]["StorefrontCheckoutResultDto"];
+                        "text/json": components["schemas"]["StorefrontCheckoutResultDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/storefront/orders/by-session/{sessionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    sessionId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["StorefrontOrderSummaryDto"];
+                        "application/json": components["schemas"]["StorefrontOrderSummaryDto"];
+                        "text/json": components["schemas"]["StorefrontOrderSummaryDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/storefront/offers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    status?: components["schemas"]["StorefrontOfferStatus"];
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["StorefrontOfferDto"][];
+                        "application/json": components["schemas"]["StorefrontOfferDto"][];
+                        "text/json": components["schemas"]["StorefrontOfferDto"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["StorefrontOfferRequest"];
+                    "text/json": components["schemas"]["StorefrontOfferRequest"];
+                    "application/*+json": components["schemas"]["StorefrontOfferRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["StorefrontOfferResultDto"];
+                        "application/json": components["schemas"]["StorefrontOfferResultDto"];
+                        "text/json": components["schemas"]["StorefrontOfferResultDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/storefront/stripe/webhook": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
         delete?: never;
         options?: never;
         head?: never;
@@ -6809,6 +7265,10 @@ export interface components {
             /** Format: double */
             allocationWeight?: number | null;
             notes?: string | null;
+        };
+        AddCartLineRequest: {
+            /** Format: uuid */
+            storeListingId?: string;
         };
         AddExpenseRequest: {
             /** Format: uuid */
@@ -7234,6 +7694,34 @@ export interface components {
         GroupSalesRequest: {
             saleIds?: string[] | null;
             orderReference?: string | null;
+        };
+        ImportMarketplaceRefundsCsvRequest: {
+            platform?: string | null;
+            csv?: string | null;
+        };
+        ImportMarketplaceRefundsResultDto: {
+            /** Format: int32 */
+            imported?: number;
+            /** Format: int32 */
+            skipped?: number;
+            warnings?: string[] | null;
+        };
+        ImportPlatformListingQualityResultDto: {
+            /** Format: int32 */
+            imported?: number;
+            /** Format: int32 */
+            updated?: number;
+            /** Format: int32 */
+            matchedListings?: number;
+            /** Format: int32 */
+            unmatchedListings?: number;
+            warnings?: string[] | null;
+            snapshots?: components["schemas"]["PlatformListingQualitySnapshotDto"][] | null;
+        };
+        ImportPlatformListingQualityWorkbookRequest: {
+            platform?: string | null;
+            fileName?: string | null;
+            contentBase64?: string | null;
         };
         ImportPlatformListingsCsvRequest: {
             platform?: string | null;
@@ -7997,6 +8485,48 @@ export interface components {
             /** Format: date-time */
             scrapedAt?: string;
         };
+        PlatformListingQualitySnapshotDto: {
+            /** Format: uuid */
+            id?: string;
+            platform?: string | null;
+            externalListingId?: string | null;
+            title?: string | null;
+            categoryName?: string | null;
+            listingCondition?: string | null;
+            priceRange?: string | null;
+            /** Format: date-time */
+            reportGeneratedAt?: string;
+            /** Format: date-time */
+            importedAt?: string;
+            /** Format: uuid */
+            platformListingId?: string | null;
+            action?: string | null;
+            /** Format: double */
+            dailyImpressions?: number | null;
+            /** Format: double */
+            clickThroughRate?: number | null;
+            /** Format: double */
+            salesConversionRate?: number | null;
+            /** Format: double */
+            promotedListingsAdRate?: number | null;
+            /** Format: int32 */
+            recommendedItemSpecificsFilled?: number | null;
+            recommendedItemSpecificsToAdd?: string | null;
+            brand?: string | null;
+            mpn?: string | null;
+            upc?: string | null;
+            /** Format: int32 */
+            photoCount?: number | null;
+            /** Format: int32 */
+            titleKeywordCount?: number | null;
+            freeShipping?: boolean | null;
+            /** Format: int32 */
+            estimatedHandlingDays?: number | null;
+            acceptsReturns?: boolean | null;
+            sellerPaidReturns?: boolean | null;
+            promotedListings?: boolean | null;
+            bestOffer?: boolean | null;
+        };
         PlatformListingReconcileResultDto: {
             /** Format: uuid */
             platformListingId?: string;
@@ -8211,6 +8741,18 @@ export interface components {
         ReconcilePlatformOrderRequest: {
             lines?: components["schemas"]["ReconcilePlatformOrderLineMap"][] | null;
             notes?: string | null;
+        };
+        ReconcileStoreCatalogResultDto: {
+            /** Format: int32 */
+            itemsExamined?: number;
+            /** Format: int32 */
+            listingsCreated?: number;
+            /** Format: int32 */
+            nowActive?: number;
+            /** Format: int32 */
+            awaitingPhotos?: number;
+            /** Format: int32 */
+            retired?: number;
         };
         RecordBundledSaleRequest: {
             items?: components["schemas"]["BundledSaleItemInput"][] | null;
@@ -8867,6 +9409,28 @@ export interface components {
             storeDomain?: string | null;
             isLive?: boolean;
         };
+        StorefrontCartDto: {
+            cartToken?: string | null;
+            lines?: components["schemas"]["StorefrontCartLineDto"][] | null;
+            /** Format: double */
+            subtotal?: number;
+            /** Format: double */
+            freeShippingThreshold?: number | null;
+            qualifiesForFreeShipping?: boolean;
+        };
+        StorefrontCartLineDto: {
+            /** Format: uuid */
+            storeListingId?: string;
+            slug?: string | null;
+            title?: string | null;
+            /** Format: double */
+            unitPrice?: number;
+            imageUrl?: string | null;
+            isAvailable?: boolean;
+        };
+        StorefrontCheckoutResultDto: {
+            checkoutUrl?: string | null;
+        };
         StorefrontListingDetailDto: {
             /** Format: uuid */
             id?: string;
@@ -8905,6 +9469,7 @@ export interface components {
             weight?: number | null;
             weightUnit?: components["schemas"]["WeightUnit"];
             imageUrls?: string[] | null;
+            availability?: string | null;
         };
         StorefrontListingDto: {
             /** Format: uuid */
@@ -8932,6 +9497,68 @@ export interface components {
             pageSize?: number;
             /** Format: int32 */
             total?: number;
+        };
+        StorefrontOfferDto: {
+            /** Format: uuid */
+            id?: string;
+            /** Format: uuid */
+            storeListingId?: string;
+            /** Format: uuid */
+            inventoryItemId?: string;
+            listingTitle?: string | null;
+            status?: string | null;
+            /** Format: double */
+            offerAmount?: number;
+            /** Format: double */
+            listingPriceSnapshot?: number;
+            buyerName?: string | null;
+            buyerEmail?: string | null;
+            buyerPhone?: string | null;
+            message?: string | null;
+            /** Format: date-time */
+            offeredAt?: string;
+            /** Format: date-time */
+            respondedAt?: string | null;
+            responseNotes?: string | null;
+        };
+        StorefrontOfferRequest: {
+            /** Format: uuid */
+            storeListingId?: string;
+            buyerName?: string | null;
+            buyerEmail?: string | null;
+            buyerPhone?: string | null;
+            /** Format: double */
+            offerAmount?: number;
+            message?: string | null;
+        };
+        StorefrontOfferResultDto: {
+            /** Format: uuid */
+            id?: string;
+            status?: string | null;
+            message?: string | null;
+        };
+        /** @enum {string} */
+        StorefrontOfferStatus: "New" | "Accepted" | "Declined" | "Expired" | "Converted";
+        StorefrontOrderSummaryDto: {
+            orderNumber?: string | null;
+            status?: string | null;
+            /** Format: double */
+            subtotal?: number;
+            /** Format: double */
+            shippingTotal?: number;
+            /** Format: double */
+            taxTotal?: number;
+            /** Format: double */
+            grandTotal?: number;
+            isLocalPickup?: boolean;
+            email?: string | null;
+            lines?: components["schemas"]["StorefrontOrderSummaryLineDto"][] | null;
+        };
+        StorefrontOrderSummaryLineDto: {
+            title?: string | null;
+            /** Format: double */
+            unitPrice?: number;
+            imageUrl?: string | null;
         };
         UngroupSalesRequest: {
             saleIds?: string[] | null;

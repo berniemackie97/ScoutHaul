@@ -3419,6 +3419,83 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                     b.ToTable("StoreListings", (string)null);
                 });
 
+            modelBuilder.Entity("HaulScout.Domain.Entities.StorefrontOffer", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("BuyerEmail")
+                        .IsRequired()
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)");
+
+                    b.Property<string>("BuyerName")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)");
+
+                    b.Property<string>("BuyerPhone")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("InventoryItemId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("ListingPriceSnapshot")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
+
+                    b.Property<string>("Message")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<decimal>("OfferAmount")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
+
+                    b.Property<DateTimeOffset>("OfferedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("RespondedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ResponseNotes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)");
+
+                    b.Property<Guid>("StoreListingId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("InventoryItemId");
+
+                    b.HasIndex("StoreListingId");
+
+                    b.HasIndex("OrganizationId", "BuyerEmail");
+
+                    b.HasIndex("OrganizationId", "Status");
+
+                    b.HasIndex("OrganizationId", "StoreListingId", "CreatedAt");
+
+                    b.ToTable("StorefrontOffers", (string)null);
+                });
+
             modelBuilder.Entity("HaulScout.Domain.Entities.WishlistItem", b =>
                 {
                     b.Property<Guid>("Id")
@@ -4278,6 +4355,25 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                     b.Navigation("Organization");
 
                     b.Navigation("StoreCategory");
+                });
+
+            modelBuilder.Entity("HaulScout.Domain.Entities.StorefrontOffer", b =>
+                {
+                    b.HasOne("HaulScout.Domain.Entities.InventoryItem", "InventoryItem")
+                        .WithMany()
+                        .HasForeignKey("InventoryItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("HaulScout.Domain.Entities.StoreListing", "StoreListing")
+                        .WithMany()
+                        .HasForeignKey("StoreListingId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("InventoryItem");
+
+                    b.Navigation("StoreListing");
                 });
 
             modelBuilder.Entity("HaulScout.Domain.Entities.WishlistItem", b =>

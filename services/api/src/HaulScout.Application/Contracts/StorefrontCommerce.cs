@@ -39,3 +39,29 @@ public sealed record StorefrontOrderSummaryDto(
     IReadOnlyList<StorefrontOrderSummaryLineDto> Lines);
 
 public sealed record StorefrontOrderSummaryLineDto(string Title, decimal UnitPrice, string? ImageUrl);
+
+public sealed record StorefrontOfferRequest(
+    Guid StoreListingId,
+    string BuyerName,
+    string BuyerEmail,
+    string? BuyerPhone,
+    decimal OfferAmount,
+    string? Message);
+
+public sealed record StorefrontOfferResultDto(Guid Id, string Status, string Message);
+
+public sealed record StorefrontOfferDto(
+    Guid Id,
+    Guid StoreListingId,
+    Guid InventoryItemId,
+    string ListingTitle,
+    string Status,
+    decimal OfferAmount,
+    decimal ListingPriceSnapshot,
+    string BuyerName,
+    string BuyerEmail,
+    string? BuyerPhone,
+    string? Message,
+    DateTimeOffset OfferedAt,
+    DateTimeOffset? RespondedAt,
+    string? ResponseNotes);
