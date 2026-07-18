@@ -1,10 +1,13 @@
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
+using Microsoft.EntityFrameworkCore;
 using HaulScout.Application.Common;
 using HaulScout.Application.Contracts;
 using HaulScout.Application.Storefront;
 using HaulScout.Domain;
 using HaulScout.Domain.Entities;
+using HaulScout.Infrastructure.Persistence;
+using HaulScout.Infrastructure.Storefront;
 
 namespace HaulScout.Tests;
 
@@ -52,6 +55,9 @@ public class StorefrontCheckoutTests
             Task.FromResult(Hydrate(world.Carts.FirstOrDefault(cart =>
                 cart.AnonymousId == anonymousToken && cart.OrganizationId == organizationId && cart.Status == CartStatus.Active)));
 
+        public Task<Cart?> FindActiveReadAsync(Guid organizationId, string anonymousToken, CancellationToken cancellationToken) =>
+            FindActiveAsync(organizationId, anonymousToken, cancellationToken);
+
         public Task<Cart?> FindActiveByIdAsync(Guid organizationId, Guid cartId, CancellationToken cancellationToken) =>
             Task.FromResult(world.Carts.FirstOrDefault(cart => cart.Id == cartId && cart.Status == CartStatus.Active));
 
@@ -60,6 +66,8 @@ public class StorefrontCheckoutTests
             world.Carts.Add(cart);
             return Task.CompletedTask;
         }
+
+        public void AddLine(Cart cart, CartLine line) => cart.Lines.Add(line);
 
         public void RemoveLine(CartLine line) { }
 
@@ -320,6 +328,54 @@ public class StorefrontCheckoutTests
     }
 
     [Fact]
+    public async Task Reusing_an_emptied_persisted_cart_persists_and_returns_the_next_line()
+    {
+        Guid org = Guid.NewGuid();
+        DbContextOptions<HaulScoutDbContext> dbOptions = new DbContextOptionsBuilder<HaulScoutDbContext>()
+            .UseInMemoryDatabase($"{nameof(Reusing_an_emptied_persisted_cart_persists_and_returns_the_next_line)}-{Guid.NewGuid()}")
+            .Options;
+
+        TenantContext tenant = new();
+        tenant.SetOrganization(org);
+        await using HaulScoutDbContext db = new(dbOptions, tenant);
+
+        InventoryItem first = SellableItem("First item", 55m);
+        InventoryItem second = SellableItem("Second item", 2m);
+        db.Organizations.Add(new Organization { Id = org, Name = "Overhaul Trading" });
+        db.InventoryItems.AddRange(first, second);
+        await db.SaveChangesAsync();
+
+        Dictionary<Guid, StoreListing> listings = await db.StoreListings.ToDictionaryAsync(listing => listing.InventoryItemId);
+        StoreListing firstListing = listings[first.Id];
+        StoreListing secondListing = listings[second.Id];
+        CartWorkflowService service = new(
+            new EfStorefrontCartStore(db),
+            new FakeCheckoutStore(new World()),
+            new FakeCustomerStore(new World()),
+            new FakeOfferStore(),
+            new StorefrontShippingCalculator(Options()),
+            Options(),
+            TimeProvider.System);
+
+        AppResult<StorefrontCartDto> addedFirst =
+            await service.AddLineAsync(org, null, new AddCartLineRequest(firstListing.Id), CancellationToken.None);
+        string token = addedFirst.Value!.CartToken;
+        await service.RemoveLineAsync(org, token, firstListing.Id, CancellationToken.None);
+
+        AppResult<StorefrontCartDto> addedSecond =
+            await service.AddLineAsync(org, token, new AddCartLineRequest(secondListing.Id), CancellationToken.None);
+
+        StorefrontCartLineDto line = Assert.Single(addedSecond.Value!.Lines);
+        Assert.Equal(secondListing.Id, line.StoreListingId);
+        Assert.Equal(secondListing.Slug, line.Slug);
+        Assert.Equal("Second item", line.Title);
+        Assert.True(line.IsAvailable);
+        Assert.Equal(2m, addedSecond.Value.Subtotal);
+        Guid cartId = db.Carts.Single(cart => cart.AnonymousId == token).Id;
+        Assert.True(await db.CartLines.AnyAsync(saved => saved.CartId == cartId && saved.StoreListingId == secondListing.Id));
+    }
+
+    [Fact]
     public async Task A_reserved_listing_cannot_be_added_and_says_why()
     {
         var harness = NewHarness();
@@ -331,6 +387,16 @@ public class StorefrontCheckoutTests
         Assert.Equal(AppResultStatus.Conflict, result.Status);
         Assert.Contains("someone else's checkout", result.Message);
     }
+
+    private static InventoryItem SellableItem(string title, decimal price) =>
+        new()
+        {
+            Title = title,
+            Status = InventoryStatus.Listed,
+            EstimatedSalePrice = price,
+            Quantity = 1,
+            Photos = { new InventoryPhoto { ContentType = "image/jpeg", OriginalBytes = [1], ThumbnailBytes = [1] } },
+        };
 
     [Fact]
     public async Task An_item_sold_on_another_channel_is_not_purchasable_even_while_its_listing_says_active()

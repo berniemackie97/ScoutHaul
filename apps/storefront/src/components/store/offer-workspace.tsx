@@ -3,12 +3,16 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ArrowRight, Loader2 } from "lucide-react";
-import { money, type CustomerOffer } from "@/lib/commerce";
+import { CustomerAuthModal } from "@/components/store/customer-auth-modal";
+import { money, type Cart, type CustomerOffer } from "@/lib/commerce";
 
 export function OfferWorkspace() {
   const [offers, setOffers] = useState<CustomerOffer[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyOfferId, setBusyOfferId] = useState<string | null>(null);
+  const [authOpen, setAuthOpen] = useState(false);
+  const [needsAuth, setNeedsAuth] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -17,9 +21,13 @@ export function OfferWorkspace() {
       setLoading(true);
       setError(null);
       try {
-        const response = await fetch("/api/offers", { cache: "no-store" });
+        const response = await fetch("/api/offers", { cache: "no-store", credentials: "same-origin" });
         if (response.status === 401) {
-          window.location.assign(`/sign-in?next=${encodeURIComponent("/offers")}`);
+          if (mounted) {
+            setNeedsAuth(true);
+            setAuthOpen(true);
+            setOffers([]);
+          }
           return;
         }
         if (!response.ok) throw new Error(await response.text());
@@ -36,16 +44,27 @@ export function OfferWorkspace() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [reloadKey]);
 
   async function addOfferToCart(offer: CustomerOffer) {
     setBusyOfferId(offer.id);
     setError(null);
     try {
-      const response = await fetch(`/api/offers/${offer.id}/cart`, { method: "POST" });
+      const response = await fetch(`/api/offers/${offer.id}/cart`, {
+        method: "POST",
+        cache: "no-store",
+        credentials: "same-origin",
+      });
+      if (response.status === 401) {
+        setNeedsAuth(true);
+        setAuthOpen(true);
+        setBusyOfferId(null);
+        return;
+      }
       if (!response.ok) throw new Error(await response.text());
-      window.dispatchEvent(new Event("haulscout:cart-changed"));
-      window.location.assign("/checkout?start=1");
+      const cart = (await response.json()) as Cart;
+      window.dispatchEvent(new CustomEvent<Cart>("haulscout:cart-changed", { detail: cart }));
+      window.location.assign(`/checkout?start=1&cartv=${Date.now()}`);
     } catch (err) {
       setError(cleanError(err));
       setBusyOfferId(null);
@@ -64,7 +83,19 @@ export function OfferWorkspace() {
     <div className="space-y-5">
       {error ? <div className="border border-red-500/25 bg-red-500/10 px-4 py-3 text-sm text-red-700">{error}</div> : null}
 
-      {offers.length === 0 ? (
+      {needsAuth ? (
+        <div className="border border-rule bg-surface p-10 text-center">
+          <h2 className="font-heading text-2xl text-ink">Sign in to view offers</h2>
+          <p className="mt-2 text-sm text-slate">Your offers, counters, and accepted checkout links are tied to your customer account.</p>
+          <button
+            type="button"
+            onClick={() => setAuthOpen(true)}
+            className="mt-5 inline-flex items-center gap-2 bg-copper px-5 py-3 text-sm font-semibold uppercase tracking-[0.12em] text-ink"
+          >
+            Sign in / register <ArrowRight className="h-4 w-4" aria-hidden />
+          </button>
+        </div>
+      ) : offers.length === 0 ? (
         <div className="border border-dashed border-rule bg-surface p-10 text-center">
           <h2 className="font-heading text-2xl text-ink">No offers yet</h2>
           <p className="mt-2 text-sm text-slate">Make an offer from a product page and it will show here.</p>
@@ -118,6 +149,18 @@ export function OfferWorkspace() {
           ))}
         </div>
       )}
+      <CustomerAuthModal
+        open={authOpen}
+        title="Sign in to view your offers"
+        body="We use a one-time email code. New shoppers are registered automatically."
+        nextPath="/offers"
+        onClose={() => setAuthOpen(false)}
+        onAuthenticated={() => {
+          setNeedsAuth(false);
+          setAuthOpen(false);
+          setReloadKey(value => value + 1);
+        }}
+      />
     </div>
   );
 }

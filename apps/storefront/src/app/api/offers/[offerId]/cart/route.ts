@@ -6,12 +6,18 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ offerId: string }> },
 ) {
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
+  let sessionAccessToken: string | undefined;
+  try {
+    const supabase = await createSupabaseServerClient();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    sessionAccessToken = session?.access_token;
+  } catch {
+    return NextResponse.json({ detail: "Customer accounts are not configured for this storefront." }, { status: 503 });
+  }
 
-  if (!session?.access_token) {
+  if (!sessionAccessToken) {
     return NextResponse.json({ detail: "Sign in to use this offer." }, { status: 401 });
   }
 
@@ -19,6 +25,6 @@ export async function POST(
   return storefrontProxy(request, {
     method: "POST",
     path: `/api/storefront/cart/offers/${offerId}/line`,
-    accessToken: session.access_token,
+    accessToken: sessionAccessToken,
   });
 }

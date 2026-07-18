@@ -11,6 +11,9 @@ const inputClass =
 export default function Page() {
   const searchParams = useSearchParams();
   const next = safeNext(searchParams.get("next"));
+  const callbackError = searchParams.get("error") === "callback"
+    ? "That sign-in link could not be completed. Request a fresh code and try again."
+    : null;
   const [stage, setStage] = useState<"email" | "code">("email");
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
@@ -27,21 +30,23 @@ export default function Page() {
 
     setLoading(true);
     setError(null);
-    const supabase = createSupabaseBrowserClient();
-    const { error: otpError } = await supabase.auth.signInWithOtp({
-      email: addr,
-      options: {
-        shouldCreateUser: true,
-        emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`,
-      },
-    });
-    setLoading(false);
-
-    if (otpError) {
-      setError(otpError.message);
+    try {
+      const supabase = createSupabaseBrowserClient();
+      const { error: otpError } = await supabase.auth.signInWithOtp({
+        email: addr,
+        options: {
+          shouldCreateUser: true,
+          emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`,
+        },
+      });
+      if (otpError) throw otpError;
+    } catch (err) {
+      setLoading(false);
+      setError(cleanError(err));
       return;
     }
 
+    setLoading(false);
     setEmail(addr);
     setStage("code");
   }
@@ -56,25 +61,29 @@ export default function Page() {
 
     setLoading(true);
     setError(null);
-    const supabase = createSupabaseBrowserClient();
-    const { error: verifyError } = await supabase.auth.verifyOtp({ email, token, type: "email" });
-    setLoading(false);
-
-    if (verifyError) {
+    try {
+      const supabase = createSupabaseBrowserClient();
+      const { error: verifyError } = await supabase.auth.verifyOtp({ email, token, type: "email" });
+      if (verifyError) throw verifyError;
+    } catch {
+      setLoading(false);
       setError("That code did not work. Check it or request a new one.");
       return;
     }
 
+    setLoading(false);
     window.location.assign(next);
   }
 
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6 py-16">
       <p className="font-mono text-xs uppercase tracking-[0.25em] text-copper">Customer account</p>
-      <h1 className="mt-3 font-heading text-4xl font-semibold text-ink">Sign in</h1>
+      <h1 className="mt-3 font-heading text-4xl font-semibold text-ink">Sign in / register</h1>
       <p className="mt-3 text-sm leading-6 text-slate">
         Use your email to manage offers and order history. We send a one-time code; no password required.
       </p>
+
+      {callbackError && !error ? <p className="mt-6 border border-red-500/25 bg-red-500/10 px-4 py-3 text-sm text-red-700">{callbackError}</p> : null}
 
       {stage === "email" ? (
         <form onSubmit={sendCode} className="mt-8 space-y-5">
@@ -143,4 +152,9 @@ export default function Page() {
 
 function safeNext(value: string | null) {
   return value?.startsWith("/") && !value.startsWith("//") ? value : "/account";
+}
+
+function cleanError(error: unknown) {
+  const raw = error instanceof Error ? error.message : "Sign-in failed.";
+  return raw.replace(/^"|"$/g, "") || "Sign-in failed.";
 }

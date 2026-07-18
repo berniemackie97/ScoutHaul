@@ -25,7 +25,7 @@ public sealed class CartWorkflowService(
 
     public async Task<StorefrontCartDto> GetAsync(Guid organizationId, string? cartToken, CancellationToken cancellationToken)
     {
-        Cart? cart = cartToken is null ? null : await carts.FindActiveAsync(organizationId, cartToken, cancellationToken);
+        Cart? cart = cartToken is null ? null : await carts.FindActiveReadAsync(organizationId, cartToken, cancellationToken);
         HashSet<Guid> heldByThisCart = await PendingListingIdsAsync(organizationId, cart, cancellationToken);
         return BuildDto(cartToken ?? string.Empty, cart, heldByThisCart);
     }
@@ -63,7 +63,7 @@ public sealed class CartWorkflowService(
         {
             // One-of-one inventory: a listing appears at most once, quantity 1. The price is snapshotted at add
             // time; checkout charges the listing's CURRENT price and the cart surfaces any drift on read.
-            cart.Lines.Add(new CartLine
+            carts.AddLine(cart, new CartLine
             {
                 OrganizationId = organizationId,
                 CartId = cart.Id,
@@ -82,7 +82,7 @@ public sealed class CartWorkflowService(
         {
             Cart? current = cart.AnonymousId is null
                 ? null
-                : await carts.FindActiveAsync(organizationId, cart.AnonymousId, cancellationToken);
+                : await carts.FindActiveReadAsync(organizationId, cart.AnonymousId, cancellationToken);
             if (current is null)
             {
                 return AppResult<StorefrontCartDto>.Conflict("Your cart changed while updating. Refresh and try again.");
@@ -91,7 +91,7 @@ public sealed class CartWorkflowService(
             return AppResult<StorefrontCartDto>.Ok(BuildDto(current.AnonymousId!, current, []));
         }
 
-        Cart reloaded = await carts.FindActiveAsync(organizationId, cart.AnonymousId!, cancellationToken) ?? cart;
+        Cart reloaded = await carts.FindActiveReadAsync(organizationId, cart.AnonymousId!, cancellationToken) ?? cart;
         return AppResult<StorefrontCartDto>.Ok(BuildDto(cart.AnonymousId!, reloaded, []));
     }
 
@@ -148,23 +148,20 @@ public sealed class CartWorkflowService(
         CartLine? existing = cart.Lines.FirstOrDefault(line => line.StoreListingId == offer.StoreListingId);
         if (existing is null)
         {
-            cart.Lines.Add(new CartLine
+            carts.AddLine(cart, new CartLine
             {
                 OrganizationId = organizationId,
                 CartId = cart.Id,
                 StoreListingId = offer.StoreListingId,
-                StoreListing = offer.StoreListing,
                 InventoryItemId = offer.InventoryItemId,
                 Quantity = 1,
                 UnitPriceSnapshot = approvedAmount.Value,
                 StorefrontOfferId = offer.Id,
-                StorefrontOffer = offer,
             });
         }
         else
         {
             existing.StorefrontOfferId = offer.Id;
-            existing.StorefrontOffer = offer;
             existing.UnitPriceSnapshot = approvedAmount.Value;
         }
 
@@ -176,7 +173,7 @@ public sealed class CartWorkflowService(
         {
             Cart? current = cart.AnonymousId is null
                 ? null
-                : await carts.FindActiveAsync(organizationId, cart.AnonymousId, cancellationToken);
+                : await carts.FindActiveReadAsync(organizationId, cart.AnonymousId, cancellationToken);
             if (current is null)
             {
                 return AppResult<StorefrontCartDto>.Conflict("Your cart changed while updating. Refresh and try again.");
@@ -185,7 +182,7 @@ public sealed class CartWorkflowService(
             return AppResult<StorefrontCartDto>.Ok(BuildDto(current.AnonymousId!, current, []));
         }
 
-        Cart reloaded = await carts.FindActiveAsync(organizationId, cart.AnonymousId!, cancellationToken) ?? cart;
+        Cart reloaded = await carts.FindActiveReadAsync(organizationId, cart.AnonymousId!, cancellationToken) ?? cart;
         return AppResult<StorefrontCartDto>.Ok(BuildDto(cart.AnonymousId!, reloaded, []));
     }
 
@@ -208,8 +205,9 @@ public sealed class CartWorkflowService(
             await carts.SaveChangesAsync(cancellationToken);
         }
 
-        HashSet<Guid> heldByThisCart = await PendingListingIdsAsync(organizationId, cart, cancellationToken);
-        return AppResult<StorefrontCartDto>.Ok(BuildDto(cart.AnonymousId!, cart, heldByThisCart));
+        Cart reloaded = await carts.FindActiveReadAsync(organizationId, cart.AnonymousId!, cancellationToken) ?? cart;
+        HashSet<Guid> heldByThisCart = await PendingListingIdsAsync(organizationId, reloaded, cancellationToken);
+        return AppResult<StorefrontCartDto>.Ok(BuildDto(cart.AnonymousId!, reloaded, heldByThisCart));
     }
 
     private StorefrontCartDto BuildDto(string token, Cart? cart, HashSet<Guid> heldByThisCart)
