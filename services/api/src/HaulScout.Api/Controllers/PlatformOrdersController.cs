@@ -201,7 +201,14 @@ public sealed class PlatformOrdersController(
             .Include(sale => sale.InventoryItem)
             .Include(sale => sale.Listing)
             .Include(sale => sale.Order)
-            .Where(sale => itemIds.Contains(sale.InventoryItemId) && sale.OrganizationId == currentUser.OrganizationId && !ReleasedInventoryStatuses.Contains(sale.Status))
+            // A released sale still matches when it belongs to THIS platform order: a return or refund ends the
+            // sale's hold on the item, but it does not un-happen the eBay order — re-importing must update that
+            // sale in place, not mint a duplicate beside it (which doubles the order's totals). The release filter
+            // only exists so a genuinely re-listed, re-sold item gets a fresh sale on its NEW order.
+            .Where(sale => itemIds.Contains(sale.InventoryItemId)
+                && sale.OrganizationId == currentUser.OrganizationId
+                && (!ReleasedInventoryStatuses.Contains(sale.Status)
+                    || (sale.Order != null && sale.Order.ExternalOrderId == order.ExternalOrderId)))
             .ToListAsync(cancellationToken);
         Dictionary<Guid, Sale> saleByItem = existingSales
             .GroupBy(sale => sale.InventoryItemId)

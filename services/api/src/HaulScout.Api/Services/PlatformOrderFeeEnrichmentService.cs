@@ -127,7 +127,10 @@ public sealed class PlatformOrderFeeEnrichmentService(HaulScoutDbContext db, ICu
         List<Sale> sales = await db.Sales
             .Include(sale => sale.Refunds)
             .Include(sale => sale.InventoryItem)
-            .Where(sale => sale.OrganizationId == currentUser.OrganizationId && sale.OrderId == reconciledOrderId && !ReleasedInventoryStatuses.Contains(sale.Status))
+            // Released sales (returned/refunded/cancelled) are NOT excluded: their money history must still be
+            // right, and net is refund-aware — a refunded sale that never received its fee truth would sit at the
+            // wrong net forever. Only the figures are corrected; status and inventory are never touched here.
+            .Where(sale => sale.OrganizationId == currentUser.OrganizationId && sale.OrderId == reconciledOrderId)
             .ToListAsync(cancellationToken);
 
         int correctedSales = 0;

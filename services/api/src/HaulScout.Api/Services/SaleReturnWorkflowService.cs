@@ -137,6 +137,33 @@ public sealed class SaleReturnWorkflowService(
         }
         Sale sale = rma.Sale!;
         decimal alreadyRefundedItem = sale.Refunds.Sum(refund => refund.ItemAmount);
+
+        // The sale can already be fully refunded — an imported marketplace refund settled the money while this
+        // return was mid-flight. There is no new money to move, and refusing (as this used to) left the operator
+        // permanently stuck: no refundable amount, an open return, and a button that could only error. Closing the
+        // return against the refund that already happened IS the resolution.
+        if (rma.IsOpen && alreadyRefundedItem >= sale.SoldPrice - 0.01m && sale.Refunds.Count > 0)
+        {
+            Refund settledBy = sale.Refunds.OrderByDescending(refund => refund.RefundedAt).First();
+            string beforeAttach = SaleFinancialStateService.Snapshot(sale);
+            try
+            {
+                rma.Resolve(settledBy, request.Restock, timeProvider.GetUtcNow());
+            }
+            catch (DomainException e)
+            {
+                return Rule(e);
+            }
+
+            settledBy.ItemReturned = request.Restock;
+            SaleFinancialStateService.ApplyRefundState(sale);
+            await saleState.AddCorrectionAsync(sale, beforeAttach,
+                $"Return closed against the existing refund of {settledBy.ItemAmount:C}{(request.Restock ? "; item restocked" : "; item kept")} — no new money moved.",
+                cancellationToken);
+            await db.SaveChangesAsync(cancellationToken);
+            return AppResult<ReturnDto>.Ok(rma.ToDto());
+        }
+
         if (alreadyRefundedItem + request.ItemAmount > sale.SoldPrice + 0.01m)
         {
             return AppResult<ReturnDto>.Validation("Total item refunds cannot exceed the sold price.");

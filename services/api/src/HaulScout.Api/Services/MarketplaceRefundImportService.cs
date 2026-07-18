@@ -57,9 +57,49 @@ public sealed class MarketplaceRefundImportService(HaulScoutDbContext db, ICurre
             }
 
             string fingerprint = RefundImportFingerprint(item);
-            if (sale.Refunds.Any(refund => refund.Notes?.Contains(fingerprint, StringComparison.OrdinalIgnoreCase) == true))
+            Refund? alreadyImported = sale.Refunds.FirstOrDefault(refund =>
+                refund.Notes?.Contains(fingerprint, StringComparison.OrdinalIgnoreCase) == true);
+            if (alreadyImported is not null)
             {
-                skipped++;
+                // Re-imports are how this system converges on the truth, so the dedupe path HEALS instead of just
+                // skipping. Two things can be wrong with an already-imported refund: its fee credit was capped when
+                // the sale's fees had not been imported yet (credit against zero fees is zero), and an open return
+                // it should have settled may still be running. Both are re-derivable from current state.
+                bool healed = false;
+                string healNote = string.Empty;
+
+                decimal remainingFeeExposure = Math.Max(0,
+                    sale.PlatformFees + sale.PaymentFees - sale.Refunds.Sum(refund => refund.FeeCredit));
+                decimal missingCredit = Math.Min(item.FeeCredit - alreadyImported.FeeCredit, remainingFeeExposure);
+                if (missingCredit > 0)
+                {
+                    alreadyImported.FeeCredit += RoundMoney(missingCredit);
+                    healed = true;
+                    healNote = $" Fee credit raised to {alreadyImported.FeeCredit:C} now that the sale's fees are known.";
+                }
+
+                Return? stuckReturn = sale.Returns.FirstOrDefault(rma => rma.IsOpen);
+                if (stuckReturn is not null)
+                {
+                    bool restockedNow = stuckReturn.ResolveFromExternalRefund(alreadyImported, timeProvider.GetUtcNow());
+                    alreadyImported.ItemReturned = restockedNow;
+                    healed = true;
+                    healNote += restockedNow
+                        ? " Resolved the open return; item restocked."
+                        : " Resolved the open return; item not yet received, so nothing was restocked.";
+                }
+
+                if (healed)
+                {
+                    string beforeHeal = SnapshotSale(sale);
+                    SaleFinancialStateService.ApplyRefundState(sale);
+                    await AddCorrection(sale, beforeHeal, $"Re-imported refund from {item.Source}:{healNote}", cancellationToken);
+                    imported++;
+                }
+                else
+                {
+                    skipped++;
+                }
                 continue;
             }
 

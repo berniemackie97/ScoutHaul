@@ -83,6 +83,10 @@ public sealed class OrderAssembler(HaulScoutDbContext db, ICurrentUserContext cu
             existing.CustomerNote ??= TrimToNull(buyerNote);
             existing.PaidAt ??= paidAt ?? orderedAt;
             existing.ShippedAt ??= shippedAt;
+            if (existing.ShippedAt is not null && existing.FulfillmentStatus == FulfillmentStatus.Unfulfilled)
+            {
+                existing.FulfillmentStatus = FulfillmentStatus.Fulfilled;
+            }
             ApplyShipTo(existing, shipToName, shipToPhone, shipToLine1, shipToLine2, shipToCity, shipToRegion, shipToPostalCode, shipToCountry);
             return existing;
         }
@@ -106,7 +110,9 @@ public sealed class OrderAssembler(HaulScoutDbContext db, ICurrentUserContext cu
             // A marketplace order only reaches us once the buyer has already paid.
             Status = OrderStatus.Paid,
             PaymentStatus = PaymentStatus.Paid,
-            FulfillmentStatus = FulfillmentStatus.Unfulfilled,
+            // The marketplace already knows whether this shipped; arriving Unfulfilled while carrying a shipped
+            // timestamp made every imported shipped order lie on the board.
+            FulfillmentStatus = shippedAt.HasValue ? FulfillmentStatus.Fulfilled : FulfillmentStatus.Unfulfilled,
             PaidAt = paidAt ?? orderedAt,
             CreatedAt = orderedAt,
             ShippingCarrier = normalizedCarrier,

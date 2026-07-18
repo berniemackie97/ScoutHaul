@@ -572,6 +572,124 @@ Brass Lamp,377251318593,1,$0.00,$0.00,$0.00,$0.00,$0.00,$12.34,$0.00,$0.00,$16.9
         Assert.Equal(-45.97m, sale.NetProfit);   // COGS stays consumed until the item actually comes back
     }
 
+    /// <summary>
+    /// The convergence guarantee, pinned to the real Charizard order: refunds imported BEFORE fees existed cap
+    /// their fee credit at zero forever, and a return opened mid-flight stays stuck — unless re-importing heals.
+    /// Fees here are 16.90 with 16.50 credited, label 11.94: eBay's own earnings figure is −12.34, and after the
+    /// healing re-import ours must be exactly that.
+    /// </summary>
+    [Fact]
+    public async Task Reimporting_refunds_after_fees_arrive_heals_the_fee_credit_and_the_stuck_return()
+    {
+        var (db, org, user) = NewContext(nameof(Reimporting_refunds_after_fees_arrive_heals_the_fee_credit_and_the_stuck_return));
+        await using var _ = db;
+        var controller = NewController(db, org, user);
+        var item = SeedItem(db, org, "Brass Lamp", 40m);
+
+        await controller.ImportEbayCsv(new ImportPlatformOrdersCsvRequest("eBay", EbayAllOrdersCsv), CancellationToken.None);
+        PlatformOrder order = await db.PlatformOrders.Include(o => o.Lines).SingleAsync();
+        await controller.Reconcile(order.Id,
+            new ReconcilePlatformOrderRequest([new ReconcilePlatformOrderLineMap(order.Lines.First().Id, item.Id)]), CancellationToken.None);
+
+        // Refunds land FIRST — fees are still zero, so the credit caps to zero. Then the return opens and is
+        // received. This is the order's real history.
+        await controller.ImportMarketplaceRefundsCsv(new ImportMarketplaceRefundsCsvRequest("eBay", EbayRefundListingSalesCsv), CancellationToken.None);
+        Sale saleMid = await db.Sales.SingleAsync();
+        Assert.Equal(0m, (await db.Refunds.SingleAsync()).FeeCredit);   // capped against zero fees
+        Return rma = Return.Open(org, saleMid, "damage", null, user, DateTimeOffset.UtcNow.AddDays(-1));
+        rma.IssueLabel(11.94m, null, DateTimeOffset.UtcNow.AddDays(-1));
+        rma.Receive(DateTimeOffset.UtcNow);
+        db.Returns.Add(rma);
+        await db.SaveChangesAsync();
+
+        // Fees arrive; then the operator re-imports the refund report — the habit this system is built around.
+        await controller.ImportEbayCsv(new ImportPlatformOrdersCsvRequest("eBay", EbayListingSalesCsv), CancellationToken.None);
+        ActionResult<ImportMarketplaceRefundsResultDto> heal = await controller.ImportMarketplaceRefundsCsv(
+            new ImportMarketplaceRefundsCsvRequest("eBay", EbayRefundListingSalesCsv), CancellationToken.None);
+
+        Assert.Equal(1, heal.Value!.Imported);                      // the heal counts as work, not a skip
+        Refund refund = Assert.Single(await db.Refunds.ToListAsync());   // still exactly one refund
+        Assert.Equal(12.08m, refund.FeeCredit);                     // raised to the sale's true fee exposure
+        Assert.True(refund.ItemReturned);
+        Return resolved = await db.Returns.SingleAsync();
+        Assert.Equal(ReturnStatus.Refunded, resolved.Status);       // no longer stuck
+        Assert.True(resolved.Restocked);
+        Sale sale = await db.Sales.SingleAsync();
+        Assert.Equal(SaleStatus.Returned, sale.Status);
+        Assert.Equal(InventoryStatus.Returned, (await db.InventoryItems.SingleAsync(i => i.Id == item.Id)).Status);
+        // Revenue fully refunded, COGS released by restock, fee exposure fully credited, label 5.97 stays spent.
+        Assert.Equal(-5.97m, sale.NetProfit);
+    }
+
+    /// <summary>
+    /// The operator's escape hatch: the sale is already fully refunded (imported), the return sits Received, and
+    /// the old code could only error ("total refunds cannot exceed the sold price"). Resolving now closes the
+    /// return against the money that already moved — no new refund row, restock honored.
+    /// </summary>
+    [Fact]
+    public async Task Resolving_a_received_return_on_a_fully_refunded_sale_attaches_the_existing_refund()
+    {
+        var (db, org, user) = NewContext(nameof(Resolving_a_received_return_on_a_fully_refunded_sale_attaches_the_existing_refund));
+        await using var _ = db;
+        var controller = NewController(db, org, user);
+        var item = SeedItem(db, org, "Brass Lamp", 40m);
+
+        await controller.ImportEbayCsv(new ImportPlatformOrdersCsvRequest("eBay", EbayAllOrdersCsv), CancellationToken.None);
+        PlatformOrder order = await db.PlatformOrders.Include(o => o.Lines).SingleAsync();
+        await controller.Reconcile(order.Id,
+            new ReconcilePlatformOrderRequest([new ReconcilePlatformOrderLineMap(order.Lines.First().Id, item.Id)]), CancellationToken.None);
+        await controller.ImportMarketplaceRefundsCsv(new ImportMarketplaceRefundsCsvRequest("eBay", EbayRefundListingSalesCsv), CancellationToken.None);
+
+        Sale saleMid = await db.Sales.SingleAsync();
+        Return rma = Return.Open(org, saleMid, "damage", null, user, DateTimeOffset.UtcNow.AddDays(-1));
+        rma.Receive(DateTimeOffset.UtcNow);
+        db.Returns.Add(rma);
+        await db.SaveChangesAsync();
+
+        var returns = new SaleReturnWorkflowService(db, new StubCurrentUser(org, user), new SaleFinancialStateService(db, new StubCurrentUser(org, user)), TimeProvider.System);
+        AppResult<ReturnDto> result = await returns.ResolveAsync(rma.Id,
+            new ResolveReturnRequest(0.40m, RefundType.Full, Restock: true),
+            CancellationToken.None);
+
+        Assert.Equal(AppResultStatus.Ok, result.Status);
+        Assert.Single(await db.Refunds.ToListAsync());              // attached, not duplicated
+        Assert.Equal(ReturnStatus.Refunded, (await db.Returns.SingleAsync()).Status);
+        Assert.Equal(SaleStatus.Returned, (await db.Sales.SingleAsync()).Status);
+        Assert.Equal(InventoryStatus.Returned, (await db.InventoryItems.SingleAsync(i => i.Id == item.Id)).Status);
+    }
+
+    /// <summary>
+    /// The doubling regression: after a return released the sale, re-importing and re-reconciling the SAME eBay
+    /// order must update that sale in place — a second sale beside it doubled every order total on the page.
+    /// </summary>
+    [Fact]
+    public async Task Rereconciling_an_order_whose_sale_was_returned_updates_it_instead_of_doubling()
+    {
+        var (db, org, user) = NewContext(nameof(Rereconciling_an_order_whose_sale_was_returned_updates_it_instead_of_doubling));
+        await using var _ = db;
+        var controller = NewController(db, org, user);
+        var item = SeedItem(db, org, "Brass Lamp", 40m);
+
+        await controller.ImportEbayCsv(new ImportPlatformOrdersCsvRequest("eBay", EbayAllOrdersCsv), CancellationToken.None);
+        PlatformOrder order = await db.PlatformOrders.Include(o => o.Lines).SingleAsync();
+        await controller.Reconcile(order.Id,
+            new ReconcilePlatformOrderRequest([new ReconcilePlatformOrderLineMap(order.Lines.First().Id, item.Id)]), CancellationToken.None);
+        await controller.ImportMarketplaceRefundsCsv(new ImportMarketplaceRefundsCsvRequest("eBay", EbayRefundListingSalesCsv), CancellationToken.None);
+        Assert.Equal(SaleStatus.Refunded, (await db.Sales.SingleAsync()).Status);   // released
+
+        // The operator re-imports and re-reconciles the same order (the "make it converge" habit).
+        await controller.ImportEbayCsv(new ImportPlatformOrdersCsvRequest("eBay", EbayAllOrdersCsv), CancellationToken.None);
+        PlatformOrder again = await db.PlatformOrders.Include(o => o.Lines).SingleAsync();
+        await controller.Reconcile(again.Id,
+            new ReconcilePlatformOrderRequest([new ReconcilePlatformOrderLineMap(again.Lines.First().Id, item.Id)]), CancellationToken.None);
+
+        Sale sale = Assert.Single(await db.Sales.ToListAsync());    // one sale, updated — never a twin
+        Assert.Equal(SaleStatus.Refunded, sale.Status);             // its refund history untouched
+        Assert.Single(await db.Refunds.ToListAsync());
+        Order salesOrder = await db.Orders.Include(o => o.Lines).SingleAsync(o => o.Channel == "eBay");
+        Assert.Single(salesOrder.Lines);                            // totals cannot double
+    }
+
     private const string DepopRefundCsv = """"
 "Date of sale","Time of sale","Buyer","Brand","SKU","Description","Size","Item price","Buyer shipping cost","Total","US Sales tax","Refunded to buyer amount","Fees refunded to seller"
 "07/03/2026","1:46 PM","strickss","Vans","N/A","Vans Shorts Mens 34 Blue Chino Denim Casual Skate 5 pockets
