@@ -1,17 +1,12 @@
 using System.Text;
-using System.Text.Json;
-using Microsoft.EntityFrameworkCore;
 using HaulScout.Application.Contracts;
 using HaulScout.Application.Imports;
+using HaulScout.Application.Sales;
 using HaulScout.Application.Security;
-using HaulScout.Application.Services;
 using HaulScout.Domain;
 using HaulScout.Domain.Entities;
-using HaulScout.Domain.Services;
-using HaulScout.Infrastructure.Orders;
-using HaulScout.Infrastructure.Persistence;
 
-namespace HaulScout.Api.Services;
+namespace HaulScout.Application.PlatformOrders;
 
 /// <summary>
 /// Projects refund facts from marketplace CSV exports onto reconciled sales. Each refund is identified by a stable
@@ -22,10 +17,9 @@ namespace HaulScout.Api.Services;
 /// stays conservative: exactly one sale match, or the row is skipped.
 /// </summary>
 public sealed class MarketplaceRefundImportService(
-    HaulScoutDbContext db,
+    IMarketplaceRefundImportStore store,
     ICurrentUserContext currentUser,
-    TimeProvider timeProvider,
-    OrderAssembler orderAssembler)
+    TimeProvider timeProvider)
 {
     public async Task<(ImportMarketplaceRefundsResultDto? Result, string? Error)> ImportCsvAsync(
         ImportMarketplaceRefundsCsvRequest request,
@@ -97,7 +91,7 @@ public sealed class MarketplaceRefundImportService(
                 continue;
             }
 
-            string before = SnapshotSale(sale);
+            string before = SaleFinancialState.Snapshot(sale);
             Refund refund = existing ?? new Refund
             {
                 OrganizationId = currentUser.OrganizationId,
@@ -117,7 +111,7 @@ public sealed class MarketplaceRefundImportService(
             if (existing is null)
             {
                 sale.Refunds.Add(refund);
-                db.Refunds.Add(refund);
+                store.AddRefund(refund);
             }
 
             // The marketplace already moved the money. If a return is open for this sale, this refund IS its
@@ -136,7 +130,7 @@ public sealed class MarketplaceRefundImportService(
 
             // The one rule derives net + status from the whole refund set — always, whether this was a create or a
             // refresh, so the recorded truth cannot drift from the facts.
-            SaleFinancialStateService.ApplyRefundState(sale);
+            SaleFinancialState.ApplyRefundState(sale);
             if (sale.OrderId is Guid orderId)
             {
                 touchedOrderIds.Add(orderId);
@@ -151,16 +145,14 @@ public sealed class MarketplaceRefundImportService(
 
         foreach (Guid orderId in touchedOrderIds)
         {
-            Order? order = await db.Orders.SingleOrDefaultAsync(
-                item => item.Id == orderId && item.OrganizationId == currentUser.OrganizationId,
-                cancellationToken);
+            Order? order = await store.GetSalesOrderAsync(currentUser.OrganizationId, orderId, cancellationToken);
             if (order is not null)
             {
-                await orderAssembler.SyncSalesOrderAsync(order, [], cancellationToken);
+                await store.SyncSalesOrderAsync(order, [], cancellationToken);
             }
         }
 
-        await db.SaveChangesAsync(cancellationToken);
+        await store.SaveChangesAsync(cancellationToken);
         return (new ImportMarketplaceRefundsResultDto(imported, skipped, warnings), null);
     }
 
@@ -188,71 +180,23 @@ public sealed class MarketplaceRefundImportService(
             return [];
         }
 
-        List<PlatformOrderLine> lines = await db.PlatformOrderLines
-            .Include(line => line.PlatformOrder)
-            .Where(line => line.OrganizationId == currentUser.OrganizationId
-                && line.ExternalItemId == item.ExternalItemId
-                && line.InventoryItemId.HasValue
-                && line.PlatformOrder != null
-                && line.PlatformOrder.Platform == "eBay"
-                && line.PlatformOrder.Status == PlatformOrderStatus.Reconciled
-                && line.PlatformOrder.ReconciledSaleGroupId.HasValue)
-            .ToListAsync(cancellationToken);
-
-        HashSet<(Guid OrderId, Guid InventoryItemId)> keys = lines
-            .Where(line => line.PlatformOrder?.ReconciledSaleGroupId is not null && line.InventoryItemId.HasValue)
-            .Select(line => (line.PlatformOrder!.ReconciledSaleGroupId!.Value, line.InventoryItemId!.Value))
-            .ToHashSet();
-        if (keys.Count == 0)
-        {
-            return [];
-        }
-
-        List<Guid> orderIds = keys.Select(key => key.OrderId).Distinct().ToList();
-        List<Guid> inventoryIds = keys.Select(key => key.InventoryItemId).Distinct().ToList();
-        List<Sale> sales = await db.Sales
-            .Include(sale => sale.InventoryItem)
-                .ThenInclude(inv => inv!.BundleComponents)
-                    .ThenInclude(component => component.ComponentInventoryItem)
-            .Include(sale => sale.Refunds)
-            .Include(sale => sale.Returns)
-            .Where(sale => sale.OrganizationId == currentUser.OrganizationId
-                && sale.OrderId.HasValue
-                && orderIds.Contains(sale.OrderId.Value)
-                && inventoryIds.Contains(sale.InventoryItemId))
-            .ToListAsync(cancellationToken);
-
-        return sales
-            .Where(sale => sale.OrderId.HasValue && keys.Contains((sale.OrderId.Value, sale.InventoryItemId)))
-            .ToList();
+        return (await store.ListEbayRefundCandidateSalesAsync(
+            currentUser.OrganizationId,
+            item.ExternalItemId,
+            cancellationToken)).ToList();
     }
 
     private async Task<List<Sale>> FindDepopRefundMatches(
         MarketplaceRefundReportParser.MarketplaceRefundEvent item,
         CancellationToken cancellationToken)
     {
-        IQueryable<Sale> query = db.Sales
-            .Include(sale => sale.InventoryItem)
-                .ThenInclude(inv => inv!.BundleComponents)
-                    .ThenInclude(component => component.ComponentInventoryItem)
-            .Include(sale => sale.Refunds)
-            .Include(sale => sale.Returns)
-            .Where(sale => sale.OrganizationId == currentUser.OrganizationId && sale.Platform == "Depop");
-
-        if (item.SoldAt.HasValue)
-        {
-            DateTimeOffset start = new(item.SoldAt.Value.Year, item.SoldAt.Value.Month, item.SoldAt.Value.Day, 0, 0, 0, TimeSpan.Zero);
-            DateTimeOffset end = start.AddDays(1);
-            query = query.Where(sale => sale.SoldAt >= start && sale.SoldAt < end);
-        }
-        if (item.ItemPrice > 0)
-        {
-            decimal low = item.ItemPrice - 0.01m;
-            decimal high = item.ItemPrice + 0.01m;
-            query = query.Where(sale => sale.SoldPrice >= low && sale.SoldPrice <= high);
-        }
-
-        List<Sale> candidates = await query.Take(50).ToListAsync(cancellationToken);
+        IReadOnlyList<Sale> candidates = await store.ListDepopRefundCandidateSalesAsync(
+            currentUser.OrganizationId,
+            item.SoldAt,
+            item.ItemPrice,
+            item.Sku,
+            50,
+            cancellationToken);
         if (!string.IsNullOrWhiteSpace(item.Sku))
         {
             candidates = candidates
@@ -358,37 +302,17 @@ public sealed class MarketplaceRefundImportService(
     }
 
 
-    private static string SnapshotSale(Sale sale) => JsonSerializer.Serialize(new
-    {
-        sale.Platform,
-        sale.SoldPrice,
-        sale.ShippingCharged,
-        sale.CostOfGoods,
-        sale.PlatformFees,
-        sale.PaymentFees,
-        sale.ShippingCost,
-        sale.SuppliesCost,
-        sale.OtherCosts,
-        sale.SalesTaxCollected,
-        sale.TaxRemittedByPlatform,
-        sale.NetProfit,
-        sale.SoldAt,
-        Status = sale.Status.ToString(),
-        sale.Notes,
-    });
-
     private async Task AddCorrection(Sale sale, string before, string reason, CancellationToken cancellationToken)
     {
-        int nextVersion = await db.SaleCorrections
-            .CountAsync(item => item.SaleId == sale.Id && item.OrganizationId == currentUser.OrganizationId, cancellationToken) + 1;
-        db.SaleCorrections.Add(new SaleCorrection
+        int nextVersion = await store.CountSaleCorrectionsAsync(currentUser.OrganizationId, sale.Id, cancellationToken) + 1;
+        store.AddSaleCorrection(new SaleCorrection
         {
             OrganizationId = currentUser.OrganizationId,
             SaleId = sale.Id,
             CorrectedByUserId = currentUser.UserId,
             Reason = reason,
             BeforeJson = before,
-            AfterJson = SnapshotSale(sale),
+            AfterJson = SaleFinancialState.Snapshot(sale),
             Version = nextVersion,
         });
     }

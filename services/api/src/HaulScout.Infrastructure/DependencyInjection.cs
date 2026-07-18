@@ -56,7 +56,11 @@ public static class DependencyInjection
         services.AddScoped<IOrganizationRoleStore, EfOrganizationRoleStore>();
         services.AddScoped<IOrganizationTeamStore, EfOrganizationTeamStore>();
         services.AddScoped<OrderAssembler>();
-        services.AddScoped<IPlatformOrderStore, EfPlatformOrderStore>();
+        services.AddScoped<EfPlatformOrderStore>();
+        services.AddScoped<IPlatformOrderStore>(services => services.GetRequiredService<EfPlatformOrderStore>());
+        services.AddScoped<IPlatformOrderImportStore>(services => services.GetRequiredService<EfPlatformOrderStore>());
+        services.AddScoped<IPlatformOrderFeeEnrichmentStore>(services => services.GetRequiredService<EfPlatformOrderStore>());
+        services.AddScoped<IMarketplaceRefundImportStore>(services => services.GetRequiredService<EfPlatformOrderStore>());
         services.AddScoped<IPlatformOrderSuggestionStore, EfPlatformOrderSuggestionStore>();
         services.AddScoped<IReferenceOverrideStore, EfReferenceOverrideStore>();
         services.AddScoped<ISalesChannelStore, EfSalesChannelStore>();

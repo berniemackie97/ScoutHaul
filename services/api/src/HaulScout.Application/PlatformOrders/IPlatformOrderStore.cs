@@ -5,8 +5,6 @@ namespace HaulScout.Application.PlatformOrders;
 
 public interface IPlatformOrderStore
 {
-    Task<bool> ChannelAccountExistsAsync(Guid organizationId, Guid channelAccountId, CancellationToken cancellationToken);
-
     Task<IReadOnlyList<PlatformOrder>> ListAsync(
         Guid organizationId,
         PlatformOrderStatus? status,

@@ -1,6 +1,6 @@
-using System.Text.Json;
 using HaulScout.Application.Common;
 using HaulScout.Application.Contracts;
+using HaulScout.Application.Sales;
 using HaulScout.Application.Security;
 using HaulScout.Domain;
 using HaulScout.Domain.Entities;
@@ -38,19 +38,6 @@ public sealed class PlatformOrderWorkflowService(
         Dictionary<Guid, (Guid Id, string Title, bool AlreadySold)> suggestions =
             await suggestionService.BuildSuggestionsAsync([order], cancellationToken);
         return AppResult<PlatformOrderDto>.Ok(PlatformOrderDtoFactory.ToPlatformOrderDto(order, suggestions));
-    }
-
-    public async Task<AppResult<Guid?>> ResolveChannelAccountAsync(Guid? channelAccountId, CancellationToken cancellationToken)
-    {
-        if (!channelAccountId.HasValue)
-        {
-            return AppResult<Guid?>.Ok(null);
-        }
-
-        bool exists = await store.ChannelAccountExistsAsync(currentUser.OrganizationId, channelAccountId.Value, cancellationToken);
-        return exists
-            ? AppResult<Guid?>.Ok(channelAccountId.Value)
-            : AppResult<Guid?>.NotFound("Channel account was not found.");
     }
 
     public async Task<AppResult<PlatformOrderDto>> IgnoreAsync(Guid id, CancellationToken cancellationToken)
@@ -183,7 +170,7 @@ public sealed class PlatformOrderWorkflowService(
                     removedSaleIdsFromSalesOrder.AddRange(duplicateSameOrderSales.Select(sale => sale.Id));
                 }
 
-                string before = SnapshotSale(existing);
+                string before = SaleFinancialState.Snapshot(existing);
                 existing.Platform = order.Platform;
                 existing.SoldPrice = applied.Price;
                 existing.ShippingCharged = applied.ShippingCharged;
@@ -344,29 +331,10 @@ public sealed class PlatformOrderWorkflowService(
             CorrectedByUserId = currentUser.UserId,
             Reason = reason,
             BeforeJson = before,
-            AfterJson = SnapshotSale(sale),
+            AfterJson = SaleFinancialState.Snapshot(sale),
             Version = nextVersion,
         });
     }
-
-    private static string SnapshotSale(Sale sale) => JsonSerializer.Serialize(new
-    {
-        sale.Platform,
-        sale.SoldPrice,
-        sale.ShippingCharged,
-        sale.CostOfGoods,
-        sale.PlatformFees,
-        sale.PaymentFees,
-        sale.ShippingCost,
-        sale.SuppliesCost,
-        sale.OtherCosts,
-        sale.SalesTaxCollected,
-        sale.TaxRemittedByPlatform,
-        sale.NetProfit,
-        sale.SoldAt,
-        Status = sale.Status.ToString(),
-        sale.Notes,
-    });
 
     private static string? TrimToNull(string? value)
     {

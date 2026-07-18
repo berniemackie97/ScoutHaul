@@ -1,4 +1,3 @@
-using HaulScout.Application.Storefront;
 using HaulScout.Infrastructure.Storefront;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
@@ -7,14 +6,13 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens;
+using HaulScout.Api;
 using HaulScout.Api.Configuration;
 using HaulScout.Api.Middleware;
 using HaulScout.Api.Services;
 using HaulScout.Application;
-using HaulScout.Application.Security;
 using HaulScout.Infrastructure;
 using HaulScout.Infrastructure.Persistence;
-using HaulScout.Application.Inventory;
 
 // Load .env into environment variables for local dev BEFORE the config builder reads them.
 // No-op in production (no .env file present); never overrides platform-provided vars.
@@ -62,37 +60,13 @@ builder.Services
         };
     });
 
-// Time is a dependency: services that make time-based decisions take TimeProvider so those rules can be
-// tested at the boundary instead of against the wall clock.
-builder.Services.AddSingleton(TimeProvider.System);
-builder.Services.AddScoped<StorefrontStoreResolver>();
-builder.Services.Configure<StorefrontCheckoutOptions>(builder.Configuration.GetSection(StorefrontCheckoutOptions.SectionName));
-builder.Services.Configure<StripeOptions>(builder.Configuration.GetSection(StripeOptions.SectionName));
-builder.Services.AddScoped<SourcingTripQueryService>();
-builder.Services.AddScoped<SourcingTripWorkflowService>();
-builder.Services.AddScoped<SourcingTripStopWorkflowService>();
-builder.Services.AddScoped<MarketplaceLookupPersistenceService>();
-builder.Services.AddScoped<IInventoryPhotoProcessor, InventoryPhotoStorageService>();
-builder.Services.AddScoped<OrdersWorkflowService>();
-builder.Services.AddScoped<MarketplaceRefundImportService>();
-builder.Services.AddScoped<PlatformOrderFeeEnrichmentService>();
-builder.Services.AddScoped<PlatformOrderIngestionService>();
-builder.Services.AddScoped<SaleRecordingWorkflowService>();
-builder.Services.AddScoped<SaleFinancialStateService>();
-builder.Services.AddScoped<SaleReturnWorkflowService>();
-builder.Services.AddScoped<SaleQueryService>();
-builder.Services.AddScoped<SaleGroupingWorkflowService>();
-builder.Services.AddScoped<SaleDeletionWorkflowService>();
-builder.Services.AddScoped<SaleTransitionWorkflowService>();
-builder.Services.AddScoped<SaleCorrectionWorkflowService>();
-builder.Services.AddScoped<SaleRefundWorkflowService>();
+builder.Services.AddApiAdapters(builder.Configuration);
 builder.Services.AddAuthorization(options =>
 {
     options.FallbackPolicy = new AuthorizationPolicyBuilder()
         .RequireAuthenticatedUser()
         .Build();
 });
-builder.Services.AddScoped<ICurrentUserContext, JwtCurrentUserContext>();
 
 // ── Rate Limiting ────────────────────────────────────────────────
 builder.Services.AddRateLimiter(options =>

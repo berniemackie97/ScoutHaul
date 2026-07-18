@@ -1,11 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
 using HaulScout.Api.Authorization;
-using HaulScout.Api.Services;
 using HaulScout.Application.Common;
 using HaulScout.Application.Contracts;
 using HaulScout.Application.PlatformOrders;
 using HaulScout.Application.Security;
-using HaulScout.Application.Services;
 using HaulScout.Domain;
 
 namespace HaulScout.Api.Controllers;
@@ -20,8 +18,7 @@ namespace HaulScout.Api.Controllers;
 public sealed class PlatformOrdersController(
     PlatformOrderWorkflowService platformOrders,
     MarketplaceRefundImportService marketplaceRefundImportService,
-    PlatformOrderFeeEnrichmentService platformOrderFeeEnrichmentService,
-    PlatformOrderIngestionService platformOrderIngestionService) : ControllerBase
+    PlatformOrderImportWorkflowService platformOrderImports) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<PlatformOrderDto>>> List(
@@ -36,67 +33,14 @@ public sealed class PlatformOrdersController(
     /// <summary>Idempotent batch upsert of imported orders. Re-ingesting a reconciled order refreshes the landing
     /// row for re-reconciliation while preserving line mappings.</summary>
     [HttpPost("ingest")]
-    public async Task<ActionResult<IngestPlatformOrdersResultDto>> Ingest(IngestPlatformOrdersRequest request, CancellationToken cancellationToken)
-    {
-        if (request.Orders is null || request.Orders.Count == 0)
-        {
-            return BadRequest("No orders were supplied.");
-        }
-
-        AppResult<Guid?> channelAccount = await platformOrders.ResolveChannelAccountAsync(request.ChannelAccountId, cancellationToken);
-        if (channelAccount.Status != AppResultStatus.Ok)
-        {
-            return channelAccount.Status switch
-            {
-                AppResultStatus.NotFound => NotFound(channelAccount.Message),
-                AppResultStatus.Conflict => Conflict(channelAccount.Message),
-                AppResultStatus.Validation => BadRequest(channelAccount.Message),
-                _ => Problem("Unexpected platform-order workflow result.")
-            };
-        }
-
-        (IngestPlatformOrdersResultDto? result, string? error) =
-            await platformOrderIngestionService.IngestAsync(request.Platform, request.Orders, channelAccount.Value, cancellationToken);
-        return error is not null ? BadRequest(error) : result!;
-    }
+    public async Task<ActionResult<IngestPlatformOrdersResultDto>> Ingest(IngestPlatformOrdersRequest request, CancellationToken cancellationToken) =>
+        ToActionResult(await platformOrderImports.IngestAsync(request, cancellationToken));
 
     /// <summary>Import eBay seller CSVs. The all-orders report creates/updates order rows; the listing-sales report
     /// enriches them with exact eBay fees, shipping labels, and net sales.</summary>
     [HttpPost("import/ebay-csv")]
-    public async Task<ActionResult<IngestPlatformOrdersResultDto>> ImportEbayCsv(ImportPlatformOrdersCsvRequest request, CancellationToken cancellationToken)
-    {
-        if (string.IsNullOrWhiteSpace(request.Csv))
-        {
-            return BadRequest("Paste or upload the eBay report CSV.");
-        }
-
-        EbayReportParser.ParseResult parsed = EbayReportParser.ParseReport(request.Csv);
-        if (parsed.Kind == EbayReportParser.EbayReportKind.AllOrders)
-        {
-            if (parsed.Orders.Count == 0)
-            {
-                return BadRequest(parsed.Warning ?? "No order rows were found in the report.");
-            }
-
-            (IngestPlatformOrdersResultDto? result, string? error) = await platformOrderIngestionService.IngestAsync(
-                string.IsNullOrWhiteSpace(request.Platform) ? "eBay" : request.Platform,
-                parsed.Orders,
-                null,
-                cancellationToken);
-            return error is not null ? BadRequest(error) : result!;
-        }
-
-        if (parsed.Kind == EbayReportParser.EbayReportKind.ListingSales)
-        {
-            if (parsed.ListingSales.Count == 0)
-            {
-                return BadRequest(parsed.Warning ?? "No listing-sales rows were found in the report.");
-            }
-            return await platformOrderFeeEnrichmentService.EnrichEbayListingSalesAsync(parsed.ListingSales, cancellationToken);
-        }
-
-        return BadRequest(parsed.Warning ?? "Unsupported eBay CSV.");
-    }
+    public async Task<ActionResult<IngestPlatformOrdersResultDto>> ImportEbayCsv(ImportPlatformOrdersCsvRequest request, CancellationToken cancellationToken) =>
+        ToActionResult(await platformOrderImports.ImportEbayCsvAsync(request, cancellationToken));
 
     /// <summary>Import refund/fee-credit evidence from marketplace CSVs onto already reconciled sales.</summary>
     [HttpPost("import/refunds-csv")]

@@ -45,11 +45,12 @@ public class PlatformOrderIngestionTests
         var suggestionService = new PlatformOrderSuggestionService(new EfPlatformOrderSuggestionStore(db, currentUser));
         var orderAssembler = new OrderAssembler(db, currentUser);
         var platformOrderStore = new EfPlatformOrderStore(db, orderAssembler);
+        var feeEnrichment = new PlatformOrderFeeEnrichmentService(platformOrderStore, currentUser);
+        var ingestion = new PlatformOrderIngestionService(platformOrderStore, currentUser, suggestionService);
         return new PlatformOrdersController(
             new PlatformOrderWorkflowService(platformOrderStore, currentUser, suggestionService),
-            new MarketplaceRefundImportService(db, currentUser, TimeProvider.System, orderAssembler),
-            new PlatformOrderFeeEnrichmentService(db, currentUser),
-            new PlatformOrderIngestionService(db, currentUser, suggestionService));
+            new MarketplaceRefundImportService(platformOrderStore, currentUser, TimeProvider.System),
+            new PlatformOrderImportWorkflowService(platformOrderStore, currentUser, ingestion, feeEnrichment));
     }
 
     private static InventoryItem SeedItem(HaulScoutDbContext db, Guid org, string title, decimal cost)
