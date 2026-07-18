@@ -56,6 +56,10 @@ public sealed class StorefrontOrderService(
         {
             return PaymentEventOutcome.AlreadyProcessed;
         }
+        if (order.Status != OrderStatus.Pending || order.PaymentStatus != PaymentStatus.Pending)
+        {
+            return await RefundInactiveCheckoutAsync(order, paymentEvent, cancellationToken);
+        }
 
         // The item subtotal is the one figure this system set; the processor echoing anything else back means the
         // payment and the order disagree, and a disagreement about money never resolves itself silently.
@@ -115,6 +119,23 @@ public sealed class StorefrontOrderService(
         order.PaymentStatus = PaymentStatus.Refunded;
         order.CancelledAt = timeProvider.GetUtcNow();
         order.CustomerNote = "Auto-refunded: an item was no longer available when payment completed.";
+        await checkout.SaveChangesAsync(cancellationToken);
+        return PaymentEventOutcome.RefundedConflict;
+    }
+
+    private async Task<PaymentEventOutcome> RefundInactiveCheckoutAsync(
+        Order order,
+        PaymentEvent paymentEvent,
+        CancellationToken cancellationToken)
+    {
+        if (paymentEvent.PaymentIntentId is string paymentIntentId)
+        {
+            await payments.RefundAsync(paymentIntentId, $"Order {order.OrderNumber}: checkout was no longer active.", cancellationToken);
+        }
+        order.Status = OrderStatus.Cancelled;
+        order.PaymentStatus = PaymentStatus.Refunded;
+        order.CancelledAt ??= timeProvider.GetUtcNow();
+        order.CustomerNote = "Auto-refunded: payment arrived for a checkout session that was no longer active.";
         await checkout.SaveChangesAsync(cancellationToken);
         return PaymentEventOutcome.RefundedConflict;
     }

@@ -27,11 +27,18 @@ export function CartWorkspace({ mode }: Props) {
 
   const unavailableLines = useMemo(() => cart?.lines.filter((line) => !line.isAvailable) ?? [], [cart]);
   const canCheckout = Boolean(cart && cart.lines.length > 0 && unavailableLines.length === 0);
+  const cartSignature = useMemo(() => signatureForCart(cart), [cart]);
   const hasFreeShipping = cart?.estimatedShippingAmount === 0;
   const remainingForFreeShipping =
     cart?.freeShippingThreshold && !hasFreeShipping
       ? Math.max(0, cart.freeShippingThreshold - cart.subtotal)
       : 0;
+
+  useEffect(() => {
+    if (embeddedCheckout && embeddedCheckout.cartSignature !== cartSignature) {
+      setEmbeddedCheckout(null);
+    }
+  }, [cartSignature, embeddedCheckout]);
 
   useEffect(() => {
     if (mode !== "checkout" || loading || !canCheckout || checkingOut || embeddedCheckout || autoStarted.current) return;
@@ -71,6 +78,7 @@ export function CartWorkspace({ mode }: Props) {
       if (!response.ok) throw new Error(await response.text());
       const nextCart = (await response.json()) as Cart;
       setCart(nextCart);
+      setEmbeddedCheckout(null);
       window.dispatchEvent(new CustomEvent<Cart>("haulscout:cart-changed", { detail: nextCart }));
     } catch (err) {
       setError(cleanError(err));
@@ -92,7 +100,7 @@ export function CartWorkspace({ mode }: Props) {
       if (!response.ok) throw new Error(await response.text());
       const result = (await response.json()) as CheckoutResult;
       if (result.clientSecret && result.publishableKey) {
-        setEmbeddedCheckout({ clientSecret: result.clientSecret, publishableKey: result.publishableKey });
+        setEmbeddedCheckout({ clientSecret: result.clientSecret, publishableKey: result.publishableKey, cartSignature });
         setCheckingOut(false);
         return;
       }
@@ -298,6 +306,7 @@ export function CartWorkspace({ mode }: Props) {
 type EmbeddedCheckoutSession = {
   clientSecret: string;
   publishableKey: string;
+  cartSignature: string;
 };
 
 type StripeInstance = {
@@ -379,6 +388,13 @@ function loadStripeScript(): Promise<void> {
 
 function versionedPath(path: string) {
   return `${path}?cartv=${Date.now()}`;
+}
+
+function signatureForCart(cart: Cart | null) {
+  return (cart?.lines ?? [])
+    .map((line) => `${line.storeListingId}:${line.unitPrice}:${line.isAvailable}`)
+    .sort()
+    .join("|");
 }
 
 function cleanError(error: unknown) {

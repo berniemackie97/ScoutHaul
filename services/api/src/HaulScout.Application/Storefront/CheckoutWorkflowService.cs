@@ -50,13 +50,14 @@ public sealed class CheckoutWorkflowService(
         Order? pending = await checkout.FindPendingOrderByCartAsync(organizationId, cart.Id, cancellationToken);
         if (pending?.StripeCheckoutSessionId is string openSession)
         {
-            if (await payments.FindOpenCheckoutAsync(openSession, cancellationToken) is HostedCheckout openCheckout)
+            if (PendingStillMatchesCart(pending, cart)
+                && await payments.FindOpenCheckoutAsync(openSession, cancellationToken) is HostedCheckout openCheckout)
             {
                 return AppResult<StorefrontCheckoutResultDto>.Ok(ToDto(openCheckout));
             }
 
-            // The session is dead but the expiry webhook hasn't landed yet — unwind it here so the shopper
-            // isn't locked out of their own items for the rest of the expiry window.
+            // The session is dead, or the cart changed after it was created. Unwind our reservation and build a new
+            // payment session from the current cart instead of charging the old line set.
             await ReleasePendingAsync(pending, cancellationToken);
             unavailable = cart.Lines
                 .Where(line => !IsCheckoutLineAvailable(line, now)
@@ -206,6 +207,36 @@ public sealed class CheckoutWorkflowService(
         checkout.ClientSecret,
         checkout.PublishableKey,
         checkout.ClientSecret is not null ? "Embedded" : "Hosted");
+
+    private static bool PendingStillMatchesCart(Order pending, Cart cart)
+    {
+        OrderLine[] pendingLines = pending.Lines
+            .Where(line => line.StoreListingId is not null)
+            .OrderBy(line => line.StoreListingId)
+            .ToArray();
+        CartLine[] cartLines = cart.Lines
+            .OrderBy(line => line.StoreListingId)
+            .ToArray();
+
+        if (pendingLines.Length != cartLines.Length)
+        {
+            return false;
+        }
+
+        for (int i = 0; i < cartLines.Length; i++)
+        {
+            CartLine cartLine = cartLines[i];
+            OrderLine pendingLine = pendingLines[i];
+            if (pendingLine.StoreListingId != cartLine.StoreListingId
+                || pendingLine.StorefrontOfferId != cartLine.StorefrontOfferId
+                || pendingLine.UnitPrice != CartWorkflowService.EffectiveUnitPrice(cartLine))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
 
     private string? HeroImageUrl(Guid? storeListingId, Cart cart)
     {
