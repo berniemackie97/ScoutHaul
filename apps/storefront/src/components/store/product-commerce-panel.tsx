@@ -75,11 +75,7 @@ export function ProductCommercePanel({
       if (!addResponse.ok) throw new Error(await addResponse.text());
       window.dispatchEvent(new Event("haulscout:cart-changed"));
 
-      const checkoutResponse = await fetch("/api/checkout", { method: "POST" });
-      if (!checkoutResponse.ok) throw new Error(await checkoutResponse.text());
-      const checkout = (await checkoutResponse.json()) as { checkoutUrl?: string };
-      if (!checkout.checkoutUrl) throw new Error("Checkout did not return a payment link.");
-      window.location.assign(checkout.checkoutUrl);
+      window.location.assign("/checkout?start=1");
     } catch (err) {
       setError(cleanError(err));
       setCheckingOut(false);

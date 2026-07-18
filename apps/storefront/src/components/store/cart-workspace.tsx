@@ -2,19 +2,21 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, ArrowRight, CreditCard, Loader2, MapPin, ShieldCheck, ShoppingBag, Trash2, Truck } from "lucide-react";
-import { imageUrl, money, type Cart } from "@/lib/commerce";
+import { imageUrl, money, type Cart, type CheckoutResult } from "@/lib/commerce";
 
 type Props = {
   mode: "cart" | "checkout";
 };
 
 export function CartWorkspace({ mode }: Props) {
+  const autoStarted = useRef(false);
   const [cart, setCart] = useState<Cart | null>(null);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [checkingOut, setCheckingOut] = useState(false);
+  const [embeddedCheckout, setEmbeddedCheckout] = useState<EmbeddedCheckoutSession | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -30,6 +32,13 @@ export function CartWorkspace({ mode }: Props) {
     cart?.freeShippingThreshold && !hasFreeShipping
       ? Math.max(0, cart.freeShippingThreshold - cart.subtotal)
       : 0;
+
+  useEffect(() => {
+    if (mode !== "checkout" || loading || !canCheckout || checkingOut || embeddedCheckout || autoStarted.current) return;
+    if (new URLSearchParams(window.location.search).get("start") !== "1") return;
+    autoStarted.current = true;
+    void checkout();
+  }, [mode, loading, canCheckout, checkingOut, embeddedCheckout]);
 
   async function loadCart(signal?: AbortSignal) {
     setLoading(true);
@@ -62,12 +71,18 @@ export function CartWorkspace({ mode }: Props) {
   }
 
   async function checkout() {
+    if (checkingOut || embeddedCheckout) return;
     setCheckingOut(true);
     setError(null);
     try {
       const response = await fetch("/api/checkout", { method: "POST" });
       if (!response.ok) throw new Error(await response.text());
-      const result = (await response.json()) as { checkoutUrl?: string };
+      const result = (await response.json()) as CheckoutResult;
+      if (result.clientSecret && result.publishableKey) {
+        setEmbeddedCheckout({ clientSecret: result.clientSecret, publishableKey: result.publishableKey });
+        setCheckingOut(false);
+        return;
+      }
       if (!result.checkoutUrl) throw new Error("Checkout did not return a payment link.");
       window.location.assign(result.checkoutUrl);
     } catch (err) {
@@ -80,7 +95,7 @@ export function CartWorkspace({ mode }: Props) {
   const eyebrow = mode === "checkout" ? "Secure checkout" : "Cart";
   const body =
     mode === "checkout"
-      ? "Next you will enter email, shipping address, delivery method, tax, and payment on Stripe's hosted checkout."
+      ? "Next you will confirm delivery, tax, and payment through Stripe secure checkout."
       : "One-of-one items stay available until checkout reserves them. If a line becomes unavailable, remove it and continue.";
 
   return (
@@ -124,6 +139,13 @@ export function CartWorkspace({ mode }: Props) {
                   <span>Local pickup appears when available. Tax is calculated by Stripe.</span>
                 </div>
               </div>
+            </section>
+          ) : null}
+
+          {mode === "checkout" && embeddedCheckout ? (
+            <section className="border border-rule bg-background p-3 lg:col-span-2 sm:p-5">
+              <h2 className="mb-4 font-heading text-2xl font-semibold text-ink">Payment</h2>
+              <EmbeddedStripeCheckout session={embeddedCheckout} />
             </section>
           ) : null}
 
@@ -214,7 +236,7 @@ export function CartWorkspace({ mode }: Props) {
             <button
               type="button"
               onClick={mode === "cart" ? () => window.location.assign("/checkout") : checkout}
-              disabled={!canCheckout || checkingOut}
+              disabled={!canCheckout || checkingOut || Boolean(embeddedCheckout)}
               className="mt-6 flex w-full items-center justify-center gap-2 bg-copper px-6 py-3.5 text-sm font-semibold uppercase tracking-[0.12em] text-ink transition-transform hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {checkingOut ? (
@@ -224,7 +246,7 @@ export function CartWorkspace({ mode }: Props) {
                 </>
               ) : (
                 <>
-                  {mode === "cart" ? "Review checkout" : "Pay securely with Stripe"}
+                  {mode === "cart" ? "Review checkout" : embeddedCheckout ? "Checkout loaded below" : "Pay securely with Stripe"}
                   <ArrowRight className="h-4 w-4" aria-hidden />
                 </>
               )}
@@ -233,7 +255,7 @@ export function CartWorkspace({ mode }: Props) {
             <ul className="mt-6 space-y-3 text-sm text-slate">
               <li className="flex gap-2">
                 <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-copper" aria-hidden />
-                Payment is handled by Stripe-hosted Checkout.
+                Payment is handled by Stripe secure checkout.
               </li>
               <li className="flex gap-2">
                 <Truck className="mt-0.5 h-4 w-4 shrink-0 text-copper" aria-hidden />
@@ -258,6 +280,88 @@ export function CartWorkspace({ mode }: Props) {
       )}
     </main>
   );
+}
+
+type EmbeddedCheckoutSession = {
+  clientSecret: string;
+  publishableKey: string;
+};
+
+type StripeInstance = {
+  createEmbeddedCheckoutPage(options: { fetchClientSecret: () => Promise<string> }): Promise<{
+    mount(target: string | HTMLElement): void;
+    destroy(): void;
+  }>;
+};
+
+declare global {
+  interface Window {
+    Stripe?: (publishableKey: string) => StripeInstance | null;
+  }
+}
+
+let stripeScriptPromise: Promise<void> | null = null;
+
+function EmbeddedStripeCheckout({ session }: { session: EmbeddedCheckoutSession }) {
+  const mountRef = useRef<HTMLDivElement>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let destroyed = false;
+    let embedded: Awaited<ReturnType<StripeInstance["createEmbeddedCheckoutPage"]>> | null = null;
+
+    async function mountCheckout() {
+      try {
+        await loadStripeScript();
+        if (destroyed) return;
+        const stripe = window.Stripe?.(session.publishableKey);
+        if (!stripe) throw new Error("Stripe could not be initialized.");
+        embedded = await stripe.createEmbeddedCheckoutPage({
+          fetchClientSecret: async () => session.clientSecret,
+        });
+        if (destroyed || !mountRef.current) {
+          embedded.destroy();
+          return;
+        }
+        embedded.mount(mountRef.current);
+      } catch (err) {
+        if (!destroyed) setError(cleanError(err));
+      }
+    }
+
+    void mountCheckout();
+    return () => {
+      destroyed = true;
+      embedded?.destroy();
+    };
+  }, [session.clientSecret, session.publishableKey]);
+
+  if (error) {
+    return <p className="border border-red-500/25 bg-red-500/10 px-3 py-2 text-sm text-red-700">{error}</p>;
+  }
+
+  return <div ref={mountRef} className="min-h-[36rem]" />;
+}
+
+function loadStripeScript(): Promise<void> {
+  if (typeof window === "undefined") return Promise.resolve();
+  if (window.Stripe) return Promise.resolve();
+  stripeScriptPromise ??= new Promise((resolve, reject) => {
+    const existing = document.querySelector<HTMLScriptElement>("script[src='https://js.stripe.com/v3/']");
+    if (existing) {
+      existing.addEventListener("load", () => resolve(), { once: true });
+      existing.addEventListener("error", () => reject(new Error("Stripe.js failed to load.")), { once: true });
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = "https://js.stripe.com/v3/";
+    script.async = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error("Stripe.js failed to load."));
+    document.head.appendChild(script);
+  });
+  return stripeScriptPromise;
 }
 
 function cleanError(error: unknown) {

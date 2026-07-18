@@ -23,3 +23,6 @@ public interface IStorefrontCartStore
 
     Task SaveChangesAsync(CancellationToken cancellationToken);
 }
+
+/// <summary>The cart changed concurrently or duplicated a one-of-one line. The workflow can reload and converge.</summary>
+public sealed class CartMutationConflictException(string message, Exception? inner = null) : Exception(message, inner);

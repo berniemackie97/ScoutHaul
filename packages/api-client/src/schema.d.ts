@@ -9527,6 +9527,9 @@ export interface components {
         };
         StorefrontCheckoutResultDto: {
             checkoutUrl?: string | null;
+            clientSecret?: string | null;
+            publishableKey?: string | null;
+            mode?: string | null;
         };
         StorefrontListingDetailDto: {
             /** Format: uuid */

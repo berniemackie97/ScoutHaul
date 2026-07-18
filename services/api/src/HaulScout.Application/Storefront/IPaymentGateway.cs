@@ -8,14 +8,14 @@ namespace HaulScout.Application.Storefront;
 /// </summary>
 public interface IPaymentGateway
 {
-    /// <summary>Creates a hosted checkout for the order and returns where to send the shopper.</summary>
+    /// <summary>Creates a Stripe checkout session for the order and returns the customer handoff details.</summary>
     Task<HostedCheckout> CreateCheckoutAsync(HostedCheckoutRequest request, CancellationToken cancellationToken);
 
     /// <summary>
     /// The live payment URL of a previously created checkout, or null once it has expired or completed — used to
     /// resume a shopper's own pending checkout instead of double-reserving against them.
     /// </summary>
-    Task<string?> FindOpenCheckoutUrlAsync(string sessionId, CancellationToken cancellationToken);
+    Task<HostedCheckout?> FindOpenCheckoutAsync(string sessionId, CancellationToken cancellationToken);
 
     /// <summary>What the processor actually charged for a captured payment — the real fee for the books.</summary>
     Task<PaymentCapture> GetCaptureAsync(string paymentIntentId, CancellationToken cancellationToken);
@@ -46,8 +46,10 @@ public sealed record HostedCheckoutRequest(
     bool OfferLocalPickup,
     bool AutomaticTax,
     string[] AllowedShipCountries,
+    bool PreferEmbedded,
     string SuccessUrl,
     string CancelUrl,
+    string ReturnUrl,
     DateTimeOffset ExpiresAt);
 
 /// <param name="UnitAmountCents">Item price in cents.</param>
@@ -57,7 +59,11 @@ public sealed record HostedCheckoutLine(string Title, long UnitAmountCents, stri
 /// <param name="AmountCents">What the shopper pays for shipping; 0 renders as free.</param>
 public sealed record ShippingChoice(string Label, long AmountCents, int EstimateMinDays, int EstimateMaxDays);
 
-public sealed record HostedCheckout(string SessionId, string Url);
+public sealed record HostedCheckout(
+    string SessionId,
+    string? Url,
+    string? ClientSecret,
+    string? PublishableKey);
 
 /// <param name="FeeCents">The processor's fee for this capture; null when it could not be determined yet.</param>
 public sealed record PaymentCapture(string PaymentIntentId, long AmountCents, long? FeeCents);

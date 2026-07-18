@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using HaulScout.Application.Storefront;
 using HaulScout.Domain;
 using HaulScout.Domain.Entities;
@@ -47,5 +48,20 @@ public sealed class EfStorefrontCartStore(HaulScoutDbContext db) : IStorefrontCa
                 listing => listing.Id == storeListingId && listing.OrganizationId == organizationId,
                 cancellationToken);
 
-    public Task SaveChangesAsync(CancellationToken cancellationToken) => db.SaveChangesAsync(cancellationToken);
+    public async Task SaveChangesAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException exception)
+        {
+            throw new CartMutationConflictException("The cart changed while it was being updated.", exception);
+        }
+        catch (DbUpdateException exception) when (exception.InnerException is PostgresException postgres
+            && postgres.SqlState == PostgresErrorCodes.UniqueViolation)
+        {
+            throw new CartMutationConflictException("The item is already in this cart.", exception);
+        }
+    }
 }

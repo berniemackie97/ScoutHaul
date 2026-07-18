@@ -28,6 +28,12 @@ public sealed class StorefrontCheckoutOptions
     /// </summary>
     public bool AutomaticTaxEnabled { get; set; } = true;
 
+    /// <summary>
+    /// Prefer Stripe Embedded Checkout when the payment provider has a browser publishable key configured. If the
+    /// key is missing, the gateway falls back to hosted redirect checkout so buyers can still pay.
+    /// </summary>
+    public bool PreferEmbeddedCheckout { get; set; } = true;
+
     /// <summary>ISO country codes the store ships to.</summary>
     public string[] AllowedShipCountries { get; set; } = ["US"];
 
