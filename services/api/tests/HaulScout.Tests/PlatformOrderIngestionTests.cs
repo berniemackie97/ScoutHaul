@@ -8,6 +8,7 @@ using HaulScout.Application.PlatformOrders;
 using HaulScout.Application.Security;
 using HaulScout.Domain;
 using HaulScout.Domain.Entities;
+using HaulScout.Infrastructure.Orders;
 using HaulScout.Infrastructure.PlatformOrders;
 using HaulScout.Infrastructure.Persistence;
 
@@ -43,14 +44,12 @@ public class PlatformOrderIngestionTests
         var currentUser = new StubCurrentUser(org, user);
         var suggestionService = new PlatformOrderSuggestionService(new EfPlatformOrderSuggestionStore(db, currentUser));
         var orderAssembler = new OrderAssembler(db, currentUser);
+        var platformOrderStore = new EfPlatformOrderStore(db, orderAssembler);
         return new PlatformOrdersController(
-            db,
-            currentUser,
-            orderAssembler,
+            new PlatformOrderWorkflowService(platformOrderStore, currentUser, suggestionService),
             new MarketplaceRefundImportService(db, currentUser, TimeProvider.System, orderAssembler),
             new PlatformOrderFeeEnrichmentService(db, currentUser),
-            new PlatformOrderIngestionService(db, currentUser, suggestionService),
-            suggestionService);
+            new PlatformOrderIngestionService(db, currentUser, suggestionService));
     }
 
     private static InventoryItem SeedItem(HaulScoutDbContext db, Guid org, string title, decimal cost)

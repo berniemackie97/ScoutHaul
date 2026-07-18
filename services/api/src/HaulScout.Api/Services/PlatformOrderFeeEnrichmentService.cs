@@ -1,9 +1,9 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
-using HaulScout.Api.Mapping;
 using HaulScout.Application.Contracts;
 using HaulScout.Application.Security;
 using HaulScout.Application.Services;
+using HaulScout.Application.PlatformOrders;
 using HaulScout.Domain;
 using HaulScout.Domain.Entities;
 using HaulScout.Domain.Services;
@@ -114,7 +114,7 @@ public sealed class PlatformOrderFeeEnrichmentService(HaulScoutDbContext db, ICu
                 .Include(order => order.Lines).ThenInclude(line => line.InventoryItem)
                 .Where(order => order.OrganizationId == currentUser.OrganizationId && touchedOrderIds.Contains(order.Id))
                 .ToListAsync(cancellationToken);
-        List<PlatformOrderDto> dtos = refreshed.Select(order => order.ToDto()).ToList();
+        List<PlatformOrderDto> dtos = refreshed.Select(order => PlatformOrderDtoFactory.ToPlatformOrderDto(order)).ToList();
         int skipped = metrics.Count - byItemId.Keys.Count + byItemId.Keys.Count(itemId => !linesByItemId.ContainsKey(itemId));
         return new IngestPlatformOrdersResultDto(0, updatedLines + correctedSales, Math.Max(0, skipped), dtos);
     }

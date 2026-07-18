@@ -205,11 +205,6 @@ public static class DtoMapping
         item.BeforeJson,
         item.AfterJson);
 
-    /// <summary>The payout a marketplace should deposit: item + buyer shipping − fees, plus any tax the seller
-    /// keeps (when the platform does not remit it). Compared to the imported payout to surface fee/import drift.</summary>
-    public static decimal ExpectedPayout(this PlatformOrder order) =>
-        order.ItemsSubtotal + order.ShippingCharged - order.FeeTotal - (order.SellerShippingCost ?? 0) + (order.TaxRemittedByPlatform ? 0 : order.TaxCollected);
-
     public static PlatformListingDto ToDto(this PlatformListing listing, (Guid Id, string Title, bool AlreadySold)? suggestion = null) => new(
         listing.Id,
         listing.Platform,
@@ -265,74 +260,6 @@ public static class DtoMapping
         snapshot.SellerPaidReturns,
         snapshot.PromotedListings,
         snapshot.BestOffer);
-
-    public static PlatformOrderDto ToDto(this PlatformOrder order, IReadOnlyDictionary<Guid, (Guid Id, string Title, bool AlreadySold)>? lineSuggestions = null)
-    {
-        decimal expectedPayout = order.ExpectedPayout();
-        return new PlatformOrderDto(
-            order.Id,
-            order.Platform,
-            order.ExternalOrderId,
-            order.BuyerName,
-            order.BuyerReference,
-            order.BuyerEmail,
-            order.BuyerNote,
-            order.ShipToName,
-            order.ShipToPhone,
-            order.ShipToLine1,
-            order.ShipToLine2,
-            order.ShipToCity,
-            order.ShipToRegion,
-            order.ShipToPostalCode,
-            order.ShipToCountry,
-            order.OrderedAt,
-            order.ItemsSubtotal,
-            order.ShippingCharged,
-            order.TaxCollected,
-            order.FeeTotal,
-            order.SellerShippingCost,
-            order.PayoutAmount,
-            expectedPayout,
-            order.PayoutAmount.HasValue ? order.PayoutAmount.Value - expectedPayout : 0,
-            order.Currency,
-            order.TaxRemittedByPlatform,
-            order.FeeBreakdownJson,
-            order.Carrier,
-            order.TrackingNumber,
-            order.PaidAt,
-            order.ShippedAt,
-            order.Status,
-            order.ReconciledSaleGroupId,
-            order.ReconciledAt,
-            order.OrderedAt.ToUniversalTime(),
-            order.ScrapedAt,
-            order.Lines
-                .OrderBy(line => line.CreatedAt)
-                .Select(line =>
-                {
-                    (Guid Id, string Title, bool AlreadySold)? suggestion = lineSuggestions is not null && lineSuggestions.TryGetValue(line.Id, out (Guid Id, string Title, bool AlreadySold) match) ? match : null;
-                    return new PlatformOrderLineDto(
-                        line.Id,
-                        line.Title,
-                        line.UnitPrice,
-                        line.Quantity,
-                        line.ExternalItemId,
-                        line.Sku,
-                        line.ShippingCharged,
-                        line.TaxCollected,
-                        line.PlatformFees,
-                        line.SellerShippingCost,
-                        line.NetSales,
-                        line.TotalSales,
-                        line.FeeBreakdownJson,
-                        line.InventoryItemId,
-                        line.InventoryItem?.Title,
-                        suggestion?.Id,
-                        suggestion?.Title,
-                        suggestion?.AlreadySold ?? false);
-                })
-                .ToList());
-    }
 
     public static ResaleTaskDto ToDto(this ResaleTask item) => new(
         item.Id,

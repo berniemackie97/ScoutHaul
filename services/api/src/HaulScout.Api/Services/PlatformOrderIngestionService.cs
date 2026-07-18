@@ -1,6 +1,5 @@
 using Microsoft.EntityFrameworkCore;
 using static HaulScout.Api.Helpers.StringHelpers;
-using HaulScout.Api.Mapping;
 using HaulScout.Application.Contracts;
 using HaulScout.Application.PlatformOrders;
 using HaulScout.Application.Security;
@@ -116,7 +115,7 @@ public sealed class PlatformOrderIngestionService(
             .ToListAsync(cancellationToken);
         Dictionary<Guid, (Guid Id, string Title, bool AlreadySold)> suggestions =
             await suggestionService.BuildSuggestionsAsync(refreshed, cancellationToken);
-        List<PlatformOrderDto> dtos = refreshed.Select(order => order.ToDto(suggestions)).ToList();
+        List<PlatformOrderDto> dtos = refreshed.Select(order => PlatformOrderDtoFactory.ToPlatformOrderDto(order, suggestions)).ToList();
         return (new IngestPlatformOrdersResultDto(created, updated, skipped, dtos), null);
     }
 

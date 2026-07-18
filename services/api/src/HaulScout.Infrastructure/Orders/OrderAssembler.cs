@@ -4,7 +4,7 @@ using HaulScout.Domain;
 using HaulScout.Domain.Entities;
 using HaulScout.Infrastructure.Persistence;
 
-namespace HaulScout.Api.Services;
+namespace HaulScout.Infrastructure.Orders;
 
 /// <summary>
 /// Builds the channel-agnostic <see cref="Order"/> (and its buyer) for any channel — storefront, eBay, Poshmark,

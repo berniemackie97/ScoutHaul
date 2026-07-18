@@ -39,6 +39,7 @@ public static class DependencyInjection
         services.AddScoped<OrganizationRoleWorkflowService>();
         services.AddScoped<OrganizationTeamWorkflowService>();
         services.AddScoped<PlatformOrderSuggestionService>();
+        services.AddScoped<PlatformOrderWorkflowService>();
         services.AddScoped<ReferenceOverrideWorkflowService>();
         services.AddScoped<SalesChannelWorkflowService>();
         services.AddScoped<SessionBootstrapService>();

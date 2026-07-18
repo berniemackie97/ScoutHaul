@@ -14,6 +14,7 @@ using HaulScout.Infrastructure.Channels;
 using HaulScout.Infrastructure.Inventory;
 using HaulScout.Infrastructure.Marketplace;
 using HaulScout.Infrastructure.Organizations;
+using HaulScout.Infrastructure.Orders;
 using HaulScout.Infrastructure.Persistence;
 using HaulScout.Infrastructure.PlatformOrders;
 using HaulScout.Infrastructure.ReferenceData;
@@ -54,6 +55,8 @@ public static class DependencyInjection
         services.AddScoped<IOrganizationStore, EfOrganizationStore>();
         services.AddScoped<IOrganizationRoleStore, EfOrganizationRoleStore>();
         services.AddScoped<IOrganizationTeamStore, EfOrganizationTeamStore>();
+        services.AddScoped<OrderAssembler>();
+        services.AddScoped<IPlatformOrderStore, EfPlatformOrderStore>();
         services.AddScoped<IPlatformOrderSuggestionStore, EfPlatformOrderSuggestionStore>();
         services.AddScoped<IReferenceOverrideStore, EfReferenceOverrideStore>();
         services.AddScoped<ISalesChannelStore, EfSalesChannelStore>();

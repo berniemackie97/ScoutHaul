@@ -8,6 +8,7 @@ using HaulScout.Application.Services;
 using HaulScout.Domain;
 using HaulScout.Domain.Entities;
 using HaulScout.Domain.Services;
+using HaulScout.Infrastructure.Orders;
 using HaulScout.Infrastructure.Persistence;
 
 namespace HaulScout.Api.Services;
