@@ -8004,6 +8004,105 @@
         }
       }
     },
+    "/api/store/listings/by-item/{inventoryItemId}": {
+      "get": {
+        "tags": [
+          "Store"
+        ],
+        "parameters": [
+          {
+            "name": "inventoryItemId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoreListingDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoreListingDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoreListingDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/store/listings/{id}/commerce": {
+      "put": {
+        "tags": [
+          "Store"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateStoreListingCommerceRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateStoreListingCommerceRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateStoreListingCommerceRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoreListingDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoreListingDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoreListingDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/store/listings/{id}/unpublish": {
       "post": {
         "tags": [
@@ -15275,6 +15374,27 @@
             "format": "double",
             "nullable": true
           },
+          "acceptsOffers": {
+            "type": "boolean"
+          },
+          "minimumOfferAmount": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "maximumOfferAmount": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "shippingPolicy": {
+            "$ref": "#/components/schemas/StoreShippingPolicy"
+          },
+          "shippingAmountOverride": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
           "status": {
             "$ref": "#/components/schemas/StoreListingStatus"
           },
@@ -15336,6 +15456,14 @@
         },
         "additionalProperties": false
       },
+      "StoreShippingPolicy": {
+        "enum": [
+          "StoreDefault",
+          "Free",
+          "FixedAmount"
+        ],
+        "type": "string"
+      },
       "StorefrontCartDto": {
         "type": "object",
         "properties": {
@@ -15353,6 +15481,14 @@
           "subtotal": {
             "type": "number",
             "format": "double"
+          },
+          "estimatedShippingAmount": {
+            "type": "number",
+            "format": "double"
+          },
+          "shippingSummary": {
+            "type": "string",
+            "nullable": true
           },
           "freeShippingThreshold": {
             "type": "number",
@@ -15432,6 +15568,27 @@
             "format": "double"
           },
           "compareAtPrice": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "acceptsOffers": {
+            "type": "boolean"
+          },
+          "minimumOfferAmount": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "maximumOfferAmount": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "shippingPolicy": {
+            "$ref": "#/components/schemas/StoreShippingPolicy"
+          },
+          "shippingAmountOverride": {
             "type": "number",
             "format": "double",
             "nullable": true
@@ -15558,6 +15715,27 @@
             "format": "double"
           },
           "compareAtPrice": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "acceptsOffers": {
+            "type": "boolean"
+          },
+          "minimumOfferAmount": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "maximumOfferAmount": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "shippingPolicy": {
+            "$ref": "#/components/schemas/StoreShippingPolicy"
+          },
+          "shippingAmountOverride": {
             "type": "number",
             "format": "double",
             "nullable": true
@@ -16018,6 +16196,33 @@
           },
           "notes": {
             "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "UpdateStoreListingCommerceRequest": {
+        "type": "object",
+        "properties": {
+          "acceptsOffers": {
+            "type": "boolean"
+          },
+          "minimumOfferAmount": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "maximumOfferAmount": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "shippingPolicy": {
+            "$ref": "#/components/schemas/StoreShippingPolicy"
+          },
+          "shippingAmountOverride": {
+            "type": "number",
+            "format": "double",
             "nullable": true
           }
         },

@@ -108,6 +108,12 @@ public sealed class StoreListing : EntityBase, IOrganizationScoped
     public decimal ListPrice { get; set; }
     public decimal? CompareAtPrice { get; set; }
 
+    public bool AcceptsOffers { get; set; } = true;
+    public decimal? MinimumOfferAmount { get; set; }
+    public decimal? MaximumOfferAmount { get; set; }
+    public StoreShippingPolicy ShippingPolicy { get; set; } = StoreShippingPolicy.StoreDefault;
+    public decimal? ShippingAmountOverride { get; set; }
+
     public StoreListingStatus Status { get; set; } = StoreListingStatus.Draft;
     public bool IsFeatured { get; set; }
 
@@ -273,8 +279,8 @@ public sealed class StorefrontOffer : EntityBase, IOrganizationScoped
     public StorefrontOfferStatus Status { get; set; } = StorefrontOfferStatus.New;
     public decimal OfferAmount { get; set; }
     public decimal ListingPriceSnapshot { get; set; }
-    public required string BuyerName { get; set; }
-    public required string BuyerEmail { get; set; }
+    public string? BuyerName { get; set; }
+    public string? BuyerEmail { get; set; }
     public string? BuyerPhone { get; set; }
     public string? Message { get; set; }
     public DateTimeOffset OfferedAt { get; set; } = DateTimeOffset.UtcNow;

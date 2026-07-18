@@ -300,6 +300,13 @@ public enum StoreListingStatus
     Archived
 }
 
+public enum StoreShippingPolicy
+{
+    StoreDefault,
+    Free,
+    FixedAmount
+}
+
 public enum CartStatus
 {
     Active,

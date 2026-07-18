@@ -6381,6 +6381,90 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/store/listings/by-item/{inventoryItemId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    inventoryItemId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["StoreListingDto"];
+                        "application/json": components["schemas"]["StoreListingDto"];
+                        "text/json": components["schemas"]["StoreListingDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/store/listings/{id}/commerce": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["UpdateStoreListingCommerceRequest"];
+                    "text/json": components["schemas"]["UpdateStoreListingCommerceRequest"];
+                    "application/*+json": components["schemas"]["UpdateStoreListingCommerceRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["StoreListingDto"];
+                        "application/json": components["schemas"]["StoreListingDto"];
+                        "text/json": components["schemas"]["StoreListingDto"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/store/listings/{id}/unpublish": {
         parameters: {
             query?: never;
@@ -9389,6 +9473,14 @@ export interface components {
             listPrice?: number;
             /** Format: double */
             compareAtPrice?: number | null;
+            acceptsOffers?: boolean;
+            /** Format: double */
+            minimumOfferAmount?: number | null;
+            /** Format: double */
+            maximumOfferAmount?: number | null;
+            shippingPolicy?: components["schemas"]["StoreShippingPolicy"];
+            /** Format: double */
+            shippingAmountOverride?: number | null;
             status?: components["schemas"]["StoreListingStatus"];
             isFeatured?: boolean;
             metaTitle?: string | null;
@@ -9409,11 +9501,16 @@ export interface components {
             storeDomain?: string | null;
             isLive?: boolean;
         };
+        /** @enum {string} */
+        StoreShippingPolicy: "StoreDefault" | "Free" | "FixedAmount";
         StorefrontCartDto: {
             cartToken?: string | null;
             lines?: components["schemas"]["StorefrontCartLineDto"][] | null;
             /** Format: double */
             subtotal?: number;
+            /** Format: double */
+            estimatedShippingAmount?: number;
+            shippingSummary?: string | null;
             /** Format: double */
             freeShippingThreshold?: number | null;
             qualifiesForFreeShipping?: boolean;
@@ -9442,6 +9539,14 @@ export interface components {
             listPrice?: number;
             /** Format: double */
             compareAtPrice?: number | null;
+            acceptsOffers?: boolean;
+            /** Format: double */
+            minimumOfferAmount?: number | null;
+            /** Format: double */
+            maximumOfferAmount?: number | null;
+            shippingPolicy?: components["schemas"]["StoreShippingPolicy"];
+            /** Format: double */
+            shippingAmountOverride?: number | null;
             brand?: string | null;
             condition?: string | null;
             metaTitle?: string | null;
@@ -9481,6 +9586,14 @@ export interface components {
             listPrice?: number;
             /** Format: double */
             compareAtPrice?: number | null;
+            acceptsOffers?: boolean;
+            /** Format: double */
+            minimumOfferAmount?: number | null;
+            /** Format: double */
+            maximumOfferAmount?: number | null;
+            shippingPolicy?: components["schemas"]["StoreShippingPolicy"];
+            /** Format: double */
+            shippingAmountOverride?: number | null;
             isFeatured?: boolean;
             /** Format: uuid */
             storeCategoryId?: string | null;
@@ -9639,6 +9752,16 @@ export interface components {
             /** Format: uuid */
             assignedToUserId?: string | null;
             notes?: string | null;
+        };
+        UpdateStoreListingCommerceRequest: {
+            acceptsOffers?: boolean;
+            /** Format: double */
+            minimumOfferAmount?: number | null;
+            /** Format: double */
+            maximumOfferAmount?: number | null;
+            shippingPolicy?: components["schemas"]["StoreShippingPolicy"];
+            /** Format: double */
+            shippingAmountOverride?: number | null;
         };
         UpdateStoreListingRequest: {
             /** Format: double */

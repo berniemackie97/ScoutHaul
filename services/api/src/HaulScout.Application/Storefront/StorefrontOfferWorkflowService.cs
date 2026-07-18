@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net.Mail;
 using HaulScout.Application.Common;
 using HaulScout.Application.Contracts;
@@ -47,13 +48,9 @@ public sealed class StorefrontOfferWorkflowService(IStorefrontOfferStore store, 
         string? buyerPhone = Text.TrimToNull(request.BuyerPhone);
         string? message = Text.TrimToNull(request.Message);
 
-        if (buyerName is null)
+        if (buyerEmail is not null && !IsEmail(buyerEmail))
         {
-            return AppResult<StorefrontOfferResultDto>.Validation("Name is required.");
-        }
-        if (!IsEmail(buyerEmail))
-        {
-            return AppResult<StorefrontOfferResultDto>.Validation("A valid email is required.");
+            return AppResult<StorefrontOfferResultDto>.Validation("Email is invalid.");
         }
         if (request.OfferAmount <= 0)
         {
@@ -69,6 +66,20 @@ public sealed class StorefrontOfferWorkflowService(IStorefrontOfferStore store, 
         {
             return AppResult<StorefrontOfferResultDto>.Conflict(StorefrontPurchasability.RefusalReason(listing));
         }
+        if (!listing.AcceptsOffers)
+        {
+            return AppResult<StorefrontOfferResultDto>.Conflict("This item is not accepting offers.");
+        }
+
+        decimal offerAmount = decimal.Round(request.OfferAmount, 2, MidpointRounding.AwayFromZero);
+        if (listing.MinimumOfferAmount is decimal min && offerAmount < min)
+        {
+            return AppResult<StorefrontOfferResultDto>.Validation($"Minimum offer is {Money(min)}.");
+        }
+        if (listing.MaximumOfferAmount is decimal max && offerAmount > max)
+        {
+            return AppResult<StorefrontOfferResultDto>.Validation($"Maximum offer is {Money(max)}.");
+        }
 
         StorefrontOffer offer = new()
         {
@@ -77,10 +88,10 @@ public sealed class StorefrontOfferWorkflowService(IStorefrontOfferStore store, 
             StoreListing = listing,
             InventoryItemId = listing.InventoryItemId,
             InventoryItem = listing.InventoryItem,
-            OfferAmount = decimal.Round(request.OfferAmount, 2, MidpointRounding.AwayFromZero),
+            OfferAmount = offerAmount,
             ListingPriceSnapshot = listing.ListPrice,
             BuyerName = buyerName,
-            BuyerEmail = buyerEmail!.Trim().ToLowerInvariant(),
+            BuyerEmail = buyerEmail?.Trim().ToLowerInvariant(),
             BuyerPhone = buyerPhone,
             Message = message,
             OfferedAt = timeProvider.GetUtcNow(),
@@ -93,7 +104,7 @@ public sealed class StorefrontOfferWorkflowService(IStorefrontOfferStore store, 
         return AppResult<StorefrontOfferResultDto>.Ok(new StorefrontOfferResultDto(
             offer.Id,
             offer.Status.ToString(),
-            "Offer received. We will reply by email."));
+            "Offer received."));
     }
 
     private static bool IsEmail(string? value)
@@ -118,4 +129,6 @@ public sealed class StorefrontOfferWorkflowService(IStorefrontOfferStore store, 
             return false;
         }
     }
+
+    private static string Money(decimal amount) => string.Format(CultureInfo.GetCultureInfo("en-US"), "{0:C}", amount);
 }

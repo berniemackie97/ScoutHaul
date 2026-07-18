@@ -21,7 +21,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 const trust = [
   { icon: ShieldCheck, body: "Inspected and graded straight — condition is exactly as listed." },
   { icon: RotateCcw, body: "Easy returns if it arrives not as described." },
-  { icon: Truck, body: "Ships nationwide. Free over $100." },
+  { icon: Truck, body: "Ships nationwide. Shipping and tax are confirmed before payment." },
   { icon: MapPin, body: "Local pickup available in Bradenton, FL." },
 ];
 
@@ -162,6 +162,9 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
               title={item.title}
               price={item.price}
               availability={item.availability}
+              acceptsOffers={item.acceptsOffers}
+              minimumOfferAmount={item.minimumOfferAmount}
+              maximumOfferAmount={item.maximumOfferAmount}
             />
 
             {/* The dossier — honest spec sheet */}

@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using HaulScout.Application.Common;
+using HaulScout.Domain;
 using HaulScout.Domain.Common;
 using HaulScout.Domain.Entities;
 
@@ -630,8 +631,13 @@ public sealed class HaulScoutDbContext(
             entity.Property(item => item.MetaTitle).HasMaxLength(200);
             entity.Property(item => item.MetaDescription).HasMaxLength(500);
             entity.Property(item => item.Status).HasConversion<string>().HasMaxLength(32);
+            entity.Property(item => item.AcceptsOffers).HasDefaultValue(true);
+            entity.Property(item => item.ShippingPolicy).HasConversion<string>().HasMaxLength(32).HasDefaultValue(StoreShippingPolicy.StoreDefault);
             ConfigureMoney(entity.Property(item => item.ListPrice));
             ConfigureMoney(entity.Property(item => item.CompareAtPrice));
+            ConfigureMoney(entity.Property(item => item.MinimumOfferAmount));
+            ConfigureMoney(entity.Property(item => item.MaximumOfferAmount));
+            ConfigureMoney(entity.Property(item => item.ShippingAmountOverride));
             entity.HasIndex(item => new { item.OrganizationId, item.Slug }).IsUnique();
             entity.HasIndex(item => new { item.OrganizationId, item.Status });
             entity.HasIndex(item => item.InventoryItemId).IsUnique();
@@ -655,6 +661,7 @@ public sealed class HaulScoutDbContext(
             entity.ToTable("CartLines");
             ConfigureMoney(entity.Property(item => item.UnitPriceSnapshot));
             entity.HasIndex(item => new { item.OrganizationId, item.CartId });
+            entity.HasIndex(item => new { item.OrganizationId, item.CartId, item.StoreListingId }).IsUnique();
             entity.HasOne(item => item.Cart).WithMany(item => item.Lines).HasForeignKey(item => item.CartId).OnDelete(DeleteBehavior.Cascade);
             entity.HasOne(item => item.StoreListing).WithMany().HasForeignKey(item => item.StoreListingId).OnDelete(DeleteBehavior.Cascade);
         });
@@ -746,8 +753,8 @@ public sealed class HaulScoutDbContext(
             entity.Property(item => item.Status).HasConversion<string>().HasMaxLength(24);
             ConfigureMoney(entity.Property(item => item.OfferAmount));
             ConfigureMoney(entity.Property(item => item.ListingPriceSnapshot));
-            entity.Property(item => item.BuyerName).HasMaxLength(160).IsRequired();
-            entity.Property(item => item.BuyerEmail).HasMaxLength(320).IsRequired();
+            entity.Property(item => item.BuyerName).HasMaxLength(160);
+            entity.Property(item => item.BuyerEmail).HasMaxLength(320);
             entity.Property(item => item.BuyerPhone).HasMaxLength(40);
             entity.Property(item => item.Message).HasMaxLength(2000);
             entity.Property(item => item.ResponseNotes).HasMaxLength(2000);

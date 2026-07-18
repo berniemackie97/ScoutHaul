@@ -33,6 +33,9 @@ public interface IPaymentGateway
 /// <summary>The webhook payload could not be proven to come from the processor. Reject the request; never act on it.</summary>
 public sealed class PaymentEventVerificationException(string message, Exception? inner = null) : Exception(message, inner);
 
+/// <summary>The payment provider was reachable code-wise but refused/failed the operation. Safe to show as checkout unavailable.</summary>
+public sealed class PaymentGatewayUnavailableException(string message, Exception? inner = null) : Exception(message, inner);
+
 /// <param name="OrderId">Ours; round-trips through the processor's metadata so the webhook can find the order.</param>
 /// <param name="ExpiresAt">When the session (and therefore the reservation) lapses.</param>
 public sealed record HostedCheckoutRequest(

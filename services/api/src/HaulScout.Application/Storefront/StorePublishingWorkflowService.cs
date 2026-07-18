@@ -28,6 +28,12 @@ public sealed class StorePublishingWorkflowService(
         return listing is null ? AppResult<StoreListingDto>.NotFound() : AppResult<StoreListingDto>.Ok(listing.ToDto());
     }
 
+    public async Task<AppResult<StoreListingDto>> GetListingByItemAsync(Guid inventoryItemId, CancellationToken cancellationToken)
+    {
+        StoreListing? listing = await store.FindListingByItemAsync(currentUser.OrganizationId, inventoryItemId, cancellationToken);
+        return listing is null ? AppResult<StoreListingDto>.NotFound() : AppResult<StoreListingDto>.Ok(listing.ToDto());
+    }
+
     public async Task<AppResult<StoreListingDto>> PublishAsync(PublishListingRequest request, CancellationToken cancellationToken)
     {
         if (request.ListPrice < 0)
@@ -73,6 +79,24 @@ public sealed class StorePublishingWorkflowService(
         }
 
         ApplyPresentation(listing, request);
+        await store.SaveChangesAsync(cancellationToken);
+        return AppResult<StoreListingDto>.Ok(listing.ToDto());
+    }
+
+    public async Task<AppResult<StoreListingDto>> UpdateCommerceAsync(Guid listingId, UpdateStoreListingCommerceRequest request, CancellationToken cancellationToken)
+    {
+        if (ValidateCommerce(request) is string validation)
+        {
+            return AppResult<StoreListingDto>.Validation(validation);
+        }
+
+        StoreListing? listing = await store.FindListingAsync(currentUser.OrganizationId, listingId, cancellationToken);
+        if (listing is null)
+        {
+            return AppResult<StoreListingDto>.NotFound();
+        }
+
+        ApplyCommerce(listing, request);
         await store.SaveChangesAsync(cancellationToken);
         return AppResult<StoreListingDto>.Ok(listing.ToDto());
     }
@@ -206,4 +230,52 @@ public sealed class StorePublishingWorkflowService(
         listing.MetaTitle = TrimToNull(request.MetaTitle) ?? listing.MetaTitle;
         listing.MetaDescription = TrimToNull(request.MetaDescription) ?? listing.MetaDescription;
     }
+
+    private static string? ValidateCommerce(UpdateStoreListingCommerceRequest request)
+    {
+        if (request.MinimumOfferAmount is < 0 || request.MaximumOfferAmount is < 0)
+        {
+            return "Offer limits cannot be negative.";
+        }
+
+        if (request.MinimumOfferAmount is decimal min
+            && request.MaximumOfferAmount is decimal max
+            && min > max)
+        {
+            return "Minimum offer cannot be greater than maximum offer.";
+        }
+
+        if (request.ShippingPolicy == StoreShippingPolicy.FixedAmount)
+        {
+            if (request.ShippingAmountOverride is null)
+            {
+                return "Fixed shipping requires a shipping amount.";
+            }
+
+            if (request.ShippingAmountOverride < 0)
+            {
+                return "Shipping amount cannot be negative.";
+            }
+        }
+        else if (request.ShippingAmountOverride is < 0)
+        {
+            return "Shipping amount cannot be negative.";
+        }
+
+        return null;
+    }
+
+    private static void ApplyCommerce(StoreListing listing, UpdateStoreListingCommerceRequest request)
+    {
+        listing.AcceptsOffers = request.AcceptsOffers;
+        listing.MinimumOfferAmount = request.AcceptsOffers ? RoundMoney(request.MinimumOfferAmount) : null;
+        listing.MaximumOfferAmount = request.AcceptsOffers ? RoundMoney(request.MaximumOfferAmount) : null;
+        listing.ShippingPolicy = request.ShippingPolicy;
+        listing.ShippingAmountOverride = request.ShippingPolicy == StoreShippingPolicy.FixedAmount
+            ? RoundMoney(request.ShippingAmountOverride)
+            : null;
+    }
+
+    private static decimal? RoundMoney(decimal? amount) =>
+        amount is null ? null : decimal.Round(amount.Value, 2, MidpointRounding.AwayFromZero);
 }

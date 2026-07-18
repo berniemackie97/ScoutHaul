@@ -44,8 +44,9 @@ public sealed class StorefrontCatalogService(IStorefrontCatalogStore catalog)
         List<StorefrontListingDto> items = rows
             .Select(row => new StorefrontListingDto(
                 row.ListingId, BuildSlug(row.Title, row.ListingId), row.Title, row.Subtitle, row.ListPrice,
-                row.CompareAtPrice, row.IsFeatured, row.StoreCategoryId, row.Condition, row.Brand,
-                PhotoUrl(row.HeroPhotoId), row.Category))
+                row.CompareAtPrice, row.AcceptsOffers, row.MinimumOfferAmount, row.MaximumOfferAmount,
+                row.ShippingPolicy, row.ShippingAmountOverride, row.IsFeatured, row.StoreCategoryId,
+                row.Condition, row.Brand, PhotoUrl(row.HeroPhotoId), row.Category))
             .ToList();
 
         return new StorefrontPageDto<StorefrontListingDto>(items, page, pageSize, total);
@@ -69,7 +70,8 @@ public sealed class StorefrontCatalogService(IStorefrontCatalogStore catalog)
 
         return new StorefrontListingDetailDto(
             row.ListingId, BuildSlug(row.Title, row.ListingId), row.Title, row.Subtitle, row.Description,
-            row.ListPrice, row.CompareAtPrice, item.Brand, item.Condition,
+            row.ListPrice, row.CompareAtPrice, row.AcceptsOffers, row.MinimumOfferAmount, row.MaximumOfferAmount,
+            row.ShippingPolicy, row.ShippingAmountOverride, item.Brand, item.Condition,
             row.MetaTitle ?? row.Title, row.MetaDescription ?? row.Description,
             gallery.FirstOrDefault(), item.Category, item.Model, item.Color, item.SizeSystem, item.SizeValue,
             item.FunctionalStatus, item.CompletenessStatus, item.PackagingStatus, item.CountryOfOrigin,

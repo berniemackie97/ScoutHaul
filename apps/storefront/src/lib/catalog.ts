@@ -21,6 +21,11 @@ export type Specimen = {
   weight?: string;
   price: number;
   compareAt?: number;
+  acceptsOffers?: boolean;
+  minimumOfferAmount?: number | null;
+  maximumOfferAmount?: number | null;
+  shippingPolicy?: string;
+  shippingAmountOverride?: number | null;
   era?: string;
   blurb: string;
   /** Absolute URL of the item's hero photo (served by the API), if any. */
@@ -49,6 +54,11 @@ export async function getListings(opts?: { category?: string; search?: string })
         condition: dto.condition ?? "Good",
         price: dto.listPrice ?? 0,
         compareAt: dto.compareAtPrice ?? undefined,
+        acceptsOffers: dto.acceptsOffers ?? true,
+        minimumOfferAmount: dto.minimumOfferAmount ?? null,
+        maximumOfferAmount: dto.maximumOfferAmount ?? null,
+        shippingPolicy: dto.shippingPolicy,
+        shippingAmountOverride: dto.shippingAmountOverride ?? null,
         blurb: dto.subtitle ?? "",
         image: dto.imageUrl ? STORE.apiBaseUrl + dto.imageUrl : undefined,
       }),
@@ -84,6 +94,11 @@ export async function getListing(slug: string): Promise<Specimen | null> {
       weight: data.weight == null ? undefined : `${data.weight} ${weightUnit(data.weightUnit)}`,
       price: data.listPrice ?? 0,
       compareAt: data.compareAtPrice ?? undefined,
+      acceptsOffers: data.acceptsOffers ?? true,
+      minimumOfferAmount: data.minimumOfferAmount ?? null,
+      maximumOfferAmount: data.maximumOfferAmount ?? null,
+      shippingPolicy: data.shippingPolicy,
+      shippingAmountOverride: data.shippingAmountOverride ?? null,
       blurb: data.description ?? data.subtitle ?? "",
       image: data.imageUrl ? STORE.apiBaseUrl + data.imageUrl : undefined,
       images: (data.imageUrls ?? []).map((url) => STORE.apiBaseUrl + url),

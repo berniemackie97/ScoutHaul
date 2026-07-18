@@ -17,6 +17,8 @@ public sealed record StorefrontCartDto(
     string CartToken,
     IReadOnlyList<StorefrontCartLineDto> Lines,
     decimal Subtotal,
+    decimal EstimatedShippingAmount,
+    string ShippingSummary,
     /// <summary>Order value at which shipping becomes free; null when no threshold is configured.</summary>
     decimal? FreeShippingThreshold,
     bool QualifiesForFreeShipping);
@@ -42,8 +44,8 @@ public sealed record StorefrontOrderSummaryLineDto(string Title, decimal UnitPri
 
 public sealed record StorefrontOfferRequest(
     Guid StoreListingId,
-    string BuyerName,
-    string BuyerEmail,
+    string? BuyerName,
+    string? BuyerEmail,
     string? BuyerPhone,
     decimal OfferAmount,
     string? Message);
@@ -58,8 +60,8 @@ public sealed record StorefrontOfferDto(
     string Status,
     decimal OfferAmount,
     decimal ListingPriceSnapshot,
-    string BuyerName,
-    string BuyerEmail,
+    string? BuyerName,
+    string? BuyerEmail,
     string? BuyerPhone,
     string? Message,
     DateTimeOffset OfferedAt,

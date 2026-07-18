@@ -42,14 +42,14 @@ public sealed class StorefrontOfferTests
         StorefrontOfferWorkflowService service = new(store, TimeProvider.System);
         await service.SubmitAsync(
             Org,
-            new StorefrontOfferRequest(listing.Id, "Bernie", "buyer@example.com", null, 80m, "Can pick up today."),
+            new StorefrontOfferRequest(listing.Id, null, null, null, 80m, null),
             CancellationToken.None);
 
         IReadOnlyList<StorefrontOfferDto> rows = await service.ListAsync(Org, StorefrontOfferStatus.New, CancellationToken.None);
 
         StorefrontOfferDto row = Assert.Single(rows);
         Assert.Equal(listing.Title, row.ListingTitle);
-        Assert.Equal("buyer@example.com", row.BuyerEmail);
+        Assert.Null(row.BuyerEmail);
         Assert.Equal(80m, row.OfferAmount);
     }
 
@@ -62,7 +62,7 @@ public sealed class StorefrontOfferTests
 
         AppResult<StorefrontOfferResultDto> result = await service.SubmitAsync(
             Org,
-            new StorefrontOfferRequest(listing.Id, "Bernie", "buyer@example.com", null, 80m, "Can pick up today."),
+            new StorefrontOfferRequest(listing.Id, null, null, null, 80m, null),
             CancellationToken.None);
 
         Assert.Equal(AppResultStatus.Ok, result.Status);
@@ -83,7 +83,7 @@ public sealed class StorefrontOfferTests
 
         AppResult<StorefrontOfferResultDto> result = await service.SubmitAsync(
             Org,
-            new StorefrontOfferRequest(listing.Id, "Bernie", "buyer@example.com", null, 80m, null),
+            new StorefrontOfferRequest(listing.Id, null, null, null, 80m, null),
             CancellationToken.None);
 
         Assert.Equal(AppResultStatus.Conflict, result.Status);
@@ -91,10 +91,9 @@ public sealed class StorefrontOfferTests
     }
 
     [Theory]
-    [InlineData("", "buyer@example.com", 80)]
-    [InlineData("Buyer", "not-email", 80)]
-    [InlineData("Buyer", "buyer@example.com", 0)]
-    public async Task Submit_validates_buyer_and_amount(string name, string email, decimal amount)
+    [InlineData("not-email", 80)]
+    [InlineData(null, 0)]
+    public async Task Submit_validates_optional_email_and_amount(string? email, decimal amount)
     {
         StoreListing listing = Listing();
         FakeOfferStore store = new(listing);
@@ -102,10 +101,50 @@ public sealed class StorefrontOfferTests
 
         AppResult<StorefrontOfferResultDto> result = await service.SubmitAsync(
             Org,
-            new StorefrontOfferRequest(listing.Id, name, email, null, amount, null),
+            new StorefrontOfferRequest(listing.Id, null, email, null, amount, null),
             CancellationToken.None);
 
         Assert.Equal(AppResultStatus.Validation, result.Status);
+        Assert.Empty(store.Offers);
+    }
+
+    [Fact]
+    public async Task Submit_enforces_listing_offer_policy()
+    {
+        StoreListing listing = Listing();
+        listing.MinimumOfferAmount = 75m;
+        listing.MaximumOfferAmount = 95m;
+        FakeOfferStore store = new(listing);
+        StorefrontOfferWorkflowService service = new(store, TimeProvider.System);
+
+        AppResult<StorefrontOfferResultDto> low = await service.SubmitAsync(
+            Org,
+            new StorefrontOfferRequest(listing.Id, null, null, null, 70m, null),
+            CancellationToken.None);
+        AppResult<StorefrontOfferResultDto> valid = await service.SubmitAsync(
+            Org,
+            new StorefrontOfferRequest(listing.Id, null, null, null, 80m, null),
+            CancellationToken.None);
+
+        Assert.Equal(AppResultStatus.Validation, low.Status);
+        Assert.Equal(AppResultStatus.Ok, valid.Status);
+        Assert.Single(store.Offers);
+    }
+
+    [Fact]
+    public async Task Submit_refuses_listings_that_do_not_accept_offers()
+    {
+        StoreListing listing = Listing();
+        listing.AcceptsOffers = false;
+        FakeOfferStore store = new(listing);
+        StorefrontOfferWorkflowService service = new(store, TimeProvider.System);
+
+        AppResult<StorefrontOfferResultDto> result = await service.SubmitAsync(
+            Org,
+            new StorefrontOfferRequest(listing.Id, null, null, null, 80m, null),
+            CancellationToken.None);
+
+        Assert.Equal(AppResultStatus.Conflict, result.Status);
         Assert.Empty(store.Offers);
     }
 
