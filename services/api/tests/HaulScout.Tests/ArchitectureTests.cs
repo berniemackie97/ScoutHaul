@@ -1,6 +1,7 @@
 using System.Reflection;
 using HaulScout.Api.Controllers;
 using HaulScout.Application.Common;
+using HaulScout.Application.PlatformOrders;
 using HaulScout.Domain.Entities;
 using HaulScout.Infrastructure.Persistence;
 
@@ -62,6 +63,36 @@ public class ArchitectureTests
             .ToArray();
 
         Assert.DoesNotContain(dependencies, parameter => parameter.ParameterType == typeof(HaulScoutDbContext));
+    }
+
+    [Theory]
+    [InlineData(typeof(PlatformOrderIngestionService))]
+    [InlineData(typeof(PlatformOrderFeeEnrichmentService))]
+    [InlineData(typeof(PlatformOrderImportWorkflowService))]
+    [InlineData(typeof(MarketplaceRefundImportService))]
+    public void Platform_order_import_use_cases_do_not_take_the_DbContext(Type workflow)
+    {
+        ParameterInfo[] dependencies = workflow.GetConstructors()
+            .SelectMany(ctor => ctor.GetParameters())
+            .ToArray();
+
+        Assert.DoesNotContain(dependencies, parameter => parameter.ParameterType == typeof(HaulScoutDbContext));
+    }
+
+    [Fact]
+    public void Marketplace_import_use_cases_do_not_live_in_api_services()
+    {
+        string[] misplaced = typeof(PlatformOrdersController).Assembly
+            .GetTypes()
+            .Where(type => type.IsClass
+                && type.Namespace == "HaulScout.Api.Services"
+                && (type.Name.Contains("PlatformOrder", StringComparison.Ordinal)
+                    || type.Name.Contains("MarketplaceRefund", StringComparison.Ordinal)))
+            .Select(type => type.FullName ?? type.Name)
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.Empty(misplaced);
     }
 
     /// <summary>The Domain is the centre: it depends on no other layer and knows nothing about persistence.</summary>

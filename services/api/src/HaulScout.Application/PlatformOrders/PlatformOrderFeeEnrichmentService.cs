@@ -1,21 +1,19 @@
-using System.Text.Json;
-using Microsoft.EntityFrameworkCore;
 using HaulScout.Application.Contracts;
+using HaulScout.Application.Sales;
 using HaulScout.Application.Security;
 using HaulScout.Application.Services;
-using HaulScout.Application.PlatformOrders;
 using HaulScout.Domain;
 using HaulScout.Domain.Entities;
-using HaulScout.Domain.Services;
-using HaulScout.Infrastructure.Persistence;
 
-namespace HaulScout.Api.Services;
+namespace HaulScout.Application.PlatformOrders;
 
 /// <summary>
 /// Applies marketplace sales-report fee enrichment onto imported platform order lines and their reconciled sales.
 /// This keeps report-specific accounting orchestration out of the HTTP controller.
 /// </summary>
-public sealed class PlatformOrderFeeEnrichmentService(HaulScoutDbContext db, ICurrentUserContext currentUser)
+public sealed class PlatformOrderFeeEnrichmentService(
+    IPlatformOrderFeeEnrichmentStore store,
+    ICurrentUserContext currentUser)
 {
     public async Task<IngestPlatformOrdersResultDto> EnrichEbayListingSalesAsync(
         IReadOnlyList<EbayReportParser.EbayListingSalesMetric> metrics,
@@ -27,14 +25,10 @@ public sealed class PlatformOrderFeeEnrichmentService(HaulScoutDbContext db, ICu
             .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
         List<string> itemIds = byItemId.Keys.ToList();
 
-        List<PlatformOrderLine> lines = await db.PlatformOrderLines
-            .Include(line => line.PlatformOrder)
-            .Where(line => line.OrganizationId == currentUser.OrganizationId
-                && line.ExternalItemId != null
-                && itemIds.Contains(line.ExternalItemId)
-                && line.PlatformOrder != null
-                && line.PlatformOrder.Platform == "eBay")
-            .ToListAsync(cancellationToken);
+        IReadOnlyList<PlatformOrderLine> lines = await store.ListEbayOrderLinesByExternalItemIdsAsync(
+            currentUser.OrganizationId,
+            itemIds,
+            cancellationToken);
 
         int updatedLines = 0;
         int correctedSales = 0;
@@ -81,9 +75,7 @@ public sealed class PlatformOrderFeeEnrichmentService(HaulScoutDbContext db, ICu
 
         foreach (Guid orderId in touchedOrderIds)
         {
-            PlatformOrder? order = await db.PlatformOrders
-                .Include(item => item.Lines)
-                .SingleOrDefaultAsync(item => item.Id == orderId && item.OrganizationId == currentUser.OrganizationId, cancellationToken);
+            PlatformOrder? order = await store.GetImportedOrderWithLinesAsync(currentUser.OrganizationId, orderId, cancellationToken);
             if (order is null)
             {
                 continue;
@@ -106,14 +98,11 @@ public sealed class PlatformOrderFeeEnrichmentService(HaulScoutDbContext db, ICu
             }
         }
 
-        await db.SaveChangesAsync(cancellationToken);
+        await store.SaveChangesAsync(cancellationToken);
 
-        List<PlatformOrder> refreshed = touchedOrderIds.Count == 0
+        IReadOnlyList<PlatformOrder> refreshed = touchedOrderIds.Count == 0
             ? []
-            : await db.PlatformOrders
-                .Include(order => order.Lines).ThenInclude(line => line.InventoryItem)
-                .Where(order => order.OrganizationId == currentUser.OrganizationId && touchedOrderIds.Contains(order.Id))
-                .ToListAsync(cancellationToken);
+            : await store.ListImportedOrdersForDisplayAsync(currentUser.OrganizationId, touchedOrderIds, cancellationToken);
         List<PlatformOrderDto> dtos = refreshed.Select(order => PlatformOrderDtoFactory.ToPlatformOrderDto(order)).ToList();
         int skipped = metrics.Count - byItemId.Keys.Count + byItemId.Keys.Count(itemId => !linesByItemId.ContainsKey(itemId));
         return new IngestPlatformOrdersResultDto(0, updatedLines + correctedSales, Math.Max(0, skipped), dtos);
@@ -122,13 +111,10 @@ public sealed class PlatformOrderFeeEnrichmentService(HaulScoutDbContext db, ICu
     private async Task<int> CorrectReconciledSales(PlatformOrder order, CancellationToken cancellationToken)
     {
         Guid reconciledOrderId = order.ReconciledSaleGroupId!.Value;
-        List<Sale> sales = await db.Sales
-            .Include(sale => sale.Refunds)
-            .Include(sale => sale.InventoryItem)
-            .Where(sale => sale.OrganizationId == currentUser.OrganizationId
-                && sale.OrderId == reconciledOrderId
-                && sale.Status != SaleStatus.Cancelled)
-            .ToListAsync(cancellationToken);
+        IReadOnlyList<Sale> sales = await store.ListActiveSalesForOrderCorrectionAsync(
+            currentUser.OrganizationId,
+            reconciledOrderId,
+            cancellationToken);
 
         int correctedSales = 0;
         foreach (Sale sale in sales)
@@ -151,7 +137,7 @@ public sealed class PlatformOrderFeeEnrichmentService(HaulScoutDbContext db, ICu
                 continue;
             }
 
-            string before = SnapshotSale(sale);
+            string before = SaleFinancialState.Snapshot(sale);
             sale.PlatformFees = newFees;
             sale.ShippingCost = newShippingCost;
             sale.ShippingCharged = newShippingCharged;
@@ -202,37 +188,17 @@ public sealed class PlatformOrderFeeEnrichmentService(HaulScoutDbContext db, ICu
 
     private static decimal RoundMoney(decimal value) => decimal.Round(value, 2, MidpointRounding.AwayFromZero);
 
-    private static string SnapshotSale(Sale sale) => JsonSerializer.Serialize(new
-    {
-        sale.Platform,
-        sale.SoldPrice,
-        sale.ShippingCharged,
-        sale.CostOfGoods,
-        sale.PlatformFees,
-        sale.PaymentFees,
-        sale.ShippingCost,
-        sale.SuppliesCost,
-        sale.OtherCosts,
-        sale.SalesTaxCollected,
-        sale.TaxRemittedByPlatform,
-        sale.NetProfit,
-        sale.SoldAt,
-        Status = sale.Status.ToString(),
-        sale.Notes,
-    });
-
     private async Task AddCorrection(Sale sale, string before, string reason, CancellationToken cancellationToken)
     {
-        int nextVersion = await db.SaleCorrections
-            .CountAsync(item => item.SaleId == sale.Id && item.OrganizationId == currentUser.OrganizationId, cancellationToken) + 1;
-        db.SaleCorrections.Add(new SaleCorrection
+        int nextVersion = await store.CountSaleCorrectionsAsync(currentUser.OrganizationId, sale.Id, cancellationToken) + 1;
+        store.AddSaleCorrection(new SaleCorrection
         {
             OrganizationId = currentUser.OrganizationId,
             SaleId = sale.Id,
             CorrectedByUserId = currentUser.UserId,
             Reason = reason,
             BeforeJson = before,
-            AfterJson = SnapshotSale(sale),
+            AfterJson = SaleFinancialState.Snapshot(sale),
             Version = nextVersion,
         });
     }

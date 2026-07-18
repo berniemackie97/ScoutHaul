@@ -9,7 +9,11 @@ namespace HaulScout.Infrastructure.PlatformOrders;
 
 public sealed class EfPlatformOrderStore(
     HaulScoutDbContext db,
-    OrderAssembler orderAssembler) : IPlatformOrderStore
+    OrderAssembler orderAssembler) :
+    IPlatformOrderStore,
+    IPlatformOrderImportStore,
+    IPlatformOrderFeeEnrichmentStore,
+    IMarketplaceRefundImportStore
 {
     public Task<bool> ChannelAccountExistsAsync(Guid organizationId, Guid channelAccountId, CancellationToken cancellationToken) =>
         db.ChannelAccounts.AnyAsync(
@@ -42,10 +46,97 @@ public sealed class EfPlatformOrderStore(
             .Include(order => order.Lines).ThenInclude(line => line.InventoryItem)
             .SingleOrDefaultAsync(order => order.Id == id && order.OrganizationId == organizationId, cancellationToken);
 
+    public async Task<IReadOnlyList<string>> ListKnownSalesChannelsAsync(Guid organizationId, CancellationToken cancellationToken) =>
+        await db.Sales
+            .AsNoTracking()
+            .Where(sale => sale.OrganizationId == organizationId)
+            .Select(sale => sale.Platform)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<string>> ListKnownListingChannelsAsync(Guid organizationId, CancellationToken cancellationToken) =>
+        await db.Listings
+            .AsNoTracking()
+            .Where(listing => listing.OrganizationId == organizationId)
+            .Select(listing => listing.Platform)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<PlatformOrder>> ListImportedOrdersByExternalIdsAsync(
+        Guid organizationId,
+        IReadOnlyCollection<string> externalOrderIds,
+        CancellationToken cancellationToken)
+    {
+        string[] ids = externalOrderIds.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        return await db.PlatformOrders
+            .Include(order => order.Lines)
+            .Where(order => order.OrganizationId == organizationId && ids.Contains(order.ExternalOrderId))
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<PlatformOrder>> ListImportedOrdersForDisplayAsync(
+        Guid organizationId,
+        IReadOnlyCollection<Guid> orderIds,
+        CancellationToken cancellationToken)
+    {
+        Guid[] ids = orderIds.Distinct().ToArray();
+        if (ids.Length == 0)
+        {
+            return [];
+        }
+
+        return await db.PlatformOrders
+            .Include(order => order.Lines).ThenInclude(line => line.InventoryItem)
+            .Where(order => order.OrganizationId == organizationId && ids.Contains(order.Id))
+            .ToListAsync(cancellationToken);
+    }
+
+    public void AddPlatformOrder(PlatformOrder order) => db.PlatformOrders.Add(order);
+
+    public void ReplacePlatformOrderLines(PlatformOrder order, IReadOnlyCollection<PlatformOrderLine> replacementLines)
+    {
+        db.PlatformOrderLines.RemoveRange(order.Lines);
+        order.Lines.Clear();
+
+        foreach (PlatformOrderLine line in replacementLines)
+        {
+            line.PlatformOrderId = order.Id;
+            line.PlatformOrder = order;
+            order.Lines.Add(line);
+            db.PlatformOrderLines.Add(line);
+        }
+    }
+
     public Task<PlatformOrder?> GetForReconciliationAsync(Guid organizationId, Guid id, CancellationToken cancellationToken) =>
         db.PlatformOrders
             .Include(order => order.Lines)
             .SingleOrDefaultAsync(order => order.Id == id && order.OrganizationId == organizationId, cancellationToken);
+
+    public async Task<IReadOnlyList<PlatformOrderLine>> ListEbayOrderLinesByExternalItemIdsAsync(
+        Guid organizationId,
+        IReadOnlyCollection<string> externalItemIds,
+        CancellationToken cancellationToken)
+    {
+        string[] ids = externalItemIds.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        if (ids.Length == 0)
+        {
+            return [];
+        }
+
+        return await db.PlatformOrderLines
+            .Include(line => line.PlatformOrder)
+            .Where(line => line.OrganizationId == organizationId
+                && line.ExternalItemId != null
+                && ids.Contains(line.ExternalItemId)
+                && line.PlatformOrder != null
+                && line.PlatformOrder.Platform == "eBay")
+            .ToListAsync(cancellationToken);
+    }
+
+    public Task<PlatformOrder?> GetImportedOrderWithLinesAsync(Guid organizationId, Guid orderId, CancellationToken cancellationToken) =>
+        db.PlatformOrders
+            .Include(order => order.Lines)
+            .SingleOrDefaultAsync(order => order.Id == orderId && order.OrganizationId == organizationId, cancellationToken);
 
     public async Task<IReadOnlyList<InventoryItem>> ListInventoryForReconciliationAsync(
         Guid organizationId,
@@ -137,12 +228,113 @@ public sealed class EfPlatformOrderStore(
     public Task<Order?> GetSalesOrderAsync(Guid organizationId, Guid id, CancellationToken cancellationToken) =>
         db.Orders.SingleOrDefaultAsync(order => order.Id == id && order.OrganizationId == organizationId, cancellationToken);
 
+    public async Task<IReadOnlyList<Sale>> ListActiveSalesForOrderCorrectionAsync(
+        Guid organizationId,
+        Guid orderId,
+        CancellationToken cancellationToken) =>
+        await db.Sales
+            .Include(sale => sale.Refunds)
+            .Include(sale => sale.InventoryItem)
+            .Where(sale => sale.OrganizationId == organizationId
+                && sale.OrderId == orderId
+                && sale.Status != SaleStatus.Cancelled)
+            .ToListAsync(cancellationToken);
+
     public Task SyncSalesOrderAsync(
         Order order,
         IReadOnlyCollection<Sale> changedSales,
         CancellationToken cancellationToken,
         IReadOnlyCollection<Guid>? removedSaleIds = null) =>
         orderAssembler.SyncSalesOrderAsync(order, changedSales, cancellationToken, removedSaleIds);
+
+    public Task SyncSalesOrderAsync(
+        Order order,
+        IReadOnlyCollection<Sale> changedSales,
+        CancellationToken cancellationToken) =>
+        orderAssembler.SyncSalesOrderAsync(order, changedSales, cancellationToken);
+
+    public async Task<IReadOnlyList<Sale>> ListEbayRefundCandidateSalesAsync(
+        Guid organizationId,
+        string externalItemId,
+        CancellationToken cancellationToken)
+    {
+        List<PlatformOrderLine> lines = await db.PlatformOrderLines
+            .Include(line => line.PlatformOrder)
+            .Where(line => line.OrganizationId == organizationId
+                && line.ExternalItemId == externalItemId
+                && line.InventoryItemId.HasValue
+                && line.PlatformOrder != null
+                && line.PlatformOrder.Platform == "eBay"
+                && line.PlatformOrder.Status == PlatformOrderStatus.Reconciled
+                && line.PlatformOrder.ReconciledSaleGroupId.HasValue)
+            .ToListAsync(cancellationToken);
+
+        HashSet<(Guid OrderId, Guid InventoryItemId)> keys = lines
+            .Where(line => line.PlatformOrder?.ReconciledSaleGroupId is not null && line.InventoryItemId.HasValue)
+            .Select(line => (line.PlatformOrder!.ReconciledSaleGroupId!.Value, line.InventoryItemId!.Value))
+            .ToHashSet();
+        if (keys.Count == 0)
+        {
+            return [];
+        }
+
+        Guid[] orderIds = keys.Select(key => key.OrderId).Distinct().ToArray();
+        Guid[] inventoryIds = keys.Select(key => key.InventoryItemId).Distinct().ToArray();
+        List<Sale> sales = await db.Sales
+            .Include(sale => sale.InventoryItem)
+                .ThenInclude(inv => inv!.BundleComponents)
+                    .ThenInclude(component => component.ComponentInventoryItem)
+            .Include(sale => sale.Refunds)
+            .Include(sale => sale.Returns)
+            .Where(sale => sale.OrganizationId == organizationId
+                && sale.OrderId.HasValue
+                && orderIds.Contains(sale.OrderId.Value)
+                && inventoryIds.Contains(sale.InventoryItemId))
+            .ToListAsync(cancellationToken);
+
+        return sales
+            .Where(sale => sale.OrderId.HasValue && keys.Contains((sale.OrderId.Value, sale.InventoryItemId)))
+            .ToList();
+    }
+
+    public async Task<IReadOnlyList<Sale>> ListDepopRefundCandidateSalesAsync(
+        Guid organizationId,
+        DateTimeOffset? soldAt,
+        decimal itemPrice,
+        string? sku,
+        int take,
+        CancellationToken cancellationToken)
+    {
+        IQueryable<Sale> query = db.Sales
+            .Include(sale => sale.InventoryItem)
+                .ThenInclude(inv => inv!.BundleComponents)
+                    .ThenInclude(component => component.ComponentInventoryItem)
+            .Include(sale => sale.Refunds)
+            .Include(sale => sale.Returns)
+            .Where(sale => sale.OrganizationId == organizationId && sale.Platform == "Depop");
+
+        if (soldAt.HasValue)
+        {
+            DateTimeOffset start = new(soldAt.Value.Year, soldAt.Value.Month, soldAt.Value.Day, 0, 0, 0, TimeSpan.Zero);
+            DateTimeOffset end = start.AddDays(1);
+            query = query.Where(sale => sale.SoldAt >= start && sale.SoldAt < end);
+        }
+        if (itemPrice > 0)
+        {
+            decimal low = itemPrice - 0.01m;
+            decimal high = itemPrice + 0.01m;
+            query = query.Where(sale => sale.SoldPrice >= low && sale.SoldPrice <= high);
+        }
+        if (!string.IsNullOrWhiteSpace(sku))
+        {
+            string normalizedSku = sku.Trim().ToLowerInvariant();
+            query = query.Where(sale => sale.InventoryItem != null
+                && sale.InventoryItem.Barcode != null
+                && sale.InventoryItem.Barcode.ToLower() == normalizedSku);
+        }
+
+        return await query.Take(take).ToListAsync(cancellationToken);
+    }
 
     public Task PruneEmptyMarketplaceOrderAsync(Guid orderId, CancellationToken cancellationToken) =>
         orderAssembler.PruneEmptyMarketplaceOrderAsync(orderId, cancellationToken);
@@ -177,6 +369,8 @@ public sealed class EfPlatformOrderStore(
     public void AddMarketObservation(MarketObservation observation) => db.MarketObservations.Add(observation);
 
     public void AddSaleCorrection(SaleCorrection correction) => db.SaleCorrections.Add(correction);
+
+    public void AddRefund(Refund refund) => db.Refunds.Add(refund);
 
     public Task SaveChangesAsync(CancellationToken cancellationToken) => db.SaveChangesAsync(cancellationToken);
 }

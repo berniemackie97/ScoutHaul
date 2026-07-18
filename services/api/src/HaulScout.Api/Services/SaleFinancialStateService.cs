@@ -1,10 +1,7 @@
-using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using HaulScout.Application.Sales;
 using HaulScout.Application.Security;
-using HaulScout.Application.Services;
-using HaulScout.Domain;
 using HaulScout.Domain.Entities;
-using HaulScout.Domain.Services;
 using HaulScout.Infrastructure.Persistence;
 
 namespace HaulScout.Api.Services;
@@ -19,52 +16,10 @@ public sealed class SaleFinancialStateService(HaulScoutDbContext db, ICurrentUse
     /// <summary>Applies a sale's refund state and carries the result across to inventory, which is a separate
     /// aggregate and therefore this service's job rather than the sale's. The money and the sale's own status are
     /// derived by <see cref="Sale.ApplyRefunds"/>; only the inventory consequence is decided here.</summary>
-    public static void ApplyRefundState(Sale sale)
-    {
-        bool restocked = sale.ApplyRefunds();
-
-        if (sale.InventoryItem is null)
-        {
-            return;
-        }
-
-        if (sale.Refunds.Count == 0)
-        {
-            if (sale.InventoryItem.Status == InventoryStatus.Returned)
-            {
-                sale.InventoryItem.Status = InventoryStatus.Delivered;
-                InventoryStatePropagation.ApplyBundleComponentInventoryStatus(sale.InventoryItem, InventoryStatus.Delivered, sale.InventoryItem.SoldAt);
-            }
-            return;
-        }
-
-        if (restocked)
-        {
-            sale.InventoryItem.Status = InventoryStatus.Returned;
-            InventoryStatePropagation.ApplyBundleComponentInventoryStatus(sale.InventoryItem, InventoryStatus.Returned, sale.InventoryItem.SoldAt);
-        }
-        // Partial or full-but-kept: the buyer still has the item, so inventory state is unchanged.
-    }
+    public static void ApplyRefundState(Sale sale) => SaleFinancialState.ApplyRefundState(sale);
 
     /// <summary>Serializes a sale's financial state for the immutable before/after audit snapshot.</summary>
-    public static string Snapshot(Sale sale) => JsonSerializer.Serialize(new
-    {
-        sale.Platform,
-        sale.SoldPrice,
-        sale.ShippingCharged,
-        sale.CostOfGoods,
-        sale.PlatformFees,
-        sale.PaymentFees,
-        sale.ShippingCost,
-        sale.SuppliesCost,
-        sale.OtherCosts,
-        sale.SalesTaxCollected,
-        sale.TaxRemittedByPlatform,
-        sale.NetProfit,
-        sale.SoldAt,
-        Status = sale.Status.ToString(),
-        sale.Notes,
-    });
+    public static string Snapshot(Sale sale) => SaleFinancialState.Snapshot(sale);
 
     /// <summary>Appends a correction row (before → after) for the sale. Caller saves.</summary>
     public async Task AddCorrectionAsync(Sale sale, string before, string reason, CancellationToken cancellationToken)
