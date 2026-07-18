@@ -25,6 +25,7 @@ public static class DependencyInjection
         services.AddScoped<CartWorkflowService>();
         services.AddScoped<CheckoutWorkflowService>();
         services.AddScoped<StorefrontOrderService>();
+        services.AddScoped<StorefrontOfferWorkflowService>();
         services.AddScoped<StorefrontCatalogService>();
         services.AddScoped<StorePublishingWorkflowService>();
         services.AddScoped<InventoryBundleWorkflowService>();

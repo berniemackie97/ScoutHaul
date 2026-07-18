@@ -12,14 +12,18 @@ namespace HaulScout.Application.Storefront;
 /// stop being purchasable while it sits in the cart. The cart re-checks on every read and says so per line instead of
 /// failing at the end.
 /// </summary>
-public sealed class CartWorkflowService(IStorefrontCartStore carts, IOptions<StorefrontCheckoutOptions> options)
+public sealed class CartWorkflowService(
+    IStorefrontCartStore carts,
+    IStorefrontCheckoutStore checkout,
+    IOptions<StorefrontCheckoutOptions> options)
 {
     private readonly StorefrontCheckoutOptions _options = options.Value;
 
     public async Task<StorefrontCartDto> GetAsync(Guid organizationId, string? cartToken, CancellationToken cancellationToken)
     {
         Cart? cart = cartToken is null ? null : await carts.FindActiveAsync(organizationId, cartToken, cancellationToken);
-        return BuildDto(cartToken ?? string.Empty, cart);
+        HashSet<Guid> heldByThisCart = await PendingListingIdsAsync(organizationId, cart, cancellationToken);
+        return BuildDto(cartToken ?? string.Empty, cart, heldByThisCart);
     }
 
     public async Task<AppResult<StorefrontCartDto>> AddLineAsync(
@@ -68,7 +72,7 @@ public sealed class CartWorkflowService(IStorefrontCartStore carts, IOptions<Sto
         }
 
         await carts.SaveChangesAsync(cancellationToken);
-        return AppResult<StorefrontCartDto>.Ok(BuildDto(cart.AnonymousId!, cart));
+        return AppResult<StorefrontCartDto>.Ok(BuildDto(cart.AnonymousId!, cart, []));
     }
 
     public async Task<AppResult<StorefrontCartDto>> RemoveLineAsync(
@@ -90,10 +94,11 @@ public sealed class CartWorkflowService(IStorefrontCartStore carts, IOptions<Sto
             await carts.SaveChangesAsync(cancellationToken);
         }
 
-        return AppResult<StorefrontCartDto>.Ok(BuildDto(cart.AnonymousId!, cart));
+        HashSet<Guid> heldByThisCart = await PendingListingIdsAsync(organizationId, cart, cancellationToken);
+        return AppResult<StorefrontCartDto>.Ok(BuildDto(cart.AnonymousId!, cart, heldByThisCart));
     }
 
-    private StorefrontCartDto BuildDto(string token, Cart? cart)
+    private StorefrontCartDto BuildDto(string token, Cart? cart, HashSet<Guid> heldByThisCart)
     {
         IReadOnlyList<StorefrontCartLineDto> lines = cart is null
             ? []
@@ -105,7 +110,7 @@ public sealed class CartWorkflowService(IStorefrontCartStore carts, IOptions<Sto
                     line.StoreListing?.Title ?? "Item",
                     line.StoreListing?.ListPrice ?? line.UnitPriceSnapshot,
                     HeroPhotoUrl(line.StoreListing),
-                    StorefrontPurchasability.IsPurchasable(line.StoreListing)))
+                    StorefrontPurchasability.IsPurchasable(line.StoreListing) || heldByThisCart.Contains(line.StoreListingId)))
                 .ToArray();
 
         // Unavailable lines are shown but never counted — the shopper removes them; totals stay honest.
@@ -126,5 +131,21 @@ public sealed class CartWorkflowService(IStorefrontCartStore carts, IOptions<Sto
             .Select(photo => (Guid?)photo.Id)
             .FirstOrDefault();
         return photoId is null ? null : $"/api/storefront/photos/{photoId}";
+    }
+
+    private async Task<HashSet<Guid>> PendingListingIdsAsync(Guid organizationId, Cart? cart, CancellationToken cancellationToken)
+    {
+        if (cart is null)
+        {
+            return [];
+        }
+
+        Order? pending = await checkout.FindPendingOrderByCartAsync(organizationId, cart.Id, cancellationToken);
+        return pending is null
+            ? []
+            : pending.Lines
+                .Where(line => line.StoreListingId is not null)
+                .Select(line => line.StoreListingId!.Value)
+                .ToHashSet();
     }
 }

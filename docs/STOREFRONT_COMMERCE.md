@@ -61,12 +61,14 @@ Next server ──X-HaulScout-Store + X-HaulScout-Cart──▶ API /api/storefr
 | GET | `/api/storefront/cart` | Current cart, priced + validated (`X-HaulScout-Cart` token) |
 | POST | `/api/storefront/cart/lines` | Add a listing (409 if not `Active`); mints cart when token absent |
 | DELETE | `/api/storefront/cart/lines/{storeListingId}` | Remove a line |
-| POST | `/api/storefront/checkout` | Reserve + create order + Stripe session → `{ url }` |
+| POST | `/api/storefront/checkout` | Reserve + create order + Stripe session → `{ checkoutUrl }` |
 | POST | `/api/storefront/stripe/webhook` | Stripe events (raw body + signature; no store header — org from order) |
 | GET | `/api/storefront/orders/by-session/{sessionId}` | Confirmation-page order summary |
+| POST | `/api/storefront/offers` | Capture a buyer offer lead; does not reserve inventory or move money |
 
-Next.js keeps a thin `/api/cart` route-handler proxy whose only job is cookie custody; pages/server
-components call the API directly.
+Next.js keeps thin `/api/cart`, `/api/checkout`, and `/api/offers` route-handler proxies. The main job is
+cookie custody: the cart token lives in a `httpOnly` cookie and is forwarded to the API as
+`X-HaulScout-Cart`, never exposed to browser JavaScript.
 
 ## 4. The one-of-one contention guard
 
@@ -114,10 +116,15 @@ the actual race (two concurrent checkouts, exactly one wins).
 
 ## 6. Configuration & rollout
 
-API (Railway): `Stripe:SecretKey`, `Stripe:WebhookSecret`. Storefront (Vercel): nothing new — hosted
+API (Railway): `Stripe__ApiKey`, `Stripe__WebhookSecret`. Storefront (Vercel): no Stripe key — hosted
 checkout needs no publishable key. Success/cancel URLs derive from the org's `StoreDomain`.
 Dev: `stripe listen --forward-to localhost:5000/api/storefront/stripe/webhook`. Prod: dashboard-registered
 endpoint, events `checkout.session.completed`, `checkout.session.expired`.
+
+Current code binds these API env vars with double-underscore environment names:
+`Stripe__ApiKey`, `Stripe__WebhookSecret`, optional `StorefrontCheckout__PublicApiBaseUrl`, optional
+`StorefrontCheckout__PublicBaseUrlOverride`. Storefront Vercel only needs `NEXT_PUBLIC_STORE_DOMAIN` and
+`NEXT_PUBLIC_API_BASE_URL`.
 
 Rollout: test-mode end-to-end (4242… card) → live keys → a real $1 listing bought by the operator → open.
 

@@ -64,6 +64,7 @@ public sealed class HaulScoutDbContext(
     public DbSet<OrderLine> OrderLines => Set<OrderLine>();
     public DbSet<WishlistItem> WishlistItems => Set<WishlistItem>();
     public DbSet<Review> Reviews => Set<Review>();
+    public DbSet<StorefrontOffer> StorefrontOffers => Set<StorefrontOffer>();
     public DbSet<ChannelAccount> ChannelAccounts => Set<ChannelAccount>();
     public DbSet<ChannelListing> ChannelListings => Set<ChannelListing>();
     public DbSet<OrgReferenceOverride> OrgReferenceOverrides => Set<OrgReferenceOverride>();
@@ -737,6 +738,24 @@ public sealed class HaulScoutDbContext(
             entity.HasIndex(item => new { item.OrganizationId, item.Status });
             entity.HasOne(item => item.Customer).WithMany(item => item.Reviews).HasForeignKey(item => item.CustomerId).OnDelete(DeleteBehavior.Cascade);
             entity.HasOne(item => item.StoreListing).WithMany(item => item.Reviews).HasForeignKey(item => item.StoreListingId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<StorefrontOffer>(entity =>
+        {
+            entity.ToTable("StorefrontOffers");
+            entity.Property(item => item.Status).HasConversion<string>().HasMaxLength(24);
+            ConfigureMoney(entity.Property(item => item.OfferAmount));
+            ConfigureMoney(entity.Property(item => item.ListingPriceSnapshot));
+            entity.Property(item => item.BuyerName).HasMaxLength(160).IsRequired();
+            entity.Property(item => item.BuyerEmail).HasMaxLength(320).IsRequired();
+            entity.Property(item => item.BuyerPhone).HasMaxLength(40);
+            entity.Property(item => item.Message).HasMaxLength(2000);
+            entity.Property(item => item.ResponseNotes).HasMaxLength(2000);
+            entity.HasIndex(item => new { item.OrganizationId, item.Status });
+            entity.HasIndex(item => new { item.OrganizationId, item.StoreListingId, item.CreatedAt });
+            entity.HasIndex(item => new { item.OrganizationId, item.BuyerEmail });
+            entity.HasOne(item => item.StoreListing).WithMany().HasForeignKey(item => item.StoreListingId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(item => item.InventoryItem).WithMany().HasForeignKey(item => item.InventoryItemId).OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<ChannelAccount>(entity =>

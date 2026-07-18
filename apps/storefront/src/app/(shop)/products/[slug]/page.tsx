@@ -3,6 +3,7 @@ import Image from "next/image";
 import { notFound } from "next/navigation";
 import { ArrowLeft, BadgeCheck, ShieldCheck, Truck, RotateCcw, MapPin } from "lucide-react";
 import { ProductCard } from "@/components/store/product-card";
+import { ProductCommercePanel } from "@/components/store/product-commerce-panel";
 import { Reveal } from "@/components/ui/reveal";
 import { getListing, getRelated } from "@/lib/catalog";
 
@@ -156,14 +157,12 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
               </div>
             </div>
 
-            <div className="mt-7 flex flex-col gap-3 sm:flex-row">
-              <button className="group flex-1 bg-copper px-6 py-3.5 text-sm font-semibold uppercase tracking-[0.12em] text-ink transition-transform duration-300 hover:-translate-y-0.5">
-                Add to cart
-              </button>
-              <button className="flex-1 border border-ink/25 px-6 py-3.5 text-sm font-semibold uppercase tracking-[0.12em] text-ink transition-colors hover:border-copper hover:text-copper">
-                Make an offer
-              </button>
-            </div>
+            <ProductCommercePanel
+              listingId={item.id}
+              title={item.title}
+              price={item.price}
+              availability={item.availability}
+            />
 
             {/* The dossier — honest spec sheet */}
             <div className="mt-9 ring-1 ring-rule">

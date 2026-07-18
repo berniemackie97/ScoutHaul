@@ -1,7 +1,7 @@
 {
   "openapi": "3.0.4",
   "info": {
-    "title": "HaulScout.Api",
+    "title": "HaulScout.Api, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null",
     "version": "1.0"
   },
   "paths": {
@@ -994,7 +994,7 @@
     "/": {
       "get": {
         "tags": [
-          "HaulScout.Api"
+          "HaulScout.Api, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
         ],
         "responses": {
           "200": {
@@ -3222,6 +3222,106 @@
         }
       }
     },
+    "/api/organizations/{id}/members/{memberId}/role": {
+      "patch": {
+        "tags": [
+          "Organizations"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "memberId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateOrganizationMemberRoleRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateOrganizationMemberRoleRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateOrganizationMemberRoleRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationMemberDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationMemberDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationMemberDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/organizations/{id}/members/{memberId}": {
+      "delete": {
+        "tags": [
+          "Organizations"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "memberId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
     "/api/organizations/{id}/invite-codes": {
       "get": {
         "tags": [
@@ -3421,106 +3521,6 @@
                 }
               }
             }
-          }
-        }
-      }
-    },
-    "/api/organizations/{id}/members/{memberId}/role": {
-      "patch": {
-        "tags": [
-          "Organizations"
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
-          {
-            "name": "memberId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateOrganizationMemberRoleRequest"
-              }
-            },
-            "text/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateOrganizationMemberRoleRequest"
-              }
-            },
-            "application/*+json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateOrganizationMemberRoleRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/OrganizationMemberDto"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/OrganizationMemberDto"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/OrganizationMemberDto"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/organizations/{id}/members/{memberId}": {
-      "delete": {
-        "tags": [
-          "Organizations"
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
-          {
-            "name": "memberId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
           }
         }
       }
@@ -4152,6 +4152,55 @@
         }
       }
     },
+    "/api/platform-listings/quality-snapshots": {
+      "get": {
+        "tags": [
+          "PlatformListings"
+        ],
+        "parameters": [
+          {
+            "name": "take",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 200
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PlatformListingQualitySnapshotDto"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PlatformListingQualitySnapshotDto"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PlatformListingQualitySnapshotDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/platform-listings/import/ebay-csv": {
       "post": {
         "tags": [
@@ -4193,6 +4242,54 @@
               "text/json": {
                 "schema": {
                   "$ref": "#/components/schemas/IngestPlatformListingsResultDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/platform-listings/import/ebay-listing-quality-workbook": {
+      "post": {
+        "tags": [
+          "PlatformListings"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportPlatformListingQualityWorkbookRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportPlatformListingQualityWorkbookRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportPlatformListingQualityWorkbookRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportPlatformListingQualityResultDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportPlatformListingQualityResultDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportPlatformListingQualityResultDto"
                 }
               }
             }
@@ -4563,6 +4660,54 @@
               "text/json": {
                 "schema": {
                   "$ref": "#/components/schemas/IngestPlatformOrdersResultDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/platform-orders/import/refunds-csv": {
+      "post": {
+        "tags": [
+          "PlatformOrders"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportMarketplaceRefundsCsvRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportMarketplaceRefundsCsvRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportMarketplaceRefundsCsvRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportMarketplaceRefundsResultDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportMarketplaceRefundsResultDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportMarketplaceRefundsResultDto"
                 }
               }
             }
@@ -5179,111 +5324,6 @@
         }
       }
     },
-    "/api/sales/group": {
-      "post": {
-        "tags": [
-          "Sales"
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/GroupSalesRequest"
-              }
-            },
-            "text/json": {
-              "schema": {
-                "$ref": "#/components/schemas/GroupSalesRequest"
-              }
-            },
-            "application/*+json": {
-              "schema": {
-                "$ref": "#/components/schemas/GroupSalesRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/SaleGroupResultDto"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SaleGroupResultDto"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SaleGroupResultDto"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/sales/ungroup": {
-      "post": {
-        "tags": [
-          "Sales"
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UngroupSalesRequest"
-              }
-            },
-            "text/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UngroupSalesRequest"
-              }
-            },
-            "application/*+json": {
-              "schema": {
-                "$ref": "#/components/schemas/UngroupSalesRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/SaleDto"
-                  }
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/SaleDto"
-                  }
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/SaleDto"
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/sales": {
       "get": {
         "tags": [
@@ -5573,54 +5613,6 @@
         }
       }
     },
-    "/api/sales/bundled": {
-      "post": {
-        "tags": [
-          "Sales"
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RecordBundledSaleRequest"
-              }
-            },
-            "text/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RecordBundledSaleRequest"
-              }
-            },
-            "application/*+json": {
-              "schema": {
-                "$ref": "#/components/schemas/RecordBundledSaleRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/BundledSaleResultDto"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BundledSaleResultDto"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BundledSaleResultDto"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/sales/{id}/profit": {
       "get": {
         "tags": [
@@ -5661,126 +5653,6 @@
         }
       }
     },
-    "/api/sales/{id}/packed": {
-      "patch": {
-        "tags": [
-          "Sales"
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/SaleDto"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SaleDto"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SaleDto"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/sales/{id}/shipped": {
-      "patch": {
-        "tags": [
-          "Sales"
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/SaleDto"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SaleDto"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SaleDto"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/sales/{id}/delivered": {
-      "patch": {
-        "tags": [
-          "Sales"
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/SaleDto"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SaleDto"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SaleDto"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/sales/{id}/shipment": {
       "get": {
         "tags": [
@@ -5814,65 +5686,6 @@
               "text/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SaleShipmentDto"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/sales/{id}/status": {
-      "patch": {
-        "tags": [
-          "Sales"
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SaleStatusTransitionRequest"
-              }
-            },
-            "text/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SaleStatusTransitionRequest"
-              }
-            },
-            "application/*+json": {
-              "schema": {
-                "$ref": "#/components/schemas/SaleStatusTransitionRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/SaleDto"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SaleDto"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SaleDto"
                 }
               }
             }
@@ -6007,6 +5820,338 @@
             "application/*+json": {
               "schema": {
                 "$ref": "#/components/schemas/RecordRefundRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaleDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaleDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaleDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sales/bundled": {
+      "post": {
+        "tags": [
+          "Sales"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordBundledSaleRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordBundledSaleRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordBundledSaleRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/BundledSaleResultDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BundledSaleResultDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BundledSaleResultDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sales/group": {
+      "post": {
+        "tags": [
+          "Sales"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GroupSalesRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GroupSalesRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/GroupSalesRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaleGroupResultDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaleGroupResultDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaleGroupResultDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sales/ungroup": {
+      "post": {
+        "tags": [
+          "Sales"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UngroupSalesRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UngroupSalesRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UngroupSalesRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SaleDto"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SaleDto"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SaleDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sales/{id}/packed": {
+      "patch": {
+        "tags": [
+          "Sales"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaleDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaleDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaleDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sales/{id}/shipped": {
+      "patch": {
+        "tags": [
+          "Sales"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaleDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaleDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaleDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sales/{id}/delivered": {
+      "patch": {
+        "tags": [
+          "Sales"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaleDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaleDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaleDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sales/{id}/status": {
+      "patch": {
+        "tags": [
+          "Sales"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaleStatusTransitionRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaleStatusTransitionRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaleStatusTransitionRequest"
               }
             }
           }
@@ -7899,6 +8044,35 @@
         }
       }
     },
+    "/api/store/reconcile": {
+      "post": {
+        "tags": [
+          "Store"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReconcileStoreCatalogResultDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReconcileStoreCatalogResultDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReconcileStoreCatalogResultDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/storefront/listings": {
       "get": {
         "tags": [
@@ -8061,6 +8235,296 @@
               "type": "string"
             }
           }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/storefront/cart": {
+      "get": {
+        "tags": [
+          "StorefrontCart"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorefrontCartDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorefrontCartDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorefrontCartDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/storefront/cart/lines": {
+      "post": {
+        "tags": [
+          "StorefrontCart"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddCartLineRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddCartLineRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddCartLineRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorefrontCartDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorefrontCartDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorefrontCartDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/storefront/cart/lines/{storeListingId}": {
+      "delete": {
+        "tags": [
+          "StorefrontCart"
+        ],
+        "parameters": [
+          {
+            "name": "storeListingId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorefrontCartDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorefrontCartDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorefrontCartDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/storefront/checkout": {
+      "post": {
+        "tags": [
+          "StorefrontCheckout"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorefrontCheckoutResultDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorefrontCheckoutResultDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorefrontCheckoutResultDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/storefront/orders/by-session/{sessionId}": {
+      "get": {
+        "tags": [
+          "StorefrontCheckout"
+        ],
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorefrontOrderSummaryDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorefrontOrderSummaryDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorefrontOrderSummaryDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/storefront/offers": {
+      "get": {
+        "tags": [
+          "StorefrontOfferAdmin"
+        ],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/StorefrontOfferStatus"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/StorefrontOfferDto"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/StorefrontOfferDto"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/StorefrontOfferDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "StorefrontOffers"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StorefrontOfferRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StorefrontOfferRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/StorefrontOfferRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorefrontOfferResultDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorefrontOfferResultDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorefrontOfferResultDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/storefront/stripe/webhook": {
+      "post": {
+        "tags": [
+          "StorefrontStripeWebhook"
         ],
         "responses": {
           "200": {
@@ -8573,6 +9037,16 @@
           "notes": {
             "type": "string",
             "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "AddCartLineRequest": {
+        "type": "object",
+        "properties": {
+          "storeListingId": {
+            "type": "string",
+            "format": "uuid"
           }
         },
         "additionalProperties": false
@@ -9855,6 +10329,95 @@
             "nullable": true
           },
           "orderReference": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ImportMarketplaceRefundsCsvRequest": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string",
+            "nullable": true
+          },
+          "csv": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ImportMarketplaceRefundsResultDto": {
+        "type": "object",
+        "properties": {
+          "imported": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "skipped": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ImportPlatformListingQualityResultDto": {
+        "type": "object",
+        "properties": {
+          "imported": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "updated": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "matchedListings": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "unmatchedListings": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "snapshots": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlatformListingQualitySnapshotDto"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ImportPlatformListingQualityWorkbookRequest": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string",
+            "nullable": true
+          },
+          "fileName": {
+            "type": "string",
+            "nullable": true
+          },
+          "contentBase64": {
             "type": "string",
             "nullable": true
           }
@@ -12222,6 +12785,133 @@
         },
         "additionalProperties": false
       },
+      "PlatformListingQualitySnapshotDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "platform": {
+            "type": "string",
+            "nullable": true
+          },
+          "externalListingId": {
+            "type": "string",
+            "nullable": true
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "categoryName": {
+            "type": "string",
+            "nullable": true
+          },
+          "listingCondition": {
+            "type": "string",
+            "nullable": true
+          },
+          "priceRange": {
+            "type": "string",
+            "nullable": true
+          },
+          "reportGeneratedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "importedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "platformListingId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "action": {
+            "type": "string",
+            "nullable": true
+          },
+          "dailyImpressions": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "clickThroughRate": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "salesConversionRate": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "promotedListingsAdRate": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "recommendedItemSpecificsFilled": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "recommendedItemSpecificsToAdd": {
+            "type": "string",
+            "nullable": true
+          },
+          "brand": {
+            "type": "string",
+            "nullable": true
+          },
+          "mpn": {
+            "type": "string",
+            "nullable": true
+          },
+          "upc": {
+            "type": "string",
+            "nullable": true
+          },
+          "photoCount": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "titleKeywordCount": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "freeShipping": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "estimatedHandlingDays": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "acceptsReturns": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "sellerPaidReturns": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "promotedListings": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "bestOffer": {
+            "type": "boolean",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "PlatformListingReconcileResultDto": {
         "type": "object",
         "properties": {
@@ -12869,6 +13559,32 @@
           "notes": {
             "type": "string",
             "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ReconcileStoreCatalogResultDto": {
+        "type": "object",
+        "properties": {
+          "itemsExamined": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "listingsCreated": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "nowActive": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "awaitingPhotos": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "retired": {
+            "type": "integer",
+            "format": "int32"
           }
         },
         "additionalProperties": false
@@ -14620,6 +15336,74 @@
         },
         "additionalProperties": false
       },
+      "StorefrontCartDto": {
+        "type": "object",
+        "properties": {
+          "cartToken": {
+            "type": "string",
+            "nullable": true
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StorefrontCartLineDto"
+            },
+            "nullable": true
+          },
+          "subtotal": {
+            "type": "number",
+            "format": "double"
+          },
+          "freeShippingThreshold": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "qualifiesForFreeShipping": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "StorefrontCartLineDto": {
+        "type": "object",
+        "properties": {
+          "storeListingId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "slug": {
+            "type": "string",
+            "nullable": true
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "unitPrice": {
+            "type": "number",
+            "format": "double"
+          },
+          "imageUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "isAvailable": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "StorefrontCheckoutResultDto": {
+        "type": "object",
+        "properties": {
+          "checkoutUrl": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "StorefrontListingDetailDto": {
         "type": "object",
         "properties": {
@@ -14742,6 +15526,10 @@
               "type": "string"
             },
             "nullable": true
+          },
+          "availability": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -14822,6 +15610,189 @@
           "total": {
             "type": "integer",
             "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "StorefrontOfferDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "storeListingId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "inventoryItemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "listingTitle": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "nullable": true
+          },
+          "offerAmount": {
+            "type": "number",
+            "format": "double"
+          },
+          "listingPriceSnapshot": {
+            "type": "number",
+            "format": "double"
+          },
+          "buyerName": {
+            "type": "string",
+            "nullable": true
+          },
+          "buyerEmail": {
+            "type": "string",
+            "nullable": true
+          },
+          "buyerPhone": {
+            "type": "string",
+            "nullable": true
+          },
+          "message": {
+            "type": "string",
+            "nullable": true
+          },
+          "offeredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "respondedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "responseNotes": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "StorefrontOfferRequest": {
+        "type": "object",
+        "properties": {
+          "storeListingId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "buyerName": {
+            "type": "string",
+            "nullable": true
+          },
+          "buyerEmail": {
+            "type": "string",
+            "nullable": true
+          },
+          "buyerPhone": {
+            "type": "string",
+            "nullable": true
+          },
+          "offerAmount": {
+            "type": "number",
+            "format": "double"
+          },
+          "message": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "StorefrontOfferResultDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "nullable": true
+          },
+          "message": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "StorefrontOfferStatus": {
+        "enum": [
+          "New",
+          "Accepted",
+          "Declined",
+          "Expired",
+          "Converted"
+        ],
+        "type": "string"
+      },
+      "StorefrontOrderSummaryDto": {
+        "type": "object",
+        "properties": {
+          "orderNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "nullable": true
+          },
+          "subtotal": {
+            "type": "number",
+            "format": "double"
+          },
+          "shippingTotal": {
+            "type": "number",
+            "format": "double"
+          },
+          "taxTotal": {
+            "type": "number",
+            "format": "double"
+          },
+          "grandTotal": {
+            "type": "number",
+            "format": "double"
+          },
+          "isLocalPickup": {
+            "type": "boolean"
+          },
+          "email": {
+            "type": "string",
+            "nullable": true
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StorefrontOrderSummaryLineDto"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "StorefrontOrderSummaryLineDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "unitPrice": {
+            "type": "number",
+            "format": "double"
+          },
+          "imageUrl": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -15814,7 +16785,7 @@
       "name": "Dashboard"
     },
     {
-      "name": "HaulScout.Api"
+      "name": "HaulScout.Api, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
     },
     {
       "name": "Inventory"
@@ -15872,6 +16843,21 @@
     },
     {
       "name": "Storefront"
+    },
+    {
+      "name": "StorefrontCart"
+    },
+    {
+      "name": "StorefrontCheckout"
+    },
+    {
+      "name": "StorefrontOfferAdmin"
+    },
+    {
+      "name": "StorefrontOffers"
+    },
+    {
+      "name": "StorefrontStripeWebhook"
     },
     {
       "name": "StoreSettings"

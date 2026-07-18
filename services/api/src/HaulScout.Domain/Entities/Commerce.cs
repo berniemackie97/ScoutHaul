@@ -258,3 +258,26 @@ public sealed class Review : EntityBase, IOrganizationScoped
     public string? Body { get; set; }
     public ReviewStatus Status { get; set; } = ReviewStatus.Pending;
 }
+
+/// <summary>
+/// A buyer-submitted offer on a storefront listing. This is not an order and does not reserve inventory; it is an
+/// auditable lead the operator can accept, decline, or convert later.
+/// </summary>
+public sealed class StorefrontOffer : EntityBase, IOrganizationScoped
+{
+    public Guid OrganizationId { get; set; }
+    public Guid StoreListingId { get; set; }
+    public StoreListing? StoreListing { get; set; }
+    public Guid InventoryItemId { get; set; }
+    public InventoryItem? InventoryItem { get; set; }
+    public StorefrontOfferStatus Status { get; set; } = StorefrontOfferStatus.New;
+    public decimal OfferAmount { get; set; }
+    public decimal ListingPriceSnapshot { get; set; }
+    public required string BuyerName { get; set; }
+    public required string BuyerEmail { get; set; }
+    public string? BuyerPhone { get; set; }
+    public string? Message { get; set; }
+    public DateTimeOffset OfferedAt { get; set; } = DateTimeOffset.UtcNow;
+    public DateTimeOffset? RespondedAt { get; set; }
+    public string? ResponseNotes { get; set; }
+}

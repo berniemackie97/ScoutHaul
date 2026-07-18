@@ -1,5 +1,7 @@
-import { ComingSoon } from "@/components/store/coming-soon";
+import { CartWorkspace } from "@/components/store/cart-workspace";
+
 export const metadata = { title: "Checkout" };
+
 export default function Page() {
-  return <ComingSoon title="Checkout" note="Secure checkout is coming soon. We'll have buying live shortly." />;
+  return <CartWorkspace mode="checkout" />;
 }
