@@ -2582,6 +2582,10 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("ExternalRefundKey")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
                     b.Property<decimal>("FeeCredit")
                         .HasPrecision(12, 2)
                         .HasColumnType("numeric(12,2)");
@@ -2635,6 +2639,10 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                     b.HasIndex("RecordedByUserId");
 
                     b.HasIndex("SaleId");
+
+                    b.HasIndex("OrganizationId", "ExternalRefundKey")
+                        .IsUnique()
+                        .HasFilter("\"ExternalRefundKey\" IS NOT NULL");
 
                     b.HasIndex("OrganizationId", "SaleId");
 

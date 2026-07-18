@@ -469,12 +469,18 @@ public sealed class HaulScoutDbContext(
             entity.Property(item => item.Type).HasConversion<string>().HasMaxLength(16);
             entity.Property(item => item.Reason).HasMaxLength(1000).IsRequired();
             entity.Property(item => item.Notes).HasMaxLength(2000);
+            entity.Property(item => item.ExternalRefundKey).HasMaxLength(200);
             entity.Ignore(item => item.BuyerRefundTotal);
             ConfigureMoney(entity.Property(item => item.ItemAmount));
             ConfigureMoney(entity.Property(item => item.ShippingRefunded));
             ConfigureMoney(entity.Property(item => item.TaxRefunded));
             ConfigureMoney(entity.Property(item => item.FeeCredit));
             entity.HasIndex(item => new { item.OrganizationId, item.SaleId });
+            // The idempotency guarantee lives in the database: one refund per source identity, so a re-import
+            // updates in place instead of duplicating, no matter what the application code does.
+            entity.HasIndex(item => new { item.OrganizationId, item.ExternalRefundKey })
+                .IsUnique()
+                .HasFilter("\"ExternalRefundKey\" IS NOT NULL");
             entity.HasOne(item => item.Sale).WithMany(item => item.Refunds).HasForeignKey(item => item.SaleId).OnDelete(DeleteBehavior.Cascade);
             entity.HasOne(item => item.RecordedByUser).WithMany().HasForeignKey(item => item.RecordedByUserId).OnDelete(DeleteBehavior.Restrict);
         });

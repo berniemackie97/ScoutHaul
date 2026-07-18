@@ -1,4 +1,3 @@
-using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
@@ -14,9 +13,12 @@ using HaulScout.Infrastructure.Persistence;
 namespace HaulScout.Api.Services;
 
 /// <summary>
-/// Posts refund evidence from marketplace CSV exports onto existing reconciled sales. The import is intentionally
-/// conservative: only one exact sale match is allowed, ambiguous rows are skipped, and source fingerprints make
-/// re-imports idempotent.
+/// Projects refund facts from marketplace CSV exports onto reconciled sales. Each refund is identified by a stable
+/// natural key derived from the sale it settles (<see cref="ExternalRefundKey"/>), so importing is an idempotent
+/// upsert: the first import creates the refund, every re-import refreshes its amounts to the latest facts. This is
+/// what makes the pipeline converge — a fee credit capped before fees were known, or a return still open, both
+/// correct themselves on the next import — without any "skip if already seen / heal if changed" branching. Matching
+/// stays conservative: exactly one sale match, or the row is skipped.
 /// </summary>
 public sealed class MarketplaceRefundImportService(
     HaulScoutDbContext db,
@@ -61,15 +63,33 @@ public sealed class MarketplaceRefundImportService(
                 continue;
             }
 
-            string fingerprint = RefundImportFingerprint(item);
-            if (sale.Refunds.Any(refund => refund.Notes?.Contains(fingerprint, StringComparison.OrdinalIgnoreCase) == true))
+            // This refund's stable identity in the source. Re-importing the same report resolves to the same sale
+            // and therefore the same key, which is what makes the whole thing an idempotent upsert instead of a
+            // pile of "skip if seen / heal if changed" special cases.
+            string refundKey = ExternalRefundKey(item.Source, sale);
+            Refund? existing = sale.Refunds.FirstOrDefault(refund => refund.ExternalRefundKey == refundKey);
+            if (existing is null)
             {
-                skipped++;
-                continue;
+                // One-time legacy adoption. Refunds imported before this key existed identified themselves with a
+                // fingerprint smuggled into Notes; on their first re-import we claim the matching one from the same
+                // source (nearest amount when several exist) and stamp the real key — so it is upgraded in place
+                // rather than duplicated. After this runs once, the keyed path above handles it forever.
+                existing = sale.Refunds
+                    .Where(refund => refund.ExternalRefundKey == null && refund.Reason == $"Imported from {item.Source}")
+                    .OrderBy(refund => Math.Abs(refund.BuyerRefundTotal - item.BuyerRefundTotal))
+                    .FirstOrDefault();
+                if (existing is not null)
+                {
+                    existing.ExternalRefundKey = refundKey;
+                }
             }
 
-            RefundAllocation allocation = AllocateRefund(sale, item);
-            if (allocation.TotalMoved <= 0)
+            // Amounts are re-derived every import against the sale's OTHER refunds — never against this one — so a
+            // fee credit that was capped at zero because the sale's fees had not been imported yet simply recomputes
+            // to the truth once they have. Convergence is a property of recomputing from current facts, not a patch.
+            IReadOnlyList<Refund> baseline = sale.Refunds.Where(refund => refund != existing).ToList();
+            RefundAllocation allocation = AllocateRefund(sale, baseline, item);
+            if (existing is null && allocation.TotalMoved <= 0)
             {
                 skipped++;
                 warnings.Add($"{item.Source}: skipped \"{item.Title}\" because the matched sale has no remaining refundable amount.");
@@ -77,29 +97,31 @@ public sealed class MarketplaceRefundImportService(
             }
 
             string before = SnapshotSale(sale);
-            string notes = $"{allocation.Notes} Source export has no exact refund timestamp. [import:{fingerprint}]";
-            Refund refund = new()
+            Refund refund = existing ?? new Refund
             {
                 OrganizationId = currentUser.OrganizationId,
                 SaleId = sale.Id,
                 Sale = sale,
-                Type = allocation.Type,
-                ItemAmount = allocation.ItemAmount,
-                ShippingRefunded = allocation.ShippingRefunded,
-                TaxRefunded = allocation.TaxRefunded,
-                FeeCredit = allocation.FeeCredit,
-                ItemReturned = false,
+                ExternalRefundKey = refundKey,
                 Reason = $"Imported from {item.Source}",
-                Notes = notes,
                 RefundedAt = timeProvider.GetUtcNow(),
                 RecordedByUserId = currentUser.UserId,
             };
-            db.Refunds.Add(refund);
+            refund.Type = allocation.Type;
+            refund.ItemAmount = allocation.ItemAmount;
+            refund.ShippingRefunded = allocation.ShippingRefunded;
+            refund.TaxRefunded = allocation.TaxRefunded;
+            refund.FeeCredit = allocation.FeeCredit;
+            refund.Notes = $"{allocation.Notes} Source export has no exact refund timestamp.";
+            if (existing is null)
+            {
+                sale.Refunds.Add(refund);
+                db.Refunds.Add(refund);
+            }
 
             // The marketplace already moved the money. If a return is open for this sale, this refund IS its
-            // resolution — leaving it open would strand the workflow at a step reality has already passed. The
-            // aggregate decides what "resolved" means at its current stage (restock only if actually received),
-            // and the refund is stamped with the outcome BEFORE the state rule derives from it.
+            // resolution — the aggregate decides what "resolved" means at its current stage (restock only if the
+            // item was actually received). Idempotent: a closed return is left untouched on re-import.
             Return? openReturn = sale.Returns.FirstOrDefault(rma => rma.IsOpen);
             string returnNote = string.Empty;
             if (openReturn is not null)
@@ -111,14 +133,17 @@ public sealed class MarketplaceRefundImportService(
                     : " Resolved the open return; item not yet received, so nothing was restocked.";
             }
 
+            // The one rule derives net + status from the whole refund set — always, whether this was a create or a
+            // refresh, so the recorded truth cannot drift from the facts.
             SaleFinancialStateService.ApplyRefundState(sale);
             if (sale.OrderId is Guid orderId)
             {
                 touchedOrderIds.Add(orderId);
             }
 
+            string verb = existing is null ? "Imported" : "Re-imported";
             await AddCorrection(sale, before,
-                $"Imported refund from {item.Source}: item {allocation.ItemAmount:C}, shipping {allocation.ShippingRefunded:C}, tax {allocation.TaxRefunded:C}, fee credit {allocation.FeeCredit:C}.{returnNote}",
+                $"{verb} refund from {item.Source}: item {allocation.ItemAmount:C}, shipping {allocation.ShippingRefunded:C}, tax {allocation.TaxRefunded:C}, fee credit {allocation.FeeCredit:C}.{returnNote}",
                 cancellationToken);
             imported++;
         }
@@ -250,12 +275,25 @@ public sealed class MarketplaceRefundImportService(
         public decimal TotalMoved => ItemAmount + ShippingRefunded + TaxRefunded + FeeCredit;
     }
 
-    private static RefundAllocation AllocateRefund(Sale sale, MarketplaceRefundReportParser.MarketplaceRefundEvent item)
+    /// <summary>
+    /// The natural key of a refund in its source. For these per-item marketplace reports there is one refund figure
+    /// per sold line, so the sale being refunded IS the refund's identity — re-importing matches the same sale and
+    /// so produces the same key. The order + item coordinates are used when present (stable and human-legible in the
+    /// key); the sale id is the fallback for channels whose refunds carry no order.
+    /// </summary>
+    private static string ExternalRefundKey(string source, Sale sale) =>
+        sale.OrderId is Guid orderId
+            ? $"{source}:{orderId}:{sale.InventoryItemId}".ToLowerInvariant()
+            : $"{source}:sale:{sale.Id}".ToLowerInvariant();
+
+    /// <param name="baseline">The sale's OTHER refunds — every refund except the one being computed — so a refresh
+    /// recomputes cleanly against the rest rather than double-counting itself.</param>
+    private static RefundAllocation AllocateRefund(Sale sale, IReadOnlyList<Refund> baseline, MarketplaceRefundReportParser.MarketplaceRefundEvent item)
     {
-        decimal remainingItem = Math.Max(0, sale.SoldPrice - sale.Refunds.Sum(refund => refund.ItemAmount));
-        decimal remainingShipping = Math.Max(0, sale.ShippingCharged - sale.Refunds.Sum(refund => refund.ShippingRefunded));
-        decimal remainingTax = Math.Max(0, sale.SalesTaxCollected - sale.Refunds.Sum(refund => refund.TaxRefunded));
-        decimal remainingFeeCredit = Math.Max(0, sale.PlatformFees + sale.PaymentFees - sale.Refunds.Sum(refund => refund.FeeCredit));
+        decimal remainingItem = Math.Max(0, sale.SoldPrice - baseline.Sum(refund => refund.ItemAmount));
+        decimal remainingShipping = Math.Max(0, sale.ShippingCharged - baseline.Sum(refund => refund.ShippingRefunded));
+        decimal remainingTax = Math.Max(0, sale.SalesTaxCollected - baseline.Sum(refund => refund.TaxRefunded));
+        decimal remainingFeeCredit = Math.Max(0, sale.PlatformFees + sale.PaymentFees - baseline.Sum(refund => refund.FeeCredit));
         decimal feeCredit = Math.Min(item.FeeCredit, remainingFeeCredit);
 
         if (item.FullRefundInferred)
@@ -288,21 +326,6 @@ public sealed class MarketplaceRefundImportService(
                 : $"Buyer refund total was {item.BuyerRefundTotal:C}.");
     }
 
-    private static string RefundImportFingerprint(MarketplaceRefundReportParser.MarketplaceRefundEvent item)
-    {
-        string raw = string.Join('|',
-            item.Platform,
-            item.Source,
-            item.ExternalItemId,
-            item.Sku,
-            NormalizeTitle(item.Title),
-            item.SoldAt?.ToString("O"),
-            item.ItemPrice,
-            item.BuyerRefundTotal,
-            item.FeeCredit,
-            item.FullRefundInferred);
-        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(raw)))[..16].ToLowerInvariant();
-    }
 
     private static bool TitleMatchesRefundEvent(string eventTitle, string? saleTitle)
     {
