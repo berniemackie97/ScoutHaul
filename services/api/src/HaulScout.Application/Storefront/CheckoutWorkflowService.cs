@@ -7,7 +7,7 @@ using Microsoft.Extensions.Options;
 namespace HaulScout.Application.Storefront;
 
 /// <summary>
-/// Turns a cart into a reservation, a pending order, and a hosted payment page. The order of operations is the
+/// Turns a cart into a reservation, a pending order, and a Stripe checkout handoff. The order of operations is the
 /// contract: reserve first (the contention guard), persist the order second, create the payment session last — so
 /// money is only ever requested for items this checkout actually holds. The webhook finishes or unwinds it.
 /// </summary>
@@ -43,9 +43,9 @@ public sealed class CheckoutWorkflowService(
         Order? pending = await checkout.FindPendingOrderByCartAsync(organizationId, cart.Id, cancellationToken);
         if (pending?.StripeCheckoutSessionId is string openSession)
         {
-            if (await payments.FindOpenCheckoutUrlAsync(openSession, cancellationToken) is string openUrl)
+            if (await payments.FindOpenCheckoutAsync(openSession, cancellationToken) is HostedCheckout openCheckout)
             {
-                return AppResult<StorefrontCheckoutResultDto>.Ok(new StorefrontCheckoutResultDto(openUrl));
+                return AppResult<StorefrontCheckoutResultDto>.Ok(ToDto(openCheckout));
             }
 
             // The session is dead but the expiry webhook hasn't landed yet — unwind it here so the shopper
@@ -178,8 +178,10 @@ public sealed class CheckoutWorkflowService(
                 _options.LocalPickupEnabled,
                 _options.AutomaticTaxEnabled,
                 _options.AllowedShipCountries,
+                _options.PreferEmbeddedCheckout,
                 SuccessUrl: $"{publicBaseUrl}/checkout/success?session_id={{CHECKOUT_SESSION_ID}}",
                 CancelUrl: $"{publicBaseUrl}/cart",
+                ReturnUrl: $"{publicBaseUrl}/checkout/success?session_id={{CHECKOUT_SESSION_ID}}",
                 // Stripe's floor is 30 minutes; the reservation lives exactly as long as the session.
                 ExpiresAt: now.AddMinutes(Math.Max(30, _options.SessionExpiryMinutes))),
             cancellationToken);
@@ -187,8 +189,14 @@ public sealed class CheckoutWorkflowService(
         order.StripeCheckoutSessionId = session.SessionId;
         await checkout.SaveChangesAsync(cancellationToken);
 
-        return AppResult<StorefrontCheckoutResultDto>.Ok(new StorefrontCheckoutResultDto(session.Url));
+        return AppResult<StorefrontCheckoutResultDto>.Ok(ToDto(session));
     }
+
+    private static StorefrontCheckoutResultDto ToDto(HostedCheckout checkout) => new(
+        checkout.Url,
+        checkout.ClientSecret,
+        checkout.PublishableKey,
+        checkout.ClientSecret is not null ? "Embedded" : "Hosted");
 
     private string? HeroImageUrl(Guid? storeListingId, Cart cart)
     {

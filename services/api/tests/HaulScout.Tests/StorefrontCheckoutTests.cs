@@ -178,11 +178,11 @@ public class StorefrontCheckoutTests
         public Task<HostedCheckout> CreateCheckoutAsync(HostedCheckoutRequest request, CancellationToken cancellationToken)
         {
             Created.Add(request);
-            return Task.FromResult(new HostedCheckout($"cs_test_{Created.Count}", $"https://checkout.stripe.test/{Created.Count}"));
+            return Task.FromResult(new HostedCheckout($"cs_test_{Created.Count}", $"https://checkout.stripe.test/{Created.Count}", null, null));
         }
 
-        public Task<string?> FindOpenCheckoutUrlAsync(string sessionId, CancellationToken cancellationToken) =>
-            Task.FromResult(OpenUrl);
+        public Task<HostedCheckout?> FindOpenCheckoutAsync(string sessionId, CancellationToken cancellationToken) =>
+            Task.FromResult(OpenUrl is null ? null : new HostedCheckout(sessionId, OpenUrl, null, null));
 
         public Task<PaymentCapture> GetCaptureAsync(string paymentIntentId, CancellationToken cancellationToken) =>
             Task.FromResult(new PaymentCapture(paymentIntentId, 0, FeeCents));

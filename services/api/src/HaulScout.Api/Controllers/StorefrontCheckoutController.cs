@@ -7,7 +7,7 @@ using HaulScout.Application.Storefront;
 
 namespace HaulScout.Api.Controllers;
 
-/// <summary>Starts a checkout (reserve + hosted payment page) and serves the confirmation-page order summary.</summary>
+/// <summary>Starts a checkout (reserve + Stripe payment session) and serves the confirmation-page order summary.</summary>
 [ApiController]
 [Route("api/storefront")]
 [AllowAnonymous]

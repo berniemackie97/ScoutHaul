@@ -20,7 +20,10 @@ export type Cart = {
 };
 
 export type CheckoutResult = {
-  checkoutUrl: string;
+  checkoutUrl?: string | null;
+  clientSecret?: string | null;
+  publishableKey?: string | null;
+  mode?: string | null;
 };
 
 export type OrderSummaryLine = {

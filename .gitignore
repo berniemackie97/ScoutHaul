@@ -30,6 +30,7 @@ out/
 coverage/
 test-results/
 playwright-report/
+.playwright-cli/
 *.tsbuildinfo
 .pnp
 .pnp.js

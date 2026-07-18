@@ -13,9 +13,12 @@ public sealed class StripeOptions
     /// <summary>
     /// The server-side key: a restricted key (rk_…, needs Checkout Sessions + Refunds + PaymentIntents read) or a
     /// secret key (sk_…). Named ApiKey to match the other providers' config (Gemini__ApiKey, GoogleCloudVision__ApiKey).
-    /// Never the publishable key — hosted Checkout does not use one.
+    /// Server-side Stripe secret key.
     /// </summary>
     public string ApiKey { get; set; } = string.Empty;
+
+    /// <summary>Browser-safe key used by Stripe.js for Embedded Checkout.</summary>
+    public string PublishableKey { get; set; } = string.Empty;
 
     /// <summary>The webhook endpoint's signing secret (whsec_…). Required before webhooks are trusted.</summary>
     public string WebhookSecret { get; set; } = string.Empty;
@@ -23,7 +26,7 @@ public sealed class StripeOptions
 
 /// <summary>
 /// The Stripe implementation of <see cref="IPaymentGateway"/> — the only file in the system where Stripe types
-/// appear. Hosted Checkout Sessions; dynamic payment methods (no payment_method_types, per Stripe guidance);
+/// appear. Stripe Checkout Sessions; dynamic payment methods (no payment_method_types, per Stripe guidance);
 /// signature-verified webhooks reduced to neutral <see cref="PaymentEvent"/>s.
 /// </summary>
 public sealed class StripePaymentGateway(IOptions<StripeOptions> options) : IPaymentGateway
@@ -94,6 +97,8 @@ public sealed class StripePaymentGateway(IOptions<StripeOptions> options) : IPay
             });
         }
 
+        bool embedded = request.PreferEmbedded && !string.IsNullOrWhiteSpace(_options.PublishableKey);
+
         SessionCreateOptions options = new()
         {
             Mode = "payment",
@@ -125,16 +130,31 @@ public sealed class StripePaymentGateway(IOptions<StripeOptions> options) : IPay
             },
             ShippingOptions = shippingOptions,
             AutomaticTax = new SessionAutomaticTaxOptions { Enabled = request.AutomaticTax },
-            SuccessUrl = request.SuccessUrl,
-            CancelUrl = request.CancelUrl,
             ExpiresAt = request.ExpiresAt.UtcDateTime,
         };
+        if (embedded)
+        {
+            options.UiMode = "embedded_page";
+            options.ReturnUrl = request.ReturnUrl;
+            options.RedirectOnCompletion = "always";
+        }
+        else
+        {
+            options.SuccessUrl = request.SuccessUrl;
+            options.CancelUrl = request.CancelUrl;
+        }
         options.AddExtraParam("integration_identifier", IntegrationIdentifier);
 
         try
         {
             Session session = await new SessionService(Client).CreateAsync(options, cancellationToken: cancellationToken);
-            return new HostedCheckout(session.Id, session.Url);
+            HostedCheckout checkout = ToHostedCheckout(session, embedded);
+            if (embedded && string.IsNullOrWhiteSpace(checkout.ClientSecret))
+            {
+                throw new PaymentGatewayUnavailableException("Stripe did not return an embedded checkout client secret.");
+            }
+
+            return checkout;
         }
         catch (StripeException exception)
         {
@@ -142,12 +162,12 @@ public sealed class StripePaymentGateway(IOptions<StripeOptions> options) : IPay
         }
     }
 
-    public async Task<string?> FindOpenCheckoutUrlAsync(string sessionId, CancellationToken cancellationToken)
+    public async Task<HostedCheckout?> FindOpenCheckoutAsync(string sessionId, CancellationToken cancellationToken)
     {
         try
         {
             Session session = await new SessionService(Client).GetAsync(sessionId, cancellationToken: cancellationToken);
-            return session.Status == "open" ? session.Url : null;
+            return session.Status == "open" ? ToHostedCheckout(session, session.ClientSecret is not null) : null;
         }
         catch (StripeException)
         {
@@ -251,4 +271,10 @@ public sealed class StripePaymentGateway(IOptions<StripeOptions> options) : IPay
 
     private static Guid? OrderIdFrom(Session session) =>
         session.Metadata.TryGetValue("order_id", out string? raw) && Guid.TryParse(raw, out Guid id) ? id : null;
+
+    private HostedCheckout ToHostedCheckout(Session session, bool embedded) => new(
+        session.Id,
+        session.Url,
+        embedded ? session.ClientSecret : null,
+        embedded ? _options.PublishableKey : null);
 }

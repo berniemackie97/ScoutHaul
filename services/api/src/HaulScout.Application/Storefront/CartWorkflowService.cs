@@ -71,7 +71,23 @@ public sealed class CartWorkflowService(
             });
         }
 
-        await carts.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await carts.SaveChangesAsync(cancellationToken);
+        }
+        catch (CartMutationConflictException)
+        {
+            Cart? current = cart.AnonymousId is null
+                ? null
+                : await carts.FindActiveAsync(organizationId, cart.AnonymousId, cancellationToken);
+            if (current is null)
+            {
+                return AppResult<StorefrontCartDto>.Conflict("Your cart changed while updating. Refresh and try again.");
+            }
+
+            return AppResult<StorefrontCartDto>.Ok(BuildDto(current.AnonymousId!, current, []));
+        }
+
         Cart reloaded = await carts.FindActiveAsync(organizationId, cart.AnonymousId!, cancellationToken) ?? cart;
         return AppResult<StorefrontCartDto>.Ok(BuildDto(cart.AnonymousId!, reloaded, []));
     }

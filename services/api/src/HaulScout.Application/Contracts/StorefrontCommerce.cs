@@ -25,8 +25,14 @@ public sealed record StorefrontCartDto(
 
 public sealed record AddCartLineRequest(Guid StoreListingId);
 
-/// <summary>Where to send the shopper: the Stripe-hosted payment page.</summary>
-public sealed record StorefrontCheckoutResultDto(string CheckoutUrl);
+/// <summary>
+/// The payment handoff. Embedded Checkout returns a client secret + publishable key; hosted Checkout returns a URL.
+/// </summary>
+public sealed record StorefrontCheckoutResultDto(
+    string? CheckoutUrl,
+    string? ClientSecret,
+    string? PublishableKey,
+    string Mode);
 
 /// <summary>The confirmation page's order summary, looked up by the unguessable Stripe session id.</summary>
 public sealed record StorefrontOrderSummaryDto(
