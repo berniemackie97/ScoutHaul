@@ -8,13 +8,19 @@ namespace HaulScout.Application.Storefront;
 /// </summary>
 public interface IStorefrontCartStore
 {
-    /// <summary>The active cart for this token with lines + listings loaded, or null. Converted/abandoned carts
+    /// <summary>The active cart for this token loaded for mutation, or null. Converted/abandoned carts
     /// never come back — a spent token gets a fresh cart.</summary>
     Task<Cart?> FindActiveAsync(Guid organizationId, string anonymousToken, CancellationToken cancellationToken);
+
+    /// <summary>A hydrated no-tracking snapshot for public reads and post-mutation responses. This must not reuse
+    /// the mutation-tracked aggregate because EF can otherwise return stale navigation state after add/remove.</summary>
+    Task<Cart?> FindActiveReadAsync(Guid organizationId, string anonymousToken, CancellationToken cancellationToken);
 
     Task<Cart?> FindActiveByIdAsync(Guid organizationId, Guid cartId, CancellationToken cancellationToken);
 
     Task AddAsync(Cart cart, CancellationToken cancellationToken);
+
+    void AddLine(Cart cart, CartLine line);
 
     void RemoveLine(CartLine line);
 

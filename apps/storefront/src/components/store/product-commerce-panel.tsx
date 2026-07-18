@@ -1,8 +1,10 @@
 "use client";
 
-import { useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { CheckCircle2, Loader2 } from "lucide-react";
-import { money, type OfferResult } from "@/lib/commerce";
+import { CustomerAuthModal } from "@/components/store/customer-auth-modal";
+import { money, type Cart, type OfferResult } from "@/lib/commerce";
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 type Props = {
   listingId: string;
@@ -29,7 +31,10 @@ export function ProductCommercePanel({
   const [checkingOut, setCheckingOut] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [cartHref, setCartHref] = useState("/cart");
   const [offerOpen, setOfferOpen] = useState(false);
+  const [authOpen, setAuthOpen] = useState(false);
+  const [isCustomerSignedIn, setIsCustomerSignedIn] = useState<boolean | null>(null);
   const [offerSending, setOfferSending] = useState(false);
   const [offerResult, setOfferResult] = useState<string | null>(null);
 
@@ -38,6 +43,23 @@ export function ProductCommercePanel({
   const suggestedOffer = Math.max(offerFloor, Math.floor(price * 0.85));
   const defaultOffer = maximumOfferAmount == null ? suggestedOffer : Math.min(suggestedOffer, maximumOfferAmount);
 
+  useEffect(() => {
+    let mounted = true;
+    try {
+      const supabase = createSupabaseBrowserClient();
+      void supabase.auth.getSession().then(({ data }) => {
+        if (mounted) setIsCustomerSignedIn(Boolean(data.session));
+      }).catch(() => {
+        if (mounted) setIsCustomerSignedIn(false);
+      });
+    } catch {
+      setIsCustomerSignedIn(false);
+    }
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   async function addToCart() {
     if (addInFlight.current || checkoutInFlight.current) return;
     addInFlight.current = true;
@@ -45,13 +67,10 @@ export function ProductCommercePanel({
     setError(null);
     setMessage(null);
     try {
-      const response = await fetch("/api/cart/lines", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ storeListingId: listingId }),
-      });
-      if (!response.ok) throw new Error(await response.text());
-      window.dispatchEvent(new Event("haulscout:cart-changed"));
+      const cart = await addListingToCart(listingId);
+      ensureListingIsInCart(cart, listingId);
+      dispatchCartChanged(cart);
+      setCartHref(versionedPath("/cart"));
       setMessage("Added to cart.");
     } catch (err) {
       setError(cleanError(err));
@@ -67,15 +86,11 @@ export function ProductCommercePanel({
     setCheckingOut(true);
     setError(null);
     try {
-      const addResponse = await fetch("/api/cart/lines", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ storeListingId: listingId }),
-      });
-      if (!addResponse.ok) throw new Error(await addResponse.text());
-      window.dispatchEvent(new Event("haulscout:cart-changed"));
+      const cart = await addListingToCart(listingId);
+      ensureListingIsInCart(cart, listingId);
+      dispatchCartChanged(cart);
 
-      window.location.assign("/checkout?start=1");
+      window.location.assign(`/checkout?start=1&cartv=${Date.now()}`);
     } catch (err) {
       setError(cleanError(err));
       setCheckingOut(false);
@@ -100,7 +115,8 @@ export function ProductCommercePanel({
         }),
       });
       if (response.status === 401) {
-        window.location.assign(`/sign-in?next=${encodeURIComponent(window.location.pathname)}`);
+        setIsCustomerSignedIn(false);
+        setAuthOpen(true);
         return;
       }
       if (!response.ok) throw new Error(await response.text());
@@ -144,10 +160,16 @@ export function ProductCommercePanel({
       {acceptsOffers && isAvailable ? (
         <button
           type="button"
-          onClick={() => setOfferOpen(value => !value)}
+          onClick={() => {
+            if (isCustomerSignedIn) {
+              setOfferOpen(value => !value);
+              return;
+            }
+            setAuthOpen(true);
+          }}
           className="w-full border border-rule px-6 py-3 text-sm font-semibold uppercase tracking-[0.12em] text-ink transition-colors hover:border-copper hover:text-copper"
         >
-          {offerOpen ? "Close offer form" : "Make an offer"}
+          {isCustomerSignedIn ? (offerOpen ? "Close offer form" : "Make an offer") : "Sign in / register to make an offer"}
         </button>
       ) : null}
 
@@ -155,7 +177,7 @@ export function ProductCommercePanel({
         <div className="flex items-center gap-2 border border-emerald-500/25 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-800">
           <CheckCircle2 className="h-4 w-4" aria-hidden />
           {message}{" "}
-          <a href="/cart" className="font-semibold underline underline-offset-4">
+          <a href={cartHref} className="font-semibold underline underline-offset-4">
             View cart
           </a>
         </div>
@@ -204,8 +226,45 @@ export function ProductCommercePanel({
           ) : null}
         </form>
       ) : null}
+      <CustomerAuthModal
+        open={authOpen}
+        title="Sign in to make an offer"
+        body="Offers require a customer account so accepted, declined, and counter offers stay tied to you securely."
+        nextPath={typeof window === "undefined" ? "/account" : window.location.pathname}
+        onClose={() => setAuthOpen(false)}
+        onAuthenticated={() => {
+          setIsCustomerSignedIn(true);
+          setOfferOpen(true);
+        }}
+      />
     </div>
   );
+}
+
+async function addListingToCart(listingId: string): Promise<Cart> {
+  const response = await fetch("/api/cart/lines", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ storeListingId: listingId }),
+    cache: "no-store",
+    credentials: "same-origin",
+  });
+  if (!response.ok) throw new Error(await response.text());
+  return (await response.json()) as Cart;
+}
+
+function ensureListingIsInCart(cart: Cart, listingId: string) {
+  if (!cart.lines.some((line) => line.storeListingId === listingId && line.isAvailable)) {
+    throw new Error("The item could not be added to your cart. Refresh and try again.");
+  }
+}
+
+function dispatchCartChanged(cart: Cart) {
+  window.dispatchEvent(new CustomEvent<Cart>("haulscout:cart-changed", { detail: cart }));
+}
+
+function versionedPath(path: string) {
+  return `${path}?cartv=${Date.now()}`;
 }
 
 function Field({

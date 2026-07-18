@@ -15,13 +15,15 @@ namespace HaulScout.Infrastructure.Storefront;
 public sealed class EfStorefrontCartStore(HaulScoutDbContext db) : IStorefrontCartStore
 {
     public Task<Cart?> FindActiveAsync(Guid organizationId, string anonymousToken, CancellationToken cancellationToken) =>
-        db.Carts
-            .Include(cart => cart.Lines)
-                .ThenInclude(line => line.StorefrontOffer)
-            .Include(cart => cart.Lines)
-                .ThenInclude(line => line.StoreListing)
-                    .ThenInclude(listing => listing!.InventoryItem)
-                        .ThenInclude(item => item!.Photos)
+        ActiveCartQuery(tracked: true)
+            .SingleOrDefaultAsync(
+                cart => cart.AnonymousId == anonymousToken
+                    && cart.OrganizationId == organizationId
+                    && cart.Status == CartStatus.Active,
+                cancellationToken);
+
+    public Task<Cart?> FindActiveReadAsync(Guid organizationId, string anonymousToken, CancellationToken cancellationToken) =>
+        ActiveCartQuery(tracked: false)
             .SingleOrDefaultAsync(
                 cart => cart.AnonymousId == anonymousToken
                     && cart.OrganizationId == organizationId
@@ -29,17 +31,19 @@ public sealed class EfStorefrontCartStore(HaulScoutDbContext db) : IStorefrontCa
                 cancellationToken);
 
     public Task<Cart?> FindActiveByIdAsync(Guid organizationId, Guid cartId, CancellationToken cancellationToken) =>
-        db.Carts
-            .Include(cart => cart.Lines)
-                .ThenInclude(line => line.StorefrontOffer)
-            .Include(cart => cart.Lines)
-                .ThenInclude(line => line.StoreListing)
+        ActiveCartQuery(tracked: true)
             .SingleOrDefaultAsync(
                 cart => cart.Id == cartId && cart.OrganizationId == organizationId && cart.Status == CartStatus.Active,
                 cancellationToken);
 
     public async Task AddAsync(Cart cart, CancellationToken cancellationToken) =>
         await db.Carts.AddAsync(cart, cancellationToken);
+
+    public void AddLine(Cart cart, CartLine line)
+    {
+        line.Cart = cart;
+        db.CartLines.Add(line);
+    }
 
     public void RemoveLine(CartLine line) => db.CartLines.Remove(line);
 
@@ -68,5 +72,23 @@ public sealed class EfStorefrontCartStore(HaulScoutDbContext db) : IStorefrontCa
         {
             throw new CartMutationConflictException("The item is already in this cart.", exception);
         }
+    }
+
+    private IQueryable<Cart> ActiveCartQuery(bool tracked)
+    {
+        IQueryable<Cart> query = db.Carts;
+        if (!tracked)
+        {
+            query = query.AsNoTracking();
+        }
+
+        return query
+            .AsSplitQuery()
+            .Include(cart => cart.Lines)
+                .ThenInclude(line => line.StorefrontOffer)
+            .Include(cart => cart.Lines)
+                .ThenInclude(line => line.StoreListing)
+                    .ThenInclude(listing => listing!.InventoryItem)
+                        .ThenInclude(item => item!.Photos);
     }
 }

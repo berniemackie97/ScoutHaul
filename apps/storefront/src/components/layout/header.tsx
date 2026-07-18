@@ -30,10 +30,16 @@ export function Header() {
 
   useEffect(() => {
     const controller = new AbortController();
-    const loadCartCount = async () => {
+    const loadCartCount = async (event?: Event) => {
+      if (event instanceof CustomEvent && isCart(event.detail)) {
+        setCartCount(event.detail.lines.length);
+        return;
+      }
+
       try {
-        const response = await fetch("/api/cart", {
+        const response = await fetch(`/api/cart?cartv=${Date.now()}`, {
           cache: "no-store",
+          credentials: "same-origin",
           signal: controller.signal,
         });
         if (!response.ok) return;
@@ -46,10 +52,13 @@ export function Header() {
     };
 
     void loadCartCount();
-    window.addEventListener("haulscout:cart-changed", loadCartCount);
+    const onCartChanged = (event: Event) => {
+      void loadCartCount(event);
+    };
+    window.addEventListener("haulscout:cart-changed", onCartChanged);
     return () => {
       controller.abort();
-      window.removeEventListener("haulscout:cart-changed", loadCartCount);
+      window.removeEventListener("haulscout:cart-changed", onCartChanged);
     };
   }, [pathname]);
 
@@ -126,6 +135,7 @@ export function Header() {
             </Link>
             <Link
               href="/cart"
+              prefetch={false}
               aria-label="Cart"
               className={`relative p-2 transition-colors ${solid ? "text-ink hover:text-copper" : "text-background hover:text-copper"}`}
             >
@@ -140,4 +150,8 @@ export function Header() {
       {!onHome ? <div aria-hidden className="h-16 md:h-20" /> : null}
     </>
   );
+}
+
+function isCart(value: unknown): value is Cart {
+  return Boolean(value && typeof value === "object" && Array.isArray((value as Cart).lines));
 }

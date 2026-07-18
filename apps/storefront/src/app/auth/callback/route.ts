@@ -11,8 +11,15 @@ export async function GET(request: Request) {
     return NextResponse.redirect(new URL("/sign-in?error=callback", requestUrl.origin));
   }
 
-  const supabase = await createSupabaseServerClient();
-  const { error } = await supabase.auth.exchangeCodeForSession(code);
+  let error: unknown;
+  try {
+    const supabase = await createSupabaseServerClient();
+    const result = await supabase.auth.exchangeCodeForSession(code);
+    error = result.error;
+  } catch {
+    error = true;
+  }
+
   if (error) {
     return NextResponse.redirect(new URL("/sign-in?error=callback", requestUrl.origin));
   }

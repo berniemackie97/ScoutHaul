@@ -23,7 +23,7 @@ export function CartWorkspace({ mode }: Props) {
     const controller = new AbortController();
     void loadCart(controller.signal);
     return () => controller.abort();
-  }, []);
+  }, [mode]);
 
   const unavailableLines = useMemo(() => cart?.lines.filter((line) => !line.isAvailable) ?? [], [cart]);
   const canCheckout = Boolean(cart && cart.lines.length > 0 && unavailableLines.length === 0);
@@ -44,7 +44,11 @@ export function CartWorkspace({ mode }: Props) {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch("/api/cart", { cache: "no-store", signal });
+      const response = await fetch(versionedPath("/api/cart"), {
+        cache: "no-store",
+        credentials: "same-origin",
+        signal,
+      });
       if (!response.ok) throw new Error(await response.text());
       setCart((await response.json()) as Cart);
     } catch (err) {
@@ -59,10 +63,15 @@ export function CartWorkspace({ mode }: Props) {
     setBusyId(storeListingId);
     setError(null);
     try {
-      const response = await fetch(`/api/cart/lines/${encodeURIComponent(storeListingId)}`, { method: "DELETE" });
+      const response = await fetch(`/api/cart/lines/${encodeURIComponent(storeListingId)}`, {
+        method: "DELETE",
+        cache: "no-store",
+        credentials: "same-origin",
+      });
       if (!response.ok) throw new Error(await response.text());
-      setCart((await response.json()) as Cart);
-      window.dispatchEvent(new Event("haulscout:cart-changed"));
+      const nextCart = (await response.json()) as Cart;
+      setCart(nextCart);
+      window.dispatchEvent(new CustomEvent<Cart>("haulscout:cart-changed", { detail: nextCart }));
     } catch (err) {
       setError(cleanError(err));
     } finally {
@@ -75,7 +84,11 @@ export function CartWorkspace({ mode }: Props) {
     setCheckingOut(true);
     setError(null);
     try {
-      const response = await fetch("/api/checkout", { method: "POST" });
+      const response = await fetch("/api/checkout", {
+        method: "POST",
+        cache: "no-store",
+        credentials: "same-origin",
+      });
       if (!response.ok) throw new Error(await response.text());
       const result = (await response.json()) as CheckoutResult;
       if (result.clientSecret && result.publishableKey) {
@@ -235,7 +248,7 @@ export function CartWorkspace({ mode }: Props) {
 
             <button
               type="button"
-              onClick={mode === "cart" ? () => window.location.assign("/checkout") : checkout}
+              onClick={mode === "cart" ? () => window.location.assign(versionedPath("/checkout")) : checkout}
               disabled={!canCheckout || checkingOut || Boolean(embeddedCheckout)}
               className="mt-6 flex w-full items-center justify-center gap-2 bg-copper px-6 py-3.5 text-sm font-semibold uppercase tracking-[0.12em] text-ink transition-transform hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
             >
@@ -362,6 +375,10 @@ function loadStripeScript(): Promise<void> {
     document.head.appendChild(script);
   });
   return stripeScriptPromise;
+}
+
+function versionedPath(path: string) {
+  return `${path}?cartv=${Date.now()}`;
 }
 
 function cleanError(error: unknown) {

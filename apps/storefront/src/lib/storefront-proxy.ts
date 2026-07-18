@@ -40,7 +40,13 @@ export async function storefrontProxy(request: NextRequest, options: ProxyOption
   const contentType = upstream.headers.get("Content-Type") ?? "application/json";
   const response = new NextResponse(text, {
     status: upstream.status,
-    headers: { "Content-Type": contentType },
+    headers: {
+      "Content-Type": contentType,
+      "Cache-Control": "private, no-store, no-cache, max-age=0, must-revalidate",
+      Pragma: "no-cache",
+      Expires: "0",
+      Vary: "Cookie",
+    },
   });
 
   if (upstream.ok && contentType.includes("application/json") && text.length > 0) {
