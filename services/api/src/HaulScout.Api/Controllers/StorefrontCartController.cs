@@ -13,12 +13,15 @@ namespace HaulScout.Api.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/storefront/cart")]
-[AllowAnonymous]
-public sealed class StorefrontCartController(StorefrontStoreResolver resolver, CartWorkflowService cart) : ControllerBase
+public sealed class StorefrontCartController(
+    StorefrontStoreResolver resolver,
+    StorefrontCustomerIdentityResolver customerIdentity,
+    CartWorkflowService cart) : ControllerBase
 {
     private const string CartHeader = "X-HaulScout-Cart";
 
     [HttpGet]
+    [AllowAnonymous]
     public async Task<ActionResult<StorefrontCartDto>> Get(CancellationToken cancellationToken)
     {
         if (await resolver.ResolveAsync(Request, cancellationToken) is not Guid organizationId)
@@ -30,6 +33,7 @@ public sealed class StorefrontCartController(StorefrontStoreResolver resolver, C
     }
 
     [HttpPost("lines")]
+    [AllowAnonymous]
     public async Task<ActionResult<StorefrontCartDto>> AddLine(AddCartLineRequest request, CancellationToken cancellationToken)
     {
         if (await resolver.ResolveAsync(Request, cancellationToken) is not Guid organizationId)
@@ -40,7 +44,27 @@ public sealed class StorefrontCartController(StorefrontStoreResolver resolver, C
         return ToActionResult(await cart.AddLineAsync(organizationId, CartToken(), request, cancellationToken));
     }
 
+    [HttpPost("offers/{offerId:guid}/line")]
+    [Authorize(AuthenticationSchemes = StorefrontAuthDefaults.Scheme)]
+    public async Task<ActionResult<StorefrontCartDto>> AddOfferLine(
+        Guid offerId,
+        CancellationToken cancellationToken)
+    {
+        if (await resolver.ResolveAsync(Request, cancellationToken) is not Guid organizationId)
+        {
+            return NotFound();
+        }
+
+        return ToActionResult(await cart.AddOfferLineAsync(
+            organizationId,
+            CartToken(),
+            offerId,
+            customerIdentity.Resolve(),
+            cancellationToken));
+    }
+
     [HttpDelete("lines/{storeListingId:guid}")]
+    [AllowAnonymous]
     public async Task<ActionResult<StorefrontCartDto>> RemoveLine(Guid storeListingId, CancellationToken cancellationToken)
     {
         if (await resolver.ResolveAsync(Request, cancellationToken) is not Guid organizationId)

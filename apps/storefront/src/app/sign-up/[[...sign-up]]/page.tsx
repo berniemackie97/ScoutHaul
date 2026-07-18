@@ -1,5 +1,5 @@
-import { ComingSoon } from "@/components/store/coming-soon";
-export const metadata = { title: "Create account" };
+import { redirect } from "next/navigation";
+
 export default function Page() {
-  return <ComingSoon title="Create an account" note="Customer accounts are coming soon." />;
+  redirect("/sign-in");
 }

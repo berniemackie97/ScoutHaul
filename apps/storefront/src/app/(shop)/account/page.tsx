@@ -1,14 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { ShoppingBag, Heart, Wrench, Settings, Package, HandCoins } from "lucide-react";
-import { Card, CardContent, Button } from "@overhaul/ui";
+import { ShoppingBag, Heart, Wrench, Package, HandCoins } from "lucide-react";
+import { Card } from "@overhaul/ui";
 
 const accountLinks = [
+  { name: "My Offers", href: "/offers", icon: HandCoins, description: "Track accepted, declined, and countered offers" },
   { name: "My Orders", href: "/account/orders", icon: ShoppingBag, description: "View order history and track shipments" },
   { name: "Wishlist", href: "/account/wishlist", icon: Heart, description: "Items you've saved for later" },
   { name: "Repair Jobs", href: "/repairs", icon: Wrench, description: "Track your repair requests" },
-  { name: "Consignments", href: "/consignment", icon: HandCoins, description: "Your consignment submissions" },
+  { name: "Consignments", href: "/consignment", icon: Package, description: "Your consignment submissions" },
 ];
 
 export default function AccountPage() {

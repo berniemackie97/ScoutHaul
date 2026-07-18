@@ -1,5 +1,4 @@
 using System.Globalization;
-using System.Net.Mail;
 using HaulScout.Application.Common;
 using HaulScout.Application.Contracts;
 using HaulScout.Domain;
@@ -11,8 +10,13 @@ namespace HaulScout.Application.Storefront;
 /// Buyer offers submitted from the public storefront. Offers capture buyer intent only; checkout remains the only
 /// path that reserves inventory or moves money.
 /// </summary>
-public sealed class StorefrontOfferWorkflowService(IStorefrontOfferStore store, TimeProvider timeProvider)
+public sealed class StorefrontOfferWorkflowService(
+    IStorefrontOfferStore store,
+    IStorefrontCustomerStore customers,
+    TimeProvider timeProvider)
 {
+    private const int ResponseExpiryDays = 7;
+
     public async Task<IReadOnlyList<StorefrontOfferDto>> ListAsync(
         Guid organizationId,
         StorefrontOfferStatus? status,
@@ -20,38 +24,28 @@ public sealed class StorefrontOfferWorkflowService(IStorefrontOfferStore store, 
     {
         IReadOnlyList<StorefrontOffer> offers = await store.ListOffersAsync(organizationId, status, cancellationToken);
         return offers
-            .Select(offer => new StorefrontOfferDto(
-                offer.Id,
-                offer.StoreListingId,
-                offer.InventoryItemId,
-                offer.StoreListing?.Title ?? offer.InventoryItem?.Title ?? "Storefront listing",
-                offer.Status.ToString(),
-                offer.OfferAmount,
-                offer.ListingPriceSnapshot,
-                offer.BuyerName,
-                offer.BuyerEmail,
-                offer.BuyerPhone,
-                offer.Message,
-                offer.OfferedAt,
-                offer.RespondedAt,
-                offer.ResponseNotes))
+            .Select(offer => ToAdminDto(offer, timeProvider.GetUtcNow()))
             .ToArray();
+    }
+
+    public async Task<IReadOnlyList<StorefrontCustomerOfferDto>> ListCustomerAsync(
+        Guid organizationId,
+        StorefrontCustomerIdentity identity,
+        CancellationToken cancellationToken)
+    {
+        DateTimeOffset now = timeProvider.GetUtcNow();
+        Customer customer = await customers.GetOrCreateAsync(organizationId, identity, now, cancellationToken);
+        IReadOnlyList<StorefrontOffer> offers = await store.ListCustomerOffersAsync(organizationId, customer.Id, cancellationToken);
+        return offers.Select(offer => ToCustomerDto(offer, now)).ToArray();
     }
 
     public async Task<AppResult<StorefrontOfferResultDto>> SubmitAsync(
         Guid organizationId,
+        StorefrontCustomerIdentity identity,
         StorefrontOfferRequest request,
         CancellationToken cancellationToken)
     {
-        string? buyerName = Text.TrimToNull(request.BuyerName);
-        string? buyerEmail = Text.TrimToNull(request.BuyerEmail);
-        string? buyerPhone = Text.TrimToNull(request.BuyerPhone);
         string? message = Text.TrimToNull(request.Message);
-
-        if (buyerEmail is not null && !IsEmail(buyerEmail))
-        {
-            return AppResult<StorefrontOfferResultDto>.Validation("Email is invalid.");
-        }
         if (request.OfferAmount <= 0)
         {
             return AppResult<StorefrontOfferResultDto>.Validation("Offer amount must be greater than zero.");
@@ -81,20 +75,24 @@ public sealed class StorefrontOfferWorkflowService(IStorefrontOfferStore store, 
             return AppResult<StorefrontOfferResultDto>.Validation($"Maximum offer is {Money(max)}.");
         }
 
+        DateTimeOffset now = timeProvider.GetUtcNow();
+        Customer customer = await customers.GetOrCreateAsync(organizationId, identity, now, cancellationToken);
         StorefrontOffer offer = new()
         {
             OrganizationId = organizationId,
+            CustomerId = customer.Id,
+            Customer = customer,
             StoreListingId = listing.Id,
             StoreListing = listing,
             InventoryItemId = listing.InventoryItemId,
             InventoryItem = listing.InventoryItem,
             OfferAmount = offerAmount,
             ListingPriceSnapshot = listing.ListPrice,
-            BuyerName = buyerName,
-            BuyerEmail = buyerEmail?.Trim().ToLowerInvariant(),
-            BuyerPhone = buyerPhone,
+            BuyerName = customer.DisplayName,
+            BuyerEmail = customer.Email,
+            BuyerPhone = customer.Phone,
             Message = message,
-            OfferedAt = timeProvider.GetUtcNow(),
+            OfferedAt = now,
             Status = StorefrontOfferStatus.New,
         };
 
@@ -104,31 +102,121 @@ public sealed class StorefrontOfferWorkflowService(IStorefrontOfferStore store, 
         return AppResult<StorefrontOfferResultDto>.Ok(new StorefrontOfferResultDto(
             offer.Id,
             offer.Status.ToString(),
-            "Offer received."));
+            "Offer received. Check My Offers for the response."));
     }
 
-    private static bool IsEmail(string? value)
+    public async Task<AppResult<StorefrontOfferDto>> DecideAsync(
+        Guid organizationId,
+        Guid offerId,
+        StorefrontOfferDecisionRequest request,
+        CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(value))
+        StorefrontOffer? offer = await store.FindOfferAsync(organizationId, offerId, cancellationToken);
+        if (offer is null)
         {
-            return false;
+            return AppResult<StorefrontOfferDto>.NotFound("Offer was not found.");
         }
 
-        if (!value.Contains('@'))
+        string? decision = Text.TrimToNull(request.Decision);
+        string? responseMessage = Text.TrimToNull(request.ResponseMessage);
+        DateTimeOffset now = timeProvider.GetUtcNow();
+
+        switch (decision?.ToLowerInvariant())
         {
-            return false;
+            case "accept":
+            case "accepted":
+                offer.Status = StorefrontOfferStatus.Accepted;
+                offer.ResponseAmount = offer.OfferAmount;
+                offer.ResponseMessage = responseMessage ?? $"Accepted at {Money(offer.OfferAmount)}.";
+                offer.ExpiresAt = now.AddDays(ResponseExpiryDays);
+                break;
+
+            case "decline":
+            case "declined":
+                offer.Status = StorefrontOfferStatus.Declined;
+                offer.ResponseAmount = null;
+                offer.ResponseMessage = responseMessage ?? "Declined.";
+                offer.ExpiresAt = null;
+                break;
+
+            case "counter":
+            case "countered":
+                if (request.ResponseAmount is null || request.ResponseAmount <= 0)
+                {
+                    return AppResult<StorefrontOfferDto>.Validation("Counter amount must be greater than zero.");
+                }
+
+                decimal counter = decimal.Round(request.ResponseAmount.Value, 2, MidpointRounding.AwayFromZero);
+                offer.Status = StorefrontOfferStatus.Countered;
+                offer.ResponseAmount = counter;
+                offer.ResponseMessage = responseMessage ?? $"Countered at {Money(counter)}.";
+                offer.ExpiresAt = now.AddDays(ResponseExpiryDays);
+                break;
+
+            default:
+                return AppResult<StorefrontOfferDto>.Validation("Decision must be accept, decline, or counter.");
         }
 
-        try
-        {
-            MailAddress address = new(value);
-            return string.Equals(address.Address, value.Trim(), StringComparison.OrdinalIgnoreCase);
-        }
-        catch (FormatException)
-        {
-            return false;
-        }
+        offer.RespondedAt = now;
+        offer.ResponseNotes = offer.ResponseMessage;
+        await store.SaveChangesAsync(cancellationToken);
+
+        return AppResult<StorefrontOfferDto>.Ok(ToAdminDto(offer, now));
     }
 
     private static string Money(decimal amount) => string.Format(CultureInfo.GetCultureInfo("en-US"), "{0:C}", amount);
+
+    private static StorefrontOfferDto ToAdminDto(StorefrontOffer offer, DateTimeOffset now) => new(
+        offer.Id,
+        offer.CustomerId,
+        offer.StoreListingId,
+        offer.InventoryItemId,
+        offer.StoreListing?.Title ?? offer.InventoryItem?.Title ?? "Storefront listing",
+        DisplayStatus(offer, now),
+        offer.OfferAmount,
+        offer.ListingPriceSnapshot,
+        offer.ResponseAmount,
+        offer.BuyerName ?? offer.Customer?.DisplayName,
+        offer.BuyerEmail ?? offer.Customer?.Email,
+        offer.BuyerPhone ?? offer.Customer?.Phone,
+        offer.Message,
+        offer.OfferedAt,
+        offer.RespondedAt,
+        offer.ExpiresAt,
+        offer.ConvertedAt,
+        offer.ResponseMessage,
+        offer.ResponseNotes);
+
+    private static StorefrontCustomerOfferDto ToCustomerDto(StorefrontOffer offer, DateTimeOffset now)
+    {
+        string status = DisplayStatus(offer, now);
+        bool canCheckout = IsCheckoutableStatus(status)
+            && CartWorkflowService.ApprovedOfferAmount(offer, now) is not null
+            && StorefrontPurchasability.IsPurchasable(offer.StoreListing);
+
+        return new StorefrontCustomerOfferDto(
+            offer.Id,
+            offer.StoreListingId,
+            offer.StoreListing?.Title ?? offer.InventoryItem?.Title ?? "Storefront listing",
+            offer.StoreListing?.Slug ?? string.Empty,
+            status,
+            offer.OfferAmount,
+            offer.ListingPriceSnapshot,
+            offer.ResponseAmount,
+            offer.ResponseMessage,
+            offer.OfferedAt,
+            offer.RespondedAt,
+            offer.ExpiresAt,
+            canCheckout);
+    }
+
+    private static string DisplayStatus(StorefrontOffer offer, DateTimeOffset now) =>
+        offer.ExpiresAt is DateTimeOffset expiresAt
+            && expiresAt <= now
+            && offer.Status is StorefrontOfferStatus.Accepted or StorefrontOfferStatus.Countered
+            ? StorefrontOfferStatus.Expired.ToString()
+            : offer.Status.ToString();
+
+    private static bool IsCheckoutableStatus(string status) =>
+        status is nameof(StorefrontOfferStatus.Accepted) or nameof(StorefrontOfferStatus.Countered);
 }

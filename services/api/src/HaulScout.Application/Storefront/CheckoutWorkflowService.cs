@@ -34,8 +34,15 @@ public sealed class CheckoutWorkflowService(
 
         // A line whose listing stopped being purchasable never reaches payment. The shopper is told which ones,
         // removes them, and tries again — silently dropping paid-for-looking items would be worse than the friction.
+        DateTimeOffset now = timeProvider.GetUtcNow();
+        if (cart.Lines.Any(line => line.StorefrontOfferId is not null
+            && (cart.CustomerId is null || line.StorefrontOffer?.CustomerId != cart.CustomerId)))
+        {
+            return AppResult<StorefrontCheckoutResultDto>.Conflict("Sign in with the account that owns this offer to check out.");
+        }
+
         string[] unavailable = cart.Lines
-            .Where(line => !StorefrontPurchasability.IsPurchasable(line.StoreListing))
+            .Where(line => !IsCheckoutLineAvailable(line, now))
             .Select(line => line.StoreListing?.Title ?? "An item")
             .ToArray();
 
@@ -52,7 +59,7 @@ public sealed class CheckoutWorkflowService(
             // isn't locked out of their own items for the rest of the expiry window.
             await ReleasePendingAsync(pending, cancellationToken);
             unavailable = cart.Lines
-                .Where(line => !StorefrontPurchasability.IsPurchasable(line.StoreListing)
+                .Where(line => !IsCheckoutLineAvailable(line, now)
                     && !pending.Lines.Any(ordered => ordered.StoreListingId == line.StoreListingId))
                 .Select(line => line.StoreListing?.Title ?? "An item")
                 .ToArray();
@@ -132,13 +139,14 @@ public sealed class CheckoutWorkflowService(
             PaymentStatus = PaymentStatus.Pending,
             FulfillmentStatus = FulfillmentStatus.Unfulfilled,
             SourceCartId = cart.Id,
+            CustomerId = cart.CustomerId,
             CreatedAt = now,
         };
 
         foreach (CartLine line in cart.Lines)
         {
-            // The listing's CURRENT price is charged — an add-time snapshot must not honor a since-corrected price.
-            decimal unitPrice = line.StoreListing?.ListPrice ?? line.UnitPriceSnapshot;
+            // Regular carts charge current listing price; approved-offer carts charge the approved offer snapshot.
+            decimal unitPrice = CartWorkflowService.EffectiveUnitPrice(line);
             InventoryItem? item = itemsById.GetValueOrDefault(line.InventoryItemId);
             order.Lines.Add(new OrderLine
             {
@@ -146,6 +154,7 @@ public sealed class CheckoutWorkflowService(
                 OrderId = order.Id,
                 InventoryItemId = line.InventoryItemId,
                 StoreListingId = line.StoreListingId,
+                StorefrontOfferId = line.StorefrontOfferId,
                 TitleSnapshot = line.StoreListing?.Title ?? item?.Title ?? "Item",
                 SkuSnapshot = item?.Barcode,
                 UnitPrice = unitPrice,
@@ -225,4 +234,15 @@ public sealed class CheckoutWorkflowService(
 
     /// <summary>Exactly once, at the processor seam: dollars to integer cents.</summary>
     internal static long ToCents(decimal amount) => (long)Math.Round(amount * 100m, MidpointRounding.AwayFromZero);
+
+    private static bool IsCheckoutLineAvailable(CartLine line, DateTimeOffset now)
+    {
+        if (line.StorefrontOfferId is not null
+            && (line.StorefrontOffer is null || CartWorkflowService.ApprovedOfferAmount(line.StorefrontOffer, now) is null))
+        {
+            return false;
+        }
+
+        return StorefrontPurchasability.IsPurchasable(line.StoreListing);
+    }
 }

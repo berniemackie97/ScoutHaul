@@ -400,6 +400,9 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("StoreListingId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("StorefrontOfferId")
+                        .HasColumnType("uuid");
+
                     b.Property<decimal>("UnitPriceSnapshot")
                         .HasPrecision(12, 2)
                         .HasColumnType("numeric(12,2)");
@@ -413,7 +416,11 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("StoreListingId");
 
+                    b.HasIndex("StorefrontOfferId");
+
                     b.HasIndex("OrganizationId", "CartId");
+
+                    b.HasIndex("OrganizationId", "StorefrontOfferId");
 
                     b.HasIndex("OrganizationId", "CartId", "StoreListingId")
                         .IsUnique();
@@ -593,7 +600,9 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasFilter("\"Email\" IS NOT NULL");
 
-                    b.HasIndex("OrganizationId", "ExternalSubject");
+                    b.HasIndex("OrganizationId", "ExternalSubject")
+                        .IsUnique()
+                        .HasFilter("\"ExternalSubject\" IS NOT NULL");
 
                     b.ToTable("Customers", (string)null);
                 });
@@ -1668,6 +1677,9 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                     b.Property<Guid?>("StoreListingId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("StorefrontOfferId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("TitleSnapshot")
                         .IsRequired()
                         .HasMaxLength(300)
@@ -1690,7 +1702,11 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("OrderId");
 
+                    b.HasIndex("StorefrontOfferId");
+
                     b.HasIndex("OrganizationId", "OrderId");
+
+                    b.HasIndex("OrganizationId", "StorefrontOfferId");
 
                     b.ToTable("OrderLines", (string)null);
                 });
@@ -3464,7 +3480,16 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                         .HasMaxLength(40)
                         .HasColumnType("character varying(40)");
 
+                    b.Property<DateTimeOffset?>("ConvertedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CustomerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("ExpiresAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid>("InventoryItemId")
@@ -3491,6 +3516,14 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset?>("RespondedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<decimal?>("ResponseAmount")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
+
+                    b.Property<string>("ResponseMessage")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
                     b.Property<string>("ResponseNotes")
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)");
@@ -3508,11 +3541,15 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("CustomerId");
+
                     b.HasIndex("InventoryItemId");
 
                     b.HasIndex("StoreListingId");
 
                     b.HasIndex("OrganizationId", "BuyerEmail");
+
+                    b.HasIndex("OrganizationId", "CustomerId");
 
                     b.HasIndex("OrganizationId", "Status");
 
@@ -3650,9 +3687,16 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("HaulScout.Domain.Entities.StorefrontOffer", "StorefrontOffer")
+                        .WithMany()
+                        .HasForeignKey("StorefrontOfferId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("Cart");
 
                     b.Navigation("StoreListing");
+
+                    b.Navigation("StorefrontOffer");
                 });
 
             modelBuilder.Entity("HaulScout.Domain.Entities.ChannelAccount", b =>
@@ -3930,9 +3974,16 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("HaulScout.Domain.Entities.StorefrontOffer", "StorefrontOffer")
+                        .WithMany()
+                        .HasForeignKey("StorefrontOfferId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("InventoryItem");
 
                     b.Navigation("Order");
+
+                    b.Navigation("StorefrontOffer");
                 });
 
             modelBuilder.Entity("HaulScout.Domain.Entities.OrgReferenceOverride", b =>
@@ -4384,6 +4435,11 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("HaulScout.Domain.Entities.StorefrontOffer", b =>
                 {
+                    b.HasOne("HaulScout.Domain.Entities.Customer", "Customer")
+                        .WithMany()
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("HaulScout.Domain.Entities.InventoryItem", "InventoryItem")
                         .WithMany()
                         .HasForeignKey("InventoryItemId")
@@ -4395,6 +4451,8 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                         .HasForeignKey("StoreListingId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.Navigation("Customer");
 
                     b.Navigation("InventoryItem");
 

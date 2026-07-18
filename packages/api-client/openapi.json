@@ -8419,6 +8419,46 @@
         }
       }
     },
+    "/api/storefront/cart/offers/{offerId}/line": {
+      "post": {
+        "tags": [
+          "StorefrontCart"
+        ],
+        "parameters": [
+          {
+            "name": "offerId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorefrontCartDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorefrontCartDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorefrontCartDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/storefront/cart/lines/{storeListingId}": {
       "delete": {
         "tags": [
@@ -8527,7 +8567,7 @@
         }
       }
     },
-    "/api/storefront/offers": {
+    "/api/admin/storefront/offers": {
       "get": {
         "tags": [
           "StorefrontOfferAdmin"
@@ -8572,7 +8612,68 @@
             }
           }
         }
-      },
+      }
+    },
+    "/api/admin/storefront/offers/{offerId}/decision": {
+      "post": {
+        "tags": [
+          "StorefrontOfferAdmin"
+        ],
+        "parameters": [
+          {
+            "name": "offerId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StorefrontOfferDecisionRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StorefrontOfferDecisionRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/StorefrontOfferDecisionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorefrontOfferDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorefrontOfferDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorefrontOfferDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/storefront/offers": {
       "post": {
         "tags": [
           "StorefrontOffers"
@@ -8613,6 +8714,42 @@
               "text/json": {
                 "schema": {
                   "$ref": "#/components/schemas/StorefrontOfferResultDto"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "StorefrontOffers"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/StorefrontCustomerOfferDto"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/StorefrontCustomerOfferDto"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/StorefrontCustomerOfferDto"
+                  }
                 }
               }
             }
@@ -15552,6 +15689,66 @@
         },
         "additionalProperties": false
       },
+      "StorefrontCustomerOfferDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "storeListingId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "listingTitle": {
+            "type": "string",
+            "nullable": true
+          },
+          "slug": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "nullable": true
+          },
+          "offerAmount": {
+            "type": "number",
+            "format": "double"
+          },
+          "listingPriceSnapshot": {
+            "type": "number",
+            "format": "double"
+          },
+          "responseAmount": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "responseMessage": {
+            "type": "string",
+            "nullable": true
+          },
+          "offeredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "respondedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "canCheckout": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
       "StorefrontListingDetailDto": {
         "type": "object",
         "properties": {
@@ -15804,12 +16001,36 @@
         },
         "additionalProperties": false
       },
+      "StorefrontOfferDecisionRequest": {
+        "type": "object",
+        "properties": {
+          "decision": {
+            "type": "string",
+            "nullable": true
+          },
+          "responseAmount": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "responseMessage": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "StorefrontOfferDto": {
         "type": "object",
         "properties": {
           "id": {
             "type": "string",
             "format": "uuid"
+          },
+          "customerId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
           },
           "storeListingId": {
             "type": "string",
@@ -15834,6 +16055,11 @@
           "listingPriceSnapshot": {
             "type": "number",
             "format": "double"
+          },
+          "responseAmount": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
           },
           "buyerName": {
             "type": "string",
@@ -15860,6 +16086,20 @@
             "format": "date-time",
             "nullable": true
           },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "convertedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "responseMessage": {
+            "type": "string",
+            "nullable": true
+          },
           "responseNotes": {
             "type": "string",
             "nullable": true
@@ -15873,18 +16113,6 @@
           "storeListingId": {
             "type": "string",
             "format": "uuid"
-          },
-          "buyerName": {
-            "type": "string",
-            "nullable": true
-          },
-          "buyerEmail": {
-            "type": "string",
-            "nullable": true
-          },
-          "buyerPhone": {
-            "type": "string",
-            "nullable": true
           },
           "offerAmount": {
             "type": "number",
@@ -15919,6 +16147,7 @@
         "enum": [
           "New",
           "Accepted",
+          "Countered",
           "Declined",
           "Expired",
           "Converted"

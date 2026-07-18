@@ -577,7 +577,9 @@ public sealed class HaulScoutDbContext(
             entity.HasIndex(item => new { item.OrganizationId, item.Email })
                 .IsUnique()
                 .HasFilter("\"Email\" IS NOT NULL");
-            entity.HasIndex(item => new { item.OrganizationId, item.ExternalSubject });
+            entity.HasIndex(item => new { item.OrganizationId, item.ExternalSubject })
+                .IsUnique()
+                .HasFilter("\"ExternalSubject\" IS NOT NULL");
             entity.HasOne(item => item.Organization).WithMany().HasForeignKey(item => item.OrganizationId);
         });
 
@@ -662,8 +664,10 @@ public sealed class HaulScoutDbContext(
             ConfigureMoney(entity.Property(item => item.UnitPriceSnapshot));
             entity.HasIndex(item => new { item.OrganizationId, item.CartId });
             entity.HasIndex(item => new { item.OrganizationId, item.CartId, item.StoreListingId }).IsUnique();
+            entity.HasIndex(item => new { item.OrganizationId, item.StorefrontOfferId });
             entity.HasOne(item => item.Cart).WithMany(item => item.Lines).HasForeignKey(item => item.CartId).OnDelete(DeleteBehavior.Cascade);
             entity.HasOne(item => item.StoreListing).WithMany().HasForeignKey(item => item.StoreListingId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(item => item.StorefrontOffer).WithMany().HasForeignKey(item => item.StorefrontOfferId).OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<Order>(entity =>
@@ -723,8 +727,10 @@ public sealed class HaulScoutDbContext(
             ConfigureMoney(entity.Property(item => item.LineTotal));
             ConfigureMoney(entity.Property(item => item.UnitCostSnapshot));
             entity.HasIndex(item => new { item.OrganizationId, item.OrderId });
+            entity.HasIndex(item => new { item.OrganizationId, item.StorefrontOfferId });
             entity.HasOne(item => item.Order).WithMany(item => item.Lines).HasForeignKey(item => item.OrderId).OnDelete(DeleteBehavior.Cascade);
             entity.HasOne(item => item.InventoryItem).WithMany().HasForeignKey(item => item.InventoryItemId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(item => item.StorefrontOffer).WithMany().HasForeignKey(item => item.StorefrontOfferId).OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<WishlistItem>(entity =>
@@ -753,14 +759,18 @@ public sealed class HaulScoutDbContext(
             entity.Property(item => item.Status).HasConversion<string>().HasMaxLength(24);
             ConfigureMoney(entity.Property(item => item.OfferAmount));
             ConfigureMoney(entity.Property(item => item.ListingPriceSnapshot));
+            ConfigureMoney(entity.Property(item => item.ResponseAmount));
             entity.Property(item => item.BuyerName).HasMaxLength(160);
             entity.Property(item => item.BuyerEmail).HasMaxLength(320);
             entity.Property(item => item.BuyerPhone).HasMaxLength(40);
             entity.Property(item => item.Message).HasMaxLength(2000);
+            entity.Property(item => item.ResponseMessage).HasMaxLength(2000);
             entity.Property(item => item.ResponseNotes).HasMaxLength(2000);
+            entity.HasIndex(item => new { item.OrganizationId, item.CustomerId });
             entity.HasIndex(item => new { item.OrganizationId, item.Status });
             entity.HasIndex(item => new { item.OrganizationId, item.StoreListingId, item.CreatedAt });
             entity.HasIndex(item => new { item.OrganizationId, item.BuyerEmail });
+            entity.HasOne(item => item.Customer).WithMany().HasForeignKey(item => item.CustomerId).OnDelete(DeleteBehavior.SetNull);
             entity.HasOne(item => item.StoreListing).WithMany().HasForeignKey(item => item.StoreListingId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(item => item.InventoryItem).WithMany().HasForeignKey(item => item.InventoryItemId).OnDelete(DeleteBehavior.Restrict);
         });

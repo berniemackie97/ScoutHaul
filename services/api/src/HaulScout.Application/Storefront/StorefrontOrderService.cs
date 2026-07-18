@@ -94,6 +94,7 @@ public sealed class StorefrontOrderService(
         await ConvertCartAsync(order, cancellationToken);
         await AttachCustomerAsync(order, paymentEvent, paidAt, cancellationToken);
         await RecordSalesAsync(order, paymentEvent, paidAt, cancellationToken);
+        await MarkOffersConvertedAsync(order, paidAt, cancellationToken);
 
         await checkout.SaveChangesAsync(cancellationToken);
         return PaymentEventOutcome.Finalized;
@@ -192,6 +193,19 @@ public sealed class StorefrontOrderService(
             return;
         }
 
+        if (order.CustomerId is Guid existingCustomerId)
+        {
+            Customer? existingCustomer = await checkout.FindCustomerByIdAsync(order.OrganizationId, existingCustomerId, cancellationToken);
+            if (existingCustomer is not null)
+            {
+                existingCustomer.Email ??= email;
+                existingCustomer.DisplayName = paymentEvent.CustomerName ?? existingCustomer.DisplayName;
+                UpsertStorefrontIdentity(existingCustomer, order.OrganizationId, email, paymentEvent.CustomerName, seenAt);
+                order.Customer = existingCustomer;
+                return;
+            }
+        }
+
         Customer? customer = await checkout.FindCustomerByEmailAsync(order.OrganizationId, email, cancellationToken);
         if (customer is null)
         {
@@ -201,22 +215,49 @@ public sealed class StorefrontOrderService(
                 Email = email,
                 DisplayName = paymentEvent.CustomerName,
             };
-            customer.ChannelIdentities.Add(new CustomerChannelIdentity
-            {
-                OrganizationId = order.OrganizationId,
-                CustomerId = customer.Id,
-                Channel = "Storefront",
-                ExternalUserId = email,
-                Email = email,
-                DisplayName = paymentEvent.CustomerName,
-                FirstSeenAt = seenAt,
-                LastSeenAt = seenAt,
-            });
+            UpsertStorefrontIdentity(customer, order.OrganizationId, email, paymentEvent.CustomerName, seenAt);
             await checkout.AddCustomerAsync(customer, cancellationToken);
+        }
+        else
+        {
+            UpsertStorefrontIdentity(customer, order.OrganizationId, email, paymentEvent.CustomerName, seenAt);
         }
 
         order.CustomerId = customer.Id;
         order.Customer = customer;
+    }
+
+    private static void UpsertStorefrontIdentity(
+        Customer customer,
+        Guid organizationId,
+        string email,
+        string? displayName,
+        DateTimeOffset seenAt)
+    {
+        CustomerChannelIdentity? channelIdentity = customer.ChannelIdentities.SingleOrDefault(identity =>
+            identity.OrganizationId == organizationId
+            && identity.Channel == "Storefront"
+            && identity.ExternalUserId == email);
+
+        if (channelIdentity is null)
+        {
+            customer.ChannelIdentities.Add(new CustomerChannelIdentity
+            {
+                OrganizationId = organizationId,
+                CustomerId = customer.Id,
+                Channel = "Storefront",
+                ExternalUserId = email,
+                Email = email,
+                DisplayName = displayName,
+                FirstSeenAt = seenAt,
+                LastSeenAt = seenAt,
+            });
+            return;
+        }
+
+        channelIdentity.Email = email;
+        channelIdentity.DisplayName = displayName ?? channelIdentity.DisplayName;
+        channelIdentity.LastSeenAt = seenAt;
     }
 
     /// <summary>
@@ -260,6 +301,16 @@ public sealed class StorefrontOrderService(
             sale.RecomputeNet();
             await checkout.AddSaleAsync(sale, cancellationToken);
         }
+    }
+
+    private async Task MarkOffersConvertedAsync(Order order, DateTimeOffset paidAt, CancellationToken cancellationToken)
+    {
+        Guid[] offerIds = order.Lines
+            .Where(line => line.StorefrontOfferId is not null)
+            .Select(line => line.StorefrontOfferId!.Value)
+            .Distinct()
+            .ToArray();
+        await checkout.MarkOffersConvertedAsync(order.OrganizationId, offerIds, paidAt, cancellationToken);
     }
 
     /// <summary>Splits a total across lines proportionally to value, cent-exact: rounding residue lands on the

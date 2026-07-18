@@ -141,6 +141,10 @@ public class StorefrontCheckoutTests
             Task.FromResult(world.Customers.FirstOrDefault(customer =>
                 string.Equals(customer.Email, email, StringComparison.OrdinalIgnoreCase)));
 
+        public Task<Customer?> FindCustomerByIdAsync(Guid organizationId, Guid customerId, CancellationToken cancellationToken) =>
+            Task.FromResult(world.Customers.FirstOrDefault(customer =>
+                customer.OrganizationId == organizationId && customer.Id == customerId));
+
         public Task AddCustomerAsync(Customer customer, CancellationToken cancellationToken)
         {
             world.Customers.Add(customer);
@@ -164,6 +168,71 @@ public class StorefrontCheckoutTests
 
         public Task<string?> GetStoreDomainAsync(Guid organizationId, CancellationToken cancellationToken) =>
             Task.FromResult<string?>("overhaultrading.com");
+
+        public Task MarkOffersConvertedAsync(
+            Guid organizationId,
+            IReadOnlyCollection<Guid> storefrontOfferIds,
+            DateTimeOffset convertedAt,
+            CancellationToken cancellationToken) =>
+            Task.CompletedTask;
+
+        public Task SaveChangesAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+    }
+
+    private sealed class FakeCustomerStore(World world) : IStorefrontCustomerStore
+    {
+        public Task<Customer> GetOrCreateAsync(
+            Guid organizationId,
+            StorefrontCustomerIdentity identity,
+            DateTimeOffset seenAt,
+            CancellationToken cancellationToken)
+        {
+            Customer? customer = world.Customers.FirstOrDefault(item =>
+                item.OrganizationId == organizationId && item.ExternalSubject == identity.ExternalSubject);
+            if (customer is null)
+            {
+                customer = new Customer
+                {
+                    OrganizationId = organizationId,
+                    ExternalSubject = identity.ExternalSubject,
+                    Email = identity.Email,
+                    DisplayName = identity.DisplayName,
+                };
+                world.Customers.Add(customer);
+            }
+
+            return Task.FromResult(customer);
+        }
+    }
+
+    private sealed class FakeOfferStore : IStorefrontOfferStore
+    {
+        public Task<IReadOnlyList<StorefrontOffer>> ListOffersAsync(
+            Guid organizationId,
+            StorefrontOfferStatus? status,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<StorefrontOffer>>([]);
+
+        public Task<StorefrontOffer?> FindOfferAsync(Guid organizationId, Guid offerId, CancellationToken cancellationToken) =>
+            Task.FromResult<StorefrontOffer?>(null);
+
+        public Task<IReadOnlyList<StorefrontOffer>> ListCustomerOffersAsync(
+            Guid organizationId,
+            Guid customerId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<StorefrontOffer>>([]);
+
+        public Task<StorefrontOffer?> FindCustomerOfferAsync(
+            Guid organizationId,
+            Guid customerId,
+            Guid offerId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<StorefrontOffer?>(null);
+
+        public Task<StoreListing?> FindListingAsync(Guid organizationId, Guid storeListingId, CancellationToken cancellationToken) =>
+            Task.FromResult<StoreListing?>(null);
+
+        public Task AddOfferAsync(StorefrontOffer offer, CancellationToken cancellationToken) => Task.CompletedTask;
 
         public Task SaveChangesAsync(CancellationToken cancellationToken) => Task.CompletedTask;
     }
@@ -213,7 +282,7 @@ public class StorefrontCheckoutTests
         StorefrontShippingCalculator shipping = new(options);
         return (
             world,
-            new CartWorkflowService(cartStore, checkoutStore, shipping, options),
+            new CartWorkflowService(cartStore, checkoutStore, new FakeCustomerStore(world), new FakeOfferStore(), shipping, options, clock),
             new CheckoutWorkflowService(cartStore, checkoutStore, gateway, shipping, options, clock),
             new StorefrontOrderService(checkoutStore, gateway, clock),
             gateway,

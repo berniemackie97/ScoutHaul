@@ -54,21 +54,29 @@ Next server ──X-HaulScout-Store + X-HaulScout-Cart──▶ API /api/storefr
    - `checkout.session.expired` → this order's still-`Reserved` listings return to `Active`; order `Cancelled`.
 5. **Confirmation** — success page reads the order by `session_id` (unguessable) and shows the order number.
 
-## 3. API surface (all anonymous, store resolved by `X-HaulScout-Store`)
+## 3. API surface (store resolved by `X-HaulScout-Store`)
 
 | Method | Route | Purpose |
 |---|---|---|
 | GET | `/api/storefront/cart` | Current cart, priced + validated (`X-HaulScout-Cart` token) |
 | POST | `/api/storefront/cart/lines` | Add a listing (409 if not `Active`); mints cart when token absent |
 | DELETE | `/api/storefront/cart/lines/{storeListingId}` | Remove a line |
+| POST | `/api/storefront/cart/offers/{offerId}/line` | Add an accepted/countered offer to cart (**customer auth required**) |
 | POST | `/api/storefront/checkout` | Reserve + create order + Stripe session → `{ checkoutUrl }` |
 | POST | `/api/storefront/stripe/webhook` | Stripe events (raw body + signature; no store header — org from order) |
 | GET | `/api/storefront/orders/by-session/{sessionId}` | Confirmation-page order summary |
-| POST | `/api/storefront/offers` | Capture a buyer offer lead; does not reserve inventory or move money |
+| GET | `/api/storefront/offers` | Customer's own offers (**customer auth required**) |
+| POST | `/api/storefront/offers` | Submit a buyer offer (**customer auth required**); does not reserve inventory or move money |
+| GET | `/api/admin/storefront/offers` | Operator offer inbox (**operator auth + ManageOrders required**) |
+| POST | `/api/admin/storefront/offers/{offerId}/decision` | Accept, decline, or counter an offer (**operator auth + ManageOrders required**) |
 
 Next.js keeps thin `/api/cart`, `/api/checkout`, and `/api/offers` route-handler proxies. The main job is
 cookie custody: the cart token lives in a `httpOnly` cookie and is forwarded to the API as
 `X-HaulScout-Cart`, never exposed to browser JavaScript.
+
+Offers are account-owned. A storefront buyer resolves into `Customer`, never operator `AppUser` or
+`OrganizationMember`. Admin decisions update the offer row; the buyer sees the response after signing in and can
+checkout only accepted/countered offers that still belong to that same customer.
 
 ## 4. The one-of-one contention guard
 

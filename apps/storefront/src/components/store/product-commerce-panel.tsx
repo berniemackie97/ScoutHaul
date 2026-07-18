@@ -99,6 +99,10 @@ export function ProductCommercePanel({
           offerAmount: Number(form.get("offerAmount")),
         }),
       });
+      if (response.status === 401) {
+        window.location.assign(`/sign-in?next=${encodeURIComponent(window.location.pathname)}`);
+        return;
+      }
       if (!response.ok) throw new Error(await response.text());
       const result = (await response.json()) as OfferResult;
       setOfferResult(result.message || "Offer received.");
@@ -164,6 +168,7 @@ export function ProductCommercePanel({
             <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-copper">Offer on</p>
             <p className="mt-1 font-heading text-lg text-ink">{title}</p>
             <p className="text-sm text-slate">Current price: {money(price)}</p>
+            <p className="mt-2 text-xs text-slate">Customer sign-in required. No password needed.</p>
           </div>
           <div>
             <Field
@@ -179,7 +184,7 @@ export function ProductCommercePanel({
             <p className="mt-1 text-xs text-slate">
               {minimumOfferAmount != null ? `Minimum ${money(minimumOfferAmount)}. ` : null}
               {maximumOfferAmount != null ? `Maximum ${money(maximumOfferAmount)}. ` : null}
-              Contact details are handled after acceptance.
+              Sign in is required so your offer response stays tied to your account.
             </p>
           </div>
           <button
@@ -189,7 +194,14 @@ export function ProductCommercePanel({
           >
             {offerSending ? <Spinner label="Sending" /> : "Submit offer"}
           </button>
-          {offerResult ? <p className="text-sm font-medium text-emerald-700">{offerResult}</p> : null}
+          {offerResult ? (
+            <p className="text-sm font-medium text-emerald-700">
+              {offerResult}{" "}
+              <a href="/offers" className="underline underline-offset-4">
+                View My Offers
+              </a>
+            </p>
+          ) : null}
         </form>
       ) : null}
     </div>
