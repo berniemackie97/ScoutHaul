@@ -1,7 +1,7 @@
 namespace HaulScout.Api.Configuration;
 
 /// <summary>
-/// Loads a local <c>.env</c> file into process environment variables for local development.
+/// Loads local <c>.env</c> profile files into process environment variables for local development.
 ///
 /// Why this exists: .NET does not read <c>.env</c> natively. Without this, configuration would
 /// silently differ depending on how you launch the API (<c>dotnet run</c> vs docker-compose).
@@ -15,10 +15,67 @@ internal static class DotEnv
 {
     public static void LoadForDevelopment(string contentRootPath)
     {
-        // Walk up from the content root to find a .env (repo layouts vary: src/Api vs services/api).
-        string? path = FindEnvFile(contentRootPath);
-        if (path is null) return;
+        IReadOnlyList<string> paths = FindEnvFiles(contentRootPath);
+        if (paths.Count == 0) return;
 
+        Dictionary<string, string> fileValues = new(StringComparer.Ordinal);
+        foreach (string path in paths)
+        {
+            LoadFile(path, fileValues);
+        }
+
+        foreach ((string key, string value) in fileValues)
+        {
+            // Never override a value already provided by the platform/shell.
+            if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable(key)))
+            {
+                Environment.SetEnvironmentVariable(key, value);
+            }
+        }
+    }
+
+    private static IReadOnlyList<string> FindEnvFiles(string startPath)
+    {
+        string? explicitFile = Environment.GetEnvironmentVariable("HAULSCOUT_ENV_FILE");
+        if (!string.IsNullOrWhiteSpace(explicitFile))
+        {
+            string fullPath = Path.GetFullPath(explicitFile);
+            return File.Exists(fullPath) ? [fullPath] : [];
+        }
+
+        DirectoryInfo? dir = new(startPath);
+        for (int depth = 0; dir is not null && depth < 6; depth++)
+        {
+            string[] candidates = CandidateNames()
+                .Select(name => Path.Combine(dir.FullName, name))
+                .Where(File.Exists)
+                .ToArray();
+            if (candidates.Length > 0)
+            {
+                return candidates;
+            }
+
+            dir = dir.Parent;
+        }
+
+        return [];
+    }
+
+    private static IEnumerable<string> CandidateNames()
+    {
+        string? profile = Environment.GetEnvironmentVariable("HAULSCOUT_ENV");
+        yield return ".env";
+        yield return ".env.local";
+        if (!string.IsNullOrWhiteSpace(profile))
+        {
+            string normalized = profile.Trim().ToLowerInvariant();
+            yield return $".env.{normalized}";
+            yield return $".env.{normalized}.local";
+        }
+    }
+
+    private static void LoadFile(string path, Dictionary<string, string> values)
+    {
         foreach (string raw in File.ReadAllLines(path))
         {
             string line = raw.Trim();
@@ -37,23 +94,8 @@ internal static class DotEnv
                 value = value[1..^1];
             }
 
-            // Never override a value already provided by the platform/shell.
-            if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable(key)))
-            {
-                Environment.SetEnvironmentVariable(key, value);
-            }
+            // Later profile files override earlier base files. Shell/platform env still wins afterward.
+            values[key] = value;
         }
-    }
-
-    private static string? FindEnvFile(string startPath)
-    {
-        DirectoryInfo? dir = new(startPath);
-        for (int depth = 0; dir is not null && depth < 6; depth++)
-        {
-            string candidate = Path.Combine(dir.FullName, ".env");
-            if (File.Exists(candidate)) return candidate;
-            dir = dir.Parent;
-        }
-        return null;
     }
 }

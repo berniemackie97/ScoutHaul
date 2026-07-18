@@ -14,9 +14,15 @@ using HaulScout.Application;
 using HaulScout.Infrastructure;
 using HaulScout.Infrastructure.Persistence;
 
-// Load .env into environment variables for local dev BEFORE the config builder reads them.
-// No-op in production (no .env file present); never overrides platform-provided vars.
-if (!string.Equals(Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT"), "Production", StringComparison.OrdinalIgnoreCase))
+// Load .env into environment variables before the config builder reads them.
+// Production cloud hosts inject real variables and ship no .env files, so this is a no-op there.
+// Local profile overrides are still allowed explicitly through HAULSCOUT_ENV/HAULSCOUT_ENV_FILE.
+bool hasExplicitLocalProfile =
+    !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("HAULSCOUT_ENV")) ||
+    !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("HAULSCOUT_ENV_FILE"));
+
+if (hasExplicitLocalProfile ||
+    !string.Equals(Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT"), "Production", StringComparison.OrdinalIgnoreCase))
 {
     DotEnv.LoadForDevelopment(Directory.GetCurrentDirectory());
 }
