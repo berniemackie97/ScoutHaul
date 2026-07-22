@@ -1,7 +1,7 @@
 import Link from "next/link";
-import Image from "next/image";
 import { notFound } from "next/navigation";
 import { ArrowLeft, BadgeCheck, ShieldCheck, Truck, RotateCcw, MapPin } from "lucide-react";
+import { ProductGallery } from "@/components/store/product-gallery";
 import { ProductCard } from "@/components/store/product-card";
 import { ProductCommercePanel } from "@/components/store/product-commerce-panel";
 import { Reveal } from "@/components/ui/reveal";
@@ -14,8 +14,17 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const item = await getListing(slug);
   return {
     title: item ? item.title : "Not found",
-    description: item?.blurb,
+    description: item ? formatDescription(item.blurb).replace(/\n+/g, " ").slice(0, 160) : undefined,
   };
+}
+
+/** Imported descriptions carry Windows line endings and doubled blank lines; normalize so the text keeps its
+ * written structure without rendering as triple-spaced or, worse, as one collapsed wall. */
+function formatDescription(raw: string): string {
+  return raw
+    .replace(/\r\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 const trust = [
@@ -65,57 +74,11 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
       <div className="mt-8 grid gap-12 lg:grid-cols-[1.05fr_0.95fr] lg:gap-16">
         {/* Gallery */}
         <div className="lg:sticky lg:top-28 lg:self-start">
-          <div className="relative">
-            {/* Certification seal */}
-            <div
-              aria-hidden
-              className="absolute -left-4 -top-5 z-20 flex h-24 w-24 -rotate-[14deg] flex-col items-center justify-center rounded-full border-2 border-copper bg-ink text-center shadow-elev-lg"
-            >
-              <span className="absolute inset-1.5 rounded-full border border-dashed border-copper/40" />
-              <span className="font-mono text-[8px] uppercase tracking-[0.16em] text-copper">Inspected</span>
-              <BadgeCheck className="my-0.5 h-5 w-5 text-copper" aria-hidden />
-              <span className="font-mono text-[8px] uppercase tracking-[0.16em] text-copper">& Graded</span>
-            </div>
-
-            <div className="relative aspect-[4/5] overflow-hidden bg-surface ring-1 ring-rule">
-              {item.image ? (
-                <Image
-                  src={item.image}
-                  alt={item.title}
-                  fill
-                  sizes="(max-width: 1024px) 100vw, 50vw"
-                  className="object-cover"
-                  priority
-                />
-              ) : (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="font-heading text-[9rem] text-ink/[0.06]">OT</span>
-                </div>
-              )}
-              {item.sku ? (
-                <span className="absolute right-4 top-4 font-mono text-[11px] uppercase tracking-[0.18em] text-slate/60">
-                  {item.sku}
-                </span>
-              ) : null}
-              <span aria-hidden className="absolute bottom-4 right-4 h-6 w-6 border-b-2 border-r-2 border-copper/60" />
-            </div>
-          </div>
-          {(item.images?.length ?? 0) > 1 ? (
-            <div className="mt-3 grid grid-cols-4 gap-3">
-              {item.images!.map((src, i) => (
-                <a
-                  key={src}
-                  href={src}
-                  target="_blank"
-                  rel="noreferrer"
-                  aria-label={`View image ${i + 1}`}
-                  className="relative aspect-square overflow-hidden bg-surface ring-1 ring-rule transition-all hover:ring-ink/30"
-                >
-                  <Image src={src} alt={`${item.title} — image ${i + 1}`} fill sizes="120px" className="object-cover" />
-                </a>
-              ))}
-            </div>
-          ) : null}
+          <ProductGallery
+            title={item.title}
+            sku={item.sku}
+            images={item.images?.length ? item.images : item.image ? [item.image] : []}
+          />
         </div>
 
         {/* Dossier */}
@@ -146,7 +109,7 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
               ) : null}
             </div>
 
-            <p className="mt-6 leading-relaxed text-slate">{item.blurb}</p>
+            <p className="mt-6 whitespace-pre-line leading-relaxed text-slate">{formatDescription(item.blurb)}</p>
 
             {/* Certified grade callout — the signature */}
             <div className="mt-7 flex items-center gap-4 border-l-2 border-copper bg-copper/[0.05] px-5 py-4">
