@@ -12,6 +12,7 @@ type Props = {
 
 export function CartWorkspace({ mode }: Props) {
   const autoStarted = useRef(false);
+  const paymentRef = useRef<HTMLElement>(null);
   const [cart, setCart] = useState<Cart | null>(null);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -46,6 +47,14 @@ export function CartWorkspace({ mode }: Props) {
     autoStarted.current = true;
     void checkout();
   }, [mode, loading, canCheckout, checkingOut, embeddedCheckout]);
+
+  // Once the embedded Stripe form mounts, bring it into view. It renders below the order summary, so without this
+  // the shopper is left staring at the summary while the payment form sits offscreen further down the page.
+  useEffect(() => {
+    if (embeddedCheckout) {
+      paymentRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [embeddedCheckout]);
 
   async function loadCart(signal?: AbortSignal) {
     setLoading(true);
@@ -163,13 +172,6 @@ export function CartWorkspace({ mode }: Props) {
             </section>
           ) : null}
 
-          {mode === "checkout" && embeddedCheckout ? (
-            <section className="border border-rule bg-background p-3 lg:col-span-2 sm:p-5">
-              <h2 className="mb-4 font-heading text-2xl font-semibold text-ink">Payment</h2>
-              <EmbeddedStripeCheckout session={embeddedCheckout} />
-            </section>
-          ) : null}
-
           <section className="divide-y divide-rule border border-rule bg-background">
             {cart.lines.map((line) => (
               <article key={line.storeListingId} className="grid gap-4 p-4 sm:grid-cols-[7rem_1fr_auto] sm:p-5">
@@ -284,6 +286,13 @@ export function CartWorkspace({ mode }: Props) {
               </li>
             </ul>
           </aside>
+
+          {mode === "checkout" && embeddedCheckout ? (
+            <section ref={paymentRef} className="border border-rule bg-background p-3 lg:col-span-2 sm:p-5">
+              <h2 className="mb-4 font-heading text-2xl font-semibold text-ink">Payment</h2>
+              <EmbeddedStripeCheckout session={embeddedCheckout} />
+            </section>
+          ) : null}
         </div>
       ) : (
         <div className="mt-10 flex min-h-80 flex-col items-center justify-center border border-rule bg-surface px-6 text-center">
