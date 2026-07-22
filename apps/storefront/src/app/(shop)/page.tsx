@@ -4,7 +4,7 @@ import { ArrowRight, ArrowUpRight, BadgeCheck } from "lucide-react";
 import { ProductCard } from "@/components/store/product-card";
 import { NewsletterForm } from "@/components/store/newsletter-form";
 import { Reveal } from "@/components/ui/reveal";
-import { getListings, getCategories } from "@/lib/catalog";
+import { getListings, getCategories, getShelfCount } from "@/lib/catalog";
 
 // Always render from live data — never a stale, build-time snapshot.
 export const dynamic = "force-dynamic";
@@ -22,12 +22,16 @@ const services = [
   { no: "03", title: "Consignment", body: "Have something good you're done with? We'll sell it for you. Clear terms, fair split.", href: "/consignment" },
 ];
 
-const heroStats: [string, string][] = [
-  ["247", "items live"],
-  ["100%", "inspected"],
-  ["50–60%", "below retail"],
-  ["FL", "ships from"],
-];
+/** Live count comes from the catalog at request time; the claim-style stats are editorial. If the count is
+ * unavailable the entry is dropped — the storefront never shows an invented number. */
+function buildHeroStats(liveCount: number | null): [string, string][] {
+  return [
+    ...(liveCount !== null ? ([[liveCount.toLocaleString(), "items live"]] as [string, string][]) : []),
+    ["100%", "inspected"],
+    ["50–60%", "below retail"],
+    ["FL", "ships from"],
+  ];
+}
 
 const ticker = ["Inspected", "Graded straight", "Certified honest", "No surprises", "Sourced fair", "A second life"];
 
@@ -44,7 +48,8 @@ const testimonials = [
 ];
 
 export default async function HomePage() {
-  const [items, categories] = await Promise.all([getListings(), getCategories()]);
+  const [items, categories, liveCount] = await Promise.all([getListings(), getCategories(), getShelfCount()]);
+  const heroStats = buildHeroStats(liveCount);
   const featured = items[0];
   const floor = items.slice(0, 8);
 

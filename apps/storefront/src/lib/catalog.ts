@@ -68,6 +68,19 @@ export async function getListings(opts?: { category?: string; search?: string })
   }
 }
 
+/** The real number of items on the floor right now — the storefront never advertises a made-up count. */
+export async function getShelfCount(): Promise<number | null> {
+  if (!liveCatalogEnabled) return null;
+  try {
+    const { data } = await storefrontApi().GET("/api/storefront/listings", {
+      params: { query: { page: 1, pageSize: 1 } },
+    });
+    return typeof data?.total === "number" ? data.total : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function getListing(slug: string): Promise<Specimen | null> {
   if (!liveCatalogEnabled) return null;
   try {
