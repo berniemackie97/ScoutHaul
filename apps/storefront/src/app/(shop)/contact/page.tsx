@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Mail, MapPin, Phone } from "lucide-react";
+import { ArrowRight, Mail, MapPin } from "lucide-react";
 import { Reveal } from "@/components/ui/reveal";
 
 export const metadata = {
@@ -14,13 +14,6 @@ const contactMethods = [
     value: "hello@overhaultrading.com",
     href: "mailto:hello@overhaultrading.com",
     detail: "Best for order questions, offers, and consignment details.",
-  },
-  {
-    icon: Phone,
-    label: "Phone",
-    value: "(941) 555-0142",
-    href: "tel:+19415550142",
-    detail: "Use for local pickup coordination and time-sensitive questions.",
   },
   {
     icon: MapPin,
