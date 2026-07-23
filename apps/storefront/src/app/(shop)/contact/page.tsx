@@ -11,8 +11,8 @@ const contactMethods = [
   {
     icon: Mail,
     label: "Email",
-    value: "hello@overhaultrading.com",
-    href: "mailto:hello@overhaultrading.com",
+    value: "overhaultradingco@gmail.com",
+    href: "mailto:overhaultradingco@gmail.com",
     detail: "Best for order questions, offers, and consignment details.",
   },
   {

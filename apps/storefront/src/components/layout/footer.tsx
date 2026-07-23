@@ -41,8 +41,8 @@ export function Footer() {
               <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-copper">LLC</span>
             </div>
             <p className="max-w-xs text-sm leading-relaxed text-background/65">
-              Quality goods, a second life. Sourced carefully, described honestly, delivered reliably — a serious
-              operator, not a flea-market stall.
+              Quality pre-owned goods, held to a higher standard. Every piece inspected, graded honestly, and backed
+              by us.
             </p>
             <p className="inline-flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.18em] text-copper">
               <BadgeCheck className="h-4 w-4" aria-hidden /> Every item inspected &amp; graded
@@ -52,6 +52,12 @@ export function Footer() {
               <br />
               Bradenton, FL 34203
             </p>
+            <a
+              href="mailto:overhaultradingco@gmail.com"
+              className="inline-block font-mono text-[11px] lowercase tracking-[0.06em] text-background/55 transition-colors hover:text-copper"
+            >
+              overhaultradingco@gmail.com
+            </a>
           </div>
 
           {columns.map((col) => (
