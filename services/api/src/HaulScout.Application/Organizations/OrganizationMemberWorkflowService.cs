@@ -147,6 +147,18 @@ public sealed class OrganizationMemberWorkflowService(
             return AppResult<OrganizationMemberDto>.NotFound();
         }
 
+        // An organization must always keep an owner. Demoting the last owner is only possible after another member is
+        // promoted — the same rule RemoveAsync enforces, so ownership can be transferred but never dropped entirely.
+        bool memberIsOwner = member.Role == OrganizationRole.Owner || member.RoleDefinition?.IsOwnerRole == true;
+        if (memberIsOwner && !ownerRoleRequested)
+        {
+            int ownerCount = await members.CountOwnersAsync(id, cancellationToken);
+            if (ownerCount <= 1)
+            {
+                return AppResult<OrganizationMemberDto>.Validation("An organization must keep at least one owner. Make another member an owner first, then change this one.");
+            }
+        }
+
         if (ownerRoleRequested && role is null)
         {
             role = await roles.FindOwnerRoleAsync(id, cancellationToken);

@@ -160,6 +160,26 @@ export async function createInviteCode(orgId: string, _prev: TeamResult, formDat
   return { ok: true, message: "Invite code created — copy it now, it won't be shown again.", code: result.data.code };
 }
 
+export async function updateRole(orgId: string, roleId: string, _prev: TeamResult, formData: FormData): Promise<TeamResult> {
+  const name = text(formData, "name");
+  const permissions = selectedPermissions(formData);
+  const fieldErrors: FieldErrors = {};
+  if (!name) fieldErrors.name = "Role name is required.";
+  if (permissions.length === 0) fieldErrors.permissions = "A role needs at least one permission.";
+  if (Object.keys(fieldErrors).length > 0) {
+    return failure("Fix the highlighted fields.", formData, fieldErrors);
+  }
+
+  const api = await getApiClient();
+  const result = await api.PUT("/api/organizations/{id}/roles/{roleId}", {
+    params: { path: { id: orgId, roleId } },
+    body: { name: name!, description: text(formData, "description"), permissions, grantsOwnerAccess: false },
+  });
+  if (!result.data) return failure(errorMessage(result.error, "The role could not be updated."), formData);
+  revalidate();
+  return { ok: true, message: `Role “${name}” updated.` };
+}
+
 export async function deactivateInviteCode(orgId: string, inviteCodeId: string): Promise<TeamResult> {
   const api = await getApiClient();
   const result = await api.PATCH("/api/organizations/{id}/invite-codes/{inviteCodeId}/deactivate", {
