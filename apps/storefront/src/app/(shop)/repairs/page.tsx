@@ -1,8 +1,11 @@
-"use client";
-
-import { useState, type FormEvent } from "react";
-import { BadgeCheck, Wrench } from "lucide-react";
 import { Reveal } from "@/components/ui/reveal";
+import { ServiceRequestForm } from "@/components/store/service-request-form";
+
+export const metadata = {
+  title: "Repairs",
+  description:
+    "Honest repair for electronics, furniture, and appliances at Overhaul Trading Company. Free no-obligation quotes, real workmanship, and a straight answer about whether it's worth fixing.",
+};
 
 const repairTypes = [
   { title: "Electronics", body: "Laptops, phones, tablets, audio, gaming." },
@@ -12,42 +15,16 @@ const repairTypes = [
 ];
 
 const steps = [
-  { no: "01", title: "Submit", body: "Tell us what needs fixing and what's wrong with it." },
+  { no: "01", title: "Submit", body: "Tell us what needs fixing and send a few photos of the problem." },
   { no: "02", title: "Quote", body: "We diagnose it and send a fair, no-obligation price." },
   { no: "03", title: "Repair", body: "Once you approve, we get to work — quality over speed." },
   { no: "04", title: "Pick up", body: "Grab it locally or we ship it back. Good as it gets." },
 ];
 
-const inputClass =
-  "w-full border border-rule bg-background px-4 py-3 text-sm text-ink outline-none transition-colors placeholder:text-slate/50 focus:border-copper";
-const labelClass = "mb-2 block font-mono text-[11px] uppercase tracking-[0.16em] text-slate/70";
-
 export default function RepairsPage() {
-  const [submitted, setSubmitted] = useState(false);
-
-  if (submitted) {
-    return (
-      <div className="mx-auto max-w-md px-6 py-32 text-center">
-        <span className="inline-flex h-16 w-16 items-center justify-center rounded-full border-2 border-copper text-copper">
-          <BadgeCheck className="h-8 w-8" aria-hidden />
-        </span>
-        <h1 className="mt-7 font-heading text-3xl font-semibold tracking-[-0.02em] text-ink">Request received.</h1>
-        <p className="mt-3 leading-relaxed text-slate">
-          We&rsquo;ll review it and send a quote within 24–48 hours. No obligation, no surprises.
-        </p>
-        <button
-          onClick={() => setSubmitted(false)}
-          className="mt-8 border-b border-ink/30 pb-1 font-mono text-[11px] uppercase tracking-[0.16em] text-ink transition-colors hover:border-copper hover:text-copper"
-        >
-          Submit another
-        </button>
-      </div>
-    );
-  }
-
   return (
     <div>
-      {/* Header — dark */}
+      {/* Hero — dark */}
       <section className="relative overflow-hidden bg-ink text-background">
         <div
           aria-hidden
@@ -66,8 +43,8 @@ export default function RepairsPage() {
               <span className="text-copper">Repair it.</span>
             </h1>
             <p className="mt-7 max-w-xl text-lg leading-relaxed text-background/70">
-              Honest repair for electronics, furniture, and appliances. Fair pricing, real workmanship, and a
-              straight answer about whether it&rsquo;s worth fixing.
+              Honest repair for electronics, furniture, and appliances. Fair pricing, real workmanship, and a straight
+              answer about whether it&rsquo;s worth fixing.
             </p>
           </Reveal>
         </div>
@@ -118,46 +95,9 @@ export default function RepairsPage() {
           <p className="mt-3 text-sm leading-relaxed text-slate">
             Free quotes, no obligation. We only proceed with your approval — most repairs done in 3–5 business days.
           </p>
-
-          <form onSubmit={(e: FormEvent) => { e.preventDefault(); setSubmitted(true); }} className="mt-8 space-y-5">
-            <div className="grid gap-5 sm:grid-cols-2">
-              <div>
-                <label htmlFor="item" className={labelClass}>Item</label>
-                <input id="item" required placeholder="e.g. Marantz 2230 receiver" className={inputClass} />
-              </div>
-              <div>
-                <label htmlFor="category" className={labelClass}>Category</label>
-                <select id="category" required defaultValue="" className={inputClass}>
-                  <option value="" disabled>Select…</option>
-                  <option>Electronics</option>
-                  <option>Furniture</option>
-                  <option>Appliances</option>
-                  <option>General</option>
-                </select>
-              </div>
-            </div>
-            <div>
-              <label htmlFor="issue" className={labelClass}>What&rsquo;s wrong with it?</label>
-              <textarea id="issue" required rows={4} placeholder="Describe the issue in as much detail as you can…" className={inputClass} />
-            </div>
-            <div className="grid gap-5 sm:grid-cols-2">
-              <div>
-                <label htmlFor="name" className={labelClass}>Your name</label>
-                <input id="name" required placeholder="Full name" className={inputClass} />
-              </div>
-              <div>
-                <label htmlFor="email" className={labelClass}>Email</label>
-                <input id="email" type="email" required placeholder="you@email.com" className={inputClass} />
-              </div>
-            </div>
-            <button
-              type="submit"
-              className="group inline-flex w-full items-center justify-center gap-2.5 bg-ink px-6 py-3.5 text-sm font-semibold uppercase tracking-[0.12em] text-background transition-colors hover:bg-copper"
-            >
-              <Wrench className="h-4 w-4" aria-hidden />
-              Submit repair request
-            </button>
-          </form>
+          <div className="mt-10">
+            <ServiceRequestForm kind="repair" />
+          </div>
         </Reveal>
       </section>
     </div>
