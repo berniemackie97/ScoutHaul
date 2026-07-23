@@ -41,12 +41,6 @@ const collections = [
   { no: "03", title: "Staff picks", body: "The pieces we'd happily take home ourselves.", href: "/products" },
 ];
 
-const testimonials = [
-  { quote: "Described the wear down to the scuff. No surprises when it showed up — rare these days.", name: "Marcus T.", place: "Sarasota, FL" },
-  { quote: "The receiver was recapped exactly like the listing said. Sounds incredible, packed with care.", name: "Dana R.", place: "Tampa, FL" },
-  { quote: "Picked up locally in Bradenton. Honest folks, fair price, zero games. I'll be back.", name: "Priya S.", place: "Bradenton, FL" },
-];
-
 export default async function HomePage() {
   const [items, categories, liveCount] = await Promise.all([getListings(), getCategories(), getShelfCount()]);
   const heroStats = buildHeroStats(liveCount);
@@ -300,31 +294,6 @@ export default async function HomePage() {
               </Reveal>
             ))}
           </div>
-        </div>
-      </section>
-
-      {/* ── Social proof ─────────────────────────────────── */}
-      <section className="mx-auto max-w-7xl px-6 py-24">
-        <Reveal>
-          <p className="font-mono text-[11px] uppercase tracking-[0.28em] text-copper">Word on the floor</p>
-          <h2 className="mt-3 font-heading text-4xl font-semibold tracking-[-0.02em] text-ink">Bought with confidence</h2>
-        </Reveal>
-        <div className="mt-12 grid gap-10 md:grid-cols-3">
-          {testimonials.map((t, i) => (
-            <Reveal key={t.name} delay={i * 90}>
-              <figure className="border-t-2 border-copper/40 pt-6">
-                <blockquote className="font-heading text-xl font-medium leading-snug text-ink">
-                  &ldquo;{t.quote}&rdquo;
-                </blockquote>
-                <figcaption className="mt-5 font-mono text-[11px] uppercase tracking-[0.16em] text-slate/70">
-                  {t.name} · {t.place}
-                </figcaption>
-                <p className="mt-2 inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.16em] text-copper">
-                  <BadgeCheck className="h-3.5 w-3.5" aria-hidden /> Verified buyer
-                </p>
-              </figure>
-            </Reveal>
-          ))}
         </div>
       </section>
 

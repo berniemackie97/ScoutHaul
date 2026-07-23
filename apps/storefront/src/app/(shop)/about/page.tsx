@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, BadgeCheck, MapPin, Mail, Phone } from "lucide-react";
+import { ArrowRight, BadgeCheck, MapPin, Mail } from "lucide-react";
 import { Reveal } from "@/components/ui/reveal";
 
 export const metadata = {
@@ -18,7 +18,6 @@ const values = [
 const contact = [
   { icon: MapPin, label: "1675 55th Avenue Cir E, Suite 201 · Bradenton, FL 34203" },
   { icon: Mail, label: "hello@overhaultrading.com" },
-  { icon: Phone, label: "(941) 555-0142" },
 ];
 
 export default function AboutPage() {

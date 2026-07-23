@@ -8,6 +8,11 @@ export const STORE = {
    */
   domain: process.env.NEXT_PUBLIC_STORE_DOMAIN ?? "overhaultrading.com",
   apiBaseUrl: process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://scouthaul-production.up.railway.app",
+  /**
+   * Canonical public origin, used for metadataBase, canonical links, Open Graph URLs and the sitemap. The apex
+   * 308-redirects to www, so www is the one true host — every indexable URL must point there.
+   */
+  siteUrl: process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.overhaultrading.com",
 };
 
 export const liveCatalogEnabled = Boolean(STORE.domain);

@@ -6,16 +6,51 @@ import { ProductCard } from "@/components/store/product-card";
 import { ProductCommercePanel } from "@/components/store/product-commerce-panel";
 import { Reveal } from "@/components/ui/reveal";
 import { getListing, getRelated } from "@/lib/catalog";
+import { STORE } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
+
+/** The photo endpoint serves a thumbnail by default; social cards and rich results want the full-resolution original. */
+function fullSize(url: string) {
+  return `${url}${url.includes("?") ? "&" : "?"}size=full`;
+}
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const item = await getListing(slug);
+  if (!item) return { title: "Not found" };
+
+  const description = formatDescription(item.blurb).replace(/\n+/g, " ").slice(0, 160);
+  const canonical = `/products/${item.slug}`;
+  const hero = item.image ? fullSize(item.image) : undefined;
+
   return {
-    title: item ? item.title : "Not found",
-    description: item ? formatDescription(item.blurb).replace(/\n+/g, " ").slice(0, 160) : undefined,
+    title: item.title,
+    description,
+    alternates: { canonical },
+    openGraph: {
+      type: "website",
+      title: item.title,
+      description,
+      url: `${STORE.siteUrl}${canonical}`,
+      ...(hero ? { images: [{ url: hero, alt: item.title }] } : {}),
+    },
+    twitter: {
+      card: hero ? "summary_large_image" : "summary",
+      title: item.title,
+      description,
+      ...(hero ? { images: [hero] } : {}),
+    },
   };
+}
+
+/** Map our plain condition grades onto the closest schema.org condition enum. Everything we sell is pre-owned unless
+ * it's explicitly new-in-box, so used is the honest default. */
+function schemaCondition(condition: string): string {
+  const value = condition.toLowerCase();
+  if (value.includes("new")) return "https://schema.org/NewCondition";
+  if (value.includes("refurb")) return "https://schema.org/RefurbishedCondition";
+  return "https://schema.org/UsedCondition";
 }
 
 /** Imported descriptions carry Windows line endings and doubled blank lines; normalize so the text keeps its
@@ -43,6 +78,30 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
   const categorySlug = item.category.toLowerCase().replace(/[^a-z0-9]+/g, "-");
   const savings = item.compareAt ? Math.round((1 - item.price / item.compareAt) * 100) : null;
 
+  const productImages = (item.images?.length ? item.images : item.image ? [item.image] : []).map(fullSize);
+  const productJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: item.title,
+    ...(productImages.length ? { image: productImages } : {}),
+    description: formatDescription(item.blurb),
+    ...(item.sku ? { sku: item.sku } : {}),
+    ...(item.brand ? { brand: { "@type": "Brand", name: item.brand } } : {}),
+    ...(item.model ? { model: item.model } : {}),
+    category: item.category,
+    itemCondition: schemaCondition(item.condition),
+    offers: {
+      "@type": "Offer",
+      url: `${STORE.siteUrl}/products/${item.slug}`,
+      priceCurrency: "USD",
+      price: item.price,
+      itemCondition: schemaCondition(item.condition),
+      availability:
+        item.availability === "Available" ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
+      seller: { "@type": "Organization", name: "Overhaul Trading Company" },
+    },
+  };
+
   const spec: [string, string | undefined][] = [
     ["Condition", item.condition],
     ["Brand", item.brand],
@@ -64,6 +123,10 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
 
   return (
     <div className="mx-auto max-w-7xl px-6 py-10 md:py-14">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(productJsonLd) }}
+      />
       <Link
         href="/products"
         className="group inline-flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.18em] text-slate transition-colors hover:text-ink"

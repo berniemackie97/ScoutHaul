@@ -145,11 +145,58 @@ export async function getRelated(slug: string, limit = 4): Promise<Specimen[]> {
     .slice(0, limit);
 }
 
+/** One listing reduced to what the sitemap and category counts need. */
+export type ListingSummary = { slug: string; category: string; image?: string };
+
+/**
+ * Every live listing, paged through in full. {@link getListings} is capped at 48 for the grid; the sitemap and the
+ * per-category counts need the whole shelf, so this walks every page. Returns what it has if a page fails.
+ */
+export async function getAllListings(): Promise<ListingSummary[]> {
+  if (!liveCatalogEnabled) return [];
+  const pageSize = 100;
+  const out: ListingSummary[] = [];
+  try {
+    for (let page = 1; page <= 100; page++) {
+      const { data } = await storefrontApi().GET("/api/storefront/listings", {
+        params: { query: { page, pageSize } },
+      });
+      const items = data?.items ?? [];
+      for (const dto of items) {
+        out.push({
+          slug: dto.slug ?? "",
+          category: dto.category ?? "",
+          image: dto.imageUrl ? STORE.apiBaseUrl + dto.imageUrl : undefined,
+        });
+      }
+      const total = typeof data?.total === "number" ? data.total : out.length;
+      if (items.length === 0 || out.length >= total) break;
+    }
+  } catch {
+    return out.filter((listing) => listing.slug);
+  }
+  return out.filter((listing) => listing.slug);
+}
+
 export async function getCategories(): Promise<{ name: string; slug: string; count: number }[]> {
   if (!liveCatalogEnabled) return [];
   try {
-    const { data } = await storefrontApi().GET("/api/storefront/categories", {});
-    return (data ?? []).map((category) => ({ name: category.name ?? "", slug: category.slug ?? "", count: 0 }));
+    // The categories endpoint carries no per-category count, so derive real counts from the live shelf rather than
+    // showing a made-up number. Matched on the human category name the listing projection exposes.
+    const [{ data }, listings] = await Promise.all([
+      storefrontApi().GET("/api/storefront/categories", {}),
+      getAllListings(),
+    ]);
+    const counts = new Map<string, number>();
+    for (const listing of listings) {
+      const key = listing.category.toLowerCase();
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    return (data ?? []).map((category) => ({
+      name: category.name ?? "",
+      slug: category.slug ?? "",
+      count: counts.get((category.name ?? "").toLowerCase()) ?? 0,
+    }));
   } catch {
     return [];
   }
