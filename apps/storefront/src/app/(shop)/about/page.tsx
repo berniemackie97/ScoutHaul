@@ -1,29 +1,24 @@
 import Link from "next/link";
-import { ArrowRight, BadgeCheck, MapPin, Mail } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { Reveal } from "@/components/ui/reveal";
 
 export const metadata = {
   title: "About",
   description:
-    "Overhaul Trading Company — a Bradenton, Florida resale operation. Quality secondhand goods, sourced carefully, graded honestly, delivered reliably.",
+    "Overhaul Trading Company — a Bradenton, Florida goods house. Quality pre-owned furniture, electronics, and collectibles, each one inspected, graded honestly, and backed by us.",
 };
 
 const values = [
-  { no: "01", title: "Sourced with intent", body: "Estate sales, liquidations, and smart buys — chosen for quality and character, never volume." },
-  { no: "02", title: "Graded honestly", body: "Every item inspected, tested, and graded against a plain scale. We'd rather undersell than oversell." },
-  { no: "03", title: "Priced fairly", body: "Typically 50–60% below retail. Good value for the buyer, sustainable for the business." },
-  { no: "04", title: "Kept in use", body: "Every piece we move is one less in a landfill. A second life, done right." },
-];
-
-const contact = [
-  { icon: MapPin, label: "1675 55th Avenue Cir E, Suite 201 · Bradenton, FL 34203" },
-  { icon: Mail, label: "hello@overhaultrading.com" },
+  { no: "01", title: "Sourced with an eye", body: "Estate sales, liquidations, and private finds. We buy for quality and character — never to fill a shelf." },
+  { no: "02", title: "Graded honestly", body: "Every item inspected, tested, and graded on one plain, consistent scale. We would rather undersell than overpromise." },
+  { no: "03", title: "Priced fairly", body: "Real market value, usually well below retail. A genuine deal for you, and sustainable for us." },
+  { no: "04", title: "Kept in use", body: "Every piece we move is one kept out of a landfill. Better for your wallet, and for the planet." },
 ];
 
 export default function AboutPage() {
   return (
     <div>
-      {/* Header — dark */}
+      {/* Hero — dark */}
       <section className="relative overflow-hidden bg-ink text-background">
         <div
           aria-hidden
@@ -37,11 +32,12 @@ export default function AboutPage() {
               Our story
             </p>
             <h1 className="mt-7 max-w-3xl font-heading text-[clamp(2.5rem,6.5vw,5rem)] font-semibold leading-[0.94] tracking-[-0.025em]">
-              A serious operator, not a flea-market stall.
+              Pre-owned, held to a higher standard.
             </h1>
             <p className="mt-7 max-w-xl text-lg leading-relaxed text-background/70">
-              Overhaul Trading Company is a Bradenton, Florida resale business. We source quality secondhand
-              goods strategically, grade them honestly, and stand behind everything we sell.
+              Overhaul Trading Company finds quality furniture, electronics, and collectibles, restores and inspects
+              every piece by hand, and grades it honestly — then stands behind all of it. Based in Bradenton,
+              Florida; shipping nationwide.
             </p>
           </Reveal>
         </div>
@@ -57,13 +53,14 @@ export default function AboutPage() {
           </Reveal>
           <Reveal delay={120} className="space-y-5 text-slate">
             <p className="leading-relaxed">
-              Too much good furniture, electronics, and equipment ends up discarded — not because it&rsquo;s broken,
-              but because reselling it honestly takes work most people won&rsquo;t do. We do that work.
+              A remarkable amount of genuinely good furniture, electronics, and gear is thrown out every year — not
+              because it stopped working, but because selling it properly takes work: testing, cleaning, honest
+              grading, careful packing. That work is the whole company.
             </p>
             <p className="leading-relaxed">
-              Every item is inspected, tested, and graded before it reaches the floor. The wear is in the listing,
-              the price is fair, and if something arrives not as described, it comes back. That&rsquo;s the whole
-              business: <span className="text-ink">good finds, no surprises.</span>
+              Every piece is inspected and tested before it is listed. The condition is documented plainly, the price
+              reflects it, and if anything arrives different from the listing, it comes straight back.{" "}
+              <span className="text-ink">Certified honest — no surprises.</span>
             </p>
           </Reveal>
         </div>
@@ -83,42 +80,18 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* Location / contact — dark band */}
-      <section className="bg-ink text-background">
-        <div className="mx-auto max-w-7xl px-6 py-20">
-          <div className="grid gap-12 lg:grid-cols-[1fr_1fr]">
-            <Reveal>
-              <p className="font-mono text-[11px] uppercase tracking-[0.28em] text-copper">Find us</p>
-              <h2 className="mt-3 font-heading text-3xl font-semibold tracking-[-0.02em] text-background">
-                Bradenton, Florida
-              </h2>
-              <p className="mt-4 max-w-md leading-relaxed text-background/65">
-                Shop online and we&rsquo;ll ship nationwide, or arrange local pickup right here on the Gulf Coast.
-              </p>
-              <p className="mt-6 inline-flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.18em] text-copper">
-                <BadgeCheck className="h-4 w-4" aria-hidden /> Every item inspected &amp; graded
-              </p>
-            </Reveal>
-            <Reveal delay={120}>
-              <ul className="space-y-4">
-                {contact.map((c) => (
-                  <li key={c.label} className="flex items-center gap-3 text-sm text-background/75">
-                    <c.icon className="h-4 w-4 shrink-0 text-copper" aria-hidden />
-                    {c.label}
-                  </li>
-                ))}
-              </ul>
-            </Reveal>
-          </div>
-        </div>
-      </section>
-
-      {/* CTA */}
-      <section className="mx-auto max-w-7xl px-6 py-20 text-center">
+      {/* Closing CTA — single band, location folded in (footer carries the full contact details) */}
+      <section className="mx-auto max-w-7xl px-6 pb-28 pt-4 text-center">
         <Reveal>
+          <p className="font-mono text-[11px] uppercase tracking-[0.28em] text-copper">
+            Bradenton, FL · Shipping nationwide · Local pickup on the Gulf Coast
+          </p>
+          <h2 className="mx-auto mt-4 max-w-2xl font-heading text-[clamp(1.75rem,3.5vw,2.75rem)] font-semibold tracking-[-0.02em] text-ink">
+            Come find something good.
+          </h2>
           <Link
             href="/products"
-            className="group inline-flex items-center gap-2.5 bg-ink px-7 py-3.5 text-sm font-semibold uppercase tracking-[0.12em] text-background transition-colors hover:bg-copper"
+            className="group mt-8 inline-flex items-center gap-2.5 bg-ink px-7 py-3.5 text-sm font-semibold uppercase tracking-[0.12em] text-background transition-colors hover:bg-copper"
           >
             Shop the floor
             <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" aria-hidden />
