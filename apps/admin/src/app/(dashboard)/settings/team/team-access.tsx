@@ -1,14 +1,14 @@
 "use client";
 
-import { useActionState, useState, useTransition } from "react";
+import { useActionState, useEffect, useState, useTransition } from "react";
 import { useFormStatus } from "react-dom";
 import { useRouter } from "next/navigation";
-import { Copy, Mail, Shield, Trash2, UserPlus } from "lucide-react";
+import { Copy, Mail, Pencil, Shield, Trash2, UserPlus, X } from "lucide-react";
 import type { components } from "@overhaul/api-client";
-import { Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Label, Textarea } from "@overhaul/ui";
+import { Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Label } from "@overhaul/ui";
 import {
   inviteMember, resendInvite, changeMemberRole, removeMember,
-  createRole, createInviteCode, deactivateInviteCode, type TeamResult,
+  createRole, updateRole, createInviteCode, deactivateInviteCode, type TeamResult,
 } from "./actions";
 
 type Member = components["schemas"]["OrganizationMemberDto"];
@@ -46,6 +46,7 @@ export function TeamAccess({ orgId, members, roles, permissions, codes }: { orgI
   const codeValues = codeState.values ?? {};
   const codeErrors = codeState.fieldErrors ?? {};
   const codeKey = codeState.formKey ?? "initial";
+  const ownerCount = members.filter((member) => member.role === "Owner").length;
 
   function run(fn: () => Promise<TeamResult>) {
     startTransition(async () => {
@@ -77,10 +78,23 @@ export function TeamAccess({ orgId, members, roles, permissions, codes }: { orgI
                     <td className="px-3 py-2"><span className="font-medium">{member.displayName}</span><span className="text-muted-foreground block text-xs">{member.email}</span></td>
                     <td className="px-3 py-2">
                       <select
-                        defaultValue={member.roleId ?? `legacy:${member.role}`}
-                        disabled={pending || member.role === "Owner"}
+                        defaultValue={member.role === "Owner" ? "legacy:Owner" : (member.roleId ?? `legacy:${member.role}`)}
+                        disabled={pending}
                         onChange={(event) => {
                           const value = event.target.value;
+                          const current = member.role === "Owner" ? "legacy:Owner" : (member.roleId ?? `legacy:${member.role}`);
+                          const revert = () => { event.target.value = current; };
+                          // Never strand the org without an owner — promote a replacement first.
+                          if (member.role === "Owner" && value !== "legacy:Owner" && ownerCount <= 1) {
+                            setRowMsg({ ok: false, message: "This is the only owner. Make another member an Owner first, then change this one." });
+                            revert();
+                            return;
+                          }
+                          if (value === "legacy:Owner" && member.role !== "Owner" &&
+                              !confirm(`Make ${member.displayName} an Owner? Owners get full control of the organization.`)) {
+                            revert();
+                            return;
+                          }
                           const roleId = value.startsWith("legacy:") ? null : value;
                           const legacyRole = value.startsWith("legacy:") ? (value.slice(7) as "Owner" | "Member") : null;
                           run(() => changeMemberRole(orgId, member.id!, roleId, legacyRole));
@@ -158,10 +172,7 @@ export function TeamAccess({ orgId, members, roles, permissions, codes }: { orgI
         <CardContent className="space-y-4">
           <div className="grid gap-2 sm:grid-cols-2">
             {roles.map((role) => (
-              <div key={role.id} className="rounded-lg border p-3 text-sm">
-                <div className="flex items-center gap-2"><span className="font-medium">{role.name}</span>{role.isOwnerRole && <Badge variant="success">Owner</Badge>}{role.isSystem && <Badge variant="secondary">System</Badge>}</div>
-                <p className="text-muted-foreground mt-1 text-xs">{role.description || `${role.permissions?.length ?? 0} permissions`}</p>
-              </div>
+              <RoleCard key={role.id} orgId={orgId} role={role} permissions={permissions} onDone={() => router.refresh()} />
             ))}
           </div>
 
@@ -284,5 +295,73 @@ export function TeamAccess({ orgId, members, roles, permissions, codes }: { orgI
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+function RoleCard({ orgId, role, permissions, onDone }: { orgId: string; role: Role; permissions: string[]; onDone: () => void }) {
+  const [editing, setEditing] = useState(false);
+  const [state, action] = useActionState(updateRole.bind(null, orgId, role.id!), initial);
+  const errors = state.fieldErrors ?? {};
+  const editable = !role.isSystem && !role.isOwnerRole;
+  const rolePerms = new Set(role.permissions ?? []);
+
+  useEffect(() => {
+    if (state.ok) {
+      setEditing(false);
+      onDone();
+    }
+  }, [state.ok, onDone]);
+
+  if (!editing) {
+    return (
+      <div className="rounded-lg border p-3 text-sm">
+        <div className="flex items-center gap-2">
+          <span className="font-medium">{role.name}</span>
+          {role.isOwnerRole && <Badge variant="success">Owner</Badge>}
+          {role.isSystem && <Badge variant="secondary">System</Badge>}
+          {editable && (
+            <button type="button" onClick={() => setEditing(true)} className="hover:bg-muted text-muted-foreground ml-auto rounded p-1" title="Edit role">
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+        <p className="text-muted-foreground mt-1 text-xs">{role.description || `${role.permissions?.length ?? 0} permissions`}</p>
+      </div>
+    );
+  }
+
+  return (
+    <form action={action} className="space-y-3 rounded-lg border border-ring/50 p-3 text-sm sm:col-span-2">
+      <div className="flex items-center justify-between">
+        <span className="font-medium">Edit “{role.name}”</span>
+        <button type="button" onClick={() => setEditing(false)} className="hover:bg-muted text-muted-foreground rounded p-1" title="Cancel"><X className="h-4 w-4" /></button>
+      </div>
+      <div className="grid gap-2 sm:grid-cols-2">
+        <div className="space-y-1">
+          <Label htmlFor={`name-${role.id}`} className="text-xs">Role name</Label>
+          <Input id={`name-${role.id}`} name="name" required className="h-9" defaultValue={role.name ?? ""} aria-invalid={errors.name ? "true" : undefined} />
+          <FieldError message={errors.name} />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor={`desc-${role.id}`} className="text-xs">Description</Label>
+          <Input id={`desc-${role.id}`} name="description" className="h-9" defaultValue={role.description ?? ""} />
+        </div>
+      </div>
+      <div className="space-y-1">
+        <Label className="text-xs">Permissions</Label>
+        <div className="grid gap-1 sm:grid-cols-2 md:grid-cols-3">
+          {permissions.map((permission) => (
+            <label key={permission} className="flex items-center gap-2 text-xs">
+              <input type="checkbox" name="permissions" value={permission} defaultChecked={rolePerms.has(permission)} /> {permission}
+            </label>
+          ))}
+        </div>
+        <FieldError message={errors.permissions} />
+      </div>
+      <div className="flex items-center gap-3">
+        <Submit label="Save changes" />
+        {state.message && <span className={`text-xs ${state.ok ? "text-green-700" : "text-destructive"}`}>{state.message}</span>}
+      </div>
+    </form>
   );
 }
