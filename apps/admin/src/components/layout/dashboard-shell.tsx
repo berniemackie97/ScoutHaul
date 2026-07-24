@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { Menu, Package2 } from "lucide-react";
 import { Button } from "@overhaul/ui";
 import { Sidebar } from "./sidebar";
+import { SessionKeepAlive } from "./session-keep-alive";
 
 /**
  * Dashboard chrome. On desktop the sidebar is in-flow; below lg it collapses to a drawer opened from a compact top
@@ -31,6 +32,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex h-screen overflow-hidden">
+      <SessionKeepAlive />
       <Sidebar mobileOpen={mobileOpen} onClose={() => setMobileOpen(false)} />
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Mobile top bar — the only way to reach the nav below lg. */}
