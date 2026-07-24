@@ -69,7 +69,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
           <CardHeader>
             <CardTitle className="text-lg">Order history</CardTitle>
           </CardHeader>
-          <CardContent className="p-0">
+          <CardContent className="overflow-x-auto p-0">
             {orders.length === 0 ? (
               <p className="text-muted-foreground p-6 text-sm">No orders yet.</p>
             ) : (
