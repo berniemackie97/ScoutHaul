@@ -33,8 +33,9 @@ export function DashboardShell({ children }: { children: ReactNode }) {
     <div className="flex h-screen overflow-hidden">
       <Sidebar mobileOpen={mobileOpen} onClose={() => setMobileOpen(false)} />
       <div className="flex min-w-0 flex-1 flex-col">
-        {/* Mobile top bar — the only way to reach the nav below lg. */}
-        <header className="bg-card flex h-14 shrink-0 items-center gap-3 border-b px-3 lg:hidden">
+        {/* Mobile top bar — the only way to reach the nav below lg. pt safe-area keeps the menu button clear of the
+            iOS status bar / Dynamic Island when launched as an installed PWA. */}
+        <header className="bg-card flex h-14 shrink-0 items-center gap-3 border-b px-3 pt-[env(safe-area-inset-top)] lg:hidden">
           <Button
             variant="ghost"
             size="icon"
@@ -52,7 +53,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
           </Link>
         </header>
         <main className="flex-1 overflow-y-auto">
-          <div className="p-4 sm:p-6 lg:p-8">{children}</div>
+          <div className="p-4 pb-[calc(1rem_+_env(safe-area-inset-bottom))] sm:p-6 lg:p-8">{children}</div>
         </main>
       </div>
     </div>

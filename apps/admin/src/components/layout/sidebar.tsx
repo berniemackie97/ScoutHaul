@@ -100,7 +100,7 @@ export function Sidebar({ mobileOpen = false, onClose }: { mobileOpen?: boolean;
         )}
       >
         {/* Header */}
-        <div className="flex h-16 shrink-0 items-center justify-between border-b px-4">
+        <div className="flex h-16 shrink-0 items-center justify-between border-b px-4 pt-[env(safe-area-inset-top)]">
           <Link
             href="/"
             onClick={onClose}
@@ -168,7 +168,7 @@ export function Sidebar({ mobileOpen = false, onClose }: { mobileOpen?: boolean;
         </nav>
 
         {/* Footer */}
-        <div className="shrink-0 border-t p-4">
+        <div className="shrink-0 border-t p-4 pb-[calc(1rem_+_env(safe-area-inset-bottom))]">
           <div className={cn("flex items-center gap-3", collapsed && "lg:justify-center lg:gap-0")}>
             <div className="bg-brand-200 text-brand-700 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold">
               A
