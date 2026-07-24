@@ -78,11 +78,11 @@ export default async function DashboardPage() {
             <TriangleAlert className="h-5 w-5 text-amber-600" />
           </div>
           <div className="mt-5 space-y-3">
-            <Link href="/inventory" className="flex items-center justify-between rounded-lg border p-3 transition-colors hover:bg-muted/40">
+            <Link href="/inventory?attention=Unlisted" className="flex items-center justify-between rounded-lg border p-3 transition-colors hover:bg-muted/40">
               <span className="inline-flex items-center gap-2 text-sm"><Tags className="h-4 w-4 text-muted-foreground" /> Not listed</span>
               <span className="inline-flex items-center gap-2 font-semibold tabular-nums">{summary?.unlistedInventoryCount ?? 0}<ArrowUpRight className="h-3.5 w-3.5" /></span>
             </Link>
-            <Link href="/inventory" className="flex items-center justify-between rounded-lg border p-3 transition-colors hover:bg-muted/40">
+            <Link href="/inventory?attention=Aged" className="flex items-center justify-between rounded-lg border p-3 transition-colors hover:bg-muted/40">
               <span className="inline-flex items-center gap-2 text-sm"><TriangleAlert className="h-4 w-4 text-muted-foreground" /> Aged over 60 days</span>
               <span className="inline-flex items-center gap-2 font-semibold tabular-nums">{summary?.staleInventoryCount ?? 0}<ArrowUpRight className="h-3.5 w-3.5" /></span>
             </Link>

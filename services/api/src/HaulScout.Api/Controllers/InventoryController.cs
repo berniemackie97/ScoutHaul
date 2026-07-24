@@ -157,13 +157,14 @@ public sealed class InventoryController(
         [FromQuery] InventoryLifecycleGroup? lifecycle,
         [FromQuery] bool includeArchived,
         [FromQuery] string? search,
+        [FromQuery] InventoryAttention? attention,
         [FromQuery] string? sort,
         [FromQuery] bool desc = true,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 25,
         CancellationToken cancellationToken = default)
     {
-        InventoryListDto result = await queries.BrowseAsync(status, lifecycle, includeArchived, search, sort, desc, page, pageSize, cancellationToken);
+        InventoryListDto result = await queries.BrowseAsync(status, lifecycle, includeArchived, search, attention, sort, desc, page, pageSize, cancellationToken);
         return result;
     }
 

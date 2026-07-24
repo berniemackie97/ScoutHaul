@@ -13,7 +13,8 @@ public sealed record InventoryFilter(
     InventoryStatus? Status = null,
     InventoryLifecycleGroup? Lifecycle = null,
     bool IncludeArchived = false,
-    string? Search = null);
+    string? Search = null,
+    InventoryAttention? Attention = null);
 
 /// <summary>The sortable columns, as a closed set. A string sort key from the wire is mapped onto this by the
 /// Application, so an unknown value can never reach the database as a column name.</summary>
