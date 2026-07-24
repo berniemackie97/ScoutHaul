@@ -26,7 +26,9 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     title: "HaulScout",
-    statusBarStyle: "black-translucent",
+    // "default" keeps the web view BELOW the iOS status bar / Dynamic Island. With "black-translucent" the content
+    // renders underneath it, which buried the mobile top bar (and its menu button) under the notch in standalone mode.
+    statusBarStyle: "default",
   },
   formatDetection: { telephone: false },
   icons: {
