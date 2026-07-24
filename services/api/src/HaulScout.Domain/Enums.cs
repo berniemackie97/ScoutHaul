@@ -28,6 +28,20 @@ public enum InventoryStatus
     Disposed
 }
 
+/// <summary>
+/// "Needs operator attention" buckets the inventory browse can filter to — the sets the dashboard/analytics action
+/// cards count. These are not lifecycle statuses; each maps to a computed predicate in the inventory query.
+/// </summary>
+public enum InventoryAttention
+{
+    Unlisted,
+    Aged,
+    MissingPhotos,
+    MissingCost,
+    MissingValue,
+    MissingLocation
+}
+
 public enum InventoryOwnershipType
 {
     Owned,

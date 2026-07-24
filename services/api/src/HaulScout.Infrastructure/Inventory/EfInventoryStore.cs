@@ -240,6 +240,34 @@ public sealed class EfInventoryStore(HaulScoutDbContext db) : IInventoryStore
             query = query.Where(item => item.Status == filter.Status.Value);
         }
 
+        if (filter.Attention.HasValue)
+        {
+            switch (filter.Attention.Value)
+            {
+                case InventoryAttention.Unlisted:
+                    // Reuse the domain rule so this can never drift from the counts the action cards show.
+                    InventoryStatus[] unlisted = Enum.GetValues<InventoryStatus>().Where(InventoryStatusRules.IsUnlistedInventory).ToArray();
+                    query = query.Where(item => unlisted.Contains(item.Status));
+                    break;
+                case InventoryAttention.Aged:
+                    DateTimeOffset agedCutoff = DateTimeOffset.UtcNow.AddDays(-60);
+                    query = query.Where(item => item.PurchasedAt < agedCutoff && item.Status != InventoryStatus.Listed);
+                    break;
+                case InventoryAttention.MissingPhotos:
+                    query = query.Where(item => !item.Photos.Any());
+                    break;
+                case InventoryAttention.MissingCost:
+                    query = query.Where(item => item.PurchasePrice == null);
+                    break;
+                case InventoryAttention.MissingValue:
+                    query = query.Where(item => item.EstimatedSalePrice == null);
+                    break;
+                case InventoryAttention.MissingLocation:
+                    query = query.Where(item => item.StorageLocation == null || item.StorageLocation == "");
+                    break;
+            }
+        }
+
         if (filter.Lifecycle.HasValue)
         {
             InventoryStatus[] groupStatuses = InventoryLifecycle.InGroup(filter.Lifecycle.Value).ToArray();

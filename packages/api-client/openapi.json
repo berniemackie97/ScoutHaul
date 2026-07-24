@@ -1619,6 +1619,13 @@
             }
           },
           {
+            "name": "attention",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/InventoryAttention"
+            }
+          },
+          {
             "name": "sort",
             "in": "query",
             "schema": {
@@ -17206,6 +17213,17 @@
           "Blocked",
           "Completed",
           "Cancelled"
+        ],
+        "type": "string"
+      },
+      "InventoryAttention": {
+        "enum": [
+          "Unlisted",
+          "Aged",
+          "MissingPhotos",
+          "MissingCost",
+          "MissingValue",
+          "MissingLocation"
         ],
         "type": "string"
       }

@@ -38,6 +38,7 @@ public sealed class InventoryQueryService(IInventoryStore inventory, ICurrentUse
         InventoryLifecycleGroup? lifecycle,
         bool includeArchived,
         string? search,
+        InventoryAttention? attention,
         string? sort,
         bool desc,
         int page,
@@ -47,7 +48,7 @@ public sealed class InventoryQueryService(IInventoryStore inventory, ICurrentUse
         page = Math.Max(1, page);
         pageSize = Math.Clamp(pageSize, 1, MaxPageSize);
 
-        InventoryFilter filter = new(status, lifecycle, includeArchived, TrimToNull(search));
+        InventoryFilter filter = new(status, lifecycle, includeArchived, TrimToNull(search), attention);
         Guid organizationId = currentUser.OrganizationId;
 
         IReadOnlyList<InventoryScalars> scalars = await inventory.ListScalarsAsync(organizationId, filter, cancellationToken);

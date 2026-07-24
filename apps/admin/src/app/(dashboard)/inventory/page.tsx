@@ -10,10 +10,21 @@ import {
   type InventoryLifecycleGroup,
   type InventoryStatus,
 } from "@/features/inventory/inventory-operations";
+import type { components } from "@overhaul/api-client";
 import { getApiAssetUrl, getApiClient } from "@/lib/api";
 import { InventoryTable, type InventoryTableRow } from "./inventory-table";
 
 export const dynamic = "force-dynamic";
+
+type InventoryAttention = components["schemas"]["InventoryAttention"];
+const ATTENTION_LABELS: Record<InventoryAttention, string> = {
+  Unlisted: "Not listed",
+  Aged: "Aged over 60 days",
+  MissingPhotos: "Missing photos",
+  MissingCost: "Missing acquisition cost",
+  MissingValue: "Missing expected value",
+  MissingLocation: "Missing storage location",
+};
 
 const money = (value: number | null | undefined) =>
   typeof value === "number"
@@ -33,6 +44,9 @@ export default async function InventoryPage({
   const selectedLifecycle = typeof query.lifecycle === "string" && LIFECYCLE_GROUP_VALUES.includes(query.lifecycle as InventoryLifecycleGroup)
     ? query.lifecycle as InventoryLifecycleGroup
     : undefined;
+  const selectedAttention = typeof query.attention === "string" && query.attention in ATTENTION_LABELS
+    ? (query.attention as InventoryAttention)
+    : undefined;
   const sort = typeof query.sort === "string" ? query.sort : "updatedAt";
   const desc = query.desc !== "false";
   const page = Math.max(1, Number(query.page) || 1);
@@ -45,6 +59,7 @@ export default async function InventoryPage({
         lifecycle: selectedLifecycle,
         includeArchived: false,
         search: search || undefined,
+        attention: selectedAttention as never,
         sort,
         desc,
         page,
@@ -97,12 +112,19 @@ export default async function InventoryPage({
           <option value="">Any exact stage</option>
           {INVENTORY_STATUSES.map((status) => <option key={status} value={status}>{inventoryStatusLabel(status)}</option>)}
         </select>
+        {selectedAttention && <input type="hidden" name="attention" value={selectedAttention} />}
         <button type="submit" className="h-10 rounded-lg bg-brand-600 px-5 text-sm font-medium text-white hover:bg-brand-700">Apply</button>
       </form>
 
-      <div className="flex items-center justify-between text-sm">
+      <div className="flex flex-wrap items-center gap-3 text-sm">
         <span className="text-muted-foreground">{totalMatching} matching records</span>
-        {(search || selectedStatus || selectedLifecycle) && <Link href="/inventory" className="text-brand-600 hover:underline">Clear filters</Link>}
+        {selectedAttention && (
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-950 dark:text-amber-200">
+            {ATTENTION_LABELS[selectedAttention]}
+            <Link href="/inventory" aria-label="Clear this filter" className="leading-none hover:text-amber-950 dark:hover:text-amber-50">✕</Link>
+          </span>
+        )}
+        {(search || selectedStatus || selectedLifecycle || selectedAttention) && <Link href="/inventory" className="text-brand-600 hover:underline">Clear filters</Link>}
       </div>
 
       {totalMatching === 0 ? (

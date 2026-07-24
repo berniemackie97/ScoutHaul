@@ -161,12 +161,12 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
         <Card className="p-6">
           <div className="flex items-start justify-between"><div><h2 className="font-semibold">Data quality control</h2><p className="text-sm text-muted-foreground">Missing fields that weaken valuation, fulfillment, and reporting.</p></div><ShieldAlert className="h-5 w-5 text-amber-600" /></div>
           <div className="mt-5 space-y-3">
-            {[
-              ["Missing acquisition cost", inventory.missingCostCount],
-              ["Missing expected value", inventory.missingValueCount],
-              ["Missing storage location", inventory.missingLocationCount],
-              ["Missing photography", inventory.missingPhotoCount],
-            ].map(([label, count]) => <Link key={String(label)} href="/inventory" className="flex items-center justify-between rounded-lg border p-3 hover:bg-muted/40"><span className="text-sm">{label}</span><span className="inline-flex items-center gap-2 font-semibold tabular-nums">{number(count as number)}<ArrowUpRight className="h-3.5 w-3.5" /></span></Link>)}
+            {([
+              ["Missing acquisition cost", inventory.missingCostCount, "MissingCost"],
+              ["Missing expected value", inventory.missingValueCount, "MissingValue"],
+              ["Missing storage location", inventory.missingLocationCount, "MissingLocation"],
+              ["Missing photography", inventory.missingPhotoCount, "MissingPhotos"],
+            ] as const).map(([label, count, attention]) => <Link key={label} href={`/inventory?attention=${attention}`} className="flex items-center justify-between rounded-lg border p-3 hover:bg-muted/40"><span className="text-sm">{label}</span><span className="inline-flex items-center gap-2 font-semibold tabular-nums">{number(count)}<ArrowUpRight className="h-3.5 w-3.5" /></span></Link>)}
           </div>
         </Card>
       </div>

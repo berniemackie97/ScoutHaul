@@ -1351,6 +1351,7 @@ export interface paths {
                     lifecycle?: components["schemas"]["InventoryLifecycleGroup"];
                     includeArchived?: boolean;
                     search?: string;
+                    attention?: components["schemas"]["InventoryAttention"];
                     sort?: string;
                     desc?: boolean;
                     page?: number;
@@ -10154,6 +10155,8 @@ export interface components {
         WeightUnit: "Ounces" | "Pounds" | "Grams" | "Kilograms";
         /** @enum {string} */
         WorkTaskStatus: "Open" | "InProgress" | "Blocked" | "Completed" | "Cancelled";
+        /** @enum {string} */
+        InventoryAttention: "Unlisted" | "Aged" | "MissingPhotos" | "MissingCost" | "MissingValue" | "MissingLocation";
     };
     responses: never;
     parameters: never;
