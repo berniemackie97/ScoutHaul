@@ -22,7 +22,7 @@ import { Screen } from '../src/components/Screen';
 import { Text } from '../src/components/Text';
 import { ScanResults } from '../src/features/scanner/ScanResults';
 import type { IdentifyResult } from '../src/features/scanner/photoIdentify';
-import { identifyFromPhoto } from '../src/features/scanner/photoIdentify';
+import { identifyFromPhoto, identifyFromDetails } from '../src/features/scanner/photoIdentify';
 import { setIdentifyHandoff } from '../src/features/scanner/identifyHandoff';
 import { radius, spacing } from '../src/components/theme';
 import { useAppTheme } from '../src/context/ThemeContext';
@@ -91,6 +91,9 @@ export default function BarcodeScannerScreen() {
   const [capturedPhotoUri, setCapturedPhotoUri] = useState<string | null>(null);
   const [showCaptureOverlay, setShowCaptureOverlay] = useState(false);
   const identifyResultRef = useRef<IdentifyResult | null>(null);
+  // Accumulated user-provided facts (the launch context + every refine's added details), fed back to
+  // the model so a correction actually changes the identification — not just the comp search.
+  const userContextRef = useRef<string>(routeParams.context ?? '');
   const hasProvidersRef = useRef<boolean | null>(null);
 
   // Check provider status once on mount — cached for session
@@ -352,11 +355,67 @@ export default function BarcodeScannerScreen() {
     }
   }
 
+  // ── Refine → RE-IDENTIFY (not just re-search) ──
+  // The old refine reused the frozen Gemini result and only re-searched comps, so typing corrections
+  // did nothing. This sends the photo + the user's accumulated facts back to the model for a FRESH
+  // identification, then re-runs the comp search off the corrected result.
+  async function refineIdentify(added: string) {
+    if (state.phase !== 'done') return;
+    const facts = added.trim();
+    if (!facts) return;
+    const photoUri = state.photoUri ?? capturedPhotoUri ?? null;
+
+    // Accumulate so earlier corrections aren't lost when the user adds more.
+    const combined = [userContextRef.current, facts]
+      .map((s) => (s ?? '').trim())
+      .filter(Boolean)
+      .join('\n');
+    userContextRef.current = combined;
+
+    // Reuse the capture overlay + step UI so re-identify reads like the original analyze.
+    if (photoUri) {
+      setCapturedPhotoUri(photoUri);
+      setShowCaptureOverlay(true);
+      setState({ phase: 'identifying', photoUri, step: 'Re-identifying with your details…' });
+    } else {
+      setState({ phase: 'searching', barcode: facts, step: 'Re-identifying with your details…' });
+    }
+    haptics.medium();
+
+    let identified: IdentifyResult;
+    try {
+      identified = photoUri
+        ? await identifyFromPhoto(photoUri, combined)
+        : await identifyFromDetails(combined);
+    } catch {
+      const prev = identifyResultRef.current;
+      setState(makeDoneFromResult(facts, makeEmptyResult(facts), photoUri ?? undefined, prev ? toVisionOverrides(prev) : undefined));
+      return;
+    }
+    identifyResultRef.current = identified;
+    const overrides = toVisionOverrides(identified);
+
+    if (identified.errorKind) {
+      haptics.error();
+      setState(makeDoneFromResult('', makeEmptyResult(''), photoUri ?? undefined, overrides));
+      return;
+    }
+
+    identified.confidence === 'high' ? haptics.success() : haptics.medium();
+    const query = identified.searchQuery || identified.title || facts;
+    if (query) {
+      await searchWithRetry(query, identified.alternateQueries, photoUri ?? '', overrides);
+    } else {
+      setState(makeDoneFromResult('', makeEmptyResult(''), photoUri ?? undefined, overrides));
+    }
+  }
+
   function resetToScanning() {
     setEditing(false);
     setCapturedPhotoUri(null);
     setShowCaptureOverlay(false);
     identifyResultRef.current = null;
+    userContextRef.current = routeParams.context ?? '';
     setState({ phase: 'scanning' });
   }
 
@@ -855,7 +914,7 @@ export default function BarcodeScannerScreen() {
               addInventoryLabel={isFillMode ? 'Use These Details' : 'Add to Inventory'}
               addInventoryIcon={isFillMode ? 'checkmark-circle-outline' : 'add-circle-outline'}
               onResearch={continueToSearch}
-              onRefine={(q) => void searchManual(q, state.photoUri ?? undefined)}
+              onRefine={(input) => void refineIdentify(input)}
               onReestimate={reestimate}
               onSaveEstimate={saveEstimateAsComp}
               onSaveProduct={() => void saveProduct()}
