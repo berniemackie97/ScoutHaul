@@ -151,40 +151,46 @@ export function ScanResults({
           </View>
         ) : null}
 
-        {/* ── Refine — correct a wrong/generic identification and search again ── */}
+        {/* ── Refine — add details / corrections; the AI RE-IDENTIFIES with them (photo + your facts) ── */}
         {refining ? (
           <View style={[styles.refineBox, { backgroundColor: c.surfaceAlt, borderColor: c.border }]}>
-            <Text variant="label" color={c.textMuted}>Correct the product, then search again</Text>
+            <Text variant="label" color={c.textMuted}>
+              {hasIdentification
+                ? 'Add details or corrections — the AI re-identifies with them'
+                : 'Describe the item — brand, model, size, condition'}
+            </Text>
             <TextField
               label=""
               value={refineQuery}
               onChangeText={setRefineQuery}
-              placeholder="e.g. Sony WH-1000XM4 headphones"
+              placeholder={hasIdentification
+                ? "e.g. it's the XM4, size L, 2019 edition, light wear"
+                : 'e.g. Sony WH-1000XM4 headphones, good condition'}
               autoFocus
-              returnKeyType="search"
-              onSubmitEditing={() => { if (refineQuery.trim()) { setRefining(false); onRefine(refineQuery.trim()); } }}
+              multiline
+              returnKeyType="default"
             />
             <View style={styles.refineActions}>
               <Button label="Cancel" variant="ghost" size="sm" onPress={() => setRefining(false)} />
               <Button
-                label="Search Again"
-                icon="search-outline"
+                label="Re-identify"
+                icon="sparkles-outline"
                 size="sm"
                 disabled={!refineQuery.trim()}
-                onPress={() => { setRefining(false); onRefine(refineQuery.trim()); }}
+                onPress={() => { const v = refineQuery.trim(); setRefining(false); setRefineQuery(''); onRefine(v); }}
               />
             </View>
           </View>
         ) : (
           <Pressable
-            onPress={() => { setRefineQuery(productName ?? state.barcode ?? ''); setRefining(true); }}
+            onPress={() => { setRefineQuery(''); setRefining(true); }}
             style={styles.refineTrigger}
             accessibilityRole="button"
-            accessibilityLabel="Refine identification and search again"
+            accessibilityLabel="Add details and re-identify"
           >
-            <Ionicons name="pencil-outline" size={14} color={c.textMuted} />
+            <Ionicons name="sparkles-outline" size={14} color={c.textMuted} />
             <Text variant="label" color={c.textSecondary}>
-              {hasIdentification ? 'Not quite right? Refine & search again' : 'Enter product name manually'}
+              {hasIdentification ? 'Wrong or vague? Add details to re-identify' : 'Add details to identify'}
             </Text>
           </Pressable>
         )}
