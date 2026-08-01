@@ -50,7 +50,7 @@ public class InventoryPhotoServingTests
             null!,
             null!,
             null!,
-            new InventoryPhotoWorkflowService(new EfInventoryPhotoStore(db), null!, null!),
+            new InventoryPhotoWorkflowService(new EfInventoryPhotoStore(db), null!, null!, null!),
             null!,
             null!);
 

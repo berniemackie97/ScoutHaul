@@ -74,7 +74,7 @@ public class InventoryBrowseTests
         SeedItem(db, org, "Sold Thing", InventoryStatus.Sold, 20m);
         InventoryController controller = NewController(db, org, user);
 
-        ActionResult<InventoryListDto> result = await controller.Browse(null, null, includeArchived: false, null, null, true, page: 1, pageSize: 5, CancellationToken.None);
+        ActionResult<InventoryListDto> result = await controller.Browse(status: null, lifecycle: null, includeArchived: false, search: null, attention: null, sort: null, desc: true, page: 1, pageSize: 5, cancellationToken: CancellationToken.None);
 
         InventoryListDto dto = result.Value!;
         Assert.Equal(8, dto.Total);
@@ -95,10 +95,10 @@ public class InventoryBrowseTests
         SeedItem(db, org, "Coffee Mug", InventoryStatus.Listed, 5m, brand: "Generic");
         InventoryController controller = NewController(db, org, user);
 
-        ActionResult<InventoryListDto> byTitle = await controller.Browse(null, null, false, "denim", null, true, 1, 25, CancellationToken.None);
+        ActionResult<InventoryListDto> byTitle = await controller.Browse(status: null, lifecycle: null, includeArchived: false, search: "denim", attention: null, sort: null, desc: true, page: 1, pageSize: 25, cancellationToken: CancellationToken.None);
         Assert.Single(byTitle.Value!.Items);
 
-        ActionResult<InventoryListDto> byBrand = await controller.Browse(null, null, false, "levi", null, true, 1, 25, CancellationToken.None);
+        ActionResult<InventoryListDto> byBrand = await controller.Browse(status: null, lifecycle: null, includeArchived: false, search: "levi", attention: null, sort: null, desc: true, page: 1, pageSize: 25, cancellationToken: CancellationToken.None);
         Assert.Single(byBrand.Value!.Items);
         Assert.Equal("Denim Jacket", byBrand.Value.Items[0].Title);
     }
@@ -112,7 +112,7 @@ public class InventoryBrowseTests
         SeedItem(db, org, "Pricey", InventoryStatus.Listed, 99m);
         InventoryController controller = NewController(db, org, user);
 
-        ActionResult<InventoryListDto> result = await controller.Browse(null, null, false, null, "purchasePrice", desc: false, 1, 25, CancellationToken.None);
+        ActionResult<InventoryListDto> result = await controller.Browse(status: null, lifecycle: null, includeArchived: false, search: null, attention: null, sort: "purchasePrice", desc: false, page: 1, pageSize: 25, cancellationToken: CancellationToken.None);
 
         Assert.Equal("Cheap", result.Value!.Items[0].Title);
         Assert.Equal("Pricey", result.Value.Items[1].Title);
