@@ -1,9 +1,14 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { ImageIcon, Star, Trash2, Upload } from "lucide-react";
+import { ImageIcon, Link as LinkIcon, Star, Trash2, Upload } from "lucide-react";
 import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle } from "@overhaul/ui";
-import { deleteInventoryPhoto, setInventoryHeroPhoto, uploadInventoryPhoto } from "./actions";
+import {
+  deleteInventoryPhoto,
+  importInventoryPhotosFromUrls,
+  setInventoryHeroPhoto,
+  uploadInventoryPhoto,
+} from "./actions";
 
 export type ManagedPhoto = {
   id: string;
@@ -20,6 +25,20 @@ export function PhotoManager({ id, photos }: { id: string; photos: ManagedPhoto[
   const [dragging, setDragging] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [urlOpen, setUrlOpen] = useState(false);
+  const [urls, setUrls] = useState("");
+  const [firstIsHero, setFirstIsHero] = useState(true);
+
+  function importUrls() {
+    startTransition(async () => {
+      const result = await importInventoryPhotosFromUrls(id, urls, firstIsHero && photos.length === 0);
+      setMessage(result.message);
+      if (result.ok) {
+        setUrls("");
+        setUrlOpen(false);
+      }
+    });
+  }
 
   function uploadFiles(fileList: FileList | File[]) {
     const files = Array.from(fileList).filter((file) => ACCEPTED.includes(file.type) && file.size > 0 && file.size <= 10_000_000);
@@ -116,6 +135,47 @@ export function PhotoManager({ id, photos }: { id: string; photos: ManagedPhoto[
             className="hidden"
             onChange={(event) => { if (event.target.files) uploadFiles(event.target.files); event.target.value = ""; }}
           />
+        </div>
+
+        {/* Import by URL — for photos that live on a listing you already published (eBay, Vinted,
+            a supplier page) instead of on this machine. Beats screenshotting each image. */}
+        <div className="rounded-lg border bg-muted/10 p-3">
+          {urlOpen ? (
+            <div className="space-y-2">
+              <label htmlFor="photo-urls" className="text-sm font-medium">Paste image addresses</label>
+              <p className="text-muted-foreground text-xs">
+                Right-click an image on the listing → <em>Copy image address</em>. One per line, up to 12.
+                A page link won&rsquo;t work — it has to be the image itself.
+              </p>
+              <textarea
+                id="photo-urls"
+                rows={3}
+                value={urls}
+                onChange={(event) => setUrls(event.target.value)}
+                placeholder={"https://i.ebayimg.com/images/g/…/s-l1600.jpg\nhttps://images1.vinted.net/…jpeg"}
+                className="w-full rounded-lg border border-input bg-background p-2 font-mono text-xs"
+                disabled={isPending}
+              />
+              <div className="flex flex-wrap items-center gap-3">
+                <Button type="button" size="sm" disabled={isPending || !urls.trim()} onClick={importUrls}>
+                  {isPending ? "Importing…" : "Import photos"}
+                </Button>
+                <Button type="button" size="sm" variant="ghost" disabled={isPending} onClick={() => { setUrlOpen(false); setUrls(""); }}>
+                  Cancel
+                </Button>
+                {photos.length === 0 && (
+                  <label className="text-muted-foreground flex items-center gap-1.5 text-xs">
+                    <input type="checkbox" checked={firstIsHero} onChange={(event) => setFirstIsHero(event.target.checked)} />
+                    Make the first one the hero
+                  </label>
+                )}
+              </div>
+            </div>
+          ) : (
+            <button type="button" onClick={() => setUrlOpen(true)} className="text-brand-600 flex items-center gap-2 text-sm hover:underline">
+              <LinkIcon className="h-4 w-4" /> Import from a URL instead
+            </button>
+          )}
         </div>
 
         {photos.length === 0 && !isPending && (

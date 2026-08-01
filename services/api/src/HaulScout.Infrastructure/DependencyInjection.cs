@@ -70,6 +70,13 @@ public static class DependencyInjection
         services.AddScoped<IStoreSettingsStore, EfStoreSettingsStore>();
         services.AddHttpClient<IOrganizationInviteSender, SupabaseOrganizationInviteSender>();
 
+        // Photo import by URL — fetches an image from an operator-pasted link (their live listing).
+        // Short timeout + no redirect-follow-limit surprises: a paste should fail fast, not hang.
+        services.AddHttpClient<IRemoteImageFetcher, HttpRemoteImageFetcher>(client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(20);
+        });
+
         // In-memory cache (resale estimates, etc.) — protects the shared Gemini free-tier quota.
         services.AddMemoryCache();
 

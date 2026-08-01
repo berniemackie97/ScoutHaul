@@ -216,6 +216,46 @@ export async function uploadInventoryPhoto(
   return { ok: true, message: "Photo uploaded." };
 }
 
+/**
+ * Attach photos by URL — for images that live on a live listing (eBay, Vinted, a supplier page)
+ * rather than on this device. Accepts several links at once (one per line) because a listing's
+ * gallery is normally pasted as a set. Each is imported in order; the first failure is reported but
+ * the ones that already succeeded are kept.
+ */
+export async function importInventoryPhotosFromUrls(
+  id: string,
+  urlsRaw: string,
+  makeFirstHero: boolean,
+): Promise<InventoryActionResult> {
+  const urls = urlsRaw
+    .split(/[\s,]+/)
+    .map((value) => value.trim())
+    .filter(Boolean);
+  if (urls.length === 0) return initialFailure("Paste at least one image address.");
+  if (urls.length > 12) return initialFailure("Import up to 12 images at a time.");
+
+  const api = await getApiClient();
+  let imported = 0;
+  for (const [index, url] of urls.entries()) {
+    const result = await api.POST("/api/inventory/{id}/photos/from-url", {
+      params: { path: { id } },
+      body: { url, isHero: makeFirstHero && index === 0 },
+    });
+    if (!result.data) {
+      const detail = errorMessage(result.error, `That image could not be imported (${url.slice(0, 60)}).`);
+      revalidatePath(`/inventory/${id}`);
+      return imported > 0
+        ? initialFailure(`Imported ${imported} of ${urls.length}. ${detail}`)
+        : initialFailure(detail);
+    }
+    imported += 1;
+  }
+
+  revalidatePath("/inventory");
+  revalidatePath(`/inventory/${id}`);
+  return { ok: true, message: imported === 1 ? "Photo imported." : `${imported} photos imported.` };
+}
+
 export async function setInventoryHeroPhoto(
   id: string,
   url: string,
