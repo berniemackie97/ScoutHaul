@@ -7408,6 +7408,49 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/inventory/{id}/photos/from-url": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["ImportInventoryPhotoRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["InventoryPhotoUploadResultDto"];
+                        "application/json": components["schemas"]["InventoryPhotoUploadResultDto"];
+                        "text/json": components["schemas"]["InventoryPhotoUploadResultDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -10157,6 +10200,10 @@ export interface components {
         WorkTaskStatus: "Open" | "InProgress" | "Blocked" | "Completed" | "Cancelled";
         /** @enum {string} */
         InventoryAttention: "Unlisted" | "Aged" | "MissingPhotos" | "MissingCost" | "MissingValue" | "MissingLocation";
+        ImportInventoryPhotoRequest: {
+            url?: string | null;
+            isHero?: boolean;
+        };
     };
     responses: never;
     parameters: never;

@@ -92,6 +92,18 @@ public sealed class InventoryController(
         return ToActionResult(result);
     }
 
+    /// <summary>Attach a photo by URL — for images that live on a live listing rather than the device.</summary>
+    [HttpPost("{id:guid}/photos/from-url")]
+    public async Task<ActionResult<InventoryPhotoUploadResultDto>> UploadPhotoFromUrl(
+        Guid id,
+        ImportInventoryPhotoRequest request,
+        CancellationToken cancellationToken)
+    {
+        AppResult<InventoryPhotoUploadResultDto> result =
+            await photos.UploadFromUrlAsync(id, request.Url, request.IsHero, cancellationToken);
+        return ToActionResult(result);
+    }
+
     [HttpDelete("{id:guid}/photos")]
     public async Task<ActionResult<InventoryPhotoUploadResultDto>> DeletePhoto(
         Guid id,

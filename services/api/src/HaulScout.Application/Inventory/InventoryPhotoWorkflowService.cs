@@ -9,9 +9,46 @@ namespace HaulScout.Application.Inventory;
 public sealed class InventoryPhotoWorkflowService(
     IInventoryPhotoStore photos,
     ICurrentUserContext currentUser,
-    IInventoryPhotoProcessor photoStorage)
+    IInventoryPhotoProcessor photoStorage,
+    IRemoteImageFetcher remoteImages)
 {
     public sealed record InventoryPhotoFile(byte[] Bytes, string ContentType);
+
+    /// <summary>
+    /// Attaches an image that lives on the web (the operator's own listing on eBay/Vinted/etc.) by URL,
+    /// so photos don't have to be saved to a device first. The bytes are fetched, then handed to the
+    /// same upload path as a file — identical validation, resizing, hero and ordering rules.
+    /// </summary>
+    public async Task<AppResult<InventoryPhotoUploadResultDto>> UploadFromUrlAsync(
+        Guid id,
+        string? url,
+        bool isHero,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(url))
+        {
+            return AppResult<InventoryPhotoUploadResultDto>.Validation("An image URL is required.");
+        }
+
+        // Check the item exists before making an outbound request for it.
+        if (await FindItemAsync(id, cancellationToken) is null)
+        {
+            return AppResult<InventoryPhotoUploadResultDto>.NotFound();
+        }
+
+        PhotoUpload upload;
+        try
+        {
+            upload = await remoteImages.FetchAsync(url, cancellationToken);
+        }
+        catch (RemoteImageFetchException exception)
+        {
+            return AppResult<InventoryPhotoUploadResultDto>.Validation(exception.Message);
+        }
+
+        await using Stream content = upload.Content;
+        return await UploadAsync(id, upload, isHero, cancellationToken);
+    }
 
     public async Task<AppResult<InventoryPhotoUploadResultDto>> UploadAsync(
         Guid id,

@@ -274,6 +274,9 @@ public sealed record InventoryPhotoUploadResultDto(
     string? UploadedUrl,
     IReadOnlyList<InventoryPhotoDto> Photos);
 
+/// <summary>Attach a photo by pasting the address of an image hosted elsewhere (a live listing, a supplier page).</summary>
+public sealed record ImportInventoryPhotoRequest(string Url, bool IsHero = false);
+
 public sealed record UpsertInventoryIssueRequest(
     string IssueType,
     string Severity,
