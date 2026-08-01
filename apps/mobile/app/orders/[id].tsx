@@ -8,6 +8,7 @@ import { Card } from '../../src/components/Card';
 import { ErrorBanner } from '../../src/components/ErrorBanner';
 import { StatusPill } from '../../src/components/StatusPill';
 import { Text } from '../../src/components/Text';
+import { TextField } from '../../src/components/TextField';
 import { spacing } from '../../src/components/theme';
 import { useAppTheme } from '../../src/context/ThemeContext';
 import { ordersApi } from '../../src/api/orders';
@@ -28,6 +29,9 @@ export default function OrderDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [editingTracking, setEditingTracking] = useState(false);
+  const [carrier, setCarrier] = useState('');
+  const [tracking, setTracking] = useState('');
 
   const load = useCallback(async (showRefresh = false) => {
     if (!id) return;
@@ -59,18 +63,21 @@ export default function OrderDetailScreen() {
 
   useFocusEffect(useCallback(() => { void load(); }, [load]));
 
+  // Controls are only disabled while the MUTATION is in flight. The refresh that follows runs in the
+  // background — the old version held `busy` across the reload too, so every tap froze the whole
+  // screen for two round-trips instead of one.
   async function act(fn: () => Promise<unknown>): Promise<boolean> {
     setBusy(true);
     try {
       await fn();
-      await load();
-      return true;
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Action failed.');
       return false;
     } finally {
       setBusy(false);
     }
+    await load();
+    return true;
   }
 
   if (loading) {
@@ -93,6 +100,8 @@ export default function OrderDetailScreen() {
 
   const buyer = order.customerName || order.buyerReference || order.email || 'Unknown buyer';
   const netReceived = order.grandTotal - order.totalRefunded;
+  // Terminal states — no further fulfillment actions make sense.
+  const isClosed = order.status === 'Delivered' || order.status === 'Cancelled' || order.status === 'Refunded';
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: c.background }]} edges={['top', 'left', 'right']}>
@@ -150,12 +159,45 @@ export default function OrderDetailScreen() {
           {order.isLocalPickup ? (
             <Text variant="caption">Local pickup — customer collects in person.</Text>
           ) : order.trackingNumber ? (
-            <Text variant="body">
-              {[order.shippingCarrier, order.trackingNumber].filter(Boolean).join(' · ')}
-            </Text>
+            <View style={styles.trackingRow}>
+              <Text variant="body" style={styles.flex}>
+                {[order.shippingCarrier, order.trackingNumber].filter(Boolean).join(' · ')}
+              </Text>
+              <Pressable onPress={() => { setCarrier(order.shippingCarrier ?? ''); setTracking(order.trackingNumber ?? ''); setEditingTracking(true); }} hitSlop={8}>
+                <Text variant="caption" color={c.primary}>Edit</Text>
+              </Pressable>
+            </View>
           ) : (
             <Text variant="caption">No tracking recorded yet.</Text>
           )}
+
+          {/* Tracking entry — the API has always accepted carrier/number; the phone had no way to
+              enter them, so shipping from mobile silently dropped the tracking the buyer needs. */}
+          {!order.isLocalPickup && (editingTracking || (!order.trackingNumber && !isClosed)) ? (
+            <View style={styles.trackingForm}>
+              <TextField label="Carrier" value={carrier} onChangeText={setCarrier} placeholder="e.g. USPS, UPS, FedEx" autoCapitalize="characters" />
+              <TextField label="Tracking number" value={tracking} onChangeText={setTracking} placeholder="Paste or scan the number" autoCapitalize="characters" />
+              <View style={styles.actions}>
+                {editingTracking ? (
+                  <Button label="Cancel" size="sm" variant="ghost" disabled={busy} onPress={() => setEditingTracking(false)} />
+                ) : null}
+                <Button
+                  label={order.shippedAt ? 'Save tracking' : 'Save & mark shipped'}
+                  size="sm"
+                  disabled={busy || !tracking.trim()}
+                  onPress={() => void act(async () => {
+                    await ordersApi.updateTracking(order.id, {
+                      shippingCarrier: carrier.trim() || null,
+                      trackingNumber: tracking.trim(),
+                      ...(order.shippedAt ? {} : { markShipped: true }),
+                    });
+                    setEditingTracking(false);
+                  })}
+                />
+              </View>
+            </View>
+          ) : null}
+
           <View style={styles.metaGrid}>
             <MetaCell label="Shipped" value={dateTime(order.shippedAt)} />
             <MetaCell label="Delivered" value={dateTime(order.deliveredAt)} />
@@ -164,11 +206,13 @@ export default function OrderDetailScreen() {
             {order.status === 'Pending' && (
               <Button label="Mark paid" size="sm" disabled={busy} onPress={() => void act(() => ordersApi.updateStatus(order.id, 'Paid'))} />
             )}
-            {order.status !== 'Delivered' && order.status !== 'Cancelled' && order.status !== 'Refunded' && (
-              <>
-                <Button label="Mark shipped" size="sm" variant="secondary" disabled={busy} onPress={() => void act(() => ordersApi.updateTracking(order.id, { markShipped: true }))} />
-                <Button label="Mark delivered" size="sm" variant="secondary" disabled={busy} onPress={() => void act(() => ordersApi.updateTracking(order.id, { markDelivered: true }))} />
-              </>
+            {/* Sequenced: you can only ship a paid order, and only mark delivered after it shipped —
+                the old screen offered both at once, out of order, on unpaid orders. */}
+            {!isClosed && order.status !== 'Pending' && !order.shippedAt && (
+              <Button label="Mark shipped" size="sm" variant="secondary" disabled={busy} onPress={() => void act(() => ordersApi.updateTracking(order.id, { markShipped: true }))} />
+            )}
+            {!isClosed && order.shippedAt && !order.deliveredAt && (
+              <Button label="Mark delivered" size="sm" variant="secondary" disabled={busy} onPress={() => void act(() => ordersApi.updateTracking(order.id, { markDelivered: true }))} />
             )}
           </View>
           <Text variant="caption" color={c.textMuted}>Shipment state is order-level. Refunds and returns are handled on each sale line above.</Text>
@@ -230,6 +274,8 @@ const styles = StyleSheet.create({
   card: { gap: spacing.sm, marginTop: spacing.md },
   totalRow: { flexDirection: 'row', justifyContent: 'space-between' },
   metaGrid: { flexDirection: 'row', gap: spacing.xl },
+  trackingRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  trackingForm: { gap: spacing.sm, marginTop: spacing.xs },
   metaCell: { gap: spacing.xxs },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.xs, alignItems: 'center' },
 });
