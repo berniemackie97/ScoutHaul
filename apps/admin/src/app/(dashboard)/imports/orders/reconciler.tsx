@@ -42,7 +42,7 @@ function ReconcileButton({
           .join(" · ");
   return (
     <Button type="submit" disabled={pending || disabled}>
-      {pending ? "Reconciling…" : `Reconcile (${label})`}
+      {pending ? "Saving…" : `Confirm (${label})`}
     </Button>
   );
 }
@@ -166,7 +166,7 @@ function OrderCard({ order, targets }: { order: PlatformOrder; targets: MatchTar
                 <tr>
                   <th className="px-3 py-2 font-medium">Platform line</th>
                   <th className="px-3 py-2 text-right font-medium">Price</th>
-                  <th className="px-3 py-2 font-medium">Matches inventory item</th>
+                  <th className="px-3 py-2 font-medium">Inventory item</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
@@ -208,7 +208,7 @@ function OrderCard({ order, targets }: { order: PlatformOrder; targets: MatchTar
                             setMap((current) => ({ ...current, [id]: event.target.value }))
                           }
                         >
-                          <option value="">Select item…</option>
+                          <option value="">Choose an item…</option>
                           {sortedTargets.map((target) => (
                             <option key={target.id} value={target.id}>
                               {target.title}
@@ -240,7 +240,7 @@ function OrderCard({ order, targets }: { order: PlatformOrder; targets: MatchTar
             </p>
           )}
 
-          <Textarea name="notes" rows={2} placeholder="Reconciliation note (optional)" />
+          <Textarea name="notes" rows={2} placeholder="Note (optional)" />
 
           <div className="flex items-center justify-between gap-3">
             <p className="text-muted-foreground text-xs">
@@ -284,7 +284,7 @@ export function PlatformOrderReconciler({
   if (orders.length === 0) {
     return (
       <div className="bg-muted/20 text-muted-foreground rounded-xl border border-dashed p-12 text-center text-sm">
-        No orders waiting to reconcile. Import an eBay All orders report below, then optionally
+        Nothing to decide — anything that matched exactly is already recorded. Import an eBay All orders report below, then optionally
         import Listing sales to add exact fees and net-sales figures.
       </div>
     );

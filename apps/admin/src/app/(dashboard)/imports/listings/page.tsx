@@ -55,7 +55,7 @@ export default async function ListingsPage({
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
           <div>
             <p className="text-muted-foreground text-sm">Data</p>
-            <h1 className="mt-1 text-2xl font-semibold tracking-tight">Listing reconciliation</h1>
+            <h1 className="mt-1 text-2xl font-semibold tracking-tight">Listings to match</h1>
             <p className="text-muted-foreground mt-1 max-w-3xl text-sm">
               Imported or intentionally captured marketplace listing records — active, draft, ended,
               sold — in one place. Link each to the right inventory item, seed a new item, or ignore
@@ -92,7 +92,7 @@ export default async function ListingsPage({
         targets={targets}
         emptyMessage={
           activeView === "Pending"
-            ? "No listings waiting to reconcile. Import an eBay Active Listings report from the Imports page."
+            ? "Nothing to decide. Import an eBay Active Listings report from the Imports page."
             : activeView === "Linked"
               ? "No linked listings yet."
               : "No ignored listings."
