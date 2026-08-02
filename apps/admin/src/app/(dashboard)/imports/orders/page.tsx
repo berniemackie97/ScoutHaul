@@ -3,6 +3,7 @@ import { ArrowLeft, FileSpreadsheet, PlugZap, ScanLine, Wallet } from "lucide-re
 import { Badge, Card } from "@overhaul/ui";
 import { getApiClient } from "@/lib/api";
 import { PlatformOrderReconciler } from "./reconciler";
+import { AutoMatchPanel } from "./auto-match-panel";
 
 export const dynamic = "force-dynamic";
 
@@ -15,10 +16,12 @@ const date = (value: string | null | undefined) =>
 
 export default async function PlatformOrdersPage() {
   const api = await getApiClient();
-  const [openResult, reconciledResult, inventoryResult] = await Promise.all([
+  const [openResult, reconciledResult, inventoryResult, autoMatchResult] = await Promise.all([
     api.GET("/api/platform-orders", { params: { query: { status: "Imported" } } }),
     api.GET("/api/platform-orders", { params: { query: { status: "Reconciled" } } }),
     api.GET("/api/inventory", { params: { query: { includeArchived: false } } }),
+    // A preview only — it reports what could be settled and writes nothing.
+    api.GET("/api/platform-orders/auto-match/preview", {}),
   ]);
 
   const openOrders = openResult.data ?? [];
@@ -100,6 +103,8 @@ export default async function PlatformOrdersPage() {
           </Card>
         ))}
       </div>
+
+      <AutoMatchPanel canSettle={autoMatchResult.data?.canSettle ?? 0} />
 
       <section className="space-y-3">
         <h2 className="text-sm font-semibold">Needs your decision</h2>

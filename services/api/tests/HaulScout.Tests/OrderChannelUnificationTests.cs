@@ -50,11 +50,13 @@ public class OrderChannelUnificationTests
         var platformOrderStore = new EfPlatformOrderStore(db, orderAssembler);
         var feeEnrichment = new PlatformOrderFeeEnrichmentService(platformOrderStore, currentUser);
         var workflow = new PlatformOrderWorkflowService(platformOrderStore, currentUser, suggestionService);
-        var ingestion = new PlatformOrderIngestionService(platformOrderStore, currentUser, suggestionService, workflow);
+        var autoMatch = new PlatformOrderAutoMatchService(suggestionService, workflow, platformOrderStore, currentUser);
+        var ingestion = new PlatformOrderIngestionService(platformOrderStore, currentUser, suggestionService, workflow, autoMatch);
         return new PlatformOrdersController(
             workflow,
             new MarketplaceRefundImportService(platformOrderStore, currentUser, TimeProvider.System),
-            new PlatformOrderImportWorkflowService(platformOrderStore, currentUser, ingestion, feeEnrichment));
+            new PlatformOrderImportWorkflowService(platformOrderStore, currentUser, ingestion, feeEnrichment),
+            autoMatch);
     }
 
     private static SalesController NewSales(HaulScoutDbContext db, Guid org, Guid user)

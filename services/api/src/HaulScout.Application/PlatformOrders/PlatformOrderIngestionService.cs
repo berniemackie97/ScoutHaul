@@ -15,7 +15,8 @@ public sealed class PlatformOrderIngestionService(
     IPlatformOrderImportStore store,
     ICurrentUserContext currentUser,
     PlatformOrderSuggestionService suggestionService,
-    PlatformOrderWorkflowService reconciliation)
+    PlatformOrderWorkflowService reconciliation,
+    PlatformOrderAutoMatchService autoMatch)
 {
     public async Task<(IngestPlatformOrdersResultDto? Result, string? Error)> IngestAsync(
         string? defaultPlatform,
@@ -141,7 +142,7 @@ public sealed class PlatformOrderIngestionService(
             touched,
             cancellationToken);
 
-        int autoReconciled = await AutoReconcileUnambiguousAsync(imported, cancellationToken);
+        int autoReconciled = await autoMatch.PlanAndApplyAsync(imported, cancellationToken);
 
         // Re-read after auto-reconciling so the caller sees final states, not the pre-settle snapshot.
         IReadOnlyList<PlatformOrder> refreshed = autoReconciled == 0
@@ -152,69 +153,6 @@ public sealed class PlatformOrderIngestionService(
             await suggestionService.BuildSuggestionsAsync(refreshed, cancellationToken);
         List<PlatformOrderDto> dtos = refreshed.Select(order => PlatformOrderDtoFactory.ToPlatformOrderDto(order, suggestions)).ToList();
         return (new IngestPlatformOrdersResultDto(created, updated, skipped, autoReconciled, dtos), null);
-    }
-
-    /// <summary>
-    /// Settles the orders that leave nothing to decide. An order qualifies only when EVERY line has an
-    /// exact match — the platform's own item number or an unambiguous SKU — on an item that is not
-    /// already sold. A title resemblance never qualifies: posting real money against an item a fuzzy
-    /// match picked is worse than leaving the order in the queue, so those still go to a person.
-    /// </summary>
-    private async Task<int> AutoReconcileUnambiguousAsync(
-        IReadOnlyList<PlatformOrder> orders,
-        CancellationToken cancellationToken)
-    {
-        List<PlatformOrder> unsettled = orders
-            .Where(order => order.Status == PlatformOrderStatus.Imported && order.Lines.Count > 0)
-            .ToList();
-        if (unsettled.Count == 0)
-        {
-            return 0;
-        }
-
-        Dictionary<Guid, PlatformLineMatch> matches = await suggestionService.BuildMatchesAsync(unsettled, cancellationToken);
-
-        int settled = 0;
-        foreach (PlatformOrder order in unsettled)
-        {
-            List<ReconcilePlatformOrderLineMap> maps = [];
-            bool everyLineCertain = true;
-            foreach (PlatformOrderLine line in order.Lines)
-            {
-                if (line.InventoryItemId is Guid alreadyMapped)
-                {
-                    maps.Add(new ReconcilePlatformOrderLineMap(line.Id, alreadyMapped));
-                    continue;
-                }
-
-                if (matches.TryGetValue(line.Id, out PlatformLineMatch? match) && match.CanAutoSettle)
-                {
-                    maps.Add(new ReconcilePlatformOrderLineMap(line.Id, match.InventoryItemId));
-                    continue;
-                }
-
-                everyLineCertain = false;
-                break;
-            }
-
-            // Two lines resolving to the same item is ambiguous, not certain — reconcile rejects it
-            // anyway, and a person should see why.
-            if (!everyLineCertain || maps.Select(map => map.InventoryItemId).Distinct().Count() != maps.Count)
-            {
-                continue;
-            }
-
-            AppResult<PlatformOrderReconcileResultDto> result =
-                await reconciliation.ReconcileAsync(order.Id, new ReconcilePlatformOrderRequest(maps), cancellationToken);
-
-            // A refusal is not a failure of the import — the order simply stays in the queue.
-            if (result.Status == AppResultStatus.Ok)
-            {
-                settled++;
-            }
-        }
-
-        return settled;
     }
 
     private static void ApplyImportedFields(PlatformOrder order, IngestPlatformOrderInput input, Guid? channelAccountId)

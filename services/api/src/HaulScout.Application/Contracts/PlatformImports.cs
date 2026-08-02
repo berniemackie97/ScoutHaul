@@ -119,6 +119,15 @@ public sealed record PlatformOrderDto(
     DateTimeOffset ScrapedAt,
     IReadOnlyList<PlatformOrderLineDto> Lines);
 
+/// <summary>What settling the backlog would do. Shown before anything is written.</summary>
+/// <param name="PendingOrders">Orders currently waiting on a decision.</param>
+/// <param name="CanSettle">How many of those need no decision at all.</param>
+public sealed record AutoMatchPreviewDto(int PendingOrders, int CanSettle, IReadOnlyList<AutoMatchPreviewOrderDto> Orders);
+
+public sealed record AutoMatchPreviewOrderDto(Guid PlatformOrderId, string ExternalOrderId, string Platform, int LineCount);
+
+public sealed record AutoMatchAppliedDto(int Settled);
+
 /// <param name="AutoReconciled">Orders settled during the import because every line matched exactly — work the operator never has to see.</param>
 public sealed record IngestPlatformOrdersResultDto(int Created, int Updated, int Skipped, int AutoReconciled, IReadOnlyList<PlatformOrderDto> Orders);
 

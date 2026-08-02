@@ -18,7 +18,8 @@ namespace HaulScout.Api.Controllers;
 public sealed class PlatformOrdersController(
     PlatformOrderWorkflowService platformOrders,
     MarketplaceRefundImportService marketplaceRefundImportService,
-    PlatformOrderImportWorkflowService platformOrderImports) : ControllerBase
+    PlatformOrderImportWorkflowService platformOrderImports,
+    PlatformOrderAutoMatchService autoMatch) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<PlatformOrderDto>>> List(
@@ -29,6 +30,20 @@ public sealed class PlatformOrdersController(
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<PlatformOrderDto>> Get(Guid id, CancellationToken cancellationToken) =>
         ToActionResult(await platformOrders.GetAsync(id, cancellationToken));
+
+    /// <summary>What settling the waiting backlog would do — nothing is written.</summary>
+    [HttpGet("auto-match/preview")]
+    public async Task<ActionResult<AutoMatchPreviewDto>> PreviewAutoMatch(CancellationToken cancellationToken) =>
+        await autoMatch.PreviewBacklogAsync(cancellationToken);
+
+    /// <summary>
+    /// Settles every waiting order that leaves nothing to decide. The plan is rebuilt here rather than
+    /// taken from the caller, so a preview the operator has been looking at for a while cannot write
+    /// something that is no longer true.
+    /// </summary>
+    [HttpPost("auto-match")]
+    public async Task<ActionResult<AutoMatchAppliedDto>> ApplyAutoMatch(CancellationToken cancellationToken) =>
+        new AutoMatchAppliedDto(await autoMatch.ApplyBacklogAsync(cancellationToken));
 
     /// <summary>Idempotent batch upsert of imported orders. Re-ingesting a reconciled order refreshes the landing
     /// row for re-reconciliation while preserving line mappings.</summary>

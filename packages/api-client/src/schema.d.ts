@@ -7451,6 +7451,76 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/platform-orders/auto-match/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AutoMatchPreviewDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/platform-orders/auto-match": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AutoMatchAppliedDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -10205,6 +10275,25 @@ export interface components {
         ImportInventoryPhotoRequest: {
             url?: string | null;
             isHero?: boolean;
+        };
+        AutoMatchPreviewOrderDto: {
+            /** Format: uuid */
+            platformOrderId?: string;
+            externalOrderId?: string | null;
+            platform?: string | null;
+            /** Format: int32 */
+            lineCount?: number;
+        };
+        AutoMatchPreviewDto: {
+            /** Format: int32 */
+            pendingOrders?: number;
+            /** Format: int32 */
+            canSettle?: number;
+            orders?: components["schemas"]["AutoMatchPreviewOrderDto"][] | null;
+        };
+        AutoMatchAppliedDto: {
+            /** Format: int32 */
+            settled?: number;
         };
     };
     responses: never;

@@ -47,11 +47,13 @@ public class PlatformOrderIngestionTests
         var platformOrderStore = new EfPlatformOrderStore(db, orderAssembler);
         var feeEnrichment = new PlatformOrderFeeEnrichmentService(platformOrderStore, currentUser);
         var workflow = new PlatformOrderWorkflowService(platformOrderStore, currentUser, suggestionService);
-        var ingestion = new PlatformOrderIngestionService(platformOrderStore, currentUser, suggestionService, workflow);
+        var autoMatch = new PlatformOrderAutoMatchService(suggestionService, workflow, platformOrderStore, currentUser);
+        var ingestion = new PlatformOrderIngestionService(platformOrderStore, currentUser, suggestionService, workflow, autoMatch);
         return new PlatformOrdersController(
             workflow,
             new MarketplaceRefundImportService(platformOrderStore, currentUser, TimeProvider.System),
-            new PlatformOrderImportWorkflowService(platformOrderStore, currentUser, ingestion, feeEnrichment));
+            new PlatformOrderImportWorkflowService(platformOrderStore, currentUser, ingestion, feeEnrichment),
+            autoMatch);
     }
 
     private static InventoryItem SeedItem(HaulScoutDbContext db, Guid org, string title, decimal cost)
@@ -133,6 +135,36 @@ public class PlatformOrderIngestionTests
         // Settling means the sale exists with the platform's exact figures.
         Sale sale = await db.Sales.SingleAsync(candidate => candidate.InventoryItemId == item.Id);
         Assert.Equal(9m, sale.PlatformFees);
+    }
+
+    [Fact]
+    public async Task The_backlog_preview_counts_what_can_settle_without_writing_anything()
+    {
+        var (db, org, user) = NewContext(nameof(The_backlog_preview_counts_what_can_settle_without_writing_anything));
+        await using var _ = db;
+        var controller = NewController(db, org, user);
+
+        // One order identifiable by barcode, one only by title.
+        InventoryItem certain = SeedItem(db, org, "Leather Boots", 30m);
+        certain.Barcode = "SKU-BOOT-9";
+        SeedItem(db, org, "Vintage Denim Jacket", 20m);
+        db.SaveChanges();
+
+        await controller.Ingest(new IngestPlatformOrdersRequest("eBay", [
+            Order("ORD-CERTAIN", [new IngestPlatformOrderLineInput("Leather Boots", 90m, Sku: "SKU-BOOT-9")]),
+            Order("ORD-FUZZY", [new IngestPlatformOrderLineInput("Vintage Denim Jacket", 60m)]),
+        ]), CancellationToken.None);
+
+        // The certain one settles during import, so the backlog holds only the fuzzy one — and the
+        // preview must report that nothing there can settle itself.
+        ActionResult<AutoMatchPreviewDto> preview = await controller.PreviewAutoMatch(CancellationToken.None);
+        Assert.Equal(1, preview.Value!.PendingOrders);
+        Assert.Equal(0, preview.Value.CanSettle);
+
+        // Previewing writes nothing: the fuzzy order is untouched and has no sale.
+        PlatformOrder fuzzy = await db.PlatformOrders.SingleAsync(o => o.ExternalOrderId == "ORD-FUZZY");
+        Assert.Equal(PlatformOrderStatus.Imported, fuzzy.Status);
+        Assert.Single(await db.Sales.ToListAsync());
     }
 
     [Fact]

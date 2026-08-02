@@ -9172,6 +9172,44 @@
           }
         }
       }
+    },
+    "/api/platform-orders/auto-match/preview": {
+      "get": {
+        "tags": [
+          "PlatformOrders"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutoMatchPreviewDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/platform-orders/auto-match": {
+      "post": {
+        "tags": [
+          "PlatformOrders"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutoMatchAppliedDto"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -17292,6 +17330,56 @@
           }
         },
         "additionalProperties": false
+      },
+      "AutoMatchPreviewOrderDto": {
+        "type": "object",
+        "properties": {
+          "platformOrderId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "externalOrderId": {
+            "type": "string",
+            "nullable": true
+          },
+          "platform": {
+            "type": "string",
+            "nullable": true
+          },
+          "lineCount": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "AutoMatchPreviewDto": {
+        "type": "object",
+        "properties": {
+          "pendingOrders": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "canSettle": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "orders": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AutoMatchPreviewOrderDto"
+            },
+            "nullable": true
+          }
+        }
+      },
+      "AutoMatchAppliedDto": {
+        "type": "object",
+        "properties": {
+          "settled": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
       }
     }
   },
