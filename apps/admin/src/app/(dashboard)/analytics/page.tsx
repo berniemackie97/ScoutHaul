@@ -86,6 +86,9 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
           <p className="mt-1 max-w-3xl text-sm text-muted-foreground">Auditable sales, profit, expense, inventory, aging, and data-quality reporting from the system of record.</p>
         </div>
         <div className="flex flex-wrap gap-2">
+          {/* Listing quality is reporting data — performance observations per listing — so it lives
+              here rather than on the Imports page, where nothing was ever done with it. */}
+          <Link href="/analytics/listing-quality" className="inline-flex h-10 items-center gap-2 rounded-lg border bg-background px-4 text-sm font-medium hover:bg-muted"><PackageSearch className="h-4 w-4" /> Listing quality</Link>
           <Link href={`/api/reports/export?${exportQuery}`} className="inline-flex h-10 items-center gap-2 rounded-lg border bg-background px-4 text-sm font-medium hover:bg-muted"><Download className="h-4 w-4" /> Export CSV</Link>
         </div>
       </header>

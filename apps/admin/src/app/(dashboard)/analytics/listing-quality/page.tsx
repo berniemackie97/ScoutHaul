@@ -86,10 +86,10 @@ export default async function ListingQualityPage() {
     <div className="space-y-6">
       <header className="space-y-3">
         <Link
-          href="/imports"
+          href="/analytics"
           className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-sm"
         >
-          <ArrowLeft className="h-4 w-4" /> Imports
+          <ArrowLeft className="h-4 w-4" /> Reports
         </Link>
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
           <div>
