@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ArrowRight, FileSpreadsheet } from "lucide-react";
-import { getApiAccessToken, getApiBaseUrl, getApiClient } from "@/lib/api";
+import { getApiClient } from "@/lib/api";
 import { CsvUploader } from "./csv-uploader";
 import {
   importEbayOrders,
@@ -13,10 +13,9 @@ export const dynamic = "force-dynamic";
 
 export default async function ImportsPage() {
   const api = await getApiClient();
-  const [orders, listings, qualitySnapshots] = await Promise.all([
+  const [orders, listings] = await Promise.all([
     api.GET("/api/platform-orders", { params: { query: { status: "Imported" } } }),
     api.GET("/api/platform-listings", { params: { query: { reconcileStatus: "Pending" } } }),
-    getQualitySnapshotsCount(),
   ]);
   const ordersToReconcile = orders.data?.length ?? 0;
   const listingsToReconcile = listings.data?.length ?? 0;
@@ -78,28 +77,9 @@ export default async function ImportsPage() {
           count={listingsToReconcile}
           hint="Link imported listings to an inventory item, or seed a new draft."
         />
-        <ReconcileCard
-          href="/imports/listing-quality"
-          title="Quality snapshots"
-          count={qualitySnapshots}
-          hint="Imported eBay listing-quality observations available for reporting."
-        />
       </section>
     </div>
   );
-}
-
-async function getQualitySnapshotsCount(): Promise<number> {
-  const token = await getApiAccessToken();
-  const response = await fetch(`${getApiBaseUrl()}/api/platform-listings/quality-snapshots?take=500`, {
-    cache: "no-store",
-    headers: {
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-  });
-  if (!response.ok) return 0;
-  const rows = (await response.json()) as unknown[];
-  return rows.length;
 }
 
 function ReconcileCard({
