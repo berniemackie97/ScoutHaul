@@ -87,3 +87,30 @@ export async function ignorePlatformOrder(
   revalidatePath("/imports/orders");
   return { ok: true, message: "Order set aside." };
 }
+
+/**
+ * Settles every waiting order that leaves nothing to decide. The server rebuilds the plan rather than
+ * trusting whatever the preview showed, so a page left open for a while cannot write something that
+ * has since stopped being true.
+ */
+export async function autoMatchWaitingOrders(): Promise<{ ok: boolean; message: string }> {
+  const api = await getApiClient();
+  const result = await api.POST("/api/platform-orders/auto-match", {});
+  if (!result.data) {
+    return { ok: false, message: "Could not match the waiting orders." };
+  }
+
+  revalidatePath("/imports/orders");
+  revalidatePath("/imports");
+  revalidatePath("/orders");
+  revalidatePath("/inventory");
+
+  const settled = result.data.settled ?? 0;
+  return {
+    ok: true,
+    message:
+      settled === 0
+        ? "Nothing could be matched without a decision."
+        : `${settled} order${settled === 1 ? "" : "s"} matched and recorded.`,
+  };
+}
