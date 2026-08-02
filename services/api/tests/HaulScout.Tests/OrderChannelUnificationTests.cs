@@ -49,9 +49,10 @@ public class OrderChannelUnificationTests
         var orderAssembler = new OrderAssembler(db, currentUser);
         var platformOrderStore = new EfPlatformOrderStore(db, orderAssembler);
         var feeEnrichment = new PlatformOrderFeeEnrichmentService(platformOrderStore, currentUser);
-        var ingestion = new PlatformOrderIngestionService(platformOrderStore, currentUser, suggestionService);
+        var workflow = new PlatformOrderWorkflowService(platformOrderStore, currentUser, suggestionService);
+        var ingestion = new PlatformOrderIngestionService(platformOrderStore, currentUser, suggestionService, workflow);
         return new PlatformOrdersController(
-            new PlatformOrderWorkflowService(platformOrderStore, currentUser, suggestionService),
+            workflow,
             new MarketplaceRefundImportService(platformOrderStore, currentUser, TimeProvider.System),
             new PlatformOrderImportWorkflowService(platformOrderStore, currentUser, ingestion, feeEnrichment));
     }

@@ -46,9 +46,10 @@ public class PlatformOrderIngestionTests
         var orderAssembler = new OrderAssembler(db, currentUser);
         var platformOrderStore = new EfPlatformOrderStore(db, orderAssembler);
         var feeEnrichment = new PlatformOrderFeeEnrichmentService(platformOrderStore, currentUser);
-        var ingestion = new PlatformOrderIngestionService(platformOrderStore, currentUser, suggestionService);
+        var workflow = new PlatformOrderWorkflowService(platformOrderStore, currentUser, suggestionService);
+        var ingestion = new PlatformOrderIngestionService(platformOrderStore, currentUser, suggestionService, workflow);
         return new PlatformOrdersController(
-            new PlatformOrderWorkflowService(platformOrderStore, currentUser, suggestionService),
+            workflow,
             new MarketplaceRefundImportService(platformOrderStore, currentUser, TimeProvider.System),
             new PlatformOrderImportWorkflowService(platformOrderStore, currentUser, ingestion, feeEnrichment));
     }
@@ -108,9 +109,9 @@ public class PlatformOrderIngestionTests
     }
 
     [Fact]
-    public async Task Reingesting_a_reconciled_order_refreshes_it_for_re_reconciliation()
+    public async Task Reingesting_a_reconciled_order_corrects_its_sale_without_re_queuing_it()
     {
-        var (db, org, user) = NewContext(nameof(Reingesting_a_reconciled_order_refreshes_it_for_re_reconciliation));
+        var (db, org, user) = NewContext(nameof(Reingesting_a_reconciled_order_corrects_its_sale_without_re_queuing_it));
         await using var _ = db;
         var controller = NewController(db, org, user);
         var item = SeedItem(db, org, "Leather Boots", 30m);
@@ -126,10 +127,13 @@ public class PlatformOrderIngestionTests
 
         PlatformOrder refreshed = await db.PlatformOrders.Include(o => o.Lines).SingleAsync();
         Assert.Equal(15m, refreshed.FeeTotal);
-        Assert.Equal(PlatformOrderStatus.Imported, refreshed.Status);
         Assert.Equal(item.Id, refreshed.Lines.Single().InventoryItemId);
 
-        await controller.Reconcile(refreshed.Id, new ReconcilePlatformOrderRequest([]), CancellationToken.None);
+        // The order stays settled: its line is still mapped, so re-importing must not send work the
+        // operator already did back into the queue.
+        Assert.Equal(PlatformOrderStatus.Reconciled, refreshed.Status);
+
+        // ...and the corrected fee still reaches the sale, without anyone reconciling it again.
         Sale corrected = await db.Sales.SingleAsync(sale => sale.InventoryItemId == item.Id);
         Assert.Equal(15m, corrected.PlatformFees);
         Assert.Single(await db.Orders.ToListAsync());

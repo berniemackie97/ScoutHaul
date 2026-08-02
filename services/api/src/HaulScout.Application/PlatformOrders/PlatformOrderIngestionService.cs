@@ -14,7 +14,8 @@ namespace HaulScout.Application.PlatformOrders;
 public sealed class PlatformOrderIngestionService(
     IPlatformOrderImportStore store,
     ICurrentUserContext currentUser,
-    PlatformOrderSuggestionService suggestionService)
+    PlatformOrderSuggestionService suggestionService,
+    PlatformOrderWorkflowService reconciliation)
 {
     public async Task<(IngestPlatformOrdersResultDto? Result, string? Error)> IngestAsync(
         string? defaultPlatform,
@@ -64,6 +65,9 @@ public sealed class PlatformOrderIngestionService(
 
         int created = 0, updated = 0, skipped = 0;
         List<Guid> touched = [];
+        // Orders that stayed reconciled but whose imported figures may have moved; their sales are
+        // re-synced after the save so corrected fees land without re-queuing them for a person.
+        List<Guid> resyncOrderIds = [];
 
         foreach ((IngestPlatformOrderInput input, string channel, string externalOrderId) in normalized)
         {
@@ -91,15 +95,23 @@ public sealed class PlatformOrderIngestionService(
                 ApplyImportedFields(order, input, channelAccountId);
                 ReplaceLines(order, input, preserveExistingMappings: wasReconciled);
 
-                // Re-importing the same report used to demote every reconciled order straight back
-                // into the queue, so a weekly export meant re-reconciling work already done. A
-                // reconciled order only needs a human again when the re-import actually left a line
-                // without a mapping — a line the seller added or changed on the platform. Otherwise
-                // the mappings still hold and the refreshed figures are corrected in place, which is
-                // exactly what the reconcile screen promises.
-                if (wasReconciled && order.Lines.Any(line => line.InventoryItemId is null))
+                // Re-importing used to demote every reconciled order back into the queue, so a weekly
+                // export meant redoing matching already done. Demotion conflated two different needs:
+                // "a human must map a line" and "the sale's figures are stale". Only the first is a
+                // person's job. A reconciled order returns to the queue solely when the re-import
+                // left a line unmapped — one the seller added or changed on the platform. When the
+                // mappings all survive it stays settled and is re-synced automatically below, so
+                // corrected fees still reach the sale without asking anyone.
+                if (wasReconciled)
                 {
-                    order.Status = PlatformOrderStatus.Imported;
+                    if (order.Lines.Any(line => line.InventoryItemId is null))
+                    {
+                        order.Status = PlatformOrderStatus.Imported;
+                    }
+                    else
+                    {
+                        resyncOrderIds.Add(order.Id);
+                    }
                 }
 
                 updated++;
@@ -114,6 +126,15 @@ public sealed class PlatformOrderIngestionService(
         }
 
         await store.SaveChangesAsync(cancellationToken);
+
+        // Reconciling with no line maps re-applies the order's current platform figures to the sales
+        // its lines already point at — the same correction the operator used to trigger by hand after
+        // the import demoted the order. Doing it here keeps the money accurate without the busywork.
+        foreach (Guid orderId in resyncOrderIds)
+        {
+            await reconciliation.ReconcileAsync(
+                orderId, new ReconcilePlatformOrderRequest([]), cancellationToken);
+        }
 
         IReadOnlyList<PlatformOrder> refreshed = await store.ListImportedOrdersForDisplayAsync(
             currentUser.OrganizationId,
