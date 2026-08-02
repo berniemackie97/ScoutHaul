@@ -7,11 +7,17 @@ namespace HaulScout.Infrastructure.PlatformOrders;
 
 public sealed class EfPlatformOrderSuggestionStore(HaulScoutDbContext db, ICurrentUserContext currentUser) : IPlatformOrderSuggestionStore
 {
+    /// <summary>
+    /// Inventory items as match targets. Barcode is supplied as the item's identifier code: an inventory
+    /// item has no separate SKU column, and a seller's platform custom-label commonly carries the
+    /// barcode. It is compared exactly, and a code shared by two items is rejected as ambiguous rather
+    /// than guessed at.
+    /// </summary>
     public async Task<IReadOnlyList<PlatformOrderInventorySuggestionCandidate>> ListInventoryCandidatesAsync(CancellationToken cancellationToken) =>
         await db.InventoryItems
             .Where(item => item.OrganizationId == currentUser.OrganizationId && !item.IsArchived)
             .OrderByDescending(item => item.UpdatedAt)
-            .Select(item => new PlatformOrderInventorySuggestionCandidate(item.Id, item.Title, item.Status))
+            .Select(item => new PlatformOrderInventorySuggestionCandidate(item.Id, item.Title, item.Barcode, item.Status))
             .Take(2000)
             .ToListAsync(cancellationToken);
 

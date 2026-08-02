@@ -27,23 +27,35 @@ public sealed class PlatformOrderSuggestionService(IPlatformOrderSuggestionStore
         IReadOnlyList<PlatformOrderInventorySuggestionCandidate> inventory =
             await store.ListInventoryCandidatesAsync(cancellationToken);
         Dictionary<Guid, string> titleById = inventory.ToDictionary(item => item.Id, item => item.Title);
-        Dictionary<Guid, bool> soldById = inventory.ToDictionary(item => item.Id, item => InventoryLifecycle.IsSold(item.Status));
-        List<(Guid Id, string Title)> titleCandidates = inventory.Select(item => (item.Id, item.Title)).ToList();
+        List<InventoryMatchCandidate> candidates = inventory
+            .Select(item => new InventoryMatchCandidate(item.Id, item.Title, item.Sku, InventoryLifecycle.IsSold(item.Status)))
+            .ToList();
 
         List<string> externalIds = openLines.Where(line => line.ExternalItemId is not null).Select(line => line.ExternalItemId!).Distinct().ToList();
-        var byExternalId = externalIds.Count == 0
+        IReadOnlyList<PlatformOrderListingSuggestionCandidate> listingLinks = externalIds.Count == 0
             ? []
             : await store.ListListingCandidatesAsync(externalIds, cancellationToken);
 
+        // First link wins per item id — the store returns channel listings ahead of imported ones.
+        Dictionary<string, Guid> itemIdToInventoryId = new(StringComparer.OrdinalIgnoreCase);
+        foreach (PlatformOrderListingSuggestionCandidate link in listingLinks)
+        {
+            if (link.ExternalListingId is string externalId)
+            {
+                itemIdToInventoryId.TryAdd(externalId, link.InventoryItemId);
+            }
+        }
+
         foreach (PlatformOrderLine line in openLines)
         {
-            Guid? matchId = line.ExternalItemId is null
-                ? null
-                : byExternalId.FirstOrDefault(candidate => candidate.ExternalListingId == line.ExternalItemId)?.InventoryItemId;
-            matchId ??= TitleMatch.Best(line.Title, titleCandidates);
-            if (matchId is Guid id && titleById.TryGetValue(id, out string? title))
+            PlatformLineMatch? match = PlatformLineMatcher.Match(
+                new PlatformLineIdentity(line.ExternalItemId, line.Sku, line.Title),
+                itemIdToInventoryId,
+                candidates);
+
+            if (match is not null && titleById.TryGetValue(match.InventoryItemId, out string? title))
             {
-                suggestions[line.Id] = (id, title, soldById.GetValueOrDefault(id));
+                suggestions[line.Id] = (match.InventoryItemId, title, match.AlreadySold);
             }
         }
 
@@ -51,6 +63,6 @@ public sealed class PlatformOrderSuggestionService(IPlatformOrderSuggestionStore
     }
 }
 
-public sealed record PlatformOrderInventorySuggestionCandidate(Guid Id, string Title, InventoryStatus Status);
+public sealed record PlatformOrderInventorySuggestionCandidate(Guid Id, string Title, string? Sku, InventoryStatus Status);
 
 public sealed record PlatformOrderListingSuggestionCandidate(string? ExternalListingId, Guid InventoryItemId);
