@@ -87,12 +87,21 @@ public sealed class PlatformOrderIngestionService(
             }
             else if (order.Status != PlatformOrderStatus.Ignored)
             {
+                bool wasReconciled = order.Status == PlatformOrderStatus.Reconciled;
                 ApplyImportedFields(order, input, channelAccountId);
-                ReplaceLines(order, input, preserveExistingMappings: order.Status == PlatformOrderStatus.Reconciled);
-                if (order.Status == PlatformOrderStatus.Reconciled)
+                ReplaceLines(order, input, preserveExistingMappings: wasReconciled);
+
+                // Re-importing the same report used to demote every reconciled order straight back
+                // into the queue, so a weekly export meant re-reconciling work already done. A
+                // reconciled order only needs a human again when the re-import actually left a line
+                // without a mapping — a line the seller added or changed on the platform. Otherwise
+                // the mappings still hold and the refreshed figures are corrected in place, which is
+                // exactly what the reconcile screen promises.
+                if (wasReconciled && order.Lines.Any(line => line.InventoryItemId is null))
                 {
                     order.Status = PlatformOrderStatus.Imported;
                 }
+
                 updated++;
             }
             else
