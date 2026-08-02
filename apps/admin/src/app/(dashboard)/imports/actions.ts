@@ -52,10 +52,15 @@ export async function importEbayOrders(
   revalidatePath("/imports");
   revalidatePath("/orders");
   revalidatePath("/imports/orders");
-  const { created, updated, skipped } = result.data;
+  const { created = 0, updated = 0, skipped = 0, autoReconciled = 0 } = result.data;
+  // Say what the import actually did. Orders whose every line matched exactly are already recorded,
+  // so the only number worth pointing at is what genuinely still needs a person.
+  const remaining = Math.max(0, created + updated - autoReconciled);
+  const settled = autoReconciled > 0 ? ` · ${autoReconciled} matched automatically` : "";
+  const next = remaining > 0 ? ` ${remaining} need a decision below.` : " Nothing left to decide.";
   return {
     ok: true,
-    message: `${created} new · ${updated} updated · ${skipped} skipped. Reconcile below.`,
+    message: `${created} new · ${updated} updated · ${skipped} skipped${settled}.${next}`,
   };
 }
 

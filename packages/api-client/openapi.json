@@ -11100,6 +11100,10 @@
             "type": "integer",
             "format": "int32"
           },
+          "autoReconciled": {
+            "type": "integer",
+            "format": "int32"
+          },
           "orders": {
             "type": "array",
             "items": {

@@ -105,7 +105,7 @@ public sealed class PlatformOrderFeeEnrichmentService(
             : await store.ListImportedOrdersForDisplayAsync(currentUser.OrganizationId, touchedOrderIds, cancellationToken);
         List<PlatformOrderDto> dtos = refreshed.Select(order => PlatformOrderDtoFactory.ToPlatformOrderDto(order)).ToList();
         int skipped = metrics.Count - byItemId.Keys.Count + byItemId.Keys.Count(itemId => !linesByItemId.ContainsKey(itemId));
-        return new IngestPlatformOrdersResultDto(0, updatedLines + correctedSales, Math.Max(0, skipped), dtos);
+        return new IngestPlatformOrdersResultDto(0, updatedLines + correctedSales, Math.Max(0, skipped), 0, dtos);
     }
 
     private async Task<int> CorrectReconciledSales(PlatformOrder order, CancellationToken cancellationToken)

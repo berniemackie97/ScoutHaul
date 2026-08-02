@@ -8096,6 +8096,8 @@ export interface components {
             updated?: number;
             /** Format: int32 */
             skipped?: number;
+            /** Format: int32 */
+            autoReconciled?: number;
             orders?: components["schemas"]["PlatformOrderDto"][] | null;
         };
         /** @enum {string} */
