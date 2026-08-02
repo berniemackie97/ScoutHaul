@@ -15,13 +15,37 @@ public sealed class EfPlatformOrderSuggestionStore(HaulScoutDbContext db, ICurre
             .Take(2000)
             .ToListAsync(cancellationToken);
 
+    /// <summary>
+    /// Which inventory item an order line's platform item number points at.
+    ///
+    /// Two independent records can answer this and both are consulted, because relying on only one
+    /// was why order reconciliation depended on having reconciled the listing import first:
+    ///   • <see cref="ChannelListing"/> — the manual channel-presence ledger.
+    ///   • <see cref="PlatformListing"/> — an imported listing the operator already reconciled.
+    /// A listings report and an orders report can be imported in either order, or only one of them
+    /// imported at all, and the line still resolves if the answer exists anywhere.
+    /// </summary>
     public async Task<IReadOnlyList<PlatformOrderListingSuggestionCandidate>> ListListingCandidatesAsync(
         IReadOnlyList<string> externalListingIds,
-        CancellationToken cancellationToken) =>
-        await db.ChannelListings
+        CancellationToken cancellationToken)
+    {
+        List<PlatformOrderListingSuggestionCandidate> fromChannelListings = await db.ChannelListings
             .Where(listing => listing.OrganizationId == currentUser.OrganizationId
                 && listing.ExternalListingId != null
                 && externalListingIds.Contains(listing.ExternalListingId))
             .Select(listing => new PlatformOrderListingSuggestionCandidate(listing.ExternalListingId, listing.InventoryItemId))
             .ToListAsync(cancellationToken);
+
+        List<PlatformOrderListingSuggestionCandidate> fromImportedListings = await db.PlatformListings
+            .Where(listing => listing.OrganizationId == currentUser.OrganizationId
+                && listing.ReconciledInventoryItemId != null
+                && externalListingIds.Contains(listing.ExternalListingId))
+            .Select(listing => new PlatformOrderListingSuggestionCandidate(
+                listing.ExternalListingId, listing.ReconciledInventoryItemId!.Value))
+            .ToListAsync(cancellationToken);
+
+        // Channel listings first: an explicit channel record is the more deliberate statement of
+        // where an item is listed, so it wins when both know the same external id.
+        return [.. fromChannelListings, .. fromImportedListings];
+    }
 }
