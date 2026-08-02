@@ -40,7 +40,7 @@ function LinkButton({ disabled }: { disabled: boolean }) {
   const { pending } = useFormStatus();
   return (
     <Button type="submit" name="intent" value="link" size="sm" disabled={pending || disabled}>
-      {pending ? "Linking…" : "Link selected item"}
+      {pending ? "Saving…" : "This is the item"}
     </Button>
   );
 }
@@ -56,7 +56,7 @@ function CreateButton() {
       variant="secondary"
       disabled={pending}
     >
-      {pending ? "Creating…" : "New item from listing"}
+      {pending ? "Creating…" : "Create new item"}
     </Button>
   );
 }
@@ -201,7 +201,7 @@ function ListingRow({
                   value={selectedId}
                   onChange={(event) => setSelectedId(event.target.value)}
                 >
-                  <option value="">Select inventory item…</option>
+                  <option value="">Choose an item…</option>
                   {filteredTargets.map((target) => (
                     <option key={target.id} value={target.id}>
                       {target.title}
@@ -235,7 +235,7 @@ function ListingRow({
               ) : (
                 <form action={ignoreAction}>
                   <input type="hidden" name="listingId" value={listing.id ?? ""} />
-                  <SmallSubmitButton label="Ignore" />
+                  <SmallSubmitButton label="Not my inventory" />
                 </form>
               )}
             </div>

@@ -29,7 +29,7 @@ export default async function ImportsPage() {
           <FileSpreadsheet className="h-6 w-6" /> Imports
         </h1>
         <p className="text-muted-foreground mt-1 max-w-2xl text-sm">
-          Bring a marketplace&apos;s own exports into ScoutHaul. Drop a file, then reconcile the
+          Bring a marketplace&apos;s own exports into ScoutHaul. Drop a file — anything that matches exactly is recorded for you, and only genuine questions reach
           results into orders, customers, sales, and listings. Re-importing the same file updates in
           place — it never duplicates.
         </p>
@@ -68,13 +68,13 @@ export default async function ImportsPage() {
       <section className="grid gap-4 sm:grid-cols-3">
         <ReconcileCard
           href="/imports/orders"
-          title="Orders to reconcile"
+          title="Orders to match"
           count={ordersToReconcile}
           hint="Match imported orders to inventory → creates sales with exact fees."
         />
         <ReconcileCard
           href="/imports/listings"
-          title="Listings to reconcile"
+          title="Listings to match"
           count={listingsToReconcile}
           hint="Link imported listings to an inventory item, or seed a new draft."
         />

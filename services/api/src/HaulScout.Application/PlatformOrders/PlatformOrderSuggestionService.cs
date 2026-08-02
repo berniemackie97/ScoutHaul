@@ -10,18 +10,48 @@ namespace HaulScout.Application.PlatformOrders;
 /// </summary>
 public sealed class PlatformOrderSuggestionService(IPlatformOrderSuggestionStore store)
 {
+    /// <summary>
+    /// The operator-facing suggestion per open line. Advisory: reconciliation still needs a person,
+    /// except where <see cref="BuildMatchesAsync"/> reports a match safe to settle on its own.
+    /// </summary>
     public async Task<Dictionary<Guid, (Guid Id, string Title, bool AlreadySold)>> BuildSuggestionsAsync(
         IReadOnlyList<PlatformOrder> orders,
         CancellationToken cancellationToken)
     {
-        Dictionary<Guid, (Guid, string, bool)> suggestions = new();
+        (Dictionary<Guid, PlatformLineMatch> matches, Dictionary<Guid, string> titleById) =
+            await MatchOpenLinesAsync(orders, cancellationToken);
+
+        return matches
+            .Where(entry => titleById.ContainsKey(entry.Value.InventoryItemId))
+            .ToDictionary(
+                entry => entry.Key,
+                entry => (entry.Value.InventoryItemId, titleById[entry.Value.InventoryItemId], entry.Value.AlreadySold));
+    }
+
+    /// <summary>
+    /// The full match per open line, including how it was found. Callers deciding whether to settle
+    /// without a person need the source, not just the item — see <see cref="PlatformLineMatch.CanAutoSettle"/>.
+    /// </summary>
+    public async Task<Dictionary<Guid, PlatformLineMatch>> BuildMatchesAsync(
+        IReadOnlyList<PlatformOrder> orders,
+        CancellationToken cancellationToken)
+    {
+        (Dictionary<Guid, PlatformLineMatch> matches, _) = await MatchOpenLinesAsync(orders, cancellationToken);
+        return matches;
+    }
+
+    private async Task<(Dictionary<Guid, PlatformLineMatch> Matches, Dictionary<Guid, string> TitleById)> MatchOpenLinesAsync(
+        IReadOnlyList<PlatformOrder> orders,
+        CancellationToken cancellationToken)
+    {
+        Dictionary<Guid, PlatformLineMatch> suggestions = new();
         List<PlatformOrderLine> openLines = orders
             .Where(order => order.Status != PlatformOrderStatus.Reconciled)
             .SelectMany(order => order.Lines.Where(line => line.InventoryItemId is null))
             .ToList();
         if (openLines.Count == 0)
         {
-            return suggestions;
+            return (suggestions, []);
         }
 
         IReadOnlyList<PlatformOrderInventorySuggestionCandidate> inventory =
@@ -53,13 +83,13 @@ public sealed class PlatformOrderSuggestionService(IPlatformOrderSuggestionStore
                 itemIdToInventoryId,
                 candidates);
 
-            if (match is not null && titleById.TryGetValue(match.InventoryItemId, out string? title))
+            if (match is not null)
             {
-                suggestions[line.Id] = (match.InventoryItemId, title, match.AlreadySold);
+                suggestions[line.Id] = match;
             }
         }
 
-        return suggestions;
+        return (suggestions, titleById);
     }
 }
 

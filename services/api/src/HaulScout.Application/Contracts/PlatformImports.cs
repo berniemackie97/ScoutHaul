@@ -119,7 +119,8 @@ public sealed record PlatformOrderDto(
     DateTimeOffset ScrapedAt,
     IReadOnlyList<PlatformOrderLineDto> Lines);
 
-public sealed record IngestPlatformOrdersResultDto(int Created, int Updated, int Skipped, IReadOnlyList<PlatformOrderDto> Orders);
+/// <param name="AutoReconciled">Orders settled during the import because every line matched exactly — work the operator never has to see.</param>
+public sealed record IngestPlatformOrdersResultDto(int Created, int Updated, int Skipped, int AutoReconciled, IReadOnlyList<PlatformOrderDto> Orders);
 
 /// <summary>Import a marketplace's own CSV export (e.g. eBay Seller Hub → Performance → Sales report) — the
 /// authoritative fee source. Parsed server-side into the same idempotent ingest path as manual JSON.</summary>

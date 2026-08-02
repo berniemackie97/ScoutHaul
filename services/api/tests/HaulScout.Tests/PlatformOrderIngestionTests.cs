@@ -109,6 +109,54 @@ public class PlatformOrderIngestionTests
     }
 
     [Fact]
+    public async Task An_order_whose_lines_all_match_a_barcode_exactly_settles_itself_on_import()
+    {
+        var (db, org, user) = NewContext(nameof(An_order_whose_lines_all_match_a_barcode_exactly_settles_itself_on_import));
+        await using var _ = db;
+        var controller = NewController(db, org, user);
+
+        InventoryItem item = SeedItem(db, org, "Leather Boots", 30m);
+        item.Barcode = "SKU-BOOT-9";
+        db.SaveChanges();
+
+        // The line carries that exact code, so there is nothing for a person to decide.
+        IngestPlatformOrderLineInput[] lines = [new("Leather Boots", 90m, Sku: "SKU-BOOT-9")];
+        ActionResult<IngestPlatformOrdersResultDto> result = await controller.Ingest(
+            new IngestPlatformOrdersRequest("eBay", [Order("ORD-AUTO", lines, fee: 9m)]), CancellationToken.None);
+
+        Assert.Equal(1, result.Value!.AutoReconciled);
+
+        PlatformOrder order = await db.PlatformOrders.Include(o => o.Lines).SingleAsync();
+        Assert.Equal(PlatformOrderStatus.Reconciled, order.Status);
+        Assert.Equal(item.Id, order.Lines.Single().InventoryItemId);
+
+        // Settling means the sale exists with the platform's exact figures.
+        Sale sale = await db.Sales.SingleAsync(candidate => candidate.InventoryItemId == item.Id);
+        Assert.Equal(9m, sale.PlatformFees);
+    }
+
+    [Fact]
+    public async Task An_order_matched_only_by_title_is_left_for_a_person()
+    {
+        var (db, org, user) = NewContext(nameof(An_order_matched_only_by_title_is_left_for_a_person));
+        await using var _ = db;
+        var controller = NewController(db, org, user);
+
+        // Title resembles the item, but nothing identifies it. A wrong sale is worse than a queue entry.
+        SeedItem(db, org, "Leather Boots Size 9", 30m);
+        IngestPlatformOrderLineInput[] lines = [new("Leather Boots Size 9", 90m)];
+
+        ActionResult<IngestPlatformOrdersResultDto> result = await controller.Ingest(
+            new IngestPlatformOrdersRequest("eBay", [Order("ORD-FUZZY", lines, fee: 9m)]), CancellationToken.None);
+
+        Assert.Equal(0, result.Value!.AutoReconciled);
+
+        PlatformOrder order = await db.PlatformOrders.SingleAsync();
+        Assert.Equal(PlatformOrderStatus.Imported, order.Status);
+        Assert.Empty(await db.Sales.ToListAsync());
+    }
+
+    [Fact]
     public async Task Reingesting_a_reconciled_order_corrects_its_sale_without_re_queuing_it()
     {
         var (db, org, user) = NewContext(nameof(Reingesting_a_reconciled_order_corrects_its_sale_without_re_queuing_it));
@@ -911,9 +959,9 @@ Brass Lamp,377251318593,1,$0.00,$0.00,$0.00,$0.00,$0.00,$12.34,$0.00,$0.00,$16.9
     }
 
     [Fact]
-    public async Task Get_suggests_an_inventory_match_from_the_channel_listing_external_id()
+    public async Task A_line_matching_a_channel_listing_external_id_is_settled_not_merely_suggested()
     {
-        var (db, org, user) = NewContext(nameof(Get_suggests_an_inventory_match_from_the_channel_listing_external_id));
+        var (db, org, user) = NewContext(nameof(A_line_matching_a_channel_listing_external_id_is_settled_not_merely_suggested));
         await using var _ = db;
         var controller = NewController(db, org, user);
         var item = SeedItem(db, org, "Signed Poster", 15m);
@@ -934,10 +982,13 @@ Brass Lamp,377251318593,1,$0.00,$0.00,$0.00,$0.00,$0.00,$12.34,$0.00,$0.00,$16.9
         await controller.Ingest(new IngestPlatformOrdersRequest("eBay", [Order("ORD-7", lines)]), CancellationToken.None);
         PlatformOrder order = await db.PlatformOrders.SingleAsync();
 
+        // The platform's own item number resolves to this item exactly, so there is nothing to ask:
+        // the import settles it rather than parking a suggestion in the queue.
+        Assert.Equal(PlatformOrderStatus.Reconciled, order.Status);
+
         ActionResult<PlatformOrderDto> detail = await controller.Get(order.Id, CancellationToken.None);
         PlatformOrderLineDto line = Assert.Single(detail.Value!.Lines);
-        Assert.Equal(item.Id, line.SuggestedInventoryItemId);
-        Assert.Equal("Signed Poster", line.SuggestedInventoryItemTitle);
+        Assert.Equal(item.Id, line.InventoryItemId);
     }
 
     [Fact]

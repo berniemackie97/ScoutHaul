@@ -38,7 +38,7 @@ export default async function PlatformOrdersPage() {
 
   const kpis = [
     {
-      label: "Waiting to reconcile",
+      label: "Needs your decision",
       value: String(openOrders.length),
       detail: "Imported platform orders not yet posted to sales",
       icon: ScanLine,
@@ -102,7 +102,7 @@ export default async function PlatformOrdersPage() {
       </div>
 
       <section className="space-y-3">
-        <h2 className="text-sm font-semibold">Reconcile queue</h2>
+        <h2 className="text-sm font-semibold">Needs your decision</h2>
         <PlatformOrderReconciler orders={openOrders} targets={targets} />
       </section>
 
