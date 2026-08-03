@@ -12629,6 +12629,19 @@
           "totalRefunded": {
             "type": "number",
             "format": "double"
+          },
+          "workflow": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/OrderWorkflowStateDto"
+              }
+            ],
+            "nullable": true
+          },
+          "packedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -12771,6 +12784,10 @@
             "nullable": true
           },
           "buyerReference": {
+            "type": "string",
+            "nullable": true
+          },
+          "stage": {
             "type": "string",
             "nullable": true
           }
@@ -16476,6 +16493,9 @@
           },
           "markDelivered": {
             "type": "boolean"
+          },
+          "markPacked": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false
@@ -17485,6 +17505,31 @@
             "format": "uuid"
           }
         }
+      },
+      "OrderWorkflowStateDto": {
+        "type": "object",
+        "properties": {
+          "stage": {
+            "type": "string"
+          },
+          "availableActions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "blockers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "stage",
+          "availableActions",
+          "blockers"
+        ]
       }
     }
   },

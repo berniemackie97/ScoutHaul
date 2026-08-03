@@ -8660,6 +8660,9 @@ export interface components {
             buyerReference?: string | null;
             /** Format: double */
             totalRefunded?: number;
+            workflow?: components["schemas"]["OrderWorkflowStateDto"] | null;
+            /** Format: date-time */
+            packedAt?: string | null;
         };
         OrderLineDto: {
             /** Format: uuid */
@@ -8710,6 +8713,7 @@ export interface components {
             channel?: string | null;
             externalOrderId?: string | null;
             buyerReference?: string | null;
+            stage?: string | null;
         };
         OrgReferenceOverrideDto: {
             /** Format: uuid */
@@ -10023,6 +10027,7 @@ export interface components {
             deliveredAt?: string | null;
             markShipped?: boolean;
             markDelivered?: boolean;
+            markPacked?: boolean;
         };
         UpdateOrganizationMemberRoleRequest: {
             /** Format: uuid */
@@ -10352,6 +10357,11 @@ export interface components {
         PlatformOrderDeletedDto: {
             /** Format: uuid */
             platformOrderId?: string;
+        };
+        OrderWorkflowStateDto: {
+            stage: string;
+            availableActions: string[];
+            blockers: string[];
         };
     };
     responses: never;

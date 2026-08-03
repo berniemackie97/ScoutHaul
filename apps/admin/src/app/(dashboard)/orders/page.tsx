@@ -12,69 +12,73 @@ const money = (value: number | null | undefined) =>
     ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value)
     : "—";
 
-const FILTERS = [
-  "All",
-  "Pending",
-  "Paid",
-  "Fulfilling",
-  "Shipped",
-  "Delivered",
-  "Cancelled",
-  "Refunded",
+/**
+ * Queues, not statuses. The operator's question is "what do I do next", and the answer is the stage
+ * OrderWorkflow derived — the raw status enum never said whether an order was waiting on a person.
+ * "Needs attention" leads because it is the one that costs money to ignore.
+ */
+const QUEUES = [
+  { key: "All", label: "All" },
+  { key: "NeedsAttention", label: "Needs attention" },
+  { key: "AwaitingPayment", label: "Awaiting payment" },
+  { key: "ToPack", label: "To pack" },
+  { key: "ToShip", label: "To ship" },
+  { key: "ReadyForPickup", label: "Ready for pickup" },
+  { key: "InTransit", label: "In transit" },
+  { key: "Delivered", label: "Delivered" },
+  { key: "Closed", label: "Closed" },
 ] as const;
+type QueueKey = (typeof QUEUES)[number]["key"];
 
-type OrderSummaryWithTracking = components["schemas"]["OrderSummaryDto"] & {
-  shippingCarrier?: string | null;
-  trackingNumber?: string | null;
-  shippedAt?: string | null;
-  deliveredAt?: string | null;
-};
+type OrderSummaryWithTracking = components["schemas"]["OrderSummaryDto"];
 
 export default async function OrdersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string }>;
+  searchParams: Promise<{ stage?: string }>;
 }) {
-  const { status } = await searchParams;
-  const active = FILTERS.includes((status ?? "All") as (typeof FILTERS)[number])
-    ? (status ?? "All")
+  const { stage } = await searchParams;
+  const active: QueueKey = QUEUES.some((queue) => queue.key === stage)
+    ? (stage as QueueKey)
     : "All";
 
+  // The stage is derived, not stored, so it cannot be a server-side filter without duplicating the
+  // rule in SQL. The list is capped at 200 rows, so filtering here costs nothing and keeps one
+  // definition of each queue.
   const api = await getApiClient();
-  const { data } = await api.GET("/api/orders", {
-    params: { query: active === "All" ? {} : { status: active } },
-  });
-  const orders = (data ?? []) as OrderSummaryWithTracking[];
+  const { data } = await api.GET("/api/orders", { params: { query: {} } });
+  const allOrders = (data ?? []) as OrderSummaryWithTracking[];
+  const orders = active === "All" ? allOrders : allOrders.filter((order) => order.stage === active);
+  const countFor = (queue: QueueKey) =>
+    queue === "All" ? allOrders.length : allOrders.filter((order) => order.stage === queue).length;
 
-  const openOrders = orders.filter(
-    (order) => !["Delivered", "Cancelled", "Refunded"].includes(order.status ?? "")
-  );
-  const revenue = orders
+  const revenue = allOrders
     .filter((order) => order.paymentStatus === "Paid")
     .reduce((sum, order) => sum + (order.grandTotal ?? 0), 0);
-  const awaitingFulfillment = orders.filter(
-    (order) =>
-      order.fulfillmentStatus !== "Fulfilled" && ["Paid", "Fulfilling"].includes(order.status ?? "")
-  ).length;
+  const openWork = countFor("ToPack") + countFor("ToShip") + countFor("ReadyForPickup");
+  const needsAttention = countFor("NeedsAttention");
 
   const kpis = [
     {
-      label: "Open orders",
-      value: String(openOrders.length),
-      detail: "Not delivered, cancelled, or refunded",
+      label: "Work waiting",
+      value: String(openWork),
+      detail: "To pack, to ship, or ready for pickup",
+      icon: Truck,
+      href: "/orders?stage=ToPack",
+    },
+    {
+      label: "Needs attention",
+      value: String(needsAttention),
+      detail: "A return in flight or a payment problem",
       icon: ShoppingBag,
+      href: "/orders?stage=NeedsAttention",
     },
     {
       label: "Captured revenue",
       value: money(revenue),
-      detail: "Paid orders in view",
+      detail: "Paid orders",
       icon: PackageCheck,
-    },
-    {
-      label: "Awaiting fulfillment",
-      value: String(awaitingFulfillment),
-      detail: "Paid, not yet shipped",
-      icon: Truck,
+      href: undefined,
     },
   ];
 
@@ -106,37 +110,56 @@ export default async function OrdersPage({
       </header>
 
       <div className="grid gap-4 sm:grid-cols-3">
-        {kpis.map((kpi) => (
-          <Card key={kpi.label} className="p-5">
-            <div className="flex items-center justify-between">
-              <span className="text-muted-foreground text-sm">{kpi.label}</span>
-              <kpi.icon className="text-muted-foreground h-4 w-4" aria-hidden />
-            </div>
-            <p className="mt-3 text-3xl font-semibold tabular-nums">{kpi.value}</p>
-            <p className="text-muted-foreground mt-1 text-xs">{kpi.detail}</p>
-          </Card>
-        ))}
+        {kpis.map((kpi) => {
+          const body = (
+            <>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground text-sm">{kpi.label}</span>
+                <kpi.icon className="text-muted-foreground h-4 w-4" aria-hidden />
+              </div>
+              <p className="mt-3 text-3xl font-semibold tabular-nums">{kpi.value}</p>
+              <p className="text-muted-foreground mt-1 text-xs">{kpi.detail}</p>
+            </>
+          );
+          // A count you cannot click is a dead end — each one opens the queue it counts.
+          return kpi.href ? (
+            <Link key={kpi.label} href={kpi.href} className="rounded-xl">
+              <Card className="hover:border-foreground/20 h-full p-5 transition">{body}</Card>
+            </Link>
+          ) : (
+            <Card key={kpi.label} className="p-5">
+              {body}
+            </Card>
+          );
+        })}
       </div>
 
       <div className="flex flex-wrap gap-2">
-        {FILTERS.map((filter) => (
-          <Link
-            key={filter}
-            href={filter === "All" ? "/orders" : `/orders?status=${filter}`}
-            className={`rounded-full border px-3 py-1 text-sm transition ${
-              active === filter
-                ? "bg-foreground text-background border-foreground"
-                : "text-muted-foreground hover:bg-muted"
-            }`}
-          >
-            {filter}
-          </Link>
-        ))}
+        {QUEUES.map((queue) => {
+          const count = countFor(queue.key);
+          if (count === 0 && queue.key !== active && queue.key !== "All") return null;
+          return (
+            <Link
+              key={queue.key}
+              href={queue.key === "All" ? "/orders" : `/orders?stage=${queue.key}`}
+              className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm transition ${
+                active === queue.key
+                  ? "bg-foreground text-background border-foreground"
+                  : "text-muted-foreground hover:bg-muted"
+              }`}
+            >
+              {queue.label}
+              <span className="tabular-nums opacity-70">{count}</span>
+            </Link>
+          );
+        })}
       </div>
 
       <OrdersTable
         orders={orders}
-        emptyLabel={`No orders${active === "All" ? " yet" : ` with status “${active}”`}.`}
+        emptyLabel={
+          active === "All" ? "No orders yet." : `Nothing in “${QUEUES.find((queue) => queue.key === active)?.label}”.`
+        }
       />
     </div>
   );

@@ -65,6 +65,7 @@ export async function updateOrderTracking(
     deliveredAt: dateTimeValue(formData, "deliveredAt"),
     markShipped: formData.get("intent") === "markShipped",
     markDelivered: formData.get("intent") === "markDelivered",
+    markPacked: formData.get("intent") === "markPacked",
   };
 
   const response = await fetch(`${getApiBaseUrl()}/api/orders/${id}/tracking`, {
@@ -88,6 +89,7 @@ export async function updateOrderTracking(
     return { ok: true, message: "Tracking saved and order marked delivered." };
   if (body.markShipped || body.shippedAt)
     return { ok: true, message: "Tracking saved and order marked shipped." };
+  if (body.markPacked) return { ok: true, message: "Packed — ready to ship." };
   return { ok: true, message: "Tracking saved." };
 }
 
