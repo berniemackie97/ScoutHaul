@@ -42,6 +42,16 @@ public sealed record CustomerSummaryDto(
     DateTimeOffset? LastOrderAt,
     IReadOnlyList<string>? Channels = null);
 
+/// <summary>
+/// The customer details an operator may correct. Deliberately excludes store credit, which is money
+/// and moves only through a credit entry, and the auth link, which identifies the account.
+/// </summary>
+public sealed record UpdateCustomerRequest(
+    string? DisplayName,
+    string? Email,
+    string? Phone,
+    bool AcceptsMarketing);
+
 public sealed record CustomerDetailDto(
     Guid Id,
     string? Email,
