@@ -55,6 +55,23 @@ jobs:
       - name: Build
         run: dotnet build services/api/HaulScout.slnx --configuration Release --no-restore -warnaserror
 
+      # The integration tests start a real Postgres via Testcontainers. Pulling it inline fails the
+      # whole run whenever Docker Hub is briefly unreachable or rate-limits the shared runner IP —
+      # a red build that says nothing about the code. Pull it up front, with retries, so a transient
+      # registry hiccup costs a few seconds instead of a false failure.
+      - name: Pre-pull test database image
+        run: |
+          for attempt in 1 2 3 4 5; do
+            if docker pull postgres:16-alpine; then
+              echo "pulled on attempt $attempt"
+              exit 0
+            fi
+            echo "pull failed (attempt $attempt/5); retrying in $((attempt * 10))s"
+            sleep $((attempt * 10))
+          done
+          echo "::error::Could not pull postgres:16-alpine after 5 attempts — Docker Hub is unreachable."
+          exit 1
+
       - name: Test
         run: dotnet test services/api/HaulScout.slnx --configuration Release --no-build
 
