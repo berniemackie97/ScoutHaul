@@ -277,13 +277,34 @@ public sealed class OrderAssembler(HaulScoutDbContext db, ICurrentUserContext cu
             return identity.Customer;
         }
 
-        var customer = new Customer
+        // No identity on this channel yet. Before inventing a person, look for one we already have:
+        // the same buyer routinely appears first from a storefront checkout and later from a
+        // marketplace import, and creating a second row would both split their history and — because
+        // Email is unique per organization — fail the insert outright. Joining the new channel
+        // identity onto the existing customer converges the two views of one person instead.
+        string? email = TrimToNull(buyerEmail);
+        Customer? customer = email is null
+            ? null
+            : await db.Customers.FirstOrDefaultAsync(
+                candidate => candidate.OrganizationId == currentUser.OrganizationId
+                    && candidate.Email != null
+                    && candidate.Email.ToLower() == email.ToLower(),
+                cancellationToken);
+
+        if (customer is not null)
         {
-            OrganizationId = currentUser.OrganizationId,
-            Email = TrimToNull(buyerEmail),
-            DisplayName = string.IsNullOrWhiteSpace(buyerName) ? handle : buyerName.Trim(),
-        };
-        db.Customers.Add(customer);
+            customer.DisplayName ??= string.IsNullOrWhiteSpace(buyerName) ? handle : buyerName.Trim();
+        }
+        else
+        {
+            customer = new Customer
+            {
+                OrganizationId = currentUser.OrganizationId,
+                Email = email,
+                DisplayName = string.IsNullOrWhiteSpace(buyerName) ? handle : buyerName.Trim(),
+            };
+            db.Customers.Add(customer);
+        }
 
         db.CustomerChannelIdentities.Add(new CustomerChannelIdentity
         {
@@ -292,7 +313,7 @@ public sealed class OrderAssembler(HaulScoutDbContext db, ICurrentUserContext cu
             Channel = channel,
             ExternalUserId = handle,
             DisplayName = string.IsNullOrWhiteSpace(buyerName) ? null : buyerName.Trim(),
-            Email = TrimToNull(buyerEmail),
+            Email = email,
         });
 
         return customer;

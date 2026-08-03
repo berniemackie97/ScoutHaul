@@ -4623,6 +4623,34 @@
             }
           }
         }
+      },
+      "delete": {
+        "tags": [
+          "PlatformOrders"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformOrderDeletedDto"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/platform-orders/ingest": {
@@ -17448,6 +17476,15 @@
           }
         },
         "additionalProperties": false
+      },
+      "PlatformOrderDeletedDto": {
+        "type": "object",
+        "properties": {
+          "platformOrderId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
       }
     }
   },

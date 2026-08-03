@@ -3646,7 +3646,28 @@ export interface paths {
         };
         put?: never;
         post?: never;
-        delete?: never;
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PlatformOrderDeletedDto"];
+                    };
+                };
+            };
+        };
         options?: never;
         head?: never;
         patch?: never;
@@ -10327,6 +10348,10 @@ export interface components {
             email?: string | null;
             phone?: string | null;
             acceptsMarketing?: boolean;
+        };
+        PlatformOrderDeletedDto: {
+            /** Format: uuid */
+            platformOrderId?: string;
         };
     };
     responses: never;

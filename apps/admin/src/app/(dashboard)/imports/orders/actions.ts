@@ -114,3 +114,20 @@ export async function autoMatchWaitingOrders(): Promise<{ ok: boolean; message: 
         : `${settled} order${settled === 1 ? "" : "s"} matched and recorded.`,
   };
 }
+
+/**
+ * Removes an imported order that should not exist — the wrong file, a test order. Refused by the API
+ * once the order has been matched, because sales were recorded from it; ignoring is the right tool
+ * there, and the refusal says so.
+ */
+export async function deleteImportedOrder(id: string): Promise<{ ok: boolean; message: string }> {
+  const api = await getApiClient();
+  const result = await api.DELETE("/api/platform-orders/{id}", { params: { path: { id } } });
+  if (!result.data) {
+    return { ok: false, message: errorMessage(result.error, "That import row could not be deleted.") };
+  }
+
+  revalidatePath("/imports/orders");
+  revalidatePath("/imports");
+  return { ok: true, message: "Import row deleted." };
+}

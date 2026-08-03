@@ -364,6 +364,12 @@ public sealed class EfPlatformOrderStore(
 
     public void AddSale(Sale sale) => db.Sales.Add(sale);
 
+    public void RemoveImportedOrder(PlatformOrder order)
+    {
+        db.PlatformOrderLines.RemoveRange(order.Lines);
+        db.PlatformOrders.Remove(order);
+    }
+
     public void RemoveSales(IReadOnlyCollection<Sale> sales) => db.Sales.RemoveRange(sales);
 
     public void AddMarketObservation(MarketObservation observation) => db.MarketObservations.Add(observation);
