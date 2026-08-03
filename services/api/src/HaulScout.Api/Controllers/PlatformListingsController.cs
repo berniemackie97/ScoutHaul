@@ -330,10 +330,43 @@ public sealed class PlatformListingsController(HaulScoutDbContext db, ICurrentUs
 
         Guid channelAccountId = await ResolveChannelAccountId(listing, cancellationToken);
 
-        ChannelListing? channelListing = await db.ChannelListings.SingleOrDefaultAsync(
+        // A ChannelListing records one item's presence on one channel account — which is what the
+        // unique index (OrganizationId, InventoryItemId, ChannelAccountId) enforces. Two questions have
+        // to be asked, because two different things can already exist:
+        //   byItem       — does this item already have a presence on this account? (relisting an item
+        //                  gives it a NEW platform item number, so an external-id lookup misses, and
+        //                  inserting a second row for the same item violates the index)
+        //   byExternalId — does another item currently claim this platform listing? (the operator is
+        //                  re-linking the listing to a different item)
+        ChannelListing? byItem = await db.ChannelListings.SingleOrDefaultAsync(
             existing => existing.OrganizationId == currentUser.OrganizationId
                 && existing.ChannelAccountId == channelAccountId
-                && existing.ExternalListingId == listing.ExternalListingId, cancellationToken);
+                && existing.InventoryItemId == item.Id, cancellationToken);
+
+        List<ChannelListing> byExternalId = listing.ExternalListingId is { Length: > 0 }
+            ? await db.ChannelListings
+                .Where(existing => existing.OrganizationId == currentUser.OrganizationId
+                    && existing.ChannelAccountId == channelAccountId
+                    && existing.ExternalListingId == listing.ExternalListingId)
+                .ToListAsync(cancellationToken)
+            : [];
+
+        ChannelListing? channelListing = byItem;
+        if (channelListing is null && byExternalId.Count > 0)
+        {
+            // Re-link: the listing moves to this item. Moving the existing row keeps one presence
+            // rather than stranding the old one.
+            channelListing = byExternalId[0];
+            channelListing.InventoryItemId = item.Id;
+        }
+
+        // Any other row still claiming this platform listing is stale — a listing identifies one
+        // presence, so release the claim instead of leaving two rows pointing at it.
+        foreach (ChannelListing stale in byExternalId.Where(existing => existing != channelListing))
+        {
+            stale.ExternalListingId = null;
+        }
+
         bool createdChannelListing = false;
         if (channelListing is null)
         {
@@ -353,6 +386,7 @@ public sealed class PlatformListingsController(HaulScoutDbContext db, ICurrentUs
             channelListing.InventoryItemId = item.Id;
         }
 
+        channelListing.ExternalListingId = listing.ExternalListingId;
         channelListing.Status = MapChannelStatus(listing.Status);
         channelListing.ExternalUrl = listing.Url;
         channelListing.ListedPrice = listing.Price;
