@@ -1,3 +1,4 @@
+using HaulScout.Infrastructure.Orders;
 using HaulScout.Infrastructure.Storefront;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
@@ -153,6 +154,10 @@ if (app.Configuration.GetValue("Database:ApplyMigrationsOnStartup", false))
         db,
         scope.ServiceProvider.GetRequiredService<TimeProvider>(),
         app.Logger);
+
+    // Buyers recorded twice before imports learned to recognise an existing customer are folded back
+    // together here, for the same reason: the data should be right without anyone remembering to fix it.
+    await CustomerConvergenceBootstrap.ConvergeDuplicatesAsync(db, app.Logger);
 }
 
 // ── Swagger (dev only) ───────────────────────────────────────────
