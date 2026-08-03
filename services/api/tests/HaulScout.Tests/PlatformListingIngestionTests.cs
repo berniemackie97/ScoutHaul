@@ -84,6 +84,42 @@ public class PlatformListingIngestionTests
     }
 
     [Fact]
+    public async Task Relisting_an_item_reuses_its_channel_listing_instead_of_violating_the_unique_key()
+    {
+        // The real-world case: an item is listed, ends, and is relisted, so eBay issues a NEW item
+        // number for the same item. Looking the channel listing up by external id found nothing and
+        // inserted a second row for the same (item, account) — which the unique index rejects, and
+        // the operator saw "An error occurred while processing your request".
+        (HaulScoutDbContext db, Guid org, Guid user) = NewContext(
+            nameof(Relisting_an_item_reuses_its_channel_listing_instead_of_violating_the_unique_key));
+        await using HaulScoutDbContext _ = db;
+
+        InventoryItem item = new() { OrganizationId = org, Title = "Mesh Maxi Dress", Status = InventoryStatus.ReadyToList };
+        db.InventoryItems.Add(item);
+        await db.SaveChangesAsync();
+
+        PlatformListingsController controller = new(db, new StubCurrentUser(org, user));
+
+        // First listing, linked.
+        await controller.Ingest(new IngestPlatformListingsRequest("eBay", [Listing("EB-OLD", "Mesh Maxi Dress", 75m)]), CancellationToken.None);
+        PlatformListing first = await db.PlatformListings.SingleAsync(candidate => candidate.ExternalListingId == "EB-OLD");
+        await controller.Reconcile(first.Id, new ReconcilePlatformListingRequest(InventoryItemId: item.Id), CancellationToken.None);
+
+        // Relisted under a new platform item number, linked to the same item.
+        await controller.Ingest(new IngestPlatformListingsRequest("eBay", [Listing("EB-NEW", "Mesh Maxi Dress", 75m)]), CancellationToken.None);
+        PlatformListing relisted = await db.PlatformListings.SingleAsync(candidate => candidate.ExternalListingId == "EB-NEW");
+
+        ActionResult<PlatformListingReconcileResultDto> result = await controller.Reconcile(
+            relisted.Id, new ReconcilePlatformListingRequest(InventoryItemId: item.Id), CancellationToken.None);
+
+        Assert.NotNull(result.Value);
+
+        // One presence for this item on this account, carrying the current external id.
+        ChannelListing channelListing = await db.ChannelListings.SingleAsync(candidate => candidate.InventoryItemId == item.Id);
+        Assert.Equal("EB-NEW", channelListing.ExternalListingId);
+    }
+
+    [Fact]
     public async Task Reconcile_link_existing_attaches_a_channel_listing_without_creating_an_item()
     {
         (HaulScoutDbContext db, Guid org, Guid user) = NewContext(nameof(Reconcile_link_existing_attaches_a_channel_listing_without_creating_an_item));
