@@ -282,7 +282,10 @@ public sealed class OrderAssembler(HaulScoutDbContext db, ICurrentUserContext cu
         // marketplace import, and creating a second row would both split their history and — because
         // Email is unique per organization — fail the insert outright. Joining the new channel
         // identity onto the existing customer converges the two views of one person instead.
-        string? email = TrimToNull(buyerEmail);
+        // Lowercased on write, matching the storefront. Storing the platform's casing let one address
+        // exist as two rows — the unique index is case-sensitive, so "JANE@x.com" and "jane@x.com"
+        // both fitted while being one person.
+        string? email = TrimToNull(buyerEmail)?.ToLowerInvariant();
         Customer? customer = email is null
             ? null
             : await db.Customers.FirstOrDefaultAsync(
