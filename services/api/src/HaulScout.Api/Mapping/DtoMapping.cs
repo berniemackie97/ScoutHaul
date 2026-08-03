@@ -282,7 +282,11 @@ public static class DtoMapping
         item.UnitCostSnapshot,
         sale?.ToDto());
 
-    public static OrderSummaryDto ToSummaryDto(this Order item) => new(
+    /// <param name="hasOpenReturn">
+    /// Whether a return is in flight. The caller supplies it: it lives on Return, not on the order, and
+    /// the list resolves it once for the whole page rather than per row.
+    /// </param>
+    public static OrderSummaryDto ToSummaryDto(this Order item, bool hasOpenReturn = false) => new(
         item.Id,
         item.OrderNumber,
         item.Status,
@@ -303,7 +307,8 @@ public static class DtoMapping
         item.DeliveredAt,
         item.Channel,
         item.ExternalOrderId,
-        item.BuyerReference);
+        item.BuyerReference,
+        OrderWorkflow.StageFor(item.ToWorkflowFacts(hasOpenReturn)).ToString());
 
     public static CustomerChannelIdentityDto ToDto(this CustomerChannelIdentity item) => new(
         item.Id,
@@ -314,7 +319,10 @@ public static class DtoMapping
         item.FirstSeenAt,
         item.LastSeenAt);
 
-    public static OrderDetailDto ToDetailDto(this Order item, IReadOnlyDictionary<Guid, Sale>? salesByInventoryItem = null)
+    public static OrderDetailDto ToDetailDto(
+        this Order item,
+        IReadOnlyDictionary<Guid, Sale>? salesByInventoryItem = null,
+        bool hasOpenReturn = false)
     {
         Sale? SaleFor(OrderLine line) =>
             salesByInventoryItem is not null && salesByInventoryItem.TryGetValue(line.InventoryItemId, out Sale? sale)
@@ -358,6 +366,7 @@ public static class DtoMapping
             item.StripePaymentIntentId,
             item.CreatedAt,
             item.PaidAt,
+            item.PackedAt,
             item.ShippedAt,
             item.DeliveredAt,
             item.CancelledAt,
@@ -366,7 +375,68 @@ public static class DtoMapping
             item.ExternalOrderId,
             item.ExternalOrderUrl,
             item.BuyerReference,
-            totalRefunded);
+            totalRefunded,
+            item.ToWorkflowState(hasOpenReturn));
+    }
+
+    /// <summary>
+    /// The order's stage and the actions it allows, answered by the domain rather than re-derived per
+    /// surface. This is what stops one client offering "mark delivered" on an unpaid, unshipped order
+    /// while another refuses it.
+    /// </summary>
+    /// <summary>The order's own facts, for a caller that only needs to test a transition.</summary>
+    public static OrderWorkflowFacts ToWorkflowFacts(this Order item, bool hasOpenReturn = false) => new(
+        item.Status,
+        item.PaymentStatus,
+        item.IsLocalPickup,
+        IsPacked: item.PackedAt is not null,
+        HasCarrier: !string.IsNullOrWhiteSpace(item.ShippingCarrier),
+        HasTrackingNumber: !string.IsNullOrWhiteSpace(item.TrackingNumber),
+        HasShippingAddress: !string.IsNullOrWhiteSpace(item.ShipToLine1),
+        IsShipped: item.ShippedAt is not null,
+        IsDelivered: item.DeliveredAt is not null,
+        hasOpenReturn);
+
+    public static OrderWorkflowStateDto ToWorkflowState(this Order item, bool hasOpenReturn)
+    {
+        OrderWorkflowFacts facts = new(
+            item.Status,
+            item.PaymentStatus,
+            item.IsLocalPickup,
+            IsPacked: item.PackedAt is not null,
+            HasCarrier: !string.IsNullOrWhiteSpace(item.ShippingCarrier),
+            HasTrackingNumber: !string.IsNullOrWhiteSpace(item.TrackingNumber),
+            HasShippingAddress: !string.IsNullOrWhiteSpace(item.ShipToLine1),
+            IsShipped: item.ShippedAt is not null,
+            IsDelivered: item.DeliveredAt is not null,
+            hasOpenReturn);
+
+        IReadOnlyList<OrderWorkflowAction> available = OrderWorkflow.AvailableActions(facts);
+
+        // Explain only what the operator might reasonably reach for next; listing every refusal for
+        // every action is noise.
+        List<string> blockers = [];
+        foreach (OrderWorkflowAction action in new[]
+                 {
+                     OrderWorkflowAction.MarkPacked,
+                     OrderWorkflowAction.Ship,
+                     OrderWorkflowAction.MarkPickedUp,
+                     OrderWorkflowAction.MarkDelivered,
+                 })
+        {
+            if (available.Contains(action))
+            {
+                continue;
+            }
+
+            OrderTransition transition = OrderWorkflow.Evaluate(facts, action);
+            blockers.AddRange(transition.Blockers);
+        }
+
+        return new OrderWorkflowStateDto(
+            OrderWorkflow.StageFor(facts).ToString(),
+            available.Select(action => action.ToString()).ToArray(),
+            blockers.Distinct().ToArray());
     }
 
     public static CustomerAddressDto ToDto(this CustomerAddress item) => new(

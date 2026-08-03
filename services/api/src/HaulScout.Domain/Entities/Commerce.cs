@@ -216,6 +216,10 @@ public sealed class Order : EntityBase, IOrganizationScoped
     public string? TrackingUrl { get; set; }
 
     public DateTimeOffset? PaidAt { get; set; }
+
+    /// <summary>When the order was packed and ready to hand over. Drives the fulfillment stage.</summary>
+    public DateTimeOffset? PackedAt { get; set; }
+
     public DateTimeOffset? ShippedAt { get; set; }
     public DateTimeOffset? DeliveredAt { get; set; }
     public DateTimeOffset? CancelledAt { get; set; }

@@ -58,7 +58,21 @@ public sealed class OrdersWorkflowService(
             .Take(200)
             .ToListAsync(cancellationToken);
 
-        return orders.Select(order => order.ToSummaryDto()).ToList();
+        // One query for the whole page rather than one per row: a return in flight changes the stage,
+        // and the operator needs to see that from the list without opening every order.
+        Guid[] orderIds = orders.Select(order => order.Id).ToArray();
+        HashSet<Guid> ordersWithOpenReturns = [.. await db.Returns
+            .Where(entry => entry.OrganizationId == currentUser.OrganizationId
+                && entry.OrderId != null
+                && orderIds.Contains(entry.OrderId.Value)
+                && (entry.Status == ReturnStatus.Requested
+                    || entry.Status == ReturnStatus.LabelIssued
+                    || entry.Status == ReturnStatus.Received))
+            .Select(entry => entry.OrderId!.Value)
+            .Distinct()
+            .ToListAsync(cancellationToken)];
+
+        return orders.Select(order => order.ToSummaryDto(ordersWithOpenReturns.Contains(order.Id))).ToList();
     }
 
     public async Task<AppResult<OrderDetailDto>> GetAsync(Guid id, CancellationToken cancellationToken)
@@ -70,7 +84,7 @@ public sealed class OrdersWorkflowService(
         }
 
         IReadOnlyDictionary<Guid, Sale> salesByInventoryItem = await SalesByInventoryItemAsync(order.Id, cancellationToken);
-        return AppResult<OrderDetailDto>.Ok(order.ToDetailDto(salesByInventoryItem));
+        return AppResult<OrderDetailDto>.Ok(order.ToDetailDto(salesByInventoryItem, await HasOpenReturnAsync(order.Id, cancellationToken)));
     }
 
     public async Task<AppResult<OrderDetailDto>> UpdateStatusAsync(
@@ -145,7 +159,7 @@ public sealed class OrdersWorkflowService(
 
         await db.SaveChangesAsync(cancellationToken);
         IReadOnlyDictionary<Guid, Sale> salesByInventoryItem = await SalesByInventoryItemAsync(order.Id, cancellationToken);
-        return AppResult<OrderDetailDto>.Ok(order.ToDetailDto(salesByInventoryItem));
+        return AppResult<OrderDetailDto>.Ok(order.ToDetailDto(salesByInventoryItem, await HasOpenReturnAsync(order.Id, cancellationToken)));
     }
 
     public async Task<AppResult<OrderDetailDto>> UpdateTrackingAsync(
@@ -175,6 +189,22 @@ public sealed class OrdersWorkflowService(
         }
 
         DateTimeOffset now = DateTimeOffset.UtcNow;
+
+        // Packing is the gate before shipping, and the domain decides whether it may happen — an
+        // unpaid order, or a shipping order with nowhere to send it, is not packable. Asking
+        // OrderWorkflow here rather than re-deriving the rule keeps every surface honest.
+        DateTimeOffset? packedAt = order.PackedAt;
+        if (request.MarkPacked && packedAt is null)
+        {
+            OrderTransition packable = OrderWorkflow.Evaluate(order.ToWorkflowFacts(), OrderWorkflowAction.MarkPacked);
+            if (!packable.Allowed)
+            {
+                return AppResult<OrderDetailDto>.Validation(string.Join(" ", packable.Blockers));
+            }
+
+            packedAt = now;
+        }
+
         DateTimeOffset? deliveredAt = request.DeliveredAt ?? (request.MarkDelivered ? now : order.DeliveredAt);
         DateTimeOffset? shippedAt = request.ShippedAt ?? (request.MarkShipped || request.MarkDelivered ? now : order.ShippedAt);
         if (deliveredAt.HasValue && !shippedAt.HasValue)
@@ -191,6 +221,10 @@ public sealed class OrdersWorkflowService(
         {
             return AppResult<OrderDetailDto>.Validation("Delivered time cannot be earlier than shipped time.");
         }
+
+        // Shipping implies packed. Recording a shipment for an order nobody marked packed should not
+        // leave the stage stuck behind it.
+        packedAt ??= shippedAt;
 
         bool hasShippedEvidence = shippedAt.HasValue;
         bool hasDeliveredEvidence = deliveredAt.HasValue;
@@ -213,6 +247,7 @@ public sealed class OrdersWorkflowService(
             order.DeliveredAt
         };
 
+        order.PackedAt = packedAt;
         order.ShippingCarrier = carrier;
         order.TrackingNumber = trackingNumber;
         order.TrackingUrl = trackingUrl;
@@ -276,7 +311,7 @@ public sealed class OrdersWorkflowService(
 
         await db.SaveChangesAsync(cancellationToken);
         IReadOnlyDictionary<Guid, Sale> salesByInventoryItem = await SalesByInventoryItemAsync(order.Id, cancellationToken);
-        return AppResult<OrderDetailDto>.Ok(order.ToDetailDto(salesByInventoryItem));
+        return AppResult<OrderDetailDto>.Ok(order.ToDetailDto(salesByInventoryItem, await HasOpenReturnAsync(order.Id, cancellationToken)));
     }
 
     public async Task<AppResult> DeleteAsync(Guid id, CancellationToken cancellationToken)
@@ -392,7 +427,7 @@ public sealed class OrdersWorkflowService(
             .Include(order => order.Lines)
             .SingleAsync(order => order.Id == surviving.Id && order.OrganizationId == currentUser.OrganizationId, cancellationToken);
         IReadOnlyDictionary<Guid, Sale> salesByInventoryItem = await SalesByInventoryItemAsync(surviving.Id, cancellationToken);
-        return AppResult<OrderDetailDto>.Ok(refreshed.ToDetailDto(salesByInventoryItem));
+        return AppResult<OrderDetailDto>.Ok(refreshed.ToDetailDto(salesByInventoryItem, await HasOpenReturnAsync(surviving.Id, cancellationToken)));
     }
 
     private Task<Order?> LoadOrderAsync(Guid id, CancellationToken cancellationToken) =>
@@ -413,6 +448,19 @@ public sealed class OrdersWorkflowService(
             sale.Status = target;
         }
     }
+
+    /// <summary>
+    /// Whether any return against this order is still in flight. A return outranks whatever stage the
+    /// order otherwise sits in — an item coming back needs a person, not a queue position.
+    /// </summary>
+    private Task<bool> HasOpenReturnAsync(Guid orderId, CancellationToken cancellationToken) =>
+        db.Returns
+            .Where(entry => entry.OrganizationId == currentUser.OrganizationId && entry.OrderId == orderId)
+            .AnyAsync(
+                entry => entry.Status == ReturnStatus.Requested
+                    || entry.Status == ReturnStatus.LabelIssued
+                    || entry.Status == ReturnStatus.Received,
+                cancellationToken);
 
     private async Task<IReadOnlyDictionary<Guid, Sale>> SalesByInventoryItemAsync(Guid orderId, CancellationToken cancellationToken)
     {

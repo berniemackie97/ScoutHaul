@@ -22,6 +22,25 @@ const money = (value: number | null | undefined) =>
 const date = (value: string | null | undefined) =>
   value ? new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(new Date(value)) : "—";
 
+// The stage the API derived, said the way an operator would say it.
+const stageLabels: Record<string, string> = {
+  AwaitingPayment: "Awaiting payment",
+  ToPack: "To pack",
+  ToShip: "To ship",
+  ReadyForPickup: "Ready for pickup",
+  InTransit: "In transit",
+  Delivered: "Delivered",
+  NeedsAttention: "Needs attention",
+  Closed: "Closed",
+};
+const stageVariant = (stage: string | undefined) => {
+  if (stage === "NeedsAttention") return "destructive" as const;
+  if (stage === "Delivered" || stage === "Closed") return "success" as const;
+  if (stage === "AwaitingPayment") return "warning" as const;
+  if (stage) return "info" as const;
+  return "secondary" as const;
+};
+
 const orderStatusVariant = (status: string | undefined) => {
   if (status === "Delivered") return "success" as const;
   if (["Cancelled", "Refunded"].includes(status ?? "")) return "destructive" as const;
@@ -112,7 +131,7 @@ export function OrdersTable({ orders, emptyLabel }: { orders: OrderRow[]; emptyL
               <th className="px-4 py-3 text-right font-medium">Total</th>
               <th className="px-4 py-3 font-medium">Tracking</th>
               <th className="px-4 py-3 font-medium">Payment</th>
-              <th className="px-4 py-3 font-medium">Status</th>
+              <th className="px-4 py-3 font-medium">Stage</th>
             </tr>
           </thead>
           <tbody className="divide-y">
@@ -173,7 +192,13 @@ export function OrdersTable({ orders, emptyLabel }: { orders: OrderRow[]; emptyL
                   </Badge>
                 </td>
                 <td className="px-4 py-3">
-                  <Badge variant={orderStatusVariant(order.status)}>{order.status}</Badge>
+                  {order.stage ? (
+                    <Badge variant={stageVariant(order.stage)}>
+                      {stageLabels[order.stage] ?? order.stage}
+                    </Badge>
+                  ) : (
+                    <Badge variant={orderStatusVariant(order.status)}>{order.status}</Badge>
+                  )}
                 </td>
               </tr>
             ))}

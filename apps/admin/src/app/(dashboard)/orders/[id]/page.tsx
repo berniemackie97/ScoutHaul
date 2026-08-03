@@ -29,6 +29,26 @@ const orderStatusVariant = (status: string | undefined) => {
   if (["Paid", "Fulfilling", "Shipped"].includes(status ?? "")) return "info" as const;
   return "secondary" as const;
 };
+
+// The stage the API derived, said the way an operator would say it.
+const stageLabels: Record<string, string> = {
+  AwaitingPayment: "Awaiting payment",
+  ToPack: "To pack",
+  ToShip: "To ship",
+  ReadyForPickup: "Ready for pickup",
+  InTransit: "In transit",
+  Delivered: "Delivered",
+  NeedsAttention: "Needs attention",
+  Closed: "Closed",
+};
+const stageLabel = (stage: string | undefined) => (stage ? (stageLabels[stage] ?? stage) : undefined);
+const stageVariant = (stage: string | undefined) => {
+  if (stage === "NeedsAttention") return "destructive" as const;
+  if (stage === "Delivered" || stage === "Closed") return "success" as const;
+  if (stage === "AwaitingPayment") return "warning" as const;
+  if (stage) return "info" as const;
+  return "secondary" as const;
+};
 type OrderStatus =
   | "Pending"
   | "Paid"
@@ -38,13 +58,8 @@ type OrderStatus =
   | "Cancelled"
   | "Refunded";
 
-type OrderWithTracking = components["schemas"]["OrderDetailDto"] & {
-  shippingCarrier?: string | null;
-  trackingNumber?: string | null;
-  trackingUrl?: string | null;
-  shippedAt?: string | null;
-  deliveredAt?: string | null;
-};
+// The generated schema carries tracking and workflow, so no widening is needed here any more.
+type OrderWithTracking = components["schemas"]["OrderDetailDto"];
 type OrderLineSale = NonNullable<NonNullable<OrderWithTracking["lines"]>[number]["sale"]>;
 type SaleFinancials = {
   itemRevenue: number;
@@ -168,8 +183,8 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
               >
                 {order.paymentStatus}
               </Badge>
-              <Badge variant={order.fulfillmentStatus === "Fulfilled" ? "success" : "secondary"}>
-                {order.fulfillmentStatus}
+              <Badge variant={stageVariant(trackedOrder.workflow?.stage)}>
+                {stageLabel(trackedOrder.workflow?.stage) ?? order.fulfillmentStatus}
               </Badge>
             </div>
             <OrderDeleteButton id={order.id!} orderNumber={order.orderNumber ?? "this order"} />
@@ -217,8 +232,10 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
               shippingCarrier: trackedOrder.shippingCarrier,
               trackingNumber: trackedOrder.trackingNumber,
               trackingUrl: trackedOrder.trackingUrl,
+              packedAt: trackedOrder.packedAt,
               shippedAt: trackedOrder.shippedAt,
               deliveredAt: trackedOrder.deliveredAt,
+              workflow: trackedOrder.workflow,
             }}
           />
         </div>

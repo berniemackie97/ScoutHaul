@@ -37,7 +37,20 @@ public sealed record OrderSummaryDto(
     DateTimeOffset? DeliveredAt,
     string Channel = "Storefront",
     string? ExternalOrderId = null,
-    string? BuyerReference = null);
+    string? BuyerReference = null,
+    // The queue this order belongs in, so the list can be grouped by work rather than by raw status.
+    string? Stage = null);
+
+/// <summary>
+/// Where an order sits in the day's work, and what may be done with it. Derived from the order's own
+/// facts by OrderWorkflow, so the admin, the mobile app and any future surface offer the same actions
+/// and give the same reason when one is unavailable.
+/// </summary>
+/// <param name="Blockers">Why the unavailable actions are unavailable, in operator language.</param>
+public sealed record OrderWorkflowStateDto(
+    string Stage,
+    IReadOnlyList<string> AvailableActions,
+    IReadOnlyList<string> Blockers);
 
 public sealed record OrderDetailDto(
     Guid Id,
@@ -71,6 +84,7 @@ public sealed record OrderDetailDto(
     string? StripePaymentIntentId,
     DateTimeOffset CreatedAt,
     DateTimeOffset? PaidAt,
+    DateTimeOffset? PackedAt,
     DateTimeOffset? ShippedAt,
     DateTimeOffset? DeliveredAt,
     DateTimeOffset? CancelledAt,
@@ -80,7 +94,8 @@ public sealed record OrderDetailDto(
     string? ExternalOrderUrl = null,
     string? BuyerReference = null,
     // Buyer money refunded across every line of the order (item + shipping). Net received = GrandTotal − TotalRefunded.
-    decimal TotalRefunded = 0);
+    decimal TotalRefunded = 0,
+    OrderWorkflowStateDto? Workflow = null);
 
 public sealed record UpdateOrderStatusRequest(OrderStatus Status);
 
@@ -96,4 +111,5 @@ public sealed record UpdateOrderTrackingRequest(
     DateTimeOffset? ShippedAt,
     DateTimeOffset? DeliveredAt,
     bool MarkShipped,
-    bool MarkDelivered);
+    bool MarkDelivered,
+    bool MarkPacked = false);
