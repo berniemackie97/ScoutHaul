@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, Check } from "lucide-react";
 import { Badge, Card, CardContent, CardHeader, CardTitle } from "@overhaul/ui";
 import { getApiClient } from "@/lib/api";
+import { CustomerEditor } from "./customer-editor";
 
 export const dynamic = "force-dynamic";
 
@@ -53,6 +54,17 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
           {customer.email}
           {customer.phone ? ` · ${customer.phone}` : ""} · joined {date(customer.createdAt)}
         </p>
+        <div className="mt-3">
+          <CustomerEditor
+            customer={{
+              id,
+              displayName: customer.displayName,
+              email: customer.email,
+              phone: customer.phone,
+              acceptsMarketing: customer.acceptsMarketing,
+            }}
+          />
+        </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-4">

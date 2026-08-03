@@ -797,7 +797,34 @@ export interface paths {
                 };
             };
         };
-        put?: never;
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["UpdateCustomerRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["CustomerDetailDto"];
+                        "application/json": components["schemas"]["CustomerDetailDto"];
+                        "text/json": components["schemas"]["CustomerDetailDto"];
+                    };
+                };
+            };
+        };
         post?: never;
         delete?: never;
         options?: never;
@@ -10294,6 +10321,12 @@ export interface components {
         AutoMatchAppliedDto: {
             /** Format: int32 */
             settled?: number;
+        };
+        UpdateCustomerRequest: {
+            displayName?: string | null;
+            email?: string | null;
+            phone?: string | null;
+            acceptsMarketing?: boolean;
         };
     };
     responses: never;
