@@ -55,6 +55,9 @@ public interface IPlatformOrderStore
 
     void AddSale(Sale sale);
 
+    /// <summary>Removes an imported order and its source lines. Only valid while it is unreconciled.</summary>
+    void RemoveImportedOrder(PlatformOrder order);
+
     void RemoveSales(IReadOnlyCollection<Sale> sales);
 
     void AddMarketObservation(MarketObservation observation);

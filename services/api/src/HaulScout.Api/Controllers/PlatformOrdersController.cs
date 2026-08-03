@@ -72,6 +72,16 @@ public sealed class PlatformOrdersController(
     public async Task<ActionResult<PlatformOrderReconcileResultDto>> Reconcile(Guid id, ReconcilePlatformOrderRequest request, CancellationToken cancellationToken) =>
         ToActionResult(await platformOrders.ReconcileAsync(id, request, cancellationToken));
 
+    /// <summary>
+    /// Removes an imported order outright — a test order, the wrong file, a row that should never
+    /// have been brought in. Only while it is unreconciled: once it has been matched, sales exist
+    /// downstream, and deleting the import row would strand them. Ignoring keeps the record and its
+    /// history; deleting is for rows that should not exist at all.
+    /// </summary>
+    [HttpDelete("{id:guid}")]
+    public async Task<ActionResult<PlatformOrderDeletedDto>> Delete(Guid id, CancellationToken cancellationToken) =>
+        ToActionResult(await platformOrders.DeleteImportedAsync(id, cancellationToken));
+
     [HttpPost("{id:guid}/ignore")]
     public async Task<ActionResult<PlatformOrderDto>> Ignore(Guid id, CancellationToken cancellationToken) =>
         ToActionResult(await platformOrders.IgnoreAsync(id, cancellationToken));

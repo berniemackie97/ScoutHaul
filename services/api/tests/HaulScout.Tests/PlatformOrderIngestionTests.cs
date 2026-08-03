@@ -138,6 +138,80 @@ public class PlatformOrderIngestionTests
     }
 
     [Fact]
+    public async Task A_marketplace_buyer_joins_the_existing_customer_with_the_same_email()
+    {
+        // The same person checks out on the storefront, then buys on eBay under a handle. Creating a
+        // second customer would split their history — and because Email is unique per organization,
+        // the insert would fail outright.
+        var (db, org, user) = NewContext(nameof(A_marketplace_buyer_joins_the_existing_customer_with_the_same_email));
+        await using var _ = db;
+        var controller = NewController(db, org, user);
+        var item = SeedItem(db, org, "Leather Boots", 30m);
+
+        Customer existing = new() { OrganizationId = org, Email = "jane@example.com", DisplayName = "Jane" };
+        db.Customers.Add(existing);
+        db.SaveChanges();
+
+        IngestPlatformOrderLineInput[] lines = [new("Leather Boots", 90m)];
+        IngestPlatformOrderInput order = Order("ORD-BUYER", lines) with
+        {
+            BuyerReference = "janedoe22",
+            BuyerEmail = "JANE@example.com",
+            BuyerName = "Jane D",
+        };
+        await controller.Ingest(new IngestPlatformOrdersRequest("eBay", [order]), CancellationToken.None);
+
+        PlatformOrder imported = await db.PlatformOrders.Include(o => o.Lines).SingleAsync();
+        await controller.Reconcile(
+            imported.Id,
+            new ReconcilePlatformOrderRequest([new ReconcilePlatformOrderLineMap(imported.Lines.First().Id, item.Id)]),
+            CancellationToken.None);
+
+        // One person, one record — with the eBay handle attached to it.
+        Customer customer = Assert.Single(await db.Customers.ToListAsync());
+        Assert.Equal(existing.Id, customer.Id);
+        CustomerChannelIdentity identity = Assert.Single(await db.CustomerChannelIdentities.ToListAsync());
+        Assert.Equal(existing.Id, identity.CustomerId);
+        Assert.Equal("janedoe22", identity.ExternalUserId);
+    }
+
+    [Fact]
+    public async Task An_unmatched_import_row_can_be_deleted_but_a_matched_one_cannot()
+    {
+        var (db, org, user) = NewContext(nameof(An_unmatched_import_row_can_be_deleted_but_a_matched_one_cannot));
+        await using var _ = db;
+        var controller = NewController(db, org, user);
+        var item = SeedItem(db, org, "Leather Boots", 30m);
+
+        await controller.Ingest(new IngestPlatformOrdersRequest("eBay", [
+            Order("ORD-JUNK", [new IngestPlatformOrderLineInput("Nothing We Own", 5m)]),
+        ]), CancellationToken.None);
+
+        PlatformOrder junk = await db.PlatformOrders.Include(o => o.Lines).SingleAsync();
+        Assert.Equal(PlatformOrderStatus.Imported, junk.Status);
+
+        // A row that should not exist can be removed outright.
+        ActionResult<PlatformOrderDeletedDto> deleted = await controller.Delete(junk.Id, CancellationToken.None);
+        Assert.NotNull(deleted.Value);
+        Assert.Empty(await db.PlatformOrders.ToListAsync());
+        Assert.Empty(await db.PlatformOrderLines.ToListAsync());
+
+        // A matched row is refused, because sales were recorded from it.
+        await controller.Ingest(new IngestPlatformOrdersRequest("eBay", [
+            Order("ORD-REAL", [new IngestPlatformOrderLineInput("Leather Boots", 90m)]),
+        ]), CancellationToken.None);
+        PlatformOrder real = await db.PlatformOrders.Include(o => o.Lines).SingleAsync();
+        await controller.Reconcile(
+            real.Id,
+            new ReconcilePlatformOrderRequest([new ReconcilePlatformOrderLineMap(real.Lines.First().Id, item.Id)]),
+            CancellationToken.None);
+
+        ActionResult<PlatformOrderDeletedDto> refused = await controller.Delete(real.Id, CancellationToken.None);
+        Assert.Null(refused.Value);
+        Assert.Single(await db.PlatformOrders.ToListAsync());
+    }
+
+    [Fact]
     public async Task The_backlog_preview_counts_what_can_settle_without_writing_anything()
     {
         var (db, org, user) = NewContext(nameof(The_backlog_preview_counts_what_can_settle_without_writing_anything));

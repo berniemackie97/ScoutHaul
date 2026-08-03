@@ -40,6 +40,31 @@ public sealed class PlatformOrderWorkflowService(
         return AppResult<PlatformOrderDto>.Ok(PlatformOrderDtoFactory.ToPlatformOrderDto(order, suggestions));
     }
 
+    /// <summary>
+    /// Removes an imported order outright — the wrong file, a test order, a row that should never have
+    /// been brought in. Refused once the order is reconciled: sales exist downstream by then, and
+    /// deleting the import row would strand them with no record of where they came from. Ignoring
+    /// keeps the row and its history; deleting is for rows that should not exist at all.
+    /// </summary>
+    public async Task<AppResult<PlatformOrderDeletedDto>> DeleteImportedAsync(Guid id, CancellationToken cancellationToken)
+    {
+        PlatformOrder? order = await store.GetForReconciliationAsync(currentUser.OrganizationId, id, cancellationToken);
+        if (order is null)
+        {
+            return AppResult<PlatformOrderDeletedDto>.NotFound();
+        }
+
+        if (order.Status == PlatformOrderStatus.Reconciled)
+        {
+            return AppResult<PlatformOrderDeletedDto>.Validation(
+                "This order has already been matched, so sales were recorded from it. Undo those first, or ignore it instead of deleting.");
+        }
+
+        store.RemoveImportedOrder(order);
+        await store.SaveChangesAsync(cancellationToken);
+        return AppResult<PlatformOrderDeletedDto>.Ok(new PlatformOrderDeletedDto(id));
+    }
+
     public async Task<AppResult<PlatformOrderDto>> IgnoreAsync(Guid id, CancellationToken cancellationToken)
     {
         PlatformOrder? order = await store.GetAsync(currentUser.OrganizationId, id, cancellationToken);

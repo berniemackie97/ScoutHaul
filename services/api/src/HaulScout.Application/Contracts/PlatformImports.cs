@@ -119,6 +119,8 @@ public sealed record PlatformOrderDto(
     DateTimeOffset ScrapedAt,
     IReadOnlyList<PlatformOrderLineDto> Lines);
 
+public sealed record PlatformOrderDeletedDto(Guid PlatformOrderId);
+
 /// <summary>What settling the backlog would do. Shown before anything is written.</summary>
 /// <param name="PendingOrders">Orders currently waiting on a decision.</param>
 /// <param name="CanSettle">How many of those need no decision at all.</param>
