@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useState } from 'react';
 import { Alert, Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { api } from '../../api';
+import { saveComp } from '../../services/saveComp';
 import { Button } from '../../components/Button';
 import { StatusPill } from '../../components/StatusPill';
 import { Text } from '../../components/Text';
@@ -521,28 +521,34 @@ function ListingRow({ listing, productIdentityId }: { listing: MarketplaceListin
   const { colors: c } = useAppTheme();
   const haptics = useHaptics();
   const [savedAsComp, setSavedAsComp] = useState(false);
+  const [queued, setQueued] = useState(false);
 
   async function saveAsComp() {
-    try {
-      await api.addComp({
-        productIdentityId: productIdentityId ?? null,
-        inventoryItemId: null,
-        observationType: listing.isSold ? 'Sold' : 'ActiveListing',
-        source: listing.source,
-        sourceUrl: listing.itemUrl ?? null,
-        title: listing.title,
-        price: listing.price,
-        shippingPrice: listing.shippingCost ?? null,
-        condition: listing.condition ?? null,
-        observedAt: new Date().toISOString(),
-        soldAt: listing.soldDate ?? null,
-        notes: null,
-      });
-      setSavedAsComp(true);
-      haptics.success();
-    } catch {
-      Alert.alert('Save Failed', 'Could not save this listing as a comp.');
+    const outcome = await saveComp({
+      productIdentityId: productIdentityId ?? null,
+      inventoryItemId: null,
+      observationType: listing.isSold ? 'Sold' : 'ActiveListing',
+      source: listing.source,
+      sourceUrl: listing.itemUrl ?? null,
+      title: listing.title,
+      price: listing.price,
+      shippingPrice: listing.shippingCost ?? null,
+      condition: listing.condition ?? null,
+      observedAt: new Date().toISOString(),
+      soldAt: listing.soldDate ?? null,
+      notes: null,
+    });
+
+    if (outcome.status === 'rejected') {
+      haptics.error();
+      Alert.alert('Save Failed', outcome.message);
+      return;
     }
+
+    // Queued counts as saved from here: the comp is on the phone and will sync itself.
+    setSavedAsComp(true);
+    setQueued(outcome.status === 'queued');
+    haptics.success();
   }
 
   const totalPrice = listing.price + (listing.shippingCost ?? 0);
@@ -593,12 +599,16 @@ function ListingRow({ listing, productIdentityId }: { listing: MarketplaceListin
         onPress={savedAsComp ? undefined : () => void saveAsComp()}
         hitSlop={6}
         style={[styles.compBtn, savedAsComp && { opacity: 0.5 }]}
-        accessibilityLabel={savedAsComp ? 'Saved as comp' : 'Save as comp'}
+        accessibilityLabel={
+          queued ? 'Saved, waiting to sync' : savedAsComp ? 'Saved as comp' : 'Save as comp'
+        }
       >
         <Ionicons
-          name={savedAsComp ? 'checkmark-circle' : 'bookmark-outline'}
+          // Kept, but not on the server yet — worth showing, since a queued comp does not affect
+          // pricing until it syncs.
+          name={queued ? 'cloud-upload-outline' : savedAsComp ? 'checkmark-circle' : 'bookmark-outline'}
           size={16}
-          color={savedAsComp ? c.success : c.textMuted}
+          color={queued ? c.warning : savedAsComp ? c.success : c.textMuted}
         />
       </Pressable>
     </View>

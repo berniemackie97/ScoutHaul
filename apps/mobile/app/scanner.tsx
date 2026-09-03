@@ -32,6 +32,7 @@ import {
   resolveProductName,
 } from '../src/features/scanner/types';
 import { useHaptics } from '../src/hooks/useHaptics';
+import { saveComp } from '../src/services/saveComp';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -577,7 +578,9 @@ export default function BarcodeScannerScreen() {
         setState((s) => (s.phase === 'done' ? { ...s, productIdentityId } : s));
       }
 
-      await api.addComp({
+      // saveComp keeps the observation on the phone when the server cannot be reached — this runs
+      // in the aisle, where the signal is worst, and these used to be dropped on the floor.
+      const estimate = await saveComp({
         productIdentityId,
         inventoryItemId: null,
         observationType: 'Estimate',
@@ -592,13 +595,19 @@ export default function BarcodeScannerScreen() {
         notes: state.priceRationale ?? `AI estimate: $${low ?? '?'}–$${high ?? '?'}`,
       });
 
+      if (estimate.status === 'rejected') {
+        haptics.error();
+        setSaveError(estimate.message);
+        return false;
+      }
+
       // Also persist the AI's individual comp data points (sold/active) as observations so the item
       // builds a real price-history trail — not just the single estimate midpoint. Tagged with an
       // "AI Comp" source so they're distinguishable from API-verified comps. Best-effort per comp.
       const observedAt = new Date().toISOString();
       await Promise.all(
         state.comps.map((comp) =>
-          api.addComp({
+          saveComp({
             productIdentityId,
             inventoryItemId: null,
             observationType: comp.status === 'sold' ? 'Sold' : 'ActiveListing',
@@ -615,9 +624,15 @@ export default function BarcodeScannerScreen() {
         ),
       );
       haptics.success();
+      setSaveError(null);
       return true;
-    } catch {
+    } catch (error) {
+      // Was a bare `catch { return false }`: the caller only flipped a flag, so a failure here was
+      // completely silent and the user believed the estimate had been kept.
       haptics.error();
+      setSaveError(
+        error instanceof Error ? error.message : 'Could not save this estimate to price history.',
+      );
       return false;
     }
   }

@@ -8,6 +8,7 @@ import { api } from '../../src/api';
 import type { InventoryReferenceData, InventoryReferenceOption } from '../../src/api/inventory';
 import { Button } from '../../src/components/Button';
 import { ErrorBanner } from '../../src/components/ErrorBanner';
+import { QueuedBanner } from '../../src/components/QueuedBanner';
 import { ExpandableSection } from '../../src/components/ExpandableSection';
 import { LoadingState } from '../../src/components/LoadingState';
 import { Screen } from '../../src/components/Screen';
@@ -19,6 +20,7 @@ import { radius, spacing } from '../../src/components/theme';
 import { useAppTheme } from '../../src/context/ThemeContext';
 import { useHaptics } from '../../src/hooks/useHaptics';
 import { enqueueOperation } from '../../src/db/localStore';
+import { isWorthQueueing } from '../../src/services/offlineWrites';
 import { takeIdentifyHandoff } from '../../src/features/scanner/identifyHandoff';
 import {
   categoryAttributeFields,
@@ -146,6 +148,7 @@ export default function EditInventoryScreen() {
   const [photos, setPhotos] = useState<LocalPhoto[]>([]);
   const [originalRemotePhotoRefs, setOriginalRemotePhotoRefs] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [queuedNotice, setQueuedNotice] = useState<string | null>(null);
   const [titleTouched, setTitleTouched] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [referenceData, setReferenceData] = useState<InventoryReferenceData | null>(null);
@@ -565,15 +568,21 @@ export default function EditInventoryScreen() {
       }
     } catch (e) {
       haptics.error();
-      if (!isEdit && params.sourcingTripId && !savedItem) {
+      // Only keep a write that could plausibly succeed later. Queuing a rejection — bad data, no
+      // permission — builds a backlog that can never drain and hides the real problem from the user.
+      const keepForLater = !isEdit && !savedItem && isWorthQueueing(e);
+
+      if (keepForLater && params.sourcingTripId) {
         await enqueueOperation('CreateRouteStopPurchase', '/api/inventory', 'POST', body);
         router.replace({ pathname: '/active-route', params: { tripId: params.sourcingTripId } });
         return;
       }
 
-      if (!isEdit && !savedItem) {
+      if (keepForLater) {
         await enqueueOperation('CreateInventory', '/api/inventory', 'POST', body);
-        setError('Saved locally. Will sync when online.');
+        // Deliberately not setError: this succeeded. Reporting it as an error put a red banner with
+        // a Retry button on a write that was already queued, and tapping it created the item twice.
+        setQueuedNotice("Saved on this phone. It'll sync when you're back online.");
         return;
       }
 
@@ -634,6 +643,7 @@ export default function EditInventoryScreen() {
   return (
     <Screen>
       {error ? <ErrorBanner message={error} onRetry={() => void save()} /> : null}
+      {queuedNotice ? <QueuedBanner message={queuedNotice} /> : null}
 
       {/* ── Photo Management ── */}
       <PhotoManager
