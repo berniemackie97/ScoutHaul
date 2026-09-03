@@ -1,4 +1,4 @@
-import { apiRequest } from '../api';
+import { ApiError, apiRequest } from '../api';
 import { createLocalId } from '../utils/id';
 import { getDatabase } from './database';
 
@@ -71,6 +71,13 @@ export async function processSyncQueue(): Promise<{ synced: number; failed: numb
       await db.runAsync(`update sync_queue set status = 'synced', lastError = null where id = ?`, [row.id]);
       synced += 1;
     } catch (error) {
+      // Being offline is not a failed write — the queue exists precisely for this. Marking every
+      // row failed here made a normal offline session look like a pile of broken syncs, so stop
+      // and leave the rest pending for the next attempt.
+      if (error instanceof ApiError && error.reason === 'offline') {
+        break;
+      }
+
       const message = error instanceof Error ? error.message : 'Unknown sync error';
       await db.runAsync(`update sync_queue set status = 'failed', lastError = ? where id = ?`, [message, row.id]);
       failed += 1;

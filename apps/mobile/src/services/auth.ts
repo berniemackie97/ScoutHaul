@@ -45,6 +45,16 @@ class AuthStore {
     return this.token !== null;
   }
 
+  /**
+   * Whether the token is close enough to expiry that it is not worth spending on a request.
+   * A session with no recorded expiry is treated as fine — we have nothing to judge it on.
+   */
+  isExpiringWithin(ms: number): boolean {
+    const expiresAt = this.session?.expiresAt;
+    if (!expiresAt) return false;
+    return expiresAt - Date.now() <= ms;
+  }
+
   subscribe(listener: AuthListener): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
@@ -83,6 +93,30 @@ export async function initializeAuthSession(): Promise<void> {
     supabase.auth.onAuthStateChange((_event, session) => {
       syncSession(session);
     });
+  }
+}
+
+/**
+ * Forces a token refresh and reports whether we ended up with a usable session.
+ *
+ * Supabase refreshes on its own schedule, which is enough while the app is in the foreground. It is
+ * not enough after the phone has been asleep: the app wakes with an expired token and the next
+ * request 401s for a reason the user cannot do anything about. The API client calls this before a
+ * request whose token is about to expire, and again after a 401.
+ */
+export async function refreshAuthSession(): Promise<boolean> {
+  const supabase = getSupabaseClient();
+  if (!supabase) return false;
+
+  try {
+    const { data, error } = await supabase.auth.refreshSession();
+    if (error || !data.session) return false;
+    syncSession(data.session);
+    return true;
+  } catch {
+    // A refresh that cannot reach the network is not a signed-out session; leave the token alone
+    // so the caller reports the transport failure rather than bouncing the user to sign-in.
+    return false;
   }
 }
 
