@@ -23,7 +23,7 @@ export type { IdentifyResult };
 const TARGET_WIDTH = 1536; // downscale width — good detail, ~400–700KB on the wire
 const JPEG_QUALITY = 0.6; // recompress quality after resize
 const MIN_BASE64_LENGTH = 100; // shorter than this means the encode produced nothing usable
-const REQUEST_TIMEOUT_MS = 30_000; // hard ceiling so a stalled backend can't hang the UI
+const VISION_TIMEOUT_MS = 30_000; // longer than the client default: the model takes real time
 
 const log = (...args: unknown[]) => {
   if (__DEV__) console.log('[Vision]', ...args);
@@ -124,9 +124,8 @@ async function callVisionApi(
   imageBase64: string | null,
   context?: string | null
 ): Promise<VisionCall> {
-  // Hard timeout: a stalled network/backend must surface as a clean failure, never a frozen overlay.
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  // The deadline lives in the API client now, which applies one to every request. Vision gets a
+  // longer one than the default because the model genuinely takes a while on a large photo.
   try {
     log(
       imageBase64 ? 'sending image…' : 'sending typed details…',
@@ -134,36 +133,39 @@ async function callVisionApi(
       'KB'
     );
     const result = imageBase64
-      ? await api.visionIdentify(imageBase64, controller.signal, context)
-      : await api.visionIdentifyText(context ?? '', controller.signal);
+      ? await api.visionIdentify(imageBase64, { timeoutMs: VISION_TIMEOUT_MS }, context)
+      : await api.visionIdentifyText(context ?? '', { timeoutMs: VISION_TIMEOUT_MS });
     log('result:', result.product?.name ?? '(not identified)', result.product?.confidence ?? '');
     return { vision: result, errorKind: null };
   } catch (error) {
-    const errorKind = classifyVisionError(error, controller.signal.aborted);
+    const errorKind = classifyVisionError(error);
     console.error(
       '[Vision] call failed:',
       errorKind,
       error instanceof Error ? error.message : String(error)
     );
     return { vision: null, errorKind };
-  } finally {
-    clearTimeout(timeout);
   }
 }
 
 // Map a thrown error to a stable kind the UI turns into a specific message + CTA.
-function classifyVisionError(error: unknown, aborted: boolean): VisionErrorKind {
-  if (aborted) return 'timeout';
-  if (error instanceof ApiError) {
-    if (error.status === 429) return error.code === 'quota_exhausted' ? 'quota' : 'rate_limited';
-    if (error.status === 503 || error.status === 502) return 'unavailable';
-    return 'error';
+// The client reports why it failed, so none of this has to guess from message text any more.
+function classifyVisionError(error: unknown): VisionErrorKind {
+  if (!(error instanceof ApiError)) return 'error';
+
+  switch (error.reason) {
+    case 'timeout':
+      return 'timeout';
+    case 'offline':
+    case 'network':
+      return 'offline';
+    case 'unauthenticated':
+      return 'auth';
+    case 'http':
+      if (error.status === 429) return error.code === 'quota_exhausted' ? 'quota' : 'rate_limited';
+      if (error.status === 503 || error.status === 502) return 'unavailable';
+      return 'error';
   }
-  const msg = error instanceof Error ? error.message : String(error);
-  if (msg.includes('Sign in')) return 'auth';
-  // RN fetch network failure surfaces as a TypeError ("Network request failed").
-  if (error instanceof TypeError || /network/i.test(msg)) return 'offline';
-  return 'error';
 }
 
 // ── Image prep ──

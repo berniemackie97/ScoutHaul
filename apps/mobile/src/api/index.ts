@@ -10,7 +10,8 @@ import { reportsApi } from './reports';
 import { customersApi } from './customers';
 import { channelsApi } from './channels';
 
-export { apiRequest, uploadMultipart } from './client';
+export { ApiError, apiRequest, uploadMultipart } from './client';
+export type { ApiFailureReason, CallOptions } from './client';
 export { inventoryApi } from './inventory';
 export { organizationApi } from './organization';
 export { marketplaceApi } from './marketplace';

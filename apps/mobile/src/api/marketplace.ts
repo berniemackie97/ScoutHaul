@@ -1,4 +1,4 @@
-import { apiRequest } from './client';
+import { apiRequest, type CallOptions } from './client';
 import type {
   DashboardSummary,
   MarketAnalysisResponse,
@@ -86,23 +86,27 @@ export const marketplaceApi = {
   analyze: (body: AnalyzeRequest) =>
     apiRequest<MarketAnalysisResponse>('/api/market-analysis/calculate', { method: 'POST', body }),
 
-  visionIdentify: (imageBase64?: string | null, signal?: AbortSignal, context?: string | null) =>
+  visionIdentify: (
+    imageBase64?: string | null,
+    options?: CallOptions,
+    context?: string | null,
+  ) =>
     apiRequest<VisionIdentifyResult>('/api/vision/identify', {
       method: 'POST',
       body: { imageBase64: imageBase64 || undefined, context: context || undefined },
-      signal,
+      ...options,
     }),
 
-  visionIdentifyText: (context: string, signal?: AbortSignal) =>
+  visionIdentifyText: (context: string, options?: CallOptions) =>
     apiRequest<VisionIdentifyResult>('/api/vision/identify', {
       method: 'POST',
       body: { context },
-      signal,
+      ...options,
     }),
 
   // Generate a ready-to-post marketplace listing (title, description, comp-backed price) from item details.
-  generateListing: (body: GenerateListingRequest, signal?: AbortSignal) =>
-    apiRequest<GeneratedListing>('/api/listing/generate', { method: 'POST', body, signal }),
+  generateListing: (body: GenerateListingRequest, options?: CallOptions) =>
+    apiRequest<GeneratedListing>('/api/listing/generate', { method: 'POST', body, ...options }),
 
   providerStatus: () => apiRequest<MarketplaceProviderStatus>('/api/marketplace-lookup/status'),
 };
