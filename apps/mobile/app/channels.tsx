@@ -20,7 +20,6 @@ import { spacing } from '../src/components/theme';
 import { useColors } from '../src/context/ThemeContext';
 import { usableChannelOptions } from '../src/domain/channelOptions';
 import type { ChannelAccount, ChannelListing, SaleChannelOption, UpsertChannelAccountRequest } from '../src/domain/types';
-import { formatMoney } from '../src/utils/money';
 
 const trimOrNull = (value: string) => value.trim() || null;
 const dateLabel = (value: string | null | undefined) =>

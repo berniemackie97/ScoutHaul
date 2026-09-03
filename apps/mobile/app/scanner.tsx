@@ -11,7 +11,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   View,
 } from 'react-native';
@@ -106,7 +105,6 @@ export default function BarcodeScannerScreen() {
   const isScanning = state.phase === 'scanning';
   const isPhotoMode = mode === 'photo-identify';
   const showPhotoOverlay = (showCaptureOverlay || !!capturedPhotoUri) && state.phase !== 'scanning';
-  const modeColor = isPhotoMode ? c.accent : c.primary;
 
   // Clear photo overlay when reaching results
   useEffect(() => {

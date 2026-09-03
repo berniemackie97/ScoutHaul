@@ -12,7 +12,7 @@ export async function bootstrapSignedInWorkspace(): Promise<SessionBootstrap | n
   let bootstrap: SessionBootstrap;
   try {
     bootstrap = await api.bootstrapSession();
-  } catch (error) {
+  } catch {
     await setActiveOrganizationId(null);
     bootstrap = await api.bootstrapSession();
   }

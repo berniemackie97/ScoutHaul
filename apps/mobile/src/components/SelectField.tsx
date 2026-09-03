@@ -48,7 +48,7 @@ export function SelectField({
   searchable = false,
   containerStyle,
 }: SelectFieldProps) {
-  const { colors: c, shadows: s } = useAppTheme();
+  const { colors: c } = useAppTheme();
   const [open, setOpen] = useState(false);
 
   const selected = options.find((o) => o.value === value);
@@ -137,7 +137,7 @@ function SelectModal({
   onSelect: (value: string) => void;
   onClose: () => void;
 }) {
-  const { colors: c, shadows: s } = useAppTheme();
+  const { colors: c } = useAppTheme();
   const insets = useSafeAreaInsets();
   const haptics = useHaptics();
   const [search, setSearch] = useState('');

@@ -1,15 +1,3 @@
-export { apiRequest, uploadMultipart } from './client';
-export { inventoryApi } from './inventory';
-export { organizationApi } from './organization';
-export { marketplaceApi } from './marketplace';
-export { sourcingApi } from './sourcing';
-export { commerceApi } from './commerce';
-export { tasksApi } from './tasks';
-export { acquisitionApi } from './acquisition';
-export { reportsApi } from './reports';
-export { customersApi } from './customers';
-export { channelsApi } from './channels';
-
 // Unified API surface. All screens import from this object.
 import { inventoryApi } from './inventory';
 import { organizationApi } from './organization';
@@ -21,6 +9,18 @@ import { acquisitionApi } from './acquisition';
 import { reportsApi } from './reports';
 import { customersApi } from './customers';
 import { channelsApi } from './channels';
+
+export { apiRequest, uploadMultipart } from './client';
+export { inventoryApi } from './inventory';
+export { organizationApi } from './organization';
+export { marketplaceApi } from './marketplace';
+export { sourcingApi } from './sourcing';
+export { commerceApi } from './commerce';
+export { tasksApi } from './tasks';
+export { acquisitionApi } from './acquisition';
+export { reportsApi } from './reports';
+export { customersApi } from './customers';
+export { channelsApi } from './channels';
 
 export const api = {
   // Session & dashboard

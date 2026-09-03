@@ -3,7 +3,6 @@ import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from './Text';
-import { radius, spacing } from './theme';
 import { useAppTheme } from '../context/ThemeContext';
 import { useHaptics } from '../hooks/useHaptics';
 

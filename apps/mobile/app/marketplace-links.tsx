@@ -54,7 +54,6 @@ export default function MarketplaceLinksScreen() {
 
   useEffect(() => {
     if (params.query) {
-      setQuery(params.query);
       void loadLinks(params.query);
     }
   }, [params.query]);

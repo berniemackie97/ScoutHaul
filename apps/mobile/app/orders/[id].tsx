@@ -13,7 +13,7 @@ import { spacing } from '../../src/components/theme';
 import { useAppTheme } from '../../src/context/ThemeContext';
 import { ordersApi } from '../../src/api/orders';
 import type { OrderDetail } from '../../src/domain/order.types';
-import { OrderLineRow, type LineEvents, type MutationRunner } from '../../src/features/orders/OrderLineWorkspace';
+import { OrderLineRow, type LineEvents } from '../../src/features/orders/OrderLineWorkspace';
 import { formatMoney } from '../../src/utils/money';
 import { orderStatusTone } from '../(tabs)/orders';
 

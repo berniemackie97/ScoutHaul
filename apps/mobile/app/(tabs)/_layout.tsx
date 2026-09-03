@@ -1,6 +1,5 @@
-import { Tabs } from 'expo-router';
+import { Tabs , useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { useFocusEffect } from 'expo-router';
 import { CustomTabBar } from '../../src/components/CustomTabBar';
 import { getPendingSyncCount } from '../../src/db/localStore';
 

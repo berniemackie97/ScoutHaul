@@ -1,5 +1,5 @@
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { api } from '../../api';
 import { Button } from '../../components/Button';
 import { Card } from '../../components/Card';
@@ -30,22 +30,20 @@ export function RoleManager({ organizationId, permissions, roles, onChanged }: R
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [grantsOwnerAccess, setGrantsOwnerAccess] = useState(false);
-  const [selectedPermissions, setSelectedPermissions] = useState<string[]>(safeDefaultPermissions);
+  // Null means "untouched", which reads as the defaults. Storing the defaults directly and
+  // re-seeding them from an effect meant clearing every permission silently put them back,
+  // and that the seed was missed entirely when `permissions` arrived after the first render.
+  const [permissionDraft, setPermissionDraft] = useState<string[] | null>(null);
+  const selectedPermissions = permissionDraft ?? safeDefaultPermissions;
   const [message, setMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-
-  useEffect(() => {
-    if (!editingRoleId && selectedPermissions.length === 0 && safeDefaultPermissions.length > 0) {
-      setSelectedPermissions(safeDefaultPermissions);
-    }
-  }, [editingRoleId, safeDefaultPermissions, selectedPermissions.length]);
 
   function resetForm() {
     setEditingRoleId(null);
     setName('');
     setDescription('');
     setGrantsOwnerAccess(false);
-    setSelectedPermissions(safeDefaultPermissions);
+    setPermissionDraft(null);
     setMessage(null);
   }
 
@@ -54,16 +52,17 @@ export function RoleManager({ organizationId, permissions, roles, onChanged }: R
     setName(role.name);
     setDescription(role.description ?? '');
     setGrantsOwnerAccess(role.isOwnerRole);
-    setSelectedPermissions(role.isOwnerRole ? permissions : role.permissions);
+    setPermissionDraft(role.isOwnerRole ? permissions : role.permissions);
     setMessage(null);
   }
 
   function togglePermission(permission: string) {
-    setSelectedPermissions((current) =>
-      current.includes(permission)
-        ? current.filter((item) => item !== permission)
-        : [...current, permission],
-    );
+    setPermissionDraft((current) => {
+      const base = current ?? safeDefaultPermissions;
+      return base.includes(permission)
+        ? base.filter((item) => item !== permission)
+        : [...base, permission];
+    });
   }
 
   async function submitRole() {

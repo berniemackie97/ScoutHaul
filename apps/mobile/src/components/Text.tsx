@@ -1,5 +1,5 @@
 import { PropsWithChildren } from 'react';
-import { Text as NativeText, TextProps as NativeTextProps, TextStyle } from 'react-native';
+import { Text as NativeText, TextProps as NativeTextProps } from 'react-native';
 import { typography } from './theme';
 import { useColors } from '../context/ThemeContext';
 

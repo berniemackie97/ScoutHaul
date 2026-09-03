@@ -83,7 +83,7 @@ function referenceOptions(
 }
 
 export default function EditInventoryScreen() {
-  const { colors: c, shadows: s } = useAppTheme();
+  const { colors: c } = useAppTheme();
   const haptics = useHaptics();
   const params = useLocalSearchParams<{
     id?: string;
@@ -1214,18 +1214,6 @@ function PhotoManager({
 }
 
 // ── Helpers ──
-
-function sizePlaceholder(system: string): string {
-  switch (system) {
-    case 'US letter': return 'XS, S, M, L, XL, 2XL';
-    case 'US numeric': return '0, 2, 4, 6, 8, 10, 12';
-    case 'Waist/Inseam': return '32×30, 34×32';
-    case 'Shoe US M': return '8, 9.5, 10, 11, 12';
-    case 'Shoe US W': return '6, 7.5, 8, 9, 10';
-    case 'Youth': return '4T, 5, 6, 7, 8, 10-12';
-    default: return 'Enter size';
-  }
-}
 
 function parseAttributes(value?: string | null): AttributeMap {
   if (!value) return {};

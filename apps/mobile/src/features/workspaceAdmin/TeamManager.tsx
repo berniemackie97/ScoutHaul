@@ -9,6 +9,7 @@ import { Text } from '../../components/Text';
 import { TextField } from '../../components/TextField';
 import { radius, spacing } from '../../components/theme';
 import { useColors } from '../../context/ThemeContext';
+import { useSelectedId } from '../../hooks/useSelectedId';
 import type { OrganizationMember, OrganizationRoleDefinition, OrganizationTeam, OrganizationTeamMember } from '../../domain/types';
 
 type TeamManagerProps = {
@@ -23,9 +24,16 @@ export function TeamManager({ organizationId, teams, members, roles, onChanged }
   const c = useColors();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [selectedTeamId, setSelectedTeamId] = useState<string | null>(teams[0]?.id ?? null);
-  const [selectedUserId, setSelectedUserId] = useState<string | null>(members[0]?.userId ?? null);
-  const [selectedRoleId, setSelectedRoleId] = useState<string | null>(roles.find((role) => !role.isOwnerRole)?.id ?? roles[0]?.id ?? null);
+  const teamIds = useMemo(() => teams.map((team) => team.id), [teams]);
+  const [selectedTeamId, setSelectedTeamId] = useSelectedId(teamIds, teams[0]?.id ?? null);
+  const memberIds = useMemo(() => members.map((member) => member.userId), [members]);
+  const [selectedUserId, setSelectedUserId] = useSelectedId(memberIds, members[0]?.userId ?? null);
+  const roleIds = useMemo(() => roles.map((role) => role.id), [roles]);
+  const assignableRoleId = useMemo(
+    () => roles.find((role) => !role.isOwnerRole)?.id ?? roles[0]?.id ?? null,
+    [roles],
+  );
+  const [selectedRoleId, setSelectedRoleId] = useSelectedId(roleIds, assignableRoleId);
   const [teamMembers, setTeamMembers] = useState<OrganizationTeamMember[]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -34,24 +42,6 @@ export function TeamManager({ organizationId, teams, members, roles, onChanged }
     () => teams.find((team) => team.id === selectedTeamId),
     [selectedTeamId, teams],
   );
-
-  useEffect(() => {
-    if (!selectedTeamId && teams[0]) {
-      setSelectedTeamId(teams[0].id);
-    }
-  }, [selectedTeamId, teams]);
-
-  useEffect(() => {
-    if (!selectedUserId && members[0]) {
-      setSelectedUserId(members[0].userId);
-    }
-  }, [members, selectedUserId]);
-
-  useEffect(() => {
-    if (!selectedRoleId && roles[0]) {
-      setSelectedRoleId(roles.find((role) => !role.isOwnerRole)?.id ?? roles[0].id);
-    }
-  }, [roles, selectedRoleId]);
 
   useEffect(() => {
     let isMounted = true;
@@ -90,8 +80,8 @@ export function TeamManager({ organizationId, teams, members, roles, onChanged }
       });
       setName('');
       setDescription('');
-      setSelectedTeamId(team.id);
       await onChanged();
+      setSelectedTeamId(team.id);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Unable to create team.');
     } finally {

@@ -9,7 +9,6 @@ import { EmptyState } from '../../src/components/EmptyState';
 import { ErrorBanner } from '../../src/components/ErrorBanner';
 import { SkeletonList } from '../../src/components/Skeleton';
 import { Screen } from '../../src/components/Screen';
-import { SectionHeader } from '../../src/components/SectionHeader';
 import { StatusPill } from '../../src/components/StatusPill';
 import { Text } from '../../src/components/Text';
 import { TextField } from '../../src/components/TextField';

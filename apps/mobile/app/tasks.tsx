@@ -10,11 +10,10 @@ import { ErrorBanner } from '../src/components/ErrorBanner';
 import { FilterChips } from '../src/components/FilterChips';
 import { SkeletonList } from '../src/components/Skeleton';
 import { Screen } from '../src/components/Screen';
-import { SectionHeader } from '../src/components/SectionHeader';
 import { StatusPill } from '../src/components/StatusPill';
 import { Text } from '../src/components/Text';
 import { TextField } from '../src/components/TextField';
-import { radius, spacing, type ToneKey } from '../src/components/theme';
+import { spacing, type ToneKey } from '../src/components/theme';
 import { useColors } from '../src/context/ThemeContext';
 import type { ResaleTask, WorkTaskStatus } from '../src/domain/types';
 

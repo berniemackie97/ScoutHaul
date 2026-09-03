@@ -1,5 +1,5 @@
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { api } from '../../api';
 import { Button } from '../../components/Button';
 import { Card } from '../../components/Card';
@@ -9,6 +9,7 @@ import { Text } from '../../components/Text';
 import { TextField } from '../../components/TextField';
 import { radius, spacing } from '../../components/theme';
 import { useColors } from '../../context/ThemeContext';
+import { useSelectedId } from '../../hooks/useSelectedId';
 import type { OrganizationMember, OrganizationRoleDefinition } from '../../domain/types';
 
 type MemberManagerProps = {
@@ -26,16 +27,11 @@ export function MemberManager({ organizationId, members, roles, onChanged }: Mem
   );
   const [email, setEmail] = useState('');
   const [displayName, setDisplayName] = useState('');
-  const [newMemberRoleId, setNewMemberRoleId] = useState<string | null>(defaultRoleId);
+  const roleIds = useMemo(() => roles.map((role) => role.id), [roles]);
+  const [newMemberRoleId, setNewMemberRoleId] = useSelectedId(roleIds, defaultRoleId);
   const [memberRoleDrafts, setMemberRoleDrafts] = useState<Record<string, string | null>>({});
   const [message, setMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-
-  useEffect(() => {
-    if (!newMemberRoleId && defaultRoleId) {
-      setNewMemberRoleId(defaultRoleId);
-    }
-  }, [defaultRoleId, newMemberRoleId]);
 
   function roleFor(id: string | null | undefined): OrganizationRoleDefinition | undefined {
     return roles.find((role) => role.id === id);
