@@ -1,4 +1,3 @@
-import type { Ionicons } from '@expo/vector-icons';
 import type { SelectOption } from '../components/SelectField';
 import type { InventoryStatus } from './types';
 

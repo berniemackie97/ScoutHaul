@@ -9,6 +9,7 @@ import { Text } from '../../components/Text';
 import { TextField } from '../../components/TextField';
 import { radius, spacing } from '../../components/theme';
 import { useColors } from '../../context/ThemeContext';
+import { useSelectedId } from '../../hooks/useSelectedId';
 import type { OrganizationInviteCode, OrganizationRoleDefinition, OrganizationTeam } from '../../domain/types';
 
 type InviteCodeManagerProps = {
@@ -23,23 +24,14 @@ export function InviteCodeManager({ organizationId, roles, teams }: InviteCodeMa
   const defaultRoleId = assignableRoles[0]?.id ?? null;
   const [inviteCodes, setInviteCodes] = useState<OrganizationInviteCode[]>([]);
   const [name, setName] = useState('New teammate');
-  const [selectedRoleId, setSelectedRoleId] = useState<string | null>(defaultRoleId);
+  const roleIds = useMemo(() => roles.map((role) => role.id), [roles]);
+  const [selectedRoleId, setSelectedRoleId] = useSelectedId(roleIds, defaultRoleId);
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
   const [maxUses, setMaxUses] = useState('1');
   const [createdCode, setCreatedCode] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-
-  useEffect(() => {
-    if (!selectedRoleId && defaultRoleId) {
-      setSelectedRoleId(defaultRoleId);
-    }
-  }, [defaultRoleId, selectedRoleId]);
-
-  useEffect(() => {
-    void loadInviteCodes();
-  }, [organizationId]);
 
   async function loadInviteCodes() {
     setIsLoading(true);
@@ -51,6 +43,10 @@ export function InviteCodeManager({ organizationId, roles, teams }: InviteCodeMa
       setIsLoading(false);
     }
   }
+
+  useEffect(() => {
+    void loadInviteCodes();
+  }, [organizationId]);
 
   async function createInviteCode() {
     if (!name.trim()) {

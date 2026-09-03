@@ -2,7 +2,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
-import { api } from '../src/api';
 import { appConfig } from '../src/config';
 import { Button } from '../src/components/Button';
 import { Card } from '../src/components/Card';

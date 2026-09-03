@@ -156,7 +156,6 @@ function RootStack() {
 }
 
 function StartupGate() {
-  const c = useColors();
   const router = useRouter();
   const pathname = usePathname();
   const [isReady, setIsReady] = useState(false);

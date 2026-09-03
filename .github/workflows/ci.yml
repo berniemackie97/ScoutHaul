@@ -101,9 +101,17 @@ jobs:
         working-directory: apps/mobile
         run: npx expo install --check
 
+      - name: Lint
+        working-directory: apps/mobile
+        run: npm run lint
+
       - name: Typecheck
         working-directory: apps/mobile
         run: npm run typecheck
+
+      - name: Test
+        working-directory: apps/mobile
+        run: npm test
 
       # Wraps `npm audit` so a known advisory we cannot act on yet is recorded rather than turning
       # the whole job red. See the reasons in apps/mobile/scripts/audit.mjs.

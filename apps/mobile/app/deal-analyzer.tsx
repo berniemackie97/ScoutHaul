@@ -5,7 +5,6 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { api } from '../src/api';
 import { Button } from '../src/components/Button';
 import { Card } from '../src/components/Card';
-import { ConfidenceRing } from '../src/components/ConfidenceRing';
 import { DecisionCard } from '../src/components/DecisionCard';
 import { ErrorBanner } from '../src/components/ErrorBanner';
 import { OfflineBanner } from '../src/components/OfflineBanner';

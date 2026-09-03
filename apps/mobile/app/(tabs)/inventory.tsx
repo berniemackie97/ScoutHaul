@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { FlashList } from '@shopify/flash-list';
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useState } from 'react';
 import { Alert, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { api } from '../../src/api';
@@ -62,19 +62,27 @@ function useHeroUri(item: InventoryItem) {
   const remoteHero = resolvePhotoUrl(
     item.heroPhotoThumbnailUrl ?? typedHero?.thumbnailUrl ?? item.photoUrls?.[0],
   );
-  const [localUri, setLocalUri] = useState<string | null>(() => heroUriCache.get(item.id) ?? null);
+  // The cache is the source of truth, read fresh on every render — rows are recycled onto new
+  // items as the list scrolls, so holding the resolved URI in state showed the previous item's
+  // photo until an effect caught up. State here only records that the cache has been filled.
+  const [, onCacheFilled] = useReducer((count: number) => count + 1, 0);
 
   useEffect(() => {
     if (remoteHero) return; // remote available, skip local lookup
-    if (heroUriCache.has(item.id)) { setLocalUri(heroUriCache.get(item.id)!); return; }
+    if (heroUriCache.has(item.id)) return; // already resolved; render reads it straight from the cache
 
+    let isActive = true;
     void getHeroPhoto(item.id).then((uri) => {
       heroUriCache.set(item.id, uri);
-      setLocalUri(uri);
+      if (isActive) onCacheFilled();
     });
+
+    return () => {
+      isActive = false;
+    };
   }, [item.id, remoteHero]);
 
-  return remoteHero ?? localUri;
+  return remoteHero ?? heroUriCache.get(item.id) ?? null;
 }
 
 function ItemCard({
@@ -156,7 +164,7 @@ function ItemCard({
 }
 
 export default function InventoryListScreen() {
-  const { colors: c, shadows: s } = useAppTheme();
+  const { colors: c } = useAppTheme();
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);

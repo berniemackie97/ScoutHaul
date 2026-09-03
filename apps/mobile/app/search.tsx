@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { SearchBar } from '../src/components/SearchBar';
 import { Screen } from '../src/components/Screen';
@@ -102,7 +102,7 @@ export default function SearchScreen() {
 
       {results.length === 0 ? (
         <View style={styles.empty}>
-          <Text variant="caption">No results for "{query}"</Text>
+          <Text variant="caption">No results for “{query}”</Text>
         </View>
       ) : null}
     </Screen>
