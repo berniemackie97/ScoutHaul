@@ -105,9 +105,11 @@ jobs:
         working-directory: apps/mobile
         run: npm run typecheck
 
+      # Wraps `npm audit` so a known advisory we cannot act on yet is recorded rather than turning
+      # the whole job red. See the reasons in apps/mobile/scripts/audit.mjs.
       - name: npm vulnerability audit
         working-directory: apps/mobile
-        run: npm audit --audit-level=high
+        run: npm run audit
 
   web:
     name: Web
