@@ -55,10 +55,11 @@ builder.Services.AddSingleton(supabaseAuth);
 builder.Services.AddSingleton(signingKeyResolver);
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options => ConfigureSupabaseBearer(options, supabaseAuth, signingKeyResolver))
+    .AddJwtBearer(options => SupabaseBearerConfiguration.Configure(options, supabaseAuth, signingKeyResolver))
     .AddJwtBearer(
         StorefrontAuthDefaults.Scheme,
-        options => ConfigureSupabaseBearer(options, storefrontSupabaseAuth, storefrontSigningKeyResolver));
+        options => SupabaseBearerConfiguration.Configure(
+            options, storefrontSupabaseAuth, storefrontSigningKeyResolver));
 
 builder.Services.AddApiAdapters(builder.Configuration);
 builder.Services.AddAuthorization(options =>
@@ -206,22 +207,3 @@ app.UseMiddleware<IdempotencyMiddleware>();
 app.MapHealthChecks("/health").AllowAnonymous();
 app.MapControllers();
 app.Run();
-
-static void ConfigureSupabaseBearer(
-    JwtBearerOptions options,
-    SupabaseAuthOptions authOptions,
-    SupabaseSigningKeyResolver signingKeyResolver)
-{
-    options.TokenValidationParameters = new TokenValidationParameters
-    {
-        ValidateIssuer = true,
-        ValidIssuer = authOptions.Issuer,
-        ValidateAudience = true,
-        ValidAudience = authOptions.Audience,
-        ValidateLifetime = true,
-        ValidateIssuerSigningKey = true,
-        ClockSkew = TimeSpan.FromSeconds(30),
-        NameClaimType = "name",
-        IssuerSigningKeyResolver = signingKeyResolver.ResolveSigningKeys
-    };
-}

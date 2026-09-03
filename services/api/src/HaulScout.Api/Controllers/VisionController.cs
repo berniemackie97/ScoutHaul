@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using HaulScout.Api.Authorization;
 using HaulScout.Application.Contracts;
+using HaulScout.Application.Inventory;
 using HaulScout.Application.Security;
 using HaulScout.Application.Services;
 
@@ -11,7 +12,7 @@ namespace HaulScout.Api.Controllers;
 [RequireOrganizationPermission(HaulScoutPermissions.ManageInventory)]
 public sealed class VisionController(
     IVisionIdentificationService visionService,
-    IHttpClientFactory httpClientFactory) : ControllerBase
+    IRemoteImageFetcher remoteImageFetcher) : ControllerBase
 {
     /// <summary>
     /// Identify a product from a photo, typed facts, or both. Returns a specific product name,
@@ -46,19 +47,24 @@ public sealed class VisionController(
 
         string? imageBase64 = string.IsNullOrWhiteSpace(request.ImageBase64) ? null : request.ImageBase64;
 
-        // If URL provided instead of base64, download and convert via IHttpClientFactory
+        // A URL instead of base64 means we fetch it, and the URL comes from the request — an SSRF
+        // surface. IRemoteImageFetcher is the same guard the photo-import path already uses: http/https
+        // only, every resolved address checked so a public hostname pointing at loopback or a cloud
+        // metadata endpoint is refused, image content types only, and a byte cap held while streaming.
+        // This used to be a bare GetByteArrayAsync, which had none of that.
         if (string.IsNullOrWhiteSpace(imageBase64) && !string.IsNullOrWhiteSpace(request.ImageUrl))
         {
             try
             {
-                using HttpClient client = httpClientFactory.CreateClient();
-                client.Timeout = TimeSpan.FromSeconds(10);
-                byte[] imageBytes = await client.GetByteArrayAsync(request.ImageUrl, cancellationToken);
-                imageBase64 = Convert.ToBase64String(imageBytes);
+                PhotoUpload fetched = await remoteImageFetcher.FetchAsync(request.ImageUrl, cancellationToken);
+                await using Stream content = fetched.Content;
+                using MemoryStream buffer = new();
+                await content.CopyToAsync(buffer, cancellationToken);
+                imageBase64 = Convert.ToBase64String(buffer.ToArray());
             }
-            catch
+            catch (RemoteImageFetchException ex)
             {
-                return BadRequest(new { title = "Image download failed", detail = "Could not download image from the provided URL." });
+                return BadRequest(new { title = "Image download failed", detail = ex.Message });
             }
         }
 
