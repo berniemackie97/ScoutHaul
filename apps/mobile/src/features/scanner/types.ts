@@ -1,5 +1,5 @@
-import type { MarketplaceListing, ResaleComp, ResaleSource } from '../../domain/types';
-import type { VisionErrorKind } from './identifyHelpers';
+import type { MarketplaceListing, MarketplaceLookupResult, ResaleComp, ResaleSource } from '../../domain/types';
+import type { IdentifyResult, VisionErrorKind } from './identifyHelpers';
 
 export type ScanMode = 'barcode' | 'photo-identify';
 
@@ -121,7 +121,7 @@ export type VisionOverrides = {
 
 export function makeDoneFromResult(
   query: string,
-  result: import('../../domain/types').MarketplaceLookupResult,
+  result: MarketplaceLookupResult,
   photoUri?: string | null,
   v?: VisionOverrides,
 ): ScanDoneState {
@@ -188,5 +188,57 @@ export function makeDoneFromResult(
     sources: result.estimateSources ?? [],
     identifyError: v?.errorKind ?? null,
     productConditionQuality: v?.conditionQuality ?? null,
+  };
+}
+
+/**
+ * A lookup that found nothing, without having asked.
+ *
+ * Used when no marketplace provider is configured, and when the lookup call itself fails: the screen
+ * still has the vision result to show, and an empty lookup is the honest shape for "we did not get
+ * marketplace prices" — not an error the shopper caused.
+ */
+export function emptyLookupResult(query: string): MarketplaceLookupResult {
+  return {
+    query, listings: [], totalResults: 0,
+    averageSoldPrice: null, lowestPrice: null, highestPrice: null,
+    productTitle: null, productBrand: null, productImageUrl: null, productCategory: null,
+    productIdentityId: null, savedObservationCount: 0, providersUsed: [], providerWarnings: [],
+  };
+}
+
+/**
+ * Whether a lookup answered well enough to stop trying other phrasings.
+ *
+ * Listings or a product name mean it worked. No providers used means nobody was asked, so retrying a
+ * different phrasing would ask nobody again — retrying then just delays the result for no reason.
+ */
+export function isConclusiveLookup(result: MarketplaceLookupResult): boolean {
+  return result.totalResults > 0
+    || Boolean(result.productTitle)
+    || !result.providersUsed?.length;
+}
+
+/** Flattens a vision identification into the overrides the results screen layers over a lookup. */
+export function toVisionOverrides(result: IdentifyResult): VisionOverrides {
+  return {
+    brand: result.brand,
+    model: result.model,
+    category: result.category,
+    color: result.color,
+    condition: result.condition,
+    title: result.title,
+    estimatedResaleLow: result.estimatedResaleLow,
+    estimatedResaleHigh: result.estimatedResaleHigh,
+    idConfidence: result.confidence,
+    valuationConfidence: result.valuationConfidence,
+    priceRangeType: result.priceRangeType,
+    keyValueFactors: result.keyValueFactors,
+    missingInformation: result.missingInformation,
+    recommendedNextSteps: result.recommendedNextSteps,
+    rationale: result.rationale,
+    comps: result.comps,
+    errorKind: result.errorKind,
+    conditionQuality: result.conditionQuality,
   };
 }

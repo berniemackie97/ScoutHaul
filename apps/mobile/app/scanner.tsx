@@ -27,10 +27,14 @@ import { radius, spacing } from '../src/components/theme';
 import { useAppTheme } from '../src/context/ThemeContext';
 import type { ScanMode, ScanState, VisionOverrides } from '../src/features/scanner/types';
 import {
+  emptyLookupResult,
+  isConclusiveLookup,
   makeDoneError,
   makeDoneFromResult,
   resolveProductName,
+  toVisionOverrides,
 } from '../src/features/scanner/types';
+import { StepDot } from '../src/features/scanner/StepDot';
 import { useHaptics } from '../src/hooks/useHaptics';
 import { saveComp } from '../src/services/saveComp';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -47,28 +51,6 @@ const PHOTO_CW = 3.5;
 
 // Carry Gemini's photo-identify metadata into the shared results state (used by both the auto-search
 // and manual-refine paths, so it lives in one place).
-function toVisionOverrides(r: IdentifyResult): VisionOverrides {
-  return {
-    brand: r.brand,
-    model: r.model,
-    category: r.category,
-    color: r.color,
-    condition: r.condition,
-    title: r.title,
-    estimatedResaleLow: r.estimatedResaleLow,
-    estimatedResaleHigh: r.estimatedResaleHigh,
-    idConfidence: r.confidence,
-    valuationConfidence: r.valuationConfidence,
-    priceRangeType: r.priceRangeType,
-    keyValueFactors: r.keyValueFactors,
-    missingInformation: r.missingInformation,
-    recommendedNextSteps: r.recommendedNextSteps,
-    rationale: r.rationale,
-    comps: r.comps,
-    errorKind: r.errorKind,
-    conditionQuality: r.conditionQuality,
-  };
-}
 
 export default function BarcodeScannerScreen() {
   const { colors: c } = useAppTheme();
@@ -182,14 +164,6 @@ export default function BarcodeScannerScreen() {
   }, [shutterFlash]);
 
   // ── Build empty marketplace result shell (no API call needed) ──
-  function makeEmptyResult(query: string): import('../src/domain/types').MarketplaceLookupResult {
-    return {
-      query, listings: [], totalResults: 0,
-      averageSoldPrice: null, lowestPrice: null, highestPrice: null,
-      productTitle: null, productBrand: null, productImageUrl: null, productCategory: null,
-      productIdentityId: null, savedObservationCount: 0, providersUsed: [], providerWarnings: [],
-    };
-  }
 
   // ── Marketplace search — skips entirely when no providers configured ──
   async function searchWithRetry(
@@ -200,7 +174,7 @@ export default function BarcodeScannerScreen() {
   ) {
     // No providers → skip API call entirely, go straight to results with Gemini data
     if (hasProvidersRef.current === false) {
-      setState(makeDoneFromResult(primary, makeEmptyResult(primary), photoUri, overrides));
+      setState(makeDoneFromResult(primary, emptyLookupResult(primary), photoUri, overrides));
       return;
     }
 
@@ -210,13 +184,13 @@ export default function BarcodeScannerScreen() {
     let primaryResult: Awaited<ReturnType<typeof api.lookupSearch>> | null = null;
     try {
       primaryResult = await api.lookupSearch(primary);
-      if (primaryResult.totalResults > 0 || primaryResult.productTitle || !primaryResult.providersUsed?.length) {
+      if (isConclusiveLookup(primaryResult)) {
         setState(makeDoneFromResult(primary, primaryResult, photoUri, overrides));
         return;
       }
     } catch {
       // API failed — show Gemini-only results
-      setState(makeDoneFromResult(primary, makeEmptyResult(primary), photoUri, overrides));
+      setState(makeDoneFromResult(primary, emptyLookupResult(primary), photoUri, overrides));
       return;
     }
 
@@ -293,7 +267,7 @@ export default function BarcodeScannerScreen() {
       // cause + CTA, don't blind-search marketplaces with an empty query.
       if (identified.errorKind) {
         haptics.error();
-        setState(makeDoneFromResult('', makeEmptyResult(''), photo.uri, overrides));
+        setState(makeDoneFromResult('', emptyLookupResult(''), photo.uri, overrides));
         return;
       }
 
@@ -304,7 +278,7 @@ export default function BarcodeScannerScreen() {
         await searchWithRetry(query, identified.alternateQueries, photo.uri, overrides);
       } else {
         // Nothing usable to search — still land on results with the photo + Refine to type a name.
-        setState(makeDoneFromResult('', makeEmptyResult(''), photo.uri, overrides));
+        setState(makeDoneFromResult('', emptyLookupResult(''), photo.uri, overrides));
       }
     } catch {
       setCapturedPhotoUri(null);
@@ -323,7 +297,7 @@ export default function BarcodeScannerScreen() {
 
     // No providers → skip API call
     if (hasProvidersRef.current === false) {
-      setState(makeDoneFromResult(q, makeEmptyResult(q), photoUri, overrides));
+      setState(makeDoneFromResult(q, emptyLookupResult(q), photoUri, overrides));
       return;
     }
 
@@ -350,7 +324,7 @@ export default function BarcodeScannerScreen() {
       }
       setState(makeDoneFromResult(q, result, photoUri, overrides));
     } catch {
-      setState(makeDoneFromResult(q, makeEmptyResult(q), photoUri, overrides));
+      setState(makeDoneFromResult(q, emptyLookupResult(q), photoUri, overrides));
     }
   }
 
@@ -388,7 +362,7 @@ export default function BarcodeScannerScreen() {
         : await identifyFromDetails(combined);
     } catch {
       const prev = identifyResultRef.current;
-      setState(makeDoneFromResult(facts, makeEmptyResult(facts), photoUri ?? undefined, prev ? toVisionOverrides(prev) : undefined));
+      setState(makeDoneFromResult(facts, emptyLookupResult(facts), photoUri ?? undefined, prev ? toVisionOverrides(prev) : undefined));
       return;
     }
     identifyResultRef.current = identified;
@@ -396,7 +370,7 @@ export default function BarcodeScannerScreen() {
 
     if (identified.errorKind) {
       haptics.error();
-      setState(makeDoneFromResult('', makeEmptyResult(''), photoUri ?? undefined, overrides));
+      setState(makeDoneFromResult('', emptyLookupResult(''), photoUri ?? undefined, overrides));
       return;
     }
 
@@ -405,7 +379,7 @@ export default function BarcodeScannerScreen() {
     if (query) {
       await searchWithRetry(query, identified.alternateQueries, photoUri ?? '', overrides);
     } else {
-      setState(makeDoneFromResult('', makeEmptyResult(''), photoUri ?? undefined, overrides));
+      setState(makeDoneFromResult('', emptyLookupResult(''), photoUri ?? undefined, overrides));
     }
   }
 
@@ -940,38 +914,7 @@ export default function BarcodeScannerScreen() {
   );
 }
 
-function StepDot({ active, done, color }: { active: boolean; done: boolean; color: string }) {
-  const { colors: c } = useAppTheme();
-  return (
-    <View
-      style={[
-        stepStyles.dot,
-        done && { backgroundColor: color, borderColor: color },
-        active && { borderColor: color, borderWidth: 2.5 },
-        !done && !active && { borderColor: c.borderLight },
-      ]}
-    >
-      {done ? <Ionicons name="checkmark" size={10} color="#fff" /> : null}
-      {active ? <View style={[stepStyles.dotInner, { backgroundColor: color }]} /> : null}
-    </View>
-  );
-}
 
-const stepStyles = StyleSheet.create({
-  dot: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  dotInner: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-});
 
 // Mode-specific corner styles
 const barcodeCornerStyles = StyleSheet.create({
