@@ -141,6 +141,12 @@ jobs:
       - name: Type-check (shared packages + apps)
         run: pnpm --filter @overhaul/api-client --filter @overhaul/ui --filter @overhaul/storefront --filter @overhaul/admin type-check
 
+      # Neither app had an ESLint config and eslint was not installed, so `next lint` had never been
+      # runnable. Starting at --max-warnings 0: the first run found ten findings and all ten are fixed
+      # here, so there is no debt to ratchet down from.
+      - name: Lint
+        run: pnpm --filter @overhaul/storefront --filter @overhaul/admin lint
+
       # These suites existed and passed, and nothing ran them — so nothing was protecting the
       # behaviour they describe. A test that never runs in CI is a comment.
       - name: Test

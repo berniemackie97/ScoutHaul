@@ -100,7 +100,6 @@ export function LineWorkspace({
 // ── Refund (no return): one form, partial vs full derived from the amount ───────────────────────
 function RefundForm({
   saleId,
-  orderId,
   remaining,
   restockContext,
   onClose,
@@ -265,7 +264,6 @@ function ReturnRequestForm({
 function ReturnFlow({
   rma,
   orderId,
-  saleId,
   remaining,
 }: {
   rma: ReturnDto;
@@ -466,7 +464,7 @@ function ReturnRefund({
 }
 
 // ── Refund history ──────────────────────────────────────────────────────────────────────────────
-function RefundHistory({ refunds, saleId, orderId }: { refunds: Refund[]; saleId: string; orderId: string }) {
+function RefundHistory({ refunds, saleId }: { refunds: Refund[]; saleId: string; orderId: string }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   if (refunds.length === 0) return null;

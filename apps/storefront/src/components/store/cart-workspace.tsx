@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, ArrowRight, CreditCard, Loader2, MapPin, ShieldCheck, ShoppingBag, Trash2, Truck } from "lucide-react";
 import { imageUrl, money, type Cart, type CheckoutResult } from "@/lib/commerce";
 
@@ -41,12 +41,40 @@ export function CartWorkspace({ mode }: Props) {
     }
   }, [cartSignature, embeddedCheckout]);
 
+  // Wrapped so the auto-start effect below can list it as a dependency without a new identity on
+  // every render. It has to be defined above that effect: the dependency array is evaluated during
+  // render, so a `const` declared further down would be in its temporal dead zone.
+  const checkout = useCallback(async () => {
+    if (checkingOut || embeddedCheckout) return;
+    setCheckingOut(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/checkout", {
+        method: "POST",
+        cache: "no-store",
+        credentials: "same-origin",
+      });
+      if (!response.ok) throw new Error(await response.text());
+      const result = (await response.json()) as CheckoutResult;
+      if (result.clientSecret && result.publishableKey) {
+        setEmbeddedCheckout({ clientSecret: result.clientSecret, publishableKey: result.publishableKey, cartSignature });
+        setCheckingOut(false);
+        return;
+      }
+      if (!result.checkoutUrl) throw new Error("Checkout did not return a payment link.");
+      window.location.assign(result.checkoutUrl);
+    } catch (err) {
+      setError(cleanError(err));
+      setCheckingOut(false);
+    }
+  }, [checkingOut, embeddedCheckout, cartSignature]);
+
   useEffect(() => {
     if (mode !== "checkout" || loading || !canCheckout || checkingOut || embeddedCheckout || autoStarted.current) return;
     if (new URLSearchParams(window.location.search).get("start") !== "1") return;
     autoStarted.current = true;
     void checkout();
-  }, [mode, loading, canCheckout, checkingOut, embeddedCheckout]);
+  }, [mode, loading, canCheckout, checkingOut, embeddedCheckout, checkout]);
 
   // Once the embedded Stripe form mounts, bring it into view. It renders below the order summary, so without this
   // the shopper is left staring at the summary while the payment form sits offscreen further down the page.
@@ -96,30 +124,6 @@ export function CartWorkspace({ mode }: Props) {
     }
   }
 
-  async function checkout() {
-    if (checkingOut || embeddedCheckout) return;
-    setCheckingOut(true);
-    setError(null);
-    try {
-      const response = await fetch("/api/checkout", {
-        method: "POST",
-        cache: "no-store",
-        credentials: "same-origin",
-      });
-      if (!response.ok) throw new Error(await response.text());
-      const result = (await response.json()) as CheckoutResult;
-      if (result.clientSecret && result.publishableKey) {
-        setEmbeddedCheckout({ clientSecret: result.clientSecret, publishableKey: result.publishableKey, cartSignature });
-        setCheckingOut(false);
-        return;
-      }
-      if (!result.checkoutUrl) throw new Error("Checkout did not return a payment link.");
-      window.location.assign(result.checkoutUrl);
-    } catch (err) {
-      setError(cleanError(err));
-      setCheckingOut(false);
-    }
-  }
 
   const title = mode === "checkout" ? "Review your order" : "Your cart";
   const eyebrow = mode === "checkout" ? "Secure checkout" : "Cart";

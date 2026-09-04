@@ -19,7 +19,6 @@ function SubmitButton({ disabledReason }: { disabledReason?: string }) {
 
 export function BundleCreator({ candidates }: { candidates: InventoryItem[] }) {
   const [state, action] = useActionState(createBundle, initial);
-  const values = state.values ?? {};
   const fieldErrors = state.fieldErrors ?? {};
   const formKey = state.formKey ?? "initial";
   const [selected, setSelected] = useState<Set<string>>(new Set());

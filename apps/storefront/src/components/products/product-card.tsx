@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { Heart } from "lucide-react";
-import { Card, Badge, Button, formatCurrency } from "@overhaul/ui";
+import { Card, Badge, Button, formatCurrency, type BadgeProps } from "@overhaul/ui";
 
 interface ProductCardProps {
   product: {
@@ -18,7 +18,7 @@ interface ProductCardProps {
   };
 }
 
-const conditionColors: Record<string, string> = {
+const conditionColors: Record<string, BadgeProps["variant"]> = {
   NEW: "success",
   LIKE_NEW: "success",
   EXCELLENT: "info",
@@ -54,7 +54,7 @@ export function ProductCard({ product }: ProductCardProps) {
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
           />
           <div className="absolute top-2 left-2 flex gap-1">
-            <Badge variant={conditionColors[product.condition] as any ?? "secondary"}>
+            <Badge variant={conditionColors[product.condition] ?? "secondary"}>
               {conditionLabels[product.condition] ?? product.condition}
             </Badge>
             {hasDiscount && (
