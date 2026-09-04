@@ -14,7 +14,7 @@ namespace HaulScout.Api.Controllers;
 public sealed class StorefrontOffersController(
     StorefrontStoreResolver resolver,
     StorefrontCustomerIdentityResolver customerIdentity,
-    StorefrontOfferWorkflowService offers) : ControllerBase
+    StorefrontOfferWorkflowService offers) : HaulScoutControllerBase
 {
     [HttpPost]
     public async Task<ActionResult<StorefrontOfferResultDto>> Submit(
@@ -44,13 +44,4 @@ public sealed class StorefrontOffersController(
         return Ok(await offers.ListCustomerAsync(organizationId, customerIdentity.Resolve(), cancellationToken));
     }
 
-    private ActionResult<T> ToActionResult<T>(AppResult<T> result) where T : class =>
-        result.Status switch
-        {
-            AppResultStatus.Ok when result.Value is not null => result.Value,
-            AppResultStatus.NotFound => NotFound(result.Message),
-            AppResultStatus.Conflict => Conflict(result.Message),
-            AppResultStatus.Validation => BadRequest(result.Message),
-            _ => BadRequest(result.Message),
-        };
 }

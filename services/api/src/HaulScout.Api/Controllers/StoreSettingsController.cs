@@ -16,7 +16,7 @@ namespace HaulScout.Api.Controllers;
 [ApiController]
 [Route("api/store/settings")]
 [RequireOrganizationPermission(HaulScoutPermissions.ManageOrganization)]
-public sealed class StoreSettingsController(StoreSettingsWorkflowService settings) : ControllerBase
+public sealed class StoreSettingsController(StoreSettingsWorkflowService settings) : HaulScoutControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<StoreSettingsDto>> Get(CancellationToken cancellationToken) =>
@@ -28,13 +28,4 @@ public sealed class StoreSettingsController(StoreSettingsWorkflowService setting
         CancellationToken cancellationToken) =>
         ToActionResult(await settings.UpdateAsync(request, cancellationToken));
 
-    private ActionResult<T> ToActionResult<T>(AppResult<T> result) where T : class =>
-        result.Status switch
-        {
-            AppResultStatus.Ok when result.Value is not null => result.Value,
-            AppResultStatus.NotFound => result.Message is null ? NotFound() : NotFound(result.Message),
-            AppResultStatus.Conflict => Conflict(result.Message),
-            AppResultStatus.Validation => BadRequest(result.Message),
-            _ => BadRequest(result.Message),
-        };
 }

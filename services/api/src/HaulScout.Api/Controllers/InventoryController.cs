@@ -21,7 +21,7 @@ public sealed class InventoryController(
     InventoryQueryService queries,
     InventoryPhotoWorkflowService photos,
     InventoryIssueWorkflowService issues,
-    InventoryStatusWorkflowService statuses) : ControllerBase
+    InventoryStatusWorkflowService statuses) : HaulScoutControllerBase
 {
     public sealed class UploadInventoryPhotoForm
     {
@@ -239,15 +239,6 @@ public sealed class InventoryController(
         return ToActionResult(result);
     }
 
-    private ActionResult<T> ToActionResult<T>(AppResult<T> result) where T : class =>
-        result.Status switch
-        {
-            AppResultStatus.Ok when result.Value is not null => result.Value,
-            AppResultStatus.NotFound => NotFound(result.Message),
-            AppResultStatus.Conflict => Conflict(result.Message),
-            AppResultStatus.Validation => BadRequest(result.Message),
-            _ => BadRequest(result.Message),
-        };
 
     private IActionResult ToActionResult(AppResult result) =>
         result.Status switch

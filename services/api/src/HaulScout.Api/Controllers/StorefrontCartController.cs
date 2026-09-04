@@ -16,7 +16,7 @@ namespace HaulScout.Api.Controllers;
 public sealed class StorefrontCartController(
     StorefrontStoreResolver resolver,
     StorefrontCustomerIdentityResolver customerIdentity,
-    CartWorkflowService cart) : ControllerBase
+    CartWorkflowService cart) : HaulScoutControllerBase
 {
     private const string CartHeader = "X-HaulScout-Cart";
 
@@ -77,13 +77,4 @@ public sealed class StorefrontCartController(
 
     private string? CartToken() => Request.Headers[CartHeader].FirstOrDefault()?.Trim() is { Length: > 0 } token ? token : null;
 
-    private ActionResult<T> ToActionResult<T>(AppResult<T> result) where T : class =>
-        result.Status switch
-        {
-            AppResultStatus.Ok when result.Value is not null => result.Value,
-            AppResultStatus.NotFound => NotFound(result.Message),
-            AppResultStatus.Conflict => Conflict(result.Message),
-            AppResultStatus.Validation => BadRequest(result.Message),
-            _ => BadRequest(result.Message),
-        };
 }

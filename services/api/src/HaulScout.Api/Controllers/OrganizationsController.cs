@@ -15,7 +15,7 @@ public sealed class OrganizationsController(
     OrganizationMemberWorkflowService members,
     OrganizationInviteCodeWorkflowService inviteCodes,
     OrganizationRoleWorkflowService roles,
-    OrganizationTeamWorkflowService teams) : ControllerBase
+    OrganizationTeamWorkflowService teams) : HaulScoutControllerBase
 {
     // ── Organization ───────────────────────────────────────────────────────
     [HttpGet]
@@ -186,15 +186,6 @@ public sealed class OrganizationsController(
     public async Task<IActionResult> RemoveTeamMember(Guid id, Guid teamId, Guid memberId, CancellationToken cancellationToken) =>
         ToNoContentResult(await teams.RemoveMemberAsync(id, teamId, memberId, cancellationToken));
 
-    private ActionResult<T> ToActionResult<T>(AppResult<T> result) where T : class =>
-        result.Status switch
-        {
-            AppResultStatus.Ok when result.Value is not null => result.Value,
-            AppResultStatus.NotFound => result.Message is null ? NotFound() : NotFound(result.Message),
-            AppResultStatus.Conflict => Conflict(result.Message),
-            AppResultStatus.Validation => BadRequest(result.Message),
-            _ => BadRequest(result.Message),
-        };
 
     private IActionResult ToNoContentResult(AppResult result) =>
         result.Status switch

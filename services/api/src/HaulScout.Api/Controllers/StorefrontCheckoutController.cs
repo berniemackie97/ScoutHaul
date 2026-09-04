@@ -14,7 +14,7 @@ namespace HaulScout.Api.Controllers;
 public sealed class StorefrontCheckoutController(
     StorefrontStoreResolver resolver,
     CheckoutWorkflowService checkout,
-    ILogger<StorefrontCheckoutController> logger) : ControllerBase
+    ILogger<StorefrontCheckoutController> logger) : HaulScoutControllerBase
 {
     private const string CartHeader = "X-HaulScout-Cart";
 
@@ -56,13 +56,4 @@ public sealed class StorefrontCheckoutController(
         return ToActionResult(await checkout.GetOrderBySessionAsync(organizationId, sessionId, cancellationToken));
     }
 
-    private ActionResult<T> ToActionResult<T>(AppResult<T> result) where T : class =>
-        result.Status switch
-        {
-            AppResultStatus.Ok when result.Value is not null => result.Value,
-            AppResultStatus.NotFound => NotFound(result.Message),
-            AppResultStatus.Conflict => Conflict(result.Message),
-            AppResultStatus.Validation => BadRequest(result.Message),
-            _ => BadRequest(result.Message),
-        };
 }

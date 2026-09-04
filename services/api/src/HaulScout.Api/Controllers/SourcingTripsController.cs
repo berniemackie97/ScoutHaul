@@ -14,7 +14,7 @@ namespace HaulScout.Api.Controllers;
 public sealed class SourcingTripsController(
     SourcingTripQueryService queries,
     SourcingTripWorkflowService trips,
-    SourcingTripStopWorkflowService stops) : ControllerBase
+    SourcingTripStopWorkflowService stops) : HaulScoutControllerBase
 {
     // ── Trip ───────────────────────────────────────────────────────────────
     [HttpPost]
@@ -126,15 +126,6 @@ public sealed class SourcingTripsController(
         CancellationToken cancellationToken) =>
         ToActionResult(await stops.UpdateChecklistItemAsync(id, stopId, checklistItemId, request, cancellationToken));
 
-    private ActionResult<T> ToActionResult<T>(AppResult<T> result) where T : class =>
-        result.Status switch
-        {
-            AppResultStatus.Ok when result.Value is not null => result.Value,
-            AppResultStatus.NotFound => result.Message is null ? NotFound() : NotFound(result.Message),
-            AppResultStatus.Conflict => Conflict(result.Message),
-            AppResultStatus.Validation => BadRequest(result.Message),
-            _ => BadRequest(result.Message),
-        };
 
     private IActionResult ToNoContentResult(AppResult result) =>
         result.Status switch
