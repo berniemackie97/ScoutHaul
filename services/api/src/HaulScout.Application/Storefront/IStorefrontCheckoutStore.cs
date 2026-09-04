@@ -31,6 +31,15 @@ public interface IStorefrontCheckoutStore
     /// session id, org-agnostic: the webhook has no store header — the order itself says whose it is.</summary>
     Task<Order?> FindOrderBySessionAsync(string sessionId, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// The order a processor event refers to, by the id we handed the processor as its client reference.
+    ///
+    /// The recovery path for an order whose session id was never written: the order is saved, the session is
+    /// created at the processor, and only then is the id attached — so a failure in between leaves a live,
+    /// payable session that no session-id lookup can find.
+    /// </summary>
+    Task<Order?> FindOrderForOrphanedSessionAsync(Guid orderId, CancellationToken cancellationToken);
+
     /// <summary>Confirmation-page read: the paid order's public summary fields, by session id.</summary>
     Task<Order?> FindOrderSummaryBySessionAsync(Guid organizationId, string sessionId, CancellationToken cancellationToken);
 
