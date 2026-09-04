@@ -1,18 +1,17 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { api } from '../../src/api';
-import type { InventoryReferenceData, InventoryReferenceOption } from '../../src/api/inventory';
+import type { InventoryReferenceData } from '../../src/api/inventory';
 import { Button } from '../../src/components/Button';
 import { ErrorBanner } from '../../src/components/ErrorBanner';
 import { QueuedBanner } from '../../src/components/QueuedBanner';
 import { ExpandableSection } from '../../src/components/ExpandableSection';
 import { LoadingState } from '../../src/components/LoadingState';
 import { Screen } from '../../src/components/Screen';
-import { SelectField, type SelectOption } from '../../src/components/SelectField';
+import { SelectField } from '../../src/components/SelectField';
 import { StatusPill } from '../../src/components/StatusPill';
 import { Text } from '../../src/components/Text';
 import { TextField } from '../../src/components/TextField';
@@ -56,33 +55,22 @@ import type {
   WeightUnit,
 } from '../../src/domain/types';
 import { parseOptionalNumber } from '../../src/utils/money';
-import { resolvePhotoUrl } from '../../src/utils/photoUrl';
+import { PhotoManager, type LocalPhoto } from '../../src/features/inventoryEdit/PhotoManager';
+import { parseAttributes, serializeAttributes, type AttributeMap } from '../../src/features/inventoryEdit/attributes';
+import { parseOptionalValidatedNumber } from '../../src/features/inventoryEdit/validation';
+import { referenceOptions } from '../../src/features/inventoryEdit/referenceOptions';
+import {
+  damageFilled as countDamageFilled,
+  detailsFilled as countDetailsFilled,
+  essentialsFilled as countEssentialsFilled,
+  physicalFilled as countPhysicalFilled,
+  pricingFilled as countPricingFilled,
+  projectedMargin as computeProjectedMargin,
+  workFilled as countWorkFilled,
+} from '../../src/features/inventoryEdit/completeness';
 
-type LocalPhoto = {
-  uri: string;
-  thumbnailUri?: string;
-  remoteId?: string;
-  isHero: boolean;
-  isRemote?: boolean;
-};
 
-type AttributeMap = Record<string, string>;
 
-function referenceOptions(
-  remote: InventoryReferenceOption[] | undefined,
-  fallback: SelectOption[],
-  current?: string,
-): SelectOption[] {
-  const options = remote?.map((option) => ({
-    value: option.value,
-    label: option.label,
-    group: option.group ?? undefined,
-  })) ?? fallback;
-  if (current && !options.some((option) => option.value === current)) {
-    return [...options, { value: current, label: `${current} (existing value)`, group: 'Existing data' }];
-  }
-  return options;
-}
 
 export default function EditInventoryScreen() {
   const { colors: c } = useAppTheme();
@@ -195,56 +183,38 @@ export default function EditInventoryScreen() {
   }, []);
 
   // Section fill counts for collapsed badges
-  const essentialsFilled = useMemo(() => {
-    let n = 0;
-    if (title.trim()) n++;
-    if (condition) n++;
-    if (category) n++;
-    if (brand.trim()) n++;
-    return n;
-  }, [title, condition, category, brand]);
+  const essentialsFilled = useMemo(
+    () => countEssentialsFilled({ title, condition, category, brand }),
+    [title, condition, category, brand],
+  );
 
-  const pricingFilled = useMemo(() => {
-    let n = 0;
-    if (purchasePrice.trim()) n++;
-    if (estimatedSalePrice.trim()) n++;
-    return n;
-  }, [purchasePrice, estimatedSalePrice]);
+  const pricingFilled = useMemo(
+    () => countPricingFilled({ purchasePrice, estimatedSalePrice }),
+    [purchasePrice, estimatedSalePrice],
+  );
 
-  const detailsFilled = useMemo(() => {
-    let n = 0;
-    if (sizeSystem) n++;
-    if (sizeValue.trim()) n++;
-    const filled = Object.values(attributes).filter((v) => v.trim()).length;
-    n += filled;
-    return n;
-  }, [sizeSystem, sizeValue, attributes]);
+  const detailsFilled = useMemo(
+    () => countDetailsFilled({ sizeSystem, sizeValue, attributes }),
+    [sizeSystem, sizeValue, attributes],
+  );
 
   const detailsTotal = useMemo(() => 2 + categoryFields.length, [categoryFields]);
 
-  const physicalFilled = useMemo(() => {
-    let n = 0;
-    if (barcode.trim()) n++;
-    if (manufacturerPartNumber.trim()) n++;
-    if (serialNumber.trim()) n++;
-    if (countryOfOrigin) n++;
-    if (manufactureYear.trim()) n++;
-    if (length.trim() || width.trim() || height.trim()) n++;
-    if (weight.trim()) n++;
-    return n;
-  }, [barcode, manufacturerPartNumber, serialNumber, countryOfOrigin, manufactureYear, length, width, height, weight]);
+  const physicalFilled = useMemo(
+    () => countPhysicalFilled({
+      barcode, manufacturerPartNumber, serialNumber, countryOfOrigin,
+      manufactureYear, length, width, height, weight,
+    }),
+    [barcode, manufacturerPartNumber, serialNumber, countryOfOrigin, manufactureYear, length, width, height, weight],
+  );
 
-  const workFilled = useMemo(() => {
-    let n = 0;
-    if (ownershipType) n++;
-    if (storageLocation.trim()) n++;
-    if (accessories.trim()) n++;
-    if (testingNotes.trim()) n++;
-    if (cleaningNotes.trim()) n++;
-    if (listingNotes.trim()) n++;
-    if (missingParts.trim()) n++;
-    return n;
-  }, [ownershipType, storageLocation, accessories, testingNotes, cleaningNotes, listingNotes, missingParts]);
+  const workFilled = useMemo(
+    () => countWorkFilled({
+      ownershipType, storageLocation, accessories, testingNotes,
+      cleaningNotes, listingNotes, missingParts,
+    }),
+    [ownershipType, storageLocation, accessories, testingNotes, cleaningNotes, listingNotes, missingParts],
+  );
 
   const readinessFacts = useMemo(() => ({
     title,
@@ -262,23 +232,16 @@ export default function EditInventoryScreen() {
   const readinessBlockingItems = useMemo(() => readinessBlockers(status, readinessFacts), [status, readinessFacts]);
   const blockedReadyToList = (status === 'ReadyToList' || status === 'Listed') && readinessBlockingItems.length > 0;
 
-  const damageFilled = useMemo(() => {
-    let n = 0;
-    if (damageType) n++;
-    if (damageSeverity) n++;
-    if (damageNote.trim()) n++;
-    return n;
-  }, [damageType, damageSeverity, damageNote]);
+  const damageFilled = useMemo(
+    () => countDamageFilled({ damageType, damageSeverity, damageNote }),
+    [damageType, damageSeverity, damageNote],
+  );
 
   // Margin summary computed in real-time
-  const projectedMargin = useMemo(() => {
-    const cost = parseOptionalNumber(purchasePrice);
-    const sale = parseOptionalNumber(estimatedSalePrice);
-    if (cost === null || sale === null || sale === 0) return null;
-    const profit = sale - cost;
-    const pct = ((profit / sale) * 100).toFixed(0);
-    return { profit, pct, positive: profit > 0 };
-  }, [purchasePrice, estimatedSalePrice]);
+  const projectedMargin = useMemo(
+    () => computeProjectedMargin(purchasePrice, estimatedSalePrice),
+    [purchasePrice, estimatedSalePrice],
+  );
 
   // Seed photo gallery from scanner's captured image
   useFocusEffect(
@@ -1118,165 +1081,6 @@ export default function EditInventoryScreen() {
 
 // ── Photo Manager ──
 
-function PhotoManager({
-  photos,
-  onTake,
-  onPick,
-  onIdentify,
-  onRemove,
-  onSetHero,
-}: {
-  photos: LocalPhoto[];
-  onTake: () => void;
-  onPick: () => void;
-  onIdentify: () => void;
-  onRemove: (index: number) => void;
-  onSetHero: (index: number) => void;
-}) {
-  const { colors: c, shadows: s } = useAppTheme();
-  const hasPhotos = photos.length > 0;
-
-  return (
-    <View style={[styles.photoSection, { backgroundColor: c.surface, borderColor: c.borderLight, ...s.sm }]}>
-      <View style={styles.photoHeader}>
-        <View style={styles.photoHeaderLeft}>
-          <Ionicons name="camera-outline" size={18} color={c.primary} />
-          <Text variant="bodyBold">Photos</Text>
-        </View>
-        {hasPhotos ? (
-          <View style={[styles.photoCountBadge, { backgroundColor: c.primaryLight }]}>
-            <Text variant="label" color={c.primary}>{photos.length}</Text>
-          </View>
-        ) : (
-          <Text variant="caption" color={c.textMuted}>Tap to add</Text>
-        )}
-      </View>
-
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.photoScroll}
-      >
-        <Pressable
-          onPress={onIdentify}
-          style={[styles.addPhotoBtn, styles.addPhotoPrimary, { backgroundColor: c.accentLight, borderColor: c.accent }]}
-          accessibilityLabel="Photo identify item"
-        >
-          <Ionicons name="sparkles-outline" size={24} color={c.accent} />
-          <Text variant="label" color={c.accent}>Identify</Text>
-        </Pressable>
-        <Pressable
-          onPress={onTake}
-          style={[styles.addPhotoBtn, styles.addPhotoPrimary, { backgroundColor: c.primaryLight, borderColor: c.primary }]}
-          accessibilityLabel="Take photo"
-        >
-          <Ionicons name="camera" size={24} color={c.primary} />
-          <Text variant="label" color={c.primary}>Camera</Text>
-        </Pressable>
-        <Pressable
-          onPress={onPick}
-          style={[styles.addPhotoBtn, { backgroundColor: c.surfaceAlt, borderColor: c.border }]}
-          accessibilityLabel="Pick from library"
-        >
-          <Ionicons name="images-outline" size={22} color={c.textSecondary} />
-          <Text variant="label" color={c.textSecondary}>Library</Text>
-        </Pressable>
-        {photos.map((photo, i) => (
-          <View key={photo.remoteId ?? photo.uri} style={styles.photoWrapper}>
-            <Pressable onPress={() => onSetHero(i)} style={styles.photoTouch}>
-              <Image
-                source={{ uri: resolvePhotoUrl(photo.thumbnailUri ?? photo.uri) ?? photo.thumbnailUri ?? photo.uri }}
-                style={styles.photoThumb}
-                contentFit="cover"
-                cachePolicy="disk"
-              />
-              {photo.isHero ? (
-                <View style={[styles.heroBadge, { backgroundColor: c.primary }]}>
-                  <Ionicons name="star" size={10} color={c.textInverse} />
-                </View>
-              ) : (
-                <View style={[styles.orderBadge, { backgroundColor: 'rgba(0,0,0,0.5)' }]}>
-                  <Text variant="label" color={c.textInverse} style={styles.orderText}>{i + 1}</Text>
-                </View>
-              )}
-            </Pressable>
-            <Pressable
-              onPress={() => onRemove(i)}
-              style={[styles.removeBtn, { backgroundColor: c.danger }]}
-              hitSlop={6}
-            >
-              <Ionicons name="close" size={12} color={c.textInverse} />
-            </Pressable>
-          </View>
-        ))}
-      </ScrollView>
-
-      {!hasPhotos ? (
-        <View style={[styles.photoHint, { backgroundColor: c.surfaceAlt }]}>
-          <Ionicons name="information-circle-outline" size={14} color={c.textMuted} />
-          <Text variant="caption" color={c.textMuted}>
-            First photo becomes the hero image. Tap any photo to set it as hero.
-          </Text>
-        </View>
-      ) : null}
-    </View>
-  );
-}
-
-// ── Helpers ──
-
-function parseAttributes(value?: string | null): AttributeMap {
-  if (!value) return {};
-  try {
-    const parsed = JSON.parse(value) as unknown;
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
-    return Object.fromEntries(
-      Object.entries(parsed as Record<string, unknown>)
-        .filter(([, entry]) => typeof entry === 'string')
-        .map(([key, entry]) => [key, entry as string]),
-    );
-  } catch {
-    return {};
-  }
-}
-
-function serializeAttributes(value: AttributeMap): string | null {
-  const cleaned = Object.fromEntries(
-    Object.entries(value)
-      .map(([key, entry]) => [key, entry.trim()])
-      .filter(([, entry]) => entry.length > 0),
-  );
-  return Object.keys(cleaned).length > 0 ? JSON.stringify(cleaned) : null;
-}
-
-function parseOptionalValidatedNumber(
-  value: string,
-  label: string,
-  rules: { min?: number; max?: number; integer?: boolean } = {},
-): { value: number | null; error: string | null } {
-  const trimmed = value.trim();
-  if (!trimmed) return { value: null, error: null };
-
-  const parsed = Number(trimmed);
-  if (!Number.isFinite(parsed)) {
-    return { value: null, error: `${label} must be a valid number.` };
-  }
-
-  if (rules.integer && !Number.isInteger(parsed)) {
-    return { value: null, error: `${label} must be a whole number.` };
-  }
-
-  if (rules.min !== undefined && parsed < rules.min) {
-    return { value: null, error: `${label} must be at least ${rules.min}.` };
-  }
-
-  if (rules.max !== undefined && parsed > rules.max) {
-    return { value: null, error: `${label} must be ${rules.max} or less.` };
-  }
-
-  return { value: parsed, error: null };
-}
-
 // ── Styles ──
 
 const styles = StyleSheet.create({
@@ -1306,98 +1110,6 @@ const styles = StyleSheet.create({
   },
 
   // Photo section
-  photoSection: {
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    padding: spacing.lg,
-    gap: spacing.md,
-  },
-  photoHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  photoHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  photoCountBadge: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xxs,
-    borderRadius: radius.full,
-  },
-  photoScroll: {
-    gap: spacing.sm,
-  },
-  photoWrapper: {
-    position: 'relative',
-  },
-  photoTouch: {
-    borderRadius: radius.md,
-    overflow: 'hidden',
-  },
-  photoThumb: {
-    width: 76,
-    height: 76,
-    borderRadius: radius.md,
-  },
-  heroBadge: {
-    position: 'absolute',
-    bottom: 4,
-    left: 4,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  orderBadge: {
-    position: 'absolute',
-    bottom: 4,
-    left: 4,
-    minWidth: 18,
-    height: 18,
-    borderRadius: 9,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 4,
-  },
-  orderText: {
-    fontSize: 9,
-    lineHeight: 12,
-    letterSpacing: 0,
-  },
-  removeBtn: {
-    position: 'absolute',
-    top: -5,
-    right: -5,
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  addPhotoBtn: {
-    width: 76,
-    height: 76,
-    borderRadius: radius.md,
-    borderWidth: 1.5,
-    borderStyle: 'dashed',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.xxs,
-  },
-  addPhotoPrimary: {
-    borderStyle: 'solid',
-  },
-  photoHint: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    padding: spacing.sm,
-    borderRadius: radius.sm,
-  },
 
   // Dynamic category fields
   dynamicSection: {
