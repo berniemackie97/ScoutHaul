@@ -13,9 +13,10 @@ import { Screen } from '../src/components/Screen';
 import { StatusPill } from '../src/components/StatusPill';
 import { Text } from '../src/components/Text';
 import { TextField } from '../src/components/TextField';
-import { spacing, type ToneKey } from '../src/components/theme';
+import { spacing } from '../src/components/theme';
 import { useColors } from '../src/context/ThemeContext';
 import type { ResaleTask, WorkTaskStatus } from '../src/domain/types';
+import { taskStatusTone } from '../src/utils/statusTone';
 
 type TaskFilter = 'Active' | 'All' | 'Completed';
 
@@ -24,13 +25,6 @@ const filterOptions: { value: TaskFilter; label: string }[] = [
   { value: 'All', label: 'All' },
   { value: 'Completed', label: 'Done' },
 ];
-
-function taskTone(status: WorkTaskStatus): ToneKey {
-  if (status === 'Completed') return 'success';
-  if (status === 'Blocked') return 'danger';
-  if (status === 'InProgress') return 'info';
-  return 'neutral';
-}
 
 const nextAction: Record<WorkTaskStatus, { label: string; status: WorkTaskStatus; icon: keyof typeof Ionicons.glyphMap }> = {
   Open: { label: 'Start', status: 'InProgress', icon: 'play-outline' },
@@ -161,7 +155,7 @@ export default function TasksScreen() {
                     {task.title}
                   </Text>
                   <View style={styles.taskMeta}>
-                    <StatusPill label={task.status} tone={taskTone(task.status)} size="sm" />
+                    <StatusPill label={task.status} tone={taskStatusTone(task.status)} size="sm" />
                     {task.dueAt ? (
                       <Text variant="caption">
                         Due {new Date(task.dueAt).toLocaleDateString()}

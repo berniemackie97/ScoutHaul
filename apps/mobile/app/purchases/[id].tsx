@@ -25,7 +25,7 @@ import {
 } from '../../src/domain/acquisition';
 import type { AcquisitionLot } from '../../src/domain/types';
 import { formatMoney } from '../../src/utils/money';
-import { statusTone } from '../../src/utils/statusTone';
+import { inventoryStatusTone } from '../../src/utils/statusTone';
 
 export default function PurchaseDetailScreen() {
   const c = useColors();
@@ -144,7 +144,7 @@ export default function PurchaseDetailScreen() {
                 <Ionicons name="chevron-forward" size={18} color={c.textMuted} />
               </View>
               <View style={styles.itemMeta}>
-                <StatusPill label={item.inventoryItemStatus ?? 'Unknown'} tone={statusTone(item.inventoryItemStatus ?? '')} size="sm" />
+                <StatusPill label={item.inventoryItemStatus ?? 'Unknown'} tone={inventoryStatusTone(item.inventoryItemStatus ?? '')} size="sm" />
                 <StatusPill label={formatMoney(item.allocatedCost ?? 0)} tone="success" size="sm" />
                 {item.allocationWeight != null ? <StatusPill label={`Weight ${item.allocationWeight}`} tone="neutral" size="sm" /> : null}
               </View>

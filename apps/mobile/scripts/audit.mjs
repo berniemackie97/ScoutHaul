@@ -26,15 +26,48 @@ const deferred = {
 };
 
 const run = promisify(execFile);
-// `npm audit` exits non-zero whenever it finds anything, so the report comes off the error too.
-const { stdout } = await run('npm', ['audit', '--json'], { maxBuffer: 32 * 1024 * 1024 }).catch(
-  (error) => {
-    if (error.stdout) return error;
-    throw error;
-  },
-);
 
-const found = Object.entries(JSON.parse(stdout).vulnerabilities ?? {}).filter(
+/**
+ * One `npm audit --json`, returning the report only if we actually got one.
+ *
+ * npm exits non-zero whenever it finds anything, so a real report arrives on the error — but it also
+ * answers with a small `{ "error": ... }` object when it cannot reach the registry, and that is valid
+ * JSON with no `vulnerabilities` in it. Reading that as an empty report is how a network blip turned
+ * into "every deferred advisory has been fixed, delete them all".
+ */
+async function audit() {
+  const { stdout } = await run('npm', ['audit', '--json'], { maxBuffer: 32 * 1024 * 1024 }).catch(
+    (error) => {
+      if (error.stdout) return error;
+      throw error;
+    },
+  );
+
+  const report = JSON.parse(stdout);
+  if (report.error || !report.vulnerabilities) {
+    throw new Error(report.error?.summary ?? report.error?.detail ?? 'npm audit returned no report.');
+  }
+  return report;
+}
+
+// The registry is reachable often enough to be worth asking twice before calling it a failure. Same
+// reasoning as the image pre-pull in CI: a transient blip should cost seconds, not a red build.
+let report;
+for (let attempt = 1; ; attempt += 1) {
+  try {
+    report = await audit();
+    break;
+  } catch (error) {
+    if (attempt === 3) {
+      console.error(`✖ Could not audit: ${error.message}`);
+      console.error('  This is npm failing to produce a report, not a finding. Re-run the job.');
+      process.exit(1);
+    }
+    await new Promise((resolve) => setTimeout(resolve, attempt * 2000));
+  }
+}
+
+const found = Object.entries(report.vulnerabilities).filter(
   ([, advisory]) => advisory.severity === 'high' || advisory.severity === 'critical',
 );
 
