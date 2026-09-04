@@ -15,7 +15,7 @@ import { ordersApi } from '../../src/api/orders';
 import type { OrderDetail } from '../../src/domain/order.types';
 import { OrderLineRow, type LineEvents } from '../../src/features/orders/OrderLineWorkspace';
 import { formatMoney } from '../../src/utils/money';
-import { orderStatusTone } from '../(tabs)/orders';
+import { orderStatusTone } from '../../src/utils/statusTone';
 
 const dateTime = (value: string | null | undefined) =>
   value ? new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value)) : '—';

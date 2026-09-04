@@ -12,21 +12,14 @@ import { Screen } from '../../src/components/Screen';
 import { SectionHeader } from '../../src/components/SectionHeader';
 import { StatusPill } from '../../src/components/StatusPill';
 import { Text } from '../../src/components/Text';
-import { spacing, type ToneKey } from '../../src/components/theme';
+import { spacing } from '../../src/components/theme';
 import { useColors } from '../../src/context/ThemeContext';
-import type { CustomerAddress, CustomerDetail, OrderStatus, OrderSummary } from '../../src/domain/types';
+import type { CustomerAddress, CustomerDetail, OrderSummary } from '../../src/domain/types';
 import { formatMoney } from '../../src/utils/money';
+import { orderStatusTone } from '../../src/utils/statusTone';
 
 const dateLabel = (value: string | null | undefined) =>
   value ? new Intl.DateTimeFormat('en-US', { dateStyle: 'medium' }).format(new Date(value)) : '—';
-
-function orderTone(status: OrderStatus): ToneKey {
-  if (status === 'Delivered') return 'success';
-  if (status === 'Cancelled' || status === 'Refunded') return 'danger';
-  if (status === 'Pending') return 'warning';
-  if (status === 'Paid' || status === 'Fulfilling' || status === 'Shipped') return 'info';
-  return 'neutral';
-}
 
 export default function CustomerDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -142,7 +135,7 @@ function OrderCard({ order }: { order: OrderSummary }) {
             <Text variant="bodyBold">{order.orderNumber}</Text>
             <Text variant="caption" color={c.textMuted}>{order.channel} · {dateLabel(order.createdAt)}</Text>
           </View>
-          <StatusPill label={order.status} tone={orderTone(order.status)} size="sm" />
+          <StatusPill label={order.status} tone={orderStatusTone(order.status)} size="sm" />
         </View>
         <View style={[styles.customerStats, { borderTopColor: c.borderLight }]}>
           <Stat label="Items" value={String(order.itemCount ?? 0)} />

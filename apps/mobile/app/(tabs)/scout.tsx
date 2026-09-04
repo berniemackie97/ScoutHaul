@@ -17,7 +17,7 @@ import { useAppTheme } from '../../src/context/ThemeContext';
 import type { InventoryItem } from '../../src/domain/types';
 import { useConnectivity } from '../../src/hooks/useConnectivity';
 import { formatMoney } from '../../src/utils/money';
-import { statusTone } from '../../src/utils/statusTone';
+import { inventoryStatusTone } from '../../src/utils/statusTone';
 
 type ActionTile = {
   icon: keyof typeof Ionicons.glyphMap;
@@ -242,7 +242,7 @@ export default function ScoutScreen() {
                         </Text>
                       </View>
                     ) : null}
-                    <StatusPill label={item.status} tone={statusTone(item.status)} size="sm" />
+                    <StatusPill label={item.status} tone={inventoryStatusTone(item.status)} size="sm" />
                   </View>
                 </View>
                 <View style={styles.recentPrice}>

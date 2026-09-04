@@ -15,9 +15,9 @@ import { TextField } from '../../src/components/TextField';
 import { radius, spacing } from '../../src/components/theme';
 import { useAppTheme } from '../../src/context/ThemeContext';
 import { ordersApi } from '../../src/api/orders';
-import type { OrderStatus, OrderSummary } from '../../src/domain/order.types';
-import type { ToneKey } from '../../src/components/theme';
+import type { OrderSummary } from '../../src/domain/order.types';
 import { formatMoney } from '../../src/utils/money';
+import { orderStatusTone } from '../../src/utils/statusTone';
 
 type Filter = 'All' | 'Open' | 'Paid' | 'Shipped' | 'Delivered' | 'Refunded';
 const filterOptions: { value: Filter; label: string }[] = [
@@ -28,14 +28,6 @@ const filterOptions: { value: Filter; label: string }[] = [
   { value: 'Delivered', label: 'Delivered' },
   { value: 'Refunded', label: 'Refunded' },
 ];
-
-export function orderStatusTone(status: OrderStatus): ToneKey {
-  if (status === 'Delivered') return 'success';
-  if (status === 'Cancelled' || status === 'Refunded') return 'danger';
-  if (status === 'Pending') return 'warning';
-  if (status === 'Paid' || status === 'Fulfilling' || status === 'Shipped') return 'info';
-  return 'neutral';
-}
 
 const shortDate = (value: string | null | undefined) =>
   value ? new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(new Date(value)) : '—';

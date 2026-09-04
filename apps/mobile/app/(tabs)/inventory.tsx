@@ -26,7 +26,7 @@ import {
 import { formatMoney } from '../../src/utils/money';
 import { getHeroPhoto } from '../../src/utils/photos';
 import { resolvePhotoUrl } from '../../src/utils/photoUrl';
-import { statusTone } from '../../src/utils/statusTone';
+import { inventoryStatusTone } from '../../src/utils/statusTone';
 
 type StatusFilter = 'All' | 'Active' | 'NeedsWork' | 'Listed' | 'Sold';
 
@@ -121,7 +121,7 @@ function ItemCard({
               </Text>
               <StatusPill
                 label={formatStatus(item.status)}
-                tone={statusTone(item.status)}
+                tone={inventoryStatusTone(item.status)}
                 size="sm"
               />
             </View>

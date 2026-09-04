@@ -13,10 +13,11 @@ import { Screen } from '../src/components/Screen';
 import { SectionHeader } from '../src/components/SectionHeader';
 import { StatusPill } from '../src/components/StatusPill';
 import { Text } from '../src/components/Text';
-import { spacing, type ToneKey } from '../src/components/theme';
+import { spacing } from '../src/components/theme';
 import { useAppTheme } from '../src/context/ThemeContext';
 import type { InventoryItem, InventoryStatus, Listing, ListingStatus } from '../src/domain/types';
 import { formatMoney } from '../src/utils/money';
+import { listingReadinessTone, listingStatusTone } from '../src/utils/statusTone';
 
 type ListingFilter = 'All' | 'Ready' | ListingStatus;
 
@@ -36,20 +37,6 @@ const unlistedStatuses: InventoryStatus[] = [
   'NeedsPhotos',
   'ReadyToList',
 ];
-
-function listingTone(status: ListingStatus): ToneKey {
-  if (status === 'Active') return 'success';
-  if (status === 'Sold') return 'info';
-  if (status === 'Draft') return 'warning';
-  if (status === 'Cancelled') return 'danger';
-  return 'neutral';
-}
-
-function itemTone(status: InventoryStatus): ToneKey {
-  if (status === 'ReadyToList') return 'success';
-  if (status === 'NeedsPhotos' || status === 'NeedsTesting' || status === 'NeedsCleaning') return 'warning';
-  return 'neutral';
-}
 
 export default function ListingQueueScreen() {
   const { colors: c } = useAppTheme();
@@ -203,7 +190,7 @@ export default function ListingQueueScreen() {
                         Cost {formatMoney(item.purchasePrice ?? item.sellerAskingPrice)} · Value {formatMoney(item.estimatedSalePrice)}
                       </Text>
                     </View>
-                    <StatusPill label={item.status} tone={itemTone(item.status)} size="sm" />
+                    <StatusPill label={item.status} tone={listingReadinessTone(item.status)} size="sm" />
                   </View>
                   <View style={styles.actions}>
                     <QueueAction icon="create-outline" label="Open" color={c.primary} onPress={() => router.push(`/inventory/${item.id}`)} />
@@ -220,7 +207,7 @@ export default function ListingQueueScreen() {
               <View key={status}>
                 <SectionHeader
                   title={`${status} listings (${grouped[status]!.length})`}
-                  trailing={<StatusPill label={status} tone={listingTone(status)} size="sm" />}
+                  trailing={<StatusPill label={status} tone={listingStatusTone(status)} size="sm" />}
                 />
                 {grouped[status]!.map((listing) => (
                   <Card key={listing.id} style={styles.listingCard}>
@@ -233,7 +220,7 @@ export default function ListingQueueScreen() {
                       </View>
                       <View style={styles.priceBlock}>
                         <Text variant="metricSmall">{formatMoney(listing.listPrice)}</Text>
-                        <StatusPill label={listing.status} tone={listingTone(listing.status)} size="sm" />
+                        <StatusPill label={listing.status} tone={listingStatusTone(listing.status)} size="sm" />
                       </View>
                     </View>
                     {listing.listingUrl ? (
