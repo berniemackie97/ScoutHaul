@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-import { getAllListings, getCategories } from "@/lib/catalog";
+import { getAllListings } from "@/lib/catalog";
 import { STORE } from "@/lib/store";
 
 // force-dynamic: the sitemap reflects the live shelf, which changes as items sell and list. A stale cached sitemap
@@ -24,7 +24,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const base = STORE.siteUrl;
   const now = new Date();
 
-  const [listings, categories] = await Promise.all([getAllListings(), getCategories()]);
+  const listings = await getAllListings();
 
   const staticEntries: MetadataRoute.Sitemap = STATIC_ROUTES.map((route) => ({
     url: `${base}${route.path}`,
@@ -33,12 +33,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: route.priority,
   }));
 
-  const categoryEntries: MetadataRoute.Sitemap = categories.map((category) => ({
-    url: `${base}/categories/${category.slug}`,
-    lastModified: now,
-    changeFrequency: "weekly",
-    priority: 0.6,
-  }));
+  // No per-category entries. /categories/{slug} is nothing but a redirect to /products?category=…,
+  // so every one of these advertised a URL that immediately sends the crawler somewhere else. The
+  // /categories index is listed above and links to them.
 
   const productEntries: MetadataRoute.Sitemap = listings.map((listing) => ({
     url: `${base}/products/${listing.slug}`,
@@ -48,5 +45,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ...(listing.image ? { images: [listing.image] } : {}),
   }));
 
-  return [...staticEntries, ...categoryEntries, ...productEntries];
+  return [...staticEntries, ...productEntries];
 }

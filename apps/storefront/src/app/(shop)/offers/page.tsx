@@ -1,6 +1,8 @@
 import { OfferWorkspace } from "@/components/store/offer-workspace";
 
-export const metadata = { title: "My offers" };
+export const metadata = { title: "My offers",
+  robots: { index: false, follow: true },
+};
 
 export default function OffersPage() {
   return (

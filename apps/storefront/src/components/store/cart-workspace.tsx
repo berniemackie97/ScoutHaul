@@ -264,7 +264,7 @@ export function CartWorkspace({ mode }: Props) {
               type="button"
               onClick={mode === "cart" ? () => window.location.assign(versionedPath("/checkout")) : checkout}
               disabled={!canCheckout || checkingOut || Boolean(embeddedCheckout)}
-              className="mt-6 flex w-full items-center justify-center gap-2 bg-copper px-6 py-3.5 text-sm font-semibold uppercase tracking-[0.12em] text-ink transition-transform hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+              className="mt-6 flex w-full items-center justify-center gap-2 bg-copper px-6 py-3.5 text-sm font-semibold uppercase tracking-[0.12em] text-background transition-transform hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {checkingOut ? (
                 <>
@@ -305,7 +305,7 @@ export function CartWorkspace({ mode }: Props) {
           <p className="mt-2 max-w-md text-sm text-slate">Browse the floor and add one-of-one finds when you are ready.</p>
           <Link
             href="/products"
-            className="mt-6 inline-flex items-center gap-2 bg-copper px-6 py-3 text-sm font-semibold uppercase tracking-[0.12em] text-ink"
+            className="mt-6 inline-flex items-center gap-2 bg-copper px-6 py-3 text-sm font-semibold uppercase tracking-[0.12em] text-background"
           >
             Shop now
             <ArrowRight className="h-4 w-4" aria-hidden />

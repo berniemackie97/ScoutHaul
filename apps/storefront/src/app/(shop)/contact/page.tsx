@@ -5,6 +5,7 @@ import { Reveal } from "@/components/ui/reveal";
 export const metadata = {
   title: "Contact",
   description: "Contact Overhaul Trading Company for order questions, local pickup, consignment, repairs, and product support.",
+  alternates: { canonical: "/contact" },
 };
 
 const contactMethods = [

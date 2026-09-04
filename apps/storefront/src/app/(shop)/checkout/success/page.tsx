@@ -5,7 +5,9 @@ import { imageUrl, money, type OrderSummary } from "@/lib/commerce";
 import { storefrontServerJson } from "@/lib/storefront-proxy";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Order confirmed" };
+export const metadata = { title: "Order confirmed",
+  robots: { index: false, follow: true },
+};
 
 export default async function CheckoutSuccessPage({
   searchParams,
@@ -28,7 +30,7 @@ export default async function CheckoutSuccessPage({
           </p>
           <Link
             href="/cart"
-            className="mt-6 inline-flex bg-copper px-6 py-3 text-sm font-semibold uppercase tracking-[0.12em] text-ink"
+            className="mt-6 inline-flex bg-copper px-6 py-3 text-sm font-semibold uppercase tracking-[0.12em] text-background"
           >
             Back to cart
           </Link>

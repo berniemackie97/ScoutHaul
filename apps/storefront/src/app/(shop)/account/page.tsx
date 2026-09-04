@@ -7,6 +7,7 @@ import { Card } from "@overhaul/ui";
 import { CustomerAuthModal } from "@/components/store/customer-auth-modal";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
+
 const accountLinks = [
   {
     name: "My Offers",
@@ -132,7 +133,7 @@ export default function AccountPage() {
           <button
             type="button"
             onClick={() => setAuthOpen(true)}
-            className="mt-6 bg-copper px-6 py-3 text-sm font-semibold uppercase tracking-[0.12em] text-ink"
+            className="mt-6 bg-copper px-6 py-3 text-sm font-semibold uppercase tracking-[0.12em] text-background"
           >
             Sign in / register
           </button>

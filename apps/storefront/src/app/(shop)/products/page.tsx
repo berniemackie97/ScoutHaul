@@ -9,6 +9,7 @@ export const dynamic = "force-dynamic";
 export const metadata = {
   title: "Shop the floor",
   description: "Quality secondhand furniture, electronics, tools and finds — each one inspected and graded straight.",
+  alternates: { canonical: "/products" },
 };
 
 function pillClass(active: boolean) {

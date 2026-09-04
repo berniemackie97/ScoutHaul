@@ -90,7 +90,7 @@ export function OfferWorkspace() {
           <button
             type="button"
             onClick={() => setAuthOpen(true)}
-            className="mt-5 inline-flex items-center gap-2 bg-copper px-5 py-3 text-sm font-semibold uppercase tracking-[0.12em] text-ink"
+            className="mt-5 inline-flex items-center gap-2 bg-copper px-5 py-3 text-sm font-semibold uppercase tracking-[0.12em] text-background"
           >
             Sign in / register <ArrowRight className="h-4 w-4" aria-hidden />
           </button>
@@ -139,7 +139,7 @@ export function OfferWorkspace() {
                   type="button"
                   onClick={() => addOfferToCart(offer)}
                   disabled={busyOfferId === offer.id}
-                  className="mt-5 inline-flex items-center gap-2 bg-copper px-5 py-3 text-sm font-semibold uppercase tracking-[0.12em] text-ink disabled:opacity-60"
+                  className="mt-5 inline-flex items-center gap-2 bg-copper px-5 py-3 text-sm font-semibold uppercase tracking-[0.12em] text-background disabled:opacity-60"
                 >
                   {busyOfferId === offer.id ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
                   Checkout this offer

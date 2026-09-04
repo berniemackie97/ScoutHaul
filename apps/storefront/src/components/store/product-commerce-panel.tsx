@@ -138,7 +138,7 @@ export function ProductCommercePanel({
             type="button"
             onClick={addToCart}
             disabled={adding || checkingOut}
-            className="group flex-1 bg-copper px-6 py-3.5 text-sm font-semibold uppercase tracking-[0.12em] text-ink transition-transform duration-300 hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+            className="group flex-1 bg-copper px-6 py-3.5 text-sm font-semibold uppercase tracking-[0.12em] text-background transition-transform duration-300 hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {adding ? <Spinner label="Adding" /> : "Add to cart"}
           </button>
@@ -212,7 +212,7 @@ export function ProductCommercePanel({
           <button
             type="submit"
             disabled={offerSending}
-            className="w-full bg-ink px-6 py-3 text-sm font-semibold uppercase tracking-[0.12em] text-background transition-colors hover:bg-copper hover:text-ink disabled:cursor-not-allowed disabled:opacity-60"
+            className="w-full bg-ink px-6 py-3 text-sm font-semibold uppercase tracking-[0.12em] text-background transition-colors hover:bg-copper hover:text-background disabled:cursor-not-allowed disabled:opacity-60"
           >
             {offerSending ? <Spinner label="Sending" /> : "Submit offer"}
           </button>

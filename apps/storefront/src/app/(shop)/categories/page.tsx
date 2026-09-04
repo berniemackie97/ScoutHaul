@@ -8,6 +8,7 @@ export const dynamic = "force-dynamic";
 export const metadata = {
   title: "Categories",
   description: "Browse the floor by department — furniture, electronics, collectibles, tools and more.",
+  alternates: { canonical: "/categories" },
 };
 
 export default async function CategoriesPage() {

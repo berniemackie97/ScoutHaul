@@ -26,7 +26,7 @@ export function ShopMessage({
         {action}
         <Link
           href="/products"
-          className="border border-rule px-5 py-2 font-mono text-[12px] uppercase tracking-[0.16em] transition hover:bg-ink hover:text-paper"
+          className="border border-rule px-5 py-2 font-mono text-[12px] uppercase tracking-[0.16em] transition hover:bg-ink hover:text-background"
         >
           Browse the shop
         </Link>

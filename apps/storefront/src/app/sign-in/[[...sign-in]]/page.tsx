@@ -5,6 +5,7 @@ import { useState, type FormEvent } from "react";
 import { ArrowRight, Loader2 } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
+
 const inputClass =
   "mt-2 w-full border border-rule bg-background px-4 py-3 text-base text-ink outline-none transition-colors focus:border-copper";
 
@@ -102,7 +103,7 @@ export default function Page() {
           <button
             type="submit"
             disabled={loading}
-            className="flex w-full items-center justify-center gap-2 bg-copper px-6 py-3 text-sm font-semibold uppercase tracking-[0.12em] text-ink disabled:opacity-60"
+            className="flex w-full items-center justify-center gap-2 bg-copper px-6 py-3 text-sm font-semibold uppercase tracking-[0.12em] text-background disabled:opacity-60"
           >
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
             Email me a code <ArrowRight className="h-4 w-4" aria-hidden />
@@ -128,7 +129,7 @@ export default function Page() {
           <button
             type="submit"
             disabled={loading}
-            className="flex w-full items-center justify-center gap-2 bg-copper px-6 py-3 text-sm font-semibold uppercase tracking-[0.12em] text-ink disabled:opacity-60"
+            className="flex w-full items-center justify-center gap-2 bg-copper px-6 py-3 text-sm font-semibold uppercase tracking-[0.12em] text-background disabled:opacity-60"
           >
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
             Verify and continue

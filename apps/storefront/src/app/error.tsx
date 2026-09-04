@@ -24,7 +24,7 @@ export default function RootError({
       <div className="mt-8">
         <button
           onClick={reset}
-          className="bg-ink px-5 py-2 font-mono text-[12px] uppercase tracking-[0.16em] text-paper transition hover:opacity-90"
+          className="bg-ink px-5 py-2 font-mono text-[12px] uppercase tracking-[0.16em] text-background transition hover:opacity-90"
         >
           Try again
         </button>

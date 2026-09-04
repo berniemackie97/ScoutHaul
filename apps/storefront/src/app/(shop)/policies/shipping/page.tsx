@@ -5,6 +5,7 @@ import { Reveal } from "@/components/ui/reveal";
 export const metadata = {
   title: "Shipping & returns",
   description: "Shipping, pickup, returns, and condition guarantee policies for Overhaul Trading Company orders.",
+  alternates: { canonical: "/policies/shipping" },
 };
 
 const policies = [

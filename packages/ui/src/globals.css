@@ -31,12 +31,14 @@
 
     --border: 38 20% 84%;           /* warm rule */
     --input: 38 20% 84%;
-    --ring: 30 59% 45%;             /* copper focus */
+    --ring: 30 59% 38%;             /* copper focus — follows --copper */
     --radius: 0.25rem;              /* tight, editorial */
 
     /* Brand + system tokens */
-    --copper: 30 59% 45%;
-    --copper-bright: 30 62% 52%;
+    /* 38%, not 45%. At 45% copper measured 3.55:1 on paper — under the 4.5:1 WCAG AA needs for
+       normal text — and it is both the site's accent and the fill of the Add to cart button, so the
+       button's own label failed too. 38% measures 4.73:1 in both directions. */
+    --copper: 30 59% 38%;
     --ink: 209 64% 13%;
     --paper: 40 36% 96%;
 
@@ -75,7 +77,6 @@
     --ring: 30 60% 52%;
 
     --copper: 30 62% 54%;
-    --copper-bright: 30 66% 60%;
     --ink: 209 64% 13%;
     --paper: 209 52% 8%;
     --shadow-sm: 0 1px 2px hsl(0 0% 0% / 0.4);
