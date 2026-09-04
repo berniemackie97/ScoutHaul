@@ -121,7 +121,7 @@ public class ChannelListingTests
     {
         (_, ChannelListingsController controller, _, Guid item, _) = Setup();
         ActionResult<ChannelListingDto> result = await controller.Upsert(item, Req(Guid.NewGuid(), ChannelListingStatus.Active), default);
-        Assert.IsType<BadRequestObjectResult>(result.Result);
+        ProblemAssert.Invalid(result.Result);
     }
 
     [Fact]

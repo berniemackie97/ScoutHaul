@@ -58,7 +58,7 @@ public class ChannelAccountTests
     {
         (_, ChannelAccountsController controller, _) = NewController();
         ActionResult<ChannelAccountDto> result = await controller.Create(Request("MySpaceMarket", "Nope"), default);
-        Assert.IsType<BadRequestObjectResult>(result.Result);
+        ProblemAssert.Invalid(result.Result);
     }
 
     [Fact]
@@ -68,7 +68,7 @@ public class ChannelAccountTests
         await controller.Create(Request("eBay", "Main Store"), default);
 
         ActionResult<ChannelAccountDto> duplicate = await controller.Create(Request("Poshmark", "Main Store"), default);
-        Assert.IsType<ConflictObjectResult>(duplicate.Result);
+        ProblemAssert.Blocked(duplicate.Result);
     }
 
     [Fact]
@@ -89,7 +89,7 @@ public class ChannelAccountTests
         });
         await db.SaveChangesAsync();
 
-        Assert.IsType<ConflictObjectResult>(await controller.Delete(used.Id, default));
+        ProblemAssert.Blocked(await controller.Delete(used.Id, default));
         Assert.IsType<NoContentResult>(await controller.Delete(empty.Id, default));
     }
 }

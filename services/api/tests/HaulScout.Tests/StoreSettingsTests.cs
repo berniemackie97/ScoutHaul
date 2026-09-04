@@ -90,7 +90,7 @@ public class StoreSettingsTests
         ActionResult<StoreSettingsDto> result = await controller.Update(
             new UpdateStoreSettingsRequest("Overhaul Trading Company", input), CancellationToken.None);
 
-        Assert.IsType<BadRequestObjectResult>(result.Result);
+        ProblemAssert.Invalid(result.Result);
     }
 
     [Fact]
@@ -105,7 +105,7 @@ public class StoreSettingsTests
         ActionResult<StoreSettingsDto> result = await controller.Update(
             new UpdateStoreSettingsRequest("Overhaul Trading Company", "overhaultrading.com"), CancellationToken.None);
 
-        Assert.IsType<ConflictObjectResult>(result.Result);
+        ProblemAssert.Blocked(result.Result);
     }
 
     [Fact]
@@ -136,6 +136,6 @@ public class StoreSettingsTests
         ActionResult<StoreSettingsDto> result = await controller.Update(
             new UpdateStoreSettingsRequest("  ", "overhaultrading.com"), CancellationToken.None);
 
-        Assert.IsType<BadRequestObjectResult>(result.Result);
+        ProblemAssert.Invalid(result.Result);
     }
 }

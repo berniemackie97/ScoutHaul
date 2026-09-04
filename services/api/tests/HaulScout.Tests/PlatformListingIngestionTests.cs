@@ -225,7 +225,7 @@ public class PlatformListingIngestionTests
         PlatformListing listing = await db.PlatformListings.SingleAsync();
 
         ActionResult<PlatformListingReconcileResultDto> result = await controller.Reconcile(listing.Id, new ReconcilePlatformListingRequest(), CancellationToken.None);
-        Assert.IsType<BadRequestObjectResult>(result.Result);
+        ProblemAssert.Invalid(result.Result);
     }
 
     [Fact]

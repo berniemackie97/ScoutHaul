@@ -12,7 +12,7 @@ namespace HaulScout.Api.Controllers;
 [RequireOrganizationPermission(HaulScoutPermissions.ManageInventory)]
 public sealed class VisionController(
     IVisionIdentificationService visionService,
-    IRemoteImageFetcher remoteImageFetcher) : ControllerBase
+    IRemoteImageFetcher remoteImageFetcher) : HaulScoutControllerBase
 {
     /// <summary>
     /// Identify a product from a photo, typed facts, or both. Returns a specific product name,
@@ -30,19 +30,19 @@ public sealed class VisionController(
     {
         if (!visionService.IsConfigured)
         {
-            return StatusCode(503, new { title = "Vision service not configured", detail = "Gemini API key (Gemini__ApiKey) is not set." });
+            return Unavailable("Gemini API key (Gemini__ApiKey) is not set.", "vision_not_configured");
         }
 
         if (string.IsNullOrWhiteSpace(request.ImageBase64)
             && string.IsNullOrWhiteSpace(request.ImageUrl)
             && string.IsNullOrWhiteSpace(request.Context))
         {
-            return BadRequest(new { title = "Input required", detail = "Provide imageBase64, imageUrl, or typed item details in context." });
+            return Invalid("Provide imageBase64, imageUrl, or typed item details in context.", "input_required");
         }
 
         if (request.Context?.Length > 4_000)
         {
-            return BadRequest(new { title = "Typed details too long", detail = "Keep item details under 4,000 characters." });
+            return Invalid("Keep item details under 4,000 characters.", "context_too_long");
         }
 
         string? imageBase64 = string.IsNullOrWhiteSpace(request.ImageBase64) ? null : request.ImageBase64;
@@ -64,7 +64,7 @@ public sealed class VisionController(
             }
             catch (RemoteImageFetchException ex)
             {
-                return BadRequest(new { title = "Image download failed", detail = ex.Message });
+                return Invalid(ex.Message, "image_download_failed");
             }
         }
 
@@ -93,7 +93,7 @@ public sealed class VisionController(
                 "upstream_unavailable" => StatusCodes.Status503ServiceUnavailable,
                 _ => StatusCodes.Status502BadGateway,
             };
-            return StatusCode(status, new { code = ex.Code, title = "AI vision unavailable", detail = ex.Message });
+            return Refused(status, "AI vision unavailable", ex.Message, ex.Code);
         }
     }
 }

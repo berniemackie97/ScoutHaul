@@ -78,7 +78,7 @@ public class ReturnLifecycleTests
 
         // A refund cannot be issued before the item is received back.
         ActionResult<ReturnDto> early = await sales.ResolveReturn(rma.Id, new ResolveReturnRequest(100m), CancellationToken.None);
-        Assert.IsType<ConflictObjectResult>(early.Result);
+        ProblemAssert.Blocked(early.Result);
 
         Assert.Equal(ReturnStatus.Received, (await sales.ReceiveReturn(rma.Id, CancellationToken.None)).Value!.Status);
 
@@ -126,6 +126,6 @@ public class ReturnLifecycleTests
         await sales.OpenReturn(saleId, new OpenReturnRequest("First"), CancellationToken.None);
         ActionResult<ReturnDto> second = await sales.OpenReturn(saleId, new OpenReturnRequest("Second"), CancellationToken.None);
 
-        Assert.IsType<ConflictObjectResult>(second.Result);
+        ProblemAssert.Blocked(second.Result);
     }
 }

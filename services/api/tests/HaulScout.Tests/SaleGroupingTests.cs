@@ -139,6 +139,6 @@ public class SaleGroupingTests
         SalesController controller = SalesControllerFactory.Create(db, new StubCurrentUser(org, user));
 
         ActionResult<SaleGroupResultDto> result = await controller.GroupIntoOrder(new GroupSalesRequest([a.Id], null), CancellationToken.None);
-        Assert.IsType<BadRequestObjectResult>(result.Result);
+        ProblemAssert.Invalid(result.Result);
     }
 }

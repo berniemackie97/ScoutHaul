@@ -80,11 +80,7 @@ public sealed class SalesController(
     public async Task<ActionResult<SaleDto>> Record(RecordSaleRequest request, CancellationToken cancellationToken)
     {
         AppResult<SaleDto> result = await recording.RecordAsync(request, cancellationToken);
-        return result.Status switch
-        {
-            AppResultStatus.Ok when result.Value is not null => CreatedAtAction(nameof(GetProfit), new { id = result.Value.Id }, result.Value),
-            _ => ToActionResult(result),
-        };
+        return ToActionResult(result, value => CreatedAtAction(nameof(GetProfit), new { id = value.Id }, value));
     }
 
     /// <summary>Record one bundled order covering several items — one package, one tracking. Creates a linked
@@ -99,15 +95,7 @@ public sealed class SalesController(
     [RequireOrganizationPermission(HaulScoutPermissions.ManageFinance)]
     public async Task<ActionResult> Delete(Guid id, CancellationToken cancellationToken)
     {
-        AppResult result = await deletion.DeleteAsync(id, cancellationToken);
-        return result.Status switch
-        {
-            AppResultStatus.Ok => NoContent(),
-            // A message-less NotFound stays a bare 404 — adding a null body would change the response shape.
-            AppResultStatus.NotFound => result.Message is null ? NotFound() : NotFound(result.Message),
-            AppResultStatus.Conflict => Conflict(result.Message),
-            _ => BadRequest(result.Message),
-        };
+        return ToActionResult(await deletion.DeleteAsync(id, cancellationToken));
     }
 
     // ── Grouping ───────────────────────────────────────────────────────────

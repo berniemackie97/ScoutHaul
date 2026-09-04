@@ -13,7 +13,7 @@ namespace HaulScout.Api.Controllers;
 [RequireOrganizationPermission(HaulScoutPermissions.ManageOrders)]
 public sealed class StorefrontOfferAdminController(
     ICurrentUserContext currentUser,
-    StorefrontOfferWorkflowService offers) : ControllerBase
+    StorefrontOfferWorkflowService offers) : HaulScoutControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<StorefrontOfferDto>>> List(
@@ -35,13 +35,6 @@ public sealed class StorefrontOfferAdminController(
             request,
             cancellationToken);
 
-        return result.Status switch
-        {
-            AppResultStatus.Ok when result.Value is not null => result.Value,
-            AppResultStatus.NotFound => NotFound(result.Message),
-            AppResultStatus.Conflict => Conflict(result.Message),
-            AppResultStatus.Validation => BadRequest(result.Message),
-            _ => BadRequest(result.Message),
-        };
+        return ToActionResult(result);
     }
 }

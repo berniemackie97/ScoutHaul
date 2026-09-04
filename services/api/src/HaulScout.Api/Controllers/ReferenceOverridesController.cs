@@ -10,7 +10,7 @@ namespace HaulScout.Api.Controllers;
 [ApiController]
 [Route("api/reference-overrides")]
 [RequireOrganizationPermission(HaulScoutPermissions.ManageInventory)]
-public sealed class ReferenceOverridesController(ReferenceOverrideWorkflowService overrides) : ControllerBase
+public sealed class ReferenceOverridesController(ReferenceOverrideWorkflowService overrides) : HaulScoutControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<OrgReferenceOverrideDto>>> List(CancellationToken cancellationToken) =>
@@ -21,26 +21,13 @@ public sealed class ReferenceOverridesController(ReferenceOverrideWorkflowServic
     public async Task<ActionResult<OrgReferenceOverrideDto>> Upsert(UpsertReferenceOverrideRequest request, CancellationToken cancellationToken)
     {
         AppResult<OrgReferenceOverrideDto> result = await overrides.UpsertAsync(request, cancellationToken);
-        return result.Status switch
-        {
-            AppResultStatus.Ok when result.Value is not null => result.Value,
-            AppResultStatus.NotFound => NotFound(result.Message),
-            AppResultStatus.Conflict => Conflict(result.Message),
-            _ => BadRequest(result.Message),
-        };
+        return ToActionResult(result);
     }
 
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
     {
         AppResult result = await overrides.DeleteAsync(id, cancellationToken);
-        return result.Status switch
-        {
-            AppResultStatus.Ok => NoContent(),
-            // A message-less NotFound stays a bare 404 — adding a null body would change the response shape.
-            AppResultStatus.NotFound => result.Message is null ? NotFound() : NotFound(result.Message),
-            AppResultStatus.Conflict => Conflict(result.Message),
-            _ => BadRequest(result.Message),
-        };
+        return ToActionResult(result);
     }
 }

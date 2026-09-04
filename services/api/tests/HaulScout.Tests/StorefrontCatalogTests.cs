@@ -129,6 +129,6 @@ public class StorefrontCatalogTests
 
         ActionResult<StorefrontPageDto<StorefrontListingDto>> result = await controller.Browse(category: null, search: null, page: 1, pageSize: 24);
 
-        Assert.IsType<BadRequestObjectResult>(result.Result);
+        ProblemAssert.Invalid(result.Result);
     }
 }

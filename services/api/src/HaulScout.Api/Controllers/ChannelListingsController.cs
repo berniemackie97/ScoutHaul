@@ -15,14 +15,14 @@ namespace HaulScout.Api.Controllers;
 [ApiController]
 [Route("api/inventory/{itemId:guid}/channel-listings")]
 [RequireOrganizationPermission(HaulScoutPermissions.ManageListings)]
-public sealed class ChannelListingsController(HaulScoutDbContext db, ICurrentUserContext currentUser) : ControllerBase
+public sealed class ChannelListingsController(HaulScoutDbContext db, ICurrentUserContext currentUser) : HaulScoutControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<ChannelListingDto>>> List(Guid itemId, CancellationToken cancellationToken)
     {
         if (!await ItemExists(itemId, cancellationToken))
         {
-            return NotFound();
+            return Missing();
         }
 
         List<ChannelListing> listings = await Query(itemId)
@@ -38,7 +38,7 @@ public sealed class ChannelListingsController(HaulScoutDbContext db, ICurrentUse
     {
         if (!await ItemExists(itemId, cancellationToken))
         {
-            return NotFound("Inventory item not found.");
+            return Missing("Inventory item not found.");
         }
 
         bool accountValid = await db.ChannelAccounts.AnyAsync(
@@ -46,7 +46,7 @@ public sealed class ChannelListingsController(HaulScoutDbContext db, ICurrentUse
             cancellationToken);
         if (!accountValid)
         {
-            return BadRequest("Channel account not found.");
+            return Invalid("Channel account not found.");
         }
 
         ChannelListing? listing = await Query(itemId).SingleOrDefaultAsync(item => item.ChannelAccountId == request.ChannelAccountId, cancellationToken);
@@ -118,7 +118,7 @@ public sealed class ChannelListingsController(HaulScoutDbContext db, ICurrentUse
             cancellationToken);
         if (listing is null)
         {
-            return NotFound();
+            return Missing();
         }
 
         db.ChannelListings.Remove(listing);

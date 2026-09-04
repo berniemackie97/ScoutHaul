@@ -19,7 +19,7 @@ public sealed class MarketAnalysisController(
     HaulScoutDbContext db,
     ICurrentUserContext currentUser,
     IConfidenceScorer confidenceScorer,
-    IDealAnalyzer dealAnalyzer) : ControllerBase
+    IDealAnalyzer dealAnalyzer) : HaulScoutControllerBase
 {
     [HttpPost("calculate")]
     public async Task<ActionResult<MarketAnalysisResponse>> Calculate(MarketAnalysisRequest request, CancellationToken cancellationToken)
@@ -33,7 +33,7 @@ public sealed class MarketAnalysisController(
 
             if (product is null)
             {
-                return NotFound("Product identity was not found.");
+                return Missing("Product identity was not found.");
             }
         }
 
@@ -46,12 +46,12 @@ public sealed class MarketAnalysisController(
 
             if (item is null)
             {
-                return NotFound("Inventory item was not found.");
+                return Missing("Inventory item was not found.");
             }
 
             if (product is not null && item.ProductIdentityId.HasValue && item.ProductIdentityId != product.Id)
             {
-                return BadRequest("Inventory item does not belong to the supplied product identity.");
+                return Invalid("Inventory item does not belong to the supplied product identity.");
             }
         }
 

@@ -25,7 +25,7 @@ namespace HaulScout.Api.Controllers;
 [ApiController]
 [Route("api/platform-listings")]
 [RequireOrganizationPermission(HaulScoutPermissions.ManageListings)]
-public sealed class PlatformListingsController(HaulScoutDbContext db, ICurrentUserContext currentUser) : ControllerBase
+public sealed class PlatformListingsController(HaulScoutDbContext db, ICurrentUserContext currentUser) : HaulScoutControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<PlatformListingDto>>> List(
@@ -78,13 +78,13 @@ public sealed class PlatformListingsController(HaulScoutDbContext db, ICurrentUs
     {
         if (string.IsNullOrWhiteSpace(request.Csv))
         {
-            return BadRequest("Paste or upload the eBay Active Listings CSV.");
+            return Invalid("Paste or upload the eBay Active Listings CSV.");
         }
 
         EbayActiveListingsParser.ParseResult parsed = EbayActiveListingsParser.Parse(request.Csv);
         if (parsed.Listings.Count == 0)
         {
-            return BadRequest(parsed.Warning ?? "No active-listing rows were found in the report.");
+            return Invalid(parsed.Warning ?? "No active-listing rows were found in the report.");
         }
 
         return await Ingest(
@@ -101,7 +101,7 @@ public sealed class PlatformListingsController(HaulScoutDbContext db, ICurrentUs
     {
         if (string.IsNullOrWhiteSpace(request.ContentBase64))
         {
-            return BadRequest("Choose the eBay Listing Quality workbook (.xlsx).");
+            return Invalid("Choose the eBay Listing Quality workbook (.xlsx).");
         }
 
         byte[] workbookBytes;
@@ -111,13 +111,13 @@ public sealed class PlatformListingsController(HaulScoutDbContext db, ICurrentUs
         }
         catch (FormatException)
         {
-            return BadRequest("The Listing Quality workbook payload was not valid base64.");
+            return Invalid("The Listing Quality workbook payload was not valid base64.");
         }
 
         EbayListingQualityWorkbookParser.ParseResult parsed = EbayListingQualityWorkbookParser.Parse(workbookBytes, DateTimeOffset.UtcNow);
         if (parsed.Rows.Count == 0)
         {
-            return BadRequest(parsed.Warnings.FirstOrDefault() ?? "No listing-level recommendations were found in the eBay Listing Quality workbook.");
+            return Invalid(parsed.Warnings.FirstOrDefault() ?? "No listing-level recommendations were found in the eBay Listing Quality workbook.");
         }
 
         List<string> existingChannels = await ExistingChannels(cancellationToken);
@@ -196,7 +196,7 @@ public sealed class PlatformListingsController(HaulScoutDbContext db, ICurrentUs
     {
         if (request.Listings is null || request.Listings.Count == 0)
         {
-            return BadRequest("No listings were supplied.");
+            return Invalid("No listings were supplied.");
         }
 
         List<string> existingChannels = await ExistingChannels(cancellationToken);
@@ -209,7 +209,7 @@ public sealed class PlatformListingsController(HaulScoutDbContext db, ICurrentUs
                 account => account.Id == request.ChannelAccountId.Value && account.OrganizationId == currentUser.OrganizationId, cancellationToken);
             if (!accountExists)
             {
-                return NotFound("Channel account was not found.");
+                return Missing("Channel account was not found.");
             }
             channelAccountId = request.ChannelAccountId;
         }
@@ -220,20 +220,20 @@ public sealed class PlatformListingsController(HaulScoutDbContext db, ICurrentUs
             string externalId = (input.ExternalListingId ?? string.Empty).Trim();
             if (externalId.Length == 0)
             {
-                return BadRequest("Every listing needs an external listing id.");
+                return Invalid("Every listing needs an external listing id.");
             }
             if (string.IsNullOrWhiteSpace(input.Title))
             {
-                return BadRequest($"Listing {externalId} has no title.");
+                return Invalid($"Listing {externalId} has no title.");
             }
             string? channel = SalesChannelCatalog.CanonicalValue(input.Platform, existingChannels) ?? defaultChannel;
             if (channel is null)
             {
-                return BadRequest($"Listing {externalId} has no recognized sales channel.");
+                return Invalid($"Listing {externalId} has no recognized sales channel.");
             }
             if (input.Price < 0 || input.Quantity < 0)
             {
-                return BadRequest($"Listing {externalId} has negative price or quantity.");
+                return Invalid($"Listing {externalId} has negative price or quantity.");
             }
             normalized.Add((input, channel, externalId));
         }
@@ -295,12 +295,12 @@ public sealed class PlatformListingsController(HaulScoutDbContext db, ICurrentUs
             .SingleOrDefaultAsync(item => item.Id == id && item.OrganizationId == currentUser.OrganizationId, cancellationToken);
         if (listing is null)
         {
-            return NotFound();
+            return Missing();
         }
 
         if (request.InventoryItemId is null && !request.CreateNewItem)
         {
-            return BadRequest("Choose an inventory item to link, or create a new one.");
+            return Invalid("Choose an inventory item to link, or create a new one.");
         }
 
         bool createdItem = false;
@@ -310,7 +310,7 @@ public sealed class PlatformListingsController(HaulScoutDbContext db, ICurrentUs
             item = await db.InventoryItems.SingleOrDefaultAsync(candidate => candidate.Id == targetId && candidate.OrganizationId == currentUser.OrganizationId, cancellationToken);
             if (item is null)
             {
-                return NotFound("The inventory item to link was not found.");
+                return Missing("The inventory item to link was not found.");
             }
         }
         else
@@ -413,7 +413,7 @@ public sealed class PlatformListingsController(HaulScoutDbContext db, ICurrentUs
             .SingleOrDefaultAsync(item => item.Id == id && item.OrganizationId == currentUser.OrganizationId, cancellationToken);
         if (listing is null)
         {
-            return NotFound();
+            return Missing();
         }
 
         if (listing.CreatedChannelListingOnReconcile && listing.ReconciledChannelListingId is Guid channelListingId)
@@ -446,7 +446,7 @@ public sealed class PlatformListingsController(HaulScoutDbContext db, ICurrentUs
             .SingleOrDefaultAsync(item => item.Id == id && item.OrganizationId == currentUser.OrganizationId, cancellationToken);
         if (listing is null)
         {
-            return NotFound();
+            return Missing();
         }
 
         listing.ReconcileStatus = PlatformListingReconcileStatus.Ignored;

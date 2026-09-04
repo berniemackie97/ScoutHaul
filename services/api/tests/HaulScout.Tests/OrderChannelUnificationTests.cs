@@ -213,7 +213,7 @@ public class OrderChannelUnificationTests
 
         IActionResult result = await NewOrders(db, org, user).Delete(Guid.NewGuid(), CancellationToken.None);
 
-        Assert.IsType<NotFoundResult>(result);
+        ProblemAssert.Missing(result);
     }
 
     [Fact]
@@ -411,7 +411,7 @@ public class OrderChannelUnificationTests
         ActionResult<OrderDetailDto> result = await NewOrders(db, org, user).Merge(
             new MergeOrdersRequest(ids), CancellationToken.None);
 
-        Assert.IsType<BadRequestObjectResult>(result.Result);
+        ProblemAssert.Invalid(result.Result);
         Assert.Equal(2, await db.Orders.CountAsync()); // nothing merged
     }
 

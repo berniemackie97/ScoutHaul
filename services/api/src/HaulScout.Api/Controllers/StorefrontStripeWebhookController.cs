@@ -15,7 +15,7 @@ namespace HaulScout.Api.Controllers;
 public sealed class StorefrontStripeWebhookController(
     IPaymentGateway payments,
     StorefrontOrderService orders,
-    ILogger<StorefrontStripeWebhookController> logger) : ControllerBase
+    ILogger<StorefrontStripeWebhookController> logger) : HaulScoutControllerBase
 {
     [HttpPost("webhook")]
     public async Task<IActionResult> Handle(CancellationToken cancellationToken)
@@ -32,7 +32,7 @@ public sealed class StorefrontStripeWebhookController(
         catch (PaymentEventVerificationException exception)
         {
             logger.LogWarning(exception, "Rejected a webhook whose signature did not verify.");
-            return BadRequest();
+            return Invalid("The webhook signature could not be verified.", "invalid_signature");
         }
         catch (PaymentGatewayNotConfiguredException exception)
         {

@@ -15,7 +15,7 @@ namespace HaulScout.Api.Controllers;
 [ApiController]
 [Route("api/market-observations")]
 [RequireOrganizationPermission(HaulScoutPermissions.ManageInventory)]
-public sealed class MarketObservationsController(HaulScoutDbContext db, ICurrentUserContext currentUser) : ControllerBase
+public sealed class MarketObservationsController(HaulScoutDbContext db, ICurrentUserContext currentUser) : HaulScoutControllerBase
 {
     [HttpPost]
     public async Task<ActionResult<MarketObservationDto>> Add(UpsertMarketObservationRequest request, CancellationToken cancellationToken)
@@ -23,12 +23,12 @@ public sealed class MarketObservationsController(HaulScoutDbContext db, ICurrent
         string? validation = Validate(request);
         if (validation is not null)
         {
-            return BadRequest(validation);
+            return Invalid(validation);
         }
 
         if (!await ReferencesBelongToOrganization(request, cancellationToken))
         {
-            return BadRequest("Referenced product identity or inventory item was not found for the current organization.");
+            return Invalid("Referenced product identity or inventory item was not found for the current organization.");
         }
 
         MarketObservation observation = new()
@@ -59,18 +59,18 @@ public sealed class MarketObservationsController(HaulScoutDbContext db, ICurrent
 
         if (observation is null)
         {
-            return NotFound();
+            return Missing();
         }
 
         string? validation = Validate(request);
         if (validation is not null)
         {
-            return BadRequest(validation);
+            return Invalid(validation);
         }
 
         if (!await ReferencesBelongToOrganization(request, cancellationToken))
         {
-            return BadRequest("Referenced product identity or inventory item was not found for the current organization.");
+            return Invalid("Referenced product identity or inventory item was not found for the current organization.");
         }
 
         Apply(request, observation);
@@ -88,7 +88,7 @@ public sealed class MarketObservationsController(HaulScoutDbContext db, ICurrent
 
         if (observation is null)
         {
-            return NotFound();
+            return Missing();
         }
 
         observation.IsArchived = true;

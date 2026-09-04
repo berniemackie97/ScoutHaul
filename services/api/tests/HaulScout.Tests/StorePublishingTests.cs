@@ -95,8 +95,8 @@ public class StorePublishingTests
 
         ActionResult<StoreListingDto> result = await controller.Publish(Publish(item.Id, 120m), CancellationToken.None);
 
-        BadRequestObjectResult refused = Assert.IsType<BadRequestObjectResult>(result.Result);
-        Assert.Contains("photo", refused.Value!.ToString(), StringComparison.OrdinalIgnoreCase);
+        ProblemDetails refused = ProblemAssert.Invalid(result.Result);
+        Assert.Contains("photo", refused.Detail!, StringComparison.OrdinalIgnoreCase);
         Assert.False(await db.StoreListings.AnyAsync(l => l.InventoryItemId == item.Id));
     }
 

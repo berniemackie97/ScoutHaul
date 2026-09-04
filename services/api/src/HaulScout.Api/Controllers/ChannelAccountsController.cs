@@ -37,15 +37,7 @@ public sealed class ChannelAccountsController(IChannelAccountService channels, I
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
     {
-        AppResult result = await channels.DeleteAsync(currentUser.OrganizationId, id, cancellationToken);
-        return result.Status switch
-        {
-            AppResultStatus.Ok => NoContent(),
-            AppResultStatus.NotFound => NotFound(),
-            AppResultStatus.Conflict => Conflict(result.Message),
-            AppResultStatus.Validation => BadRequest(result.Message),
-            _ => BadRequest(result.Message),
-        };
+        return ToActionResult(await channels.DeleteAsync(currentUser.OrganizationId, id, cancellationToken));
     }
 
 }

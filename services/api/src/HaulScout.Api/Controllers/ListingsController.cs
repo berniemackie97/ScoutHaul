@@ -15,7 +15,7 @@ namespace HaulScout.Api.Controllers;
 [ApiController]
 [Route("api/listings")]
 [RequireOrganizationPermission(HaulScoutPermissions.ManageListings)]
-public sealed class ListingsController(HaulScoutDbContext db, ICurrentUserContext currentUser) : ControllerBase
+public sealed class ListingsController(HaulScoutDbContext db, ICurrentUserContext currentUser) : HaulScoutControllerBase
 {
     [HttpPost]
     public async Task<ActionResult<ListingDto>> Create(CreateListingRequest request, CancellationToken cancellationToken)
@@ -26,12 +26,12 @@ public sealed class ListingsController(HaulScoutDbContext db, ICurrentUserContex
 
         if (item is null)
         {
-            return NotFound("Inventory item was not found.");
+            return Missing("Inventory item was not found.");
         }
 
         if (string.IsNullOrWhiteSpace(request.Platform) || request.ListPrice <= 0)
         {
-            return BadRequest("Platform and positive list price are required.");
+            return Invalid("Platform and positive list price are required.");
         }
 
         Listing listing = new()
@@ -58,12 +58,12 @@ public sealed class ListingsController(HaulScoutDbContext db, ICurrentUserContex
         Listing? listing = await FindListing(id, cancellationToken);
         if (listing is null)
         {
-            return NotFound();
+            return Missing();
         }
 
         if (string.IsNullOrWhiteSpace(request.Platform) || request.ListPrice <= 0)
         {
-            return BadRequest("Platform and positive list price are required.");
+            return Invalid("Platform and positive list price are required.");
         }
 
         listing.Platform = request.Platform.Trim();
@@ -112,7 +112,7 @@ public sealed class ListingsController(HaulScoutDbContext db, ICurrentUserContex
 
         if (listing is null)
         {
-            return NotFound();
+            return Missing();
         }
 
         DateTimeOffset now = DateTimeOffset.UtcNow;
@@ -130,7 +130,7 @@ public sealed class ListingsController(HaulScoutDbContext db, ICurrentUserContex
         Listing? listing = await FindListing(id, cancellationToken);
         if (listing is null)
         {
-            return NotFound();
+            return Missing();
         }
 
         db.Listings.Remove(listing);

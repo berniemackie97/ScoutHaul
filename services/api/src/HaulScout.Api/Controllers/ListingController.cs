@@ -9,7 +9,7 @@ namespace HaulScout.Api.Controllers;
 [ApiController]
 [Route("api/listing")]
 [RequireOrganizationPermission(HaulScoutPermissions.ManageInventory)]
-public sealed class ListingController(IListingGenerationService listingService) : ControllerBase
+public sealed class ListingController(IListingGenerationService listingService) : HaulScoutControllerBase
 {
     /// <summary>
     /// Generate a ready-to-post marketplace listing — an optimized title, an honest description, and a
@@ -25,7 +25,7 @@ public sealed class ListingController(IListingGenerationService listingService) 
 
         if (string.IsNullOrWhiteSpace(request.Title))
         {
-            return BadRequest(new { title = "Title required", detail = "Provide at least the item title/name to generate a listing." });
+            return Invalid("Provide at least the item title/name to generate a listing.", "title_required");
         }
 
         GeneratedListingDto? result = await listingService.GenerateAsync(request, cancellationToken);
