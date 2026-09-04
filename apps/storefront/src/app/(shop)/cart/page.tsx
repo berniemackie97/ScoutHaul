@@ -1,6 +1,8 @@
 import { CartWorkspace } from "@/components/store/cart-workspace";
 
-export const metadata = { title: "Cart" };
+export const metadata = { title: "Cart",
+  robots: { index: false, follow: true },
+};
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 

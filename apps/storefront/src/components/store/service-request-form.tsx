@@ -155,7 +155,7 @@ export function ServiceRequestForm({ kind }: { kind: Kind }) {
           <li key={label} className="flex flex-1 items-center gap-2">
             <span
               className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full font-mono text-xs transition-colors ${
-                index < step ? "bg-copper text-ink" : index === step ? "bg-ink text-background" : "border border-rule text-slate/60"
+                index < step ? "bg-copper text-background" : index === step ? "bg-ink text-background" : "border border-rule text-slate/60"
               }`}
             >
               {index < step ? <Check className="h-3.5 w-3.5" aria-hidden /> : index + 1}
@@ -236,7 +236,7 @@ export function ServiceRequestForm({ kind }: { kind: Kind }) {
                   type="button"
                   onClick={() => removePhoto(photo.id)}
                   aria-label="Remove photo"
-                  className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-ink/80 text-background transition-colors hover:bg-copper hover:text-ink"
+                  className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-ink/80 text-background transition-colors hover:bg-copper hover:text-background"
                 >
                   <X className="h-3.5 w-3.5" aria-hidden />
                 </button>
@@ -337,7 +337,7 @@ export function ServiceRequestForm({ kind }: { kind: Kind }) {
           <button
             type="button"
             onClick={next}
-            className="group inline-flex items-center gap-2 bg-ink px-6 py-3.5 text-sm font-semibold uppercase tracking-[0.12em] text-background transition-colors hover:bg-copper hover:text-ink"
+            className="group inline-flex items-center gap-2 bg-ink px-6 py-3.5 text-sm font-semibold uppercase tracking-[0.12em] text-background transition-colors hover:bg-copper hover:text-background"
           >
             Continue
             <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" aria-hidden />
@@ -347,7 +347,7 @@ export function ServiceRequestForm({ kind }: { kind: Kind }) {
             type="button"
             onClick={submit}
             disabled={submitting}
-            className="inline-flex items-center gap-2 bg-copper px-6 py-3.5 text-sm font-semibold uppercase tracking-[0.12em] text-ink transition-transform hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex items-center gap-2 bg-copper px-6 py-3.5 text-sm font-semibold uppercase tracking-[0.12em] text-background transition-transform hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {submitting ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
             {submitting ? "Sending…" : config.submitLabel}

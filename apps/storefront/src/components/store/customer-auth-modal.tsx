@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { ArrowRight, Loader2, X } from "lucide-react";
+import { ArrowRight, Loader2 } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@overhaul/ui";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 const inputClass =
@@ -29,8 +30,6 @@ export function CustomerAuthModal({
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  if (!open) return null;
 
   async function sendCode(event: FormEvent) {
     event.preventDefault();
@@ -93,23 +92,19 @@ export function CustomerAuthModal({
   }
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-ink/55 px-4 py-8 backdrop-blur-sm" role="dialog" aria-modal="true">
-      <div className="relative w-full max-w-md border border-rule bg-background p-6 shadow-elev-lg">
-        <button
-          type="button"
-          onClick={() => {
-            onClose();
-            reset();
-          }}
-          className="absolute right-4 top-4 p-1 text-slate transition-colors hover:text-ink"
-          aria-label="Close sign-in"
-        >
-          <X className="h-5 w-5" aria-hidden />
-        </button>
-
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) {
+          onClose();
+          reset();
+        }
+      }}
+    >
+      <DialogContent className="w-full max-w-md border border-rule bg-background p-6 shadow-elev-lg">
         <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-copper">Customer account</p>
-        <h2 className="mt-3 pr-8 font-heading text-3xl font-semibold text-ink">{title}</h2>
-        <p className="mt-3 text-sm leading-6 text-slate">{body}</p>
+        <DialogTitle className="mt-3 pr-8 font-heading text-3xl font-semibold text-ink">{title}</DialogTitle>
+        <DialogDescription className="mt-3 text-sm leading-6 text-slate">{body}</DialogDescription>
 
         {stage === "email" ? (
           <form onSubmit={sendCode} className="mt-6 space-y-5">
@@ -128,7 +123,7 @@ export function CustomerAuthModal({
             <button
               type="submit"
               disabled={loading}
-              className="flex w-full items-center justify-center gap-2 bg-copper px-6 py-3 text-sm font-semibold uppercase tracking-[0.12em] text-ink disabled:opacity-60"
+              className="flex w-full items-center justify-center gap-2 bg-copper px-6 py-3 text-sm font-semibold uppercase tracking-[0.12em] text-background disabled:opacity-60"
             >
               {loading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
               Email me a code <ArrowRight className="h-4 w-4" aria-hidden />
@@ -154,7 +149,7 @@ export function CustomerAuthModal({
             <button
               type="submit"
               disabled={loading}
-              className="flex w-full items-center justify-center gap-2 bg-copper px-6 py-3 text-sm font-semibold uppercase tracking-[0.12em] text-ink disabled:opacity-60"
+              className="flex w-full items-center justify-center gap-2 bg-copper px-6 py-3 text-sm font-semibold uppercase tracking-[0.12em] text-background disabled:opacity-60"
             >
               {loading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
               Verify and continue
@@ -172,8 +167,8 @@ export function CustomerAuthModal({
             </button>
           </form>
         )}
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 

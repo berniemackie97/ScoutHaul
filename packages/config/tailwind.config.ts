@@ -55,7 +55,10 @@ const config: Config = {
           900: "#623d23",
           950: "#371f10",
         },
-        copper: "#b5742e",
+        // Was the literal "#b5742e" — a second, slightly different definition of the same brand colour
+        // (the variable resolves to #b6732f) that could drift from it and could not follow the dark
+        // theme. Every other semantic colour here already reads its variable.
+        copper: "hsl(var(--copper))",
         ink: "#0f2a43",
         slate: "#33475b",
         rule: "#dcd5c7",

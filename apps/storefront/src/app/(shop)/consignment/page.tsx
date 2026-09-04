@@ -5,6 +5,7 @@ export const metadata = {
   title: "Consignment",
   description:
     "Consign quality furniture, electronics, and collectibles with Overhaul Trading Company. We photograph, grade, list, and ship — you get paid when it sells, on clear terms.",
+  alternates: { canonical: "/consignment" },
 };
 
 const benefits = [

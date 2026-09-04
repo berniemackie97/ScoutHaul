@@ -6,6 +6,7 @@ export const metadata = {
   title: "How we grade",
   description:
     "Every item is inspected, tested, and graded against an honest scale before it hits the floor. Here's exactly how — no inflation, no surprises.",
+  alternates: { canonical: "/grading" },
 };
 
 const grades = [

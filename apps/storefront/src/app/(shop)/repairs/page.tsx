@@ -5,6 +5,7 @@ export const metadata = {
   title: "Repairs",
   description:
     "Honest repair for electronics, furniture, and appliances at Overhaul Trading Company. Free no-obligation quotes, real workmanship, and a straight answer about whether it's worth fixing.",
+  alternates: { canonical: "/repairs" },
 };
 
 const repairTypes = [

@@ -91,7 +91,7 @@ export default async function HomePage() {
               <div className="mt-8 flex flex-wrap items-center gap-5">
                 <Link
                   href="/products"
-                  className="group inline-flex items-center gap-2.5 bg-copper px-7 py-3.5 text-sm font-semibold uppercase tracking-[0.12em] text-ink transition-transform duration-300 hover:-translate-y-0.5"
+                  className="group inline-flex items-center gap-2.5 bg-copper px-7 py-3.5 text-sm font-semibold uppercase tracking-[0.12em] text-background transition-transform duration-300 hover:-translate-y-0.5"
                 >
                   Shop the floor
                   <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" aria-hidden />
@@ -325,7 +325,7 @@ export default async function HomePage() {
               The good stuff goes fast.
             </h2>
             <p className="mx-auto mt-4 max-w-md leading-relaxed text-slate">
-              New finds drop every week. Send us a line and we&rsquo;ll tell you before they hit the floor.
+              New finds drop every week. Get them in your inbox before they hit the floor.
             </p>
             <NewsletterForm />
           </Reveal>

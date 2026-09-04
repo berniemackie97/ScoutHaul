@@ -165,7 +165,7 @@ export function Header() {
               className={`relative p-2 transition-colors ${solid ? "text-ink hover:text-copper" : "text-background hover:text-copper"}`}
             >
               <ShoppingBag className="h-5 w-5" aria-hidden />
-              <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center bg-copper px-1 font-mono text-[10px] font-semibold text-ink">
+              <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center bg-copper px-1 font-mono text-[10px] font-semibold text-background">
                 {cartCount}
               </span>
             </Link>

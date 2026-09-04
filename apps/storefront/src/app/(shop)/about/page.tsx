@@ -6,6 +6,7 @@ export const metadata = {
   title: "About",
   description:
     "Overhaul Trading Company — a Bradenton, Florida goods house. Quality pre-owned furniture, electronics, and collectibles, each one inspected, graded honestly, and backed by us.",
+  alternates: { canonical: "/about" },
 };
 
 const values = [
