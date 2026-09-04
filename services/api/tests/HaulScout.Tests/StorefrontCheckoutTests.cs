@@ -142,6 +142,10 @@ public class StorefrontCheckoutTests
         public Task<Order?> FindOrderBySessionAsync(string sessionId, CancellationToken cancellationToken) =>
             Task.FromResult(world.Orders.FirstOrDefault(order => order.StripeCheckoutSessionId == sessionId));
 
+        public Task<Order?> FindOrderForOrphanedSessionAsync(Guid orderId, CancellationToken cancellationToken) =>
+            Task.FromResult(world.Orders.FirstOrDefault(
+                order => order.Id == orderId && order.StripeCheckoutSessionId is null));
+
         public Task<Order?> FindOrderSummaryBySessionAsync(Guid organizationId, string sessionId, CancellationToken cancellationToken) =>
             FindOrderBySessionAsync(sessionId, cancellationToken);
 
@@ -408,6 +412,92 @@ public class StorefrontCheckoutTests
 
         Assert.Equal(AppResultStatus.Conflict, result.Status);
         Assert.Contains("no longer available", result.Message);
+    }
+
+    // ── orphaned session (the session id never got written) ────────────────
+
+    /// <summary>
+    /// Checkout saves the order, creates the session at the processor, then saves again to attach the session
+    /// id. If that last save fails the processor holds a live, payable session that no session-id lookup can
+    /// find — and the completed event was being dismissed as "not ours" and acked, so the shopper paid and
+    /// nothing was ever fulfilled. The processor also carries the order id, which is how these recover.
+    /// </summary>
+    [Fact]
+    public async Task Payment_for_an_order_whose_session_id_was_never_saved_still_finalizes()
+    {
+        var harness = NewHarness();
+        (string token, StoreListing listing) = await AddToCart(harness);
+        await harness.Checkout.CheckoutAsync(Org, token, CancellationToken.None);
+
+        Order order = Assert.Single(harness.World.Orders);
+        string sessionId = order.StripeCheckoutSessionId!;
+        order.StripeCheckoutSessionId = null;   // the second save never landed
+
+        PaymentEventOutcome outcome = await harness.Orders.HandleAsync(
+            Completed(order, 10_000) with { SessionId = sessionId },
+            CancellationToken.None);
+
+        Assert.Equal(PaymentEventOutcome.Finalized, outcome);
+        Assert.Equal(PaymentStatus.Paid, order.PaymentStatus);
+        Assert.Equal(StoreListingStatus.Sold, listing.Status);
+        // Written down now, so every later event for this session matches the ordinary way.
+        Assert.Equal(sessionId, order.StripeCheckoutSessionId);
+    }
+
+    [Fact]
+    public async Task Recovered_order_is_still_finalized_only_once()
+    {
+        var harness = NewHarness();
+        (string token, _) = await AddToCart(harness);
+        await harness.Checkout.CheckoutAsync(Org, token, CancellationToken.None);
+
+        Order order = Assert.Single(harness.World.Orders);
+        string sessionId = order.StripeCheckoutSessionId!;
+        order.StripeCheckoutSessionId = null;
+        PaymentEvent completed = Completed(order, 10_000) with { SessionId = sessionId };
+
+        Assert.Equal(PaymentEventOutcome.Finalized, await harness.Orders.HandleAsync(completed, CancellationToken.None));
+        // Stripe redelivers for days; the recovery path must not open a second door to double-finalizing.
+        Assert.Equal(PaymentEventOutcome.AlreadyProcessed, await harness.Orders.HandleAsync(completed, CancellationToken.None));
+    }
+
+    /// <summary>
+    /// A second checkout of the same cart reuses the order and overwrites the session id. The superseded
+    /// session then expires, and that stale event must not be adopted — cancelling the order the shopper is
+    /// paying for right now.
+    /// </summary>
+    [Fact]
+    public async Task A_superseded_session_event_is_not_adopted_by_the_order_it_belonged_to()
+    {
+        var harness = NewHarness();
+        (string token, StoreListing listing) = await AddToCart(harness);
+        await harness.Checkout.CheckoutAsync(Org, token, CancellationToken.None);
+
+        Order order = Assert.Single(harness.World.Orders);
+        const string supersededSession = "cs_test_superseded";
+
+        PaymentEventOutcome outcome = await harness.Orders.HandleAsync(
+            new PaymentEvent(PaymentEventKind.CheckoutExpired, supersededSession, order.Id, null,
+                null, null, null, null, null, null, null, false),
+            CancellationToken.None);
+
+        Assert.Equal(PaymentEventOutcome.Ignored, outcome);
+        Assert.Equal(OrderStatus.Pending, order.Status);
+        Assert.Equal(StoreListingStatus.Reserved, listing.Status);
+        Assert.Equal("cs_test_1", order.StripeCheckoutSessionId);
+    }
+
+    [Fact]
+    public async Task An_event_for_an_order_this_system_does_not_have_is_still_ignored()
+    {
+        var harness = NewHarness();
+
+        PaymentEventOutcome outcome = await harness.Orders.HandleAsync(
+            new PaymentEvent(PaymentEventKind.CheckoutExpired, "cs_other_env", Guid.NewGuid(), null,
+                null, null, null, null, null, null, null, false),
+            CancellationToken.None);
+
+        Assert.Equal(PaymentEventOutcome.Ignored, outcome);
     }
 
     // ── checkout ───────────────────────────────────────────────────────────

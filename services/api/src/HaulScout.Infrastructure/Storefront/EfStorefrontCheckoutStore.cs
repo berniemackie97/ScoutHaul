@@ -118,6 +118,17 @@ public sealed class EfStorefrontCheckoutStore(HaulScoutDbContext db) : IStorefro
             .Include(order => order.Lines)
             .SingleOrDefaultAsync(order => order.StripeCheckoutSessionId == sessionId, cancellationToken);
 
+    // Only an order that never got a session id qualifies. One that carries a different id has since been
+    // through checkout again, and this event belongs to the superseded attempt — adopting it would let a
+    // stale expiry cancel the order the shopper is currently paying for.
+    public Task<Order?> FindOrderForOrphanedSessionAsync(Guid orderId, CancellationToken cancellationToken) =>
+        db.Orders
+            .IgnoreQueryFilters()
+            .Include(order => order.Lines)
+            .SingleOrDefaultAsync(
+                order => order.Id == orderId && order.StripeCheckoutSessionId == null,
+                cancellationToken);
+
     public Task<Order?> FindOrderSummaryBySessionAsync(Guid organizationId, string sessionId, CancellationToken cancellationToken) =>
         db.Orders
             .IgnoreQueryFilters()

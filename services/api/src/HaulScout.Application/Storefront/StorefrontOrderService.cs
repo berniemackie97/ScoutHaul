@@ -36,6 +36,21 @@ public sealed class StorefrontOrderService(
         }
 
         Order? order = await checkout.FindOrderBySessionAsync(paymentEvent.SessionId, cancellationToken);
+
+        if (order is null && paymentEvent.OrderId is Guid orphanedOrderId)
+        {
+            // Checkout saves the order, creates the session at the processor, then saves again to attach the
+            // session id. A failure in that last step leaves a live, payable session that no session-id lookup
+            // can find — so the shopper could pay and the event would be dismissed as "not ours", acked 200,
+            // and never retried. The processor also gets the order id as its client reference, so recover with
+            // that and write the session id down now.
+            order = await checkout.FindOrderForOrphanedSessionAsync(orphanedOrderId, cancellationToken);
+            if (order is not null)
+            {
+                order.StripeCheckoutSessionId = paymentEvent.SessionId;
+            }
+        }
+
         if (order is null)
         {
             // Not an error: another environment's event, or a session created outside this system.
