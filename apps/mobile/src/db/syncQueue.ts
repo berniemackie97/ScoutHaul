@@ -1,17 +1,25 @@
-import { ApiError, apiRequest } from '../api';
+import { apiRequest } from '../api';
 import { createLocalId } from '../utils/id';
 import { getDatabase } from './database';
+import { classifyFailure } from './syncQueueRules';
 
-type SyncQueueRow = {
+export type SyncQueueRow = {
   id: string;
   operationType: string;
   endpoint: string;
   method: 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   bodyJson: string;
-  status: 'pending' | 'synced' | 'failed';
+  /** `stuck` is the end of the line: tried enough times, or rejected in a way that will not change. */
+  status: 'pending' | 'synced' | 'failed' | 'stuck';
   createdAt: string;
   lastError: string | null;
+  attempts: number;
+  /** Not retried before this time. Null means "as soon as possible". */
+  nextAttemptAt: string | null;
 };
+
+/** Rows the queue still intends to send. `stuck` ones are excluded — they need a person, not a retry. */
+const RETRIABLE = `status in ('pending', 'failed')`;
 
 export async function enqueueOperation(
   operationType: string,
@@ -42,9 +50,32 @@ export async function enqueueComp(body: unknown, draftId?: string): Promise<void
 export async function getPendingSyncCount(): Promise<number> {
   const db = await getDatabase();
   const row = await db.getFirstAsync<{ count: number }>(
-    `select count(*) as count from sync_queue where status in ('pending', 'failed')`,
+    `select count(*) as count from sync_queue where ${RETRIABLE}`,
   );
   return row?.count ?? 0;
+}
+
+/** Writes the queue has given up on. These are the only ones a person has to decide about. */
+export async function listStuckOperations(): Promise<SyncQueueRow[]> {
+  const db = await getDatabase();
+  return db.getAllAsync<SyncQueueRow>(
+    `select * from sync_queue where status = 'stuck' order by createdAt asc`,
+  );
+}
+
+/** Throws away a write the queue could not deliver. The only way a stuck row leaves the queue. */
+export async function discardOperation(id: string): Promise<void> {
+  const db = await getDatabase();
+  await db.runAsync(`delete from sync_queue where id = ? and status = 'stuck'`, [id]);
+}
+
+/** Puts a stuck write back in line, for when the reason it failed has been dealt with. */
+export async function retryStuckOperation(id: string): Promise<void> {
+  const db = await getDatabase();
+  await db.runAsync(
+    `update sync_queue set status = 'pending', attempts = 0, nextAttemptAt = null where id = ? and status = 'stuck'`,
+    [id],
+  );
 }
 
 export async function listSyncQueue(): Promise<SyncQueueRow[]> {
@@ -52,14 +83,21 @@ export async function listSyncQueue(): Promise<SyncQueueRow[]> {
   return db.getAllAsync<SyncQueueRow>(`select * from sync_queue order by createdAt asc`);
 }
 
-export async function processSyncQueue(): Promise<{ synced: number; failed: number }> {
+export type SyncResult = { synced: number; failed: number; stuck: number };
+
+export async function processSyncQueue(now: Date = new Date()): Promise<SyncResult> {
   const db = await getDatabase();
+  // Rows still inside their backoff are skipped rather than hammered on every reconnect.
   const rows = await db.getAllAsync<SyncQueueRow>(
-    `select * from sync_queue where status in ('pending', 'failed') order by createdAt asc`,
+    `select * from sync_queue
+      where ${RETRIABLE} and (nextAttemptAt is null or nextAttemptAt <= ?)
+      order by createdAt asc`,
+    [now.toISOString()],
   );
 
   let synced = 0;
   let failed = 0;
+  let stuck = 0;
 
   for (const row of rows) {
     try {
@@ -68,21 +106,37 @@ export async function processSyncQueue(): Promise<{ synced: number; failed: numb
         body: JSON.parse(row.bodyJson),
         idempotencyKey: row.id,
       });
-      await db.runAsync(`update sync_queue set status = 'synced', lastError = null where id = ?`, [row.id]);
+      await db.runAsync(
+        `update sync_queue set status = 'synced', lastError = null, nextAttemptAt = null where id = ?`,
+        [row.id],
+      );
       synced += 1;
     } catch (error) {
-      // Being offline is not a failed write — the queue exists precisely for this. Marking every
-      // row failed here made a normal offline session look like a pile of broken syncs, so stop
-      // and leave the rest pending for the next attempt.
-      if (error instanceof ApiError && error.reason === 'offline') {
+      const verdict = classifyFailure(error, row.attempts ?? 0, now);
+
+      // Offline is not this row's fault, and the rest of the queue will fail the same way. Stop and
+      // leave everything as it was, so a normal offline session does not look like broken syncs.
+      if (verdict.action === 'pause') {
         break;
       }
 
-      const message = error instanceof Error ? error.message : 'Unknown sync error';
-      await db.runAsync(`update sync_queue set status = 'failed', lastError = ? where id = ?`, [message, row.id]);
+      if (verdict.action === 'give-up') {
+        await db.runAsync(
+          `update sync_queue set status = 'stuck', attempts = ?, lastError = ?, nextAttemptAt = null where id = ?`,
+          [verdict.attempts, verdict.reason, row.id],
+        );
+        stuck += 1;
+        continue;
+      }
+
+      await db.runAsync(
+        `update sync_queue set status = 'failed', attempts = ?, lastError = ?, nextAttemptAt = ? where id = ?`,
+        [verdict.attempts, error instanceof Error ? error.message : 'Unknown sync error',
+         verdict.nextAttemptAt.toISOString(), row.id],
+      );
       failed += 1;
     }
   }
 
-  return { synced, failed };
+  return { synced, failed, stuck };
 }

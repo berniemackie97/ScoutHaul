@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, View } from 'react-native';
 import { appConfig } from '../src/config';
 import { Button } from '../src/components/Button';
 import { Card } from '../src/components/Card';
@@ -12,7 +12,7 @@ import { StatusPill } from '../src/components/StatusPill';
 import { Text } from '../src/components/Text';
 import { spacing } from '../src/components/theme';
 import { useAppTheme } from '../src/context/ThemeContext';
-import { getPendingSyncCount, getWorkspaceProfile, listItemDrafts, processSyncQueue, saveWorkspaceProfile, type AppWorkspaceProfile } from '../src/db/localStore';
+import { discardOperation, getPendingSyncCount, getWorkspaceProfile, listItemDrafts, listStuckOperations, processSyncQueue, retryStuckOperation, saveWorkspaceProfile, type AppWorkspaceProfile, type SyncQueueRow } from '../src/db/localStore';
 import type { LocalItemDraft } from '../src/domain/types';
 import { useConnectivity } from '../src/hooks/useConnectivity';
 import { formatMoney } from '../src/utils/money';
@@ -30,6 +30,7 @@ export default function SettingsScreen() {
   const connectivity = useConnectivity();
   const [drafts, setDrafts] = useState<LocalItemDraft[]>([]);
   const [pendingSync, setPendingSync] = useState(0);
+  const [stuck, setStuck] = useState<SyncQueueRow[]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
   const [workspaceProfile, setWorkspaceProfile] = useState<AppWorkspaceProfile | null>(null);
@@ -38,6 +39,7 @@ export default function SettingsScreen() {
     setWorkspaceProfile(await getWorkspaceProfile());
     setDrafts(await listItemDrafts());
     setPendingSync(await getPendingSyncCount());
+    setStuck(await listStuckOperations());
   }
 
   useFocusEffect(useCallback(() => { void load(); }, []));
@@ -49,9 +51,41 @@ export default function SettingsScreen() {
     }
     setIsSyncing(true);
     const result = await processSyncQueue();
-    setMessage(`Synced ${result.synced}, failed ${result.failed}.`);
+    setMessage(
+      result.stuck > 0
+        ? `Synced ${result.synced}, retrying ${result.failed}, ${result.stuck} need attention.`
+        : `Synced ${result.synced}, retrying ${result.failed}.`,
+    );
     setIsSyncing(false);
     await load();
+  }
+
+  async function retryStuck(id: string) {
+    await retryStuckOperation(id);
+    await load();
+    setMessage('Queued to try again on the next sync.');
+  }
+
+  function confirmDiscard(row: SyncQueueRow) {
+    // Discarding is the one action here that loses work for good, so it asks first.
+    Alert.alert(
+      'Discard this change?',
+      `${row.operationType} will be deleted and never sent. This cannot be undone.`,
+      [
+        { text: 'Keep', style: 'cancel' },
+        {
+          text: 'Discard',
+          style: 'destructive',
+          onPress: () => {
+            void (async () => {
+              await discardOperation(row.id);
+              await load();
+              setMessage('Discarded.');
+            })();
+          },
+        },
+      ],
+    );
   }
 
   async function disconnectAccount() {
@@ -174,6 +208,44 @@ export default function SettingsScreen() {
         ) : null}
       </Card>
 
+      {stuck.length > 0 ? (
+        <>
+          <SectionHeader title={`Needs Attention (${stuck.length})`} />
+          {stuck.map((row) => (
+            <Card key={row.id}>
+              <View style={styles.row}>
+                <Text variant="bodyBold" numberOfLines={1} style={styles.flex}>
+                  {row.operationType}
+                </Text>
+                <StatusPill label={`${row.attempts} tries`} tone="danger" size="sm" />
+              </View>
+              {/* The reason was recorded all along and never shown, so a write that could not be
+                  delivered just sat in the pending count with no way to find out why. */}
+              <Text variant="caption" color={c.dangerDark}>
+                {row.lastError ?? 'No reason recorded.'}
+              </Text>
+              <Text variant="caption" color={c.textSecondary}>
+                Saved {new Date(row.createdAt).toLocaleString()}
+              </Text>
+              <View style={styles.stuckActions}>
+                <Button
+                  label="Try Again"
+                  icon="refresh-outline"
+                  variant="secondary"
+                  onPress={() => void retryStuck(row.id)}
+                />
+                <Button
+                  label="Discard"
+                  icon="trash-outline"
+                  variant="secondary"
+                  onPress={() => void confirmDiscard(row)}
+                />
+              </View>
+            </Card>
+          ))}
+        </>
+      ) : null}
+
       <SectionHeader title={`Local Drafts (${drafts.length})`} />
       {drafts.length === 0 ? (
         <Card>
@@ -225,6 +297,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: spacing.sm,
+  },
+  stuckActions: {
+    flexDirection: 'row',
     gap: spacing.sm,
   },
   flex: {

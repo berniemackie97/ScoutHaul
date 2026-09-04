@@ -19,6 +19,10 @@ export {
   enqueueComp,
   getPendingSyncCount,
   listSyncQueue,
+  listStuckOperations,
+  discardOperation,
+  retryStuckOperation,
   processSyncQueue,
 } from './syncQueue';
+export type { SyncQueueRow, SyncResult } from './syncQueue';
 export { saveRouteSnapshot, getRouteSnapshot, updateRouteSnapshot } from './routeSnapshots';

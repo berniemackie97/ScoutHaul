@@ -90,6 +90,17 @@ export const migrations: readonly Migration[] = [
       );
     `,
   },
+  {
+    // A queued write that can never succeed used to be retried on every launch, for ever. These two
+    // columns are what lets the queue back off between attempts and eventually stop, and they are
+    // the reason the runner exists: `create table if not exists` would not have added them to any
+    // phone that already had the app.
+    name: '002-sync-queue-attempts',
+    up: `
+      alter table sync_queue add column attempts integer not null default 0;
+      alter table sync_queue add column nextAttemptAt text;
+    `,
+  },
 ];
 
 /** The slice of expo-sqlite this runner needs — small enough for a test to stand in for. */
