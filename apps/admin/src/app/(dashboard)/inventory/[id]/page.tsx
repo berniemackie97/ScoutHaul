@@ -8,6 +8,7 @@ import {
   inventoryStatusLabel,
   type InventoryItem,
 } from "@/features/inventory/inventory-operations";
+import { findStatusConflicts } from "@/features/inventory/status-conflicts";
 import { getApiAssetUrl, getApiClient } from "@/lib/api";
 import { InventoryEditor } from "./inventory-editor";
 import { PhotoManager, type ManagedPhoto } from "./photo-manager";
@@ -17,6 +18,7 @@ import { ChannelPresencePanel } from "./cross-list-panel";
 import { RecordSaleCard } from "./record-sale-card";
 import { DeleteInventoryCard } from "./delete-inventory-card";
 import { StorefrontPolicyCard } from "./storefront-policy-card";
+import { StatusConflictNotice } from "./status-conflict-notice";
 
 export const dynamic = "force-dynamic";
 
@@ -56,6 +58,10 @@ export default async function InventoryDetailPage({ params }: { params: Promise<
     return [{ id: photo.id, imageUrl, apiUrl: photo.originalUrl, isHero: photo.isHero ?? false }];
   });
 
+  // The status control and the channel panel below both write this item's state and neither reads
+  // the other, so say plainly when they contradict each other.
+  const statusConflicts = findStatusConflicts(inventoryItem.status, channelListings ?? []);
+
   const cost = getInventoryCost(inventoryItem);
   const { profit: projectedProfit, roiPercent: projectedRoi } = getProjectedMetrics(inventoryItem);
 
@@ -78,6 +84,8 @@ export default async function InventoryDetailPage({ params }: { params: Promise<
           <div className="font-mono text-xs text-muted-foreground">{inventoryItem.id}</div>
         </div>
       </header>
+
+      <StatusConflictNotice conflicts={statusConflicts} />
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
         <InventoryEditor item={inventoryItem} referenceData={referenceData} />
