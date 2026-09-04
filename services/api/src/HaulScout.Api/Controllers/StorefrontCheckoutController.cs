@@ -23,7 +23,7 @@ public sealed class StorefrontCheckoutController(
     {
         if (await resolver.ResolveAsync(Request, cancellationToken) is not Guid organizationId)
         {
-            return NotFound();
+            return Missing();
         }
 
         string? cartToken = Request.Headers[CartHeader].FirstOrDefault()?.Trim() is { Length: > 0 } token ? token : null;
@@ -50,7 +50,7 @@ public sealed class StorefrontCheckoutController(
     {
         if (await resolver.ResolveAsync(Request, cancellationToken) is not Guid organizationId)
         {
-            return NotFound();
+            return Missing();
         }
 
         return ToActionResult(await checkout.GetOrderBySessionAsync(organizationId, sessionId, cancellationToken));

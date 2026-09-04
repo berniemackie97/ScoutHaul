@@ -14,19 +14,19 @@ namespace HaulScout.Api.Controllers;
 [ApiController]
 [Route("api/budgets")]
 [RequireOrganizationPermission(HaulScoutPermissions.ManageBudgets)]
-public sealed class BudgetsController(HaulScoutDbContext db, ICurrentUserContext currentUser) : ControllerBase
+public sealed class BudgetsController(HaulScoutDbContext db, ICurrentUserContext currentUser) : HaulScoutControllerBase
 {
     [HttpPost]
     public async Task<ActionResult<BudgetDto>> Create(CreateBudgetRequest request, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(request.Name))
         {
-            return BadRequest("Budget name is required.");
+            return Invalid("Budget name is required.");
         }
 
         if (request.StartingAmount < 0)
         {
-            return BadRequest("Starting amount cannot be negative.");
+            return Invalid("Starting amount cannot be negative.");
         }
 
         List<Budget> activeBudgets = await db.Budgets
@@ -63,7 +63,7 @@ public sealed class BudgetsController(HaulScoutDbContext db, ICurrentUserContext
             .OrderByDescending(item => item.StartsAt)
             .FirstOrDefaultAsync(cancellationToken);
 
-        return budget is null ? NotFound() : budget.ToDto();
+        return budget is null ? Missing() : budget.ToDto();
     }
 
     [HttpDelete("{id:guid}")]
@@ -75,7 +75,7 @@ public sealed class BudgetsController(HaulScoutDbContext db, ICurrentUserContext
 
         if (budget is null)
         {
-            return NotFound();
+            return Missing();
         }
 
         db.Budgets.Remove(budget);
@@ -88,12 +88,12 @@ public sealed class BudgetsController(HaulScoutDbContext db, ICurrentUserContext
     {
         if (string.IsNullOrWhiteSpace(request.Description))
         {
-            return BadRequest("Expense description is required.");
+            return Invalid("Expense description is required.");
         }
 
         if (request.Amount <= 0)
         {
-            return BadRequest("Expense amount must be greater than zero.");
+            return Invalid("Expense amount must be greater than zero.");
         }
 
         Expense expense = new()
@@ -146,7 +146,7 @@ public sealed class BudgetsController(HaulScoutDbContext db, ICurrentUserContext
 
         if (expense is null)
         {
-            return NotFound();
+            return Missing();
         }
 
         Budget? budget = await db.Budgets

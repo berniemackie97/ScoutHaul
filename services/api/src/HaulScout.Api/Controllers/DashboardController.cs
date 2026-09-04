@@ -13,7 +13,7 @@ namespace HaulScout.Api.Controllers;
 [ApiController]
 [Route("api/dashboard")]
 [RequireOrganizationPermission(HaulScoutPermissions.ViewReports)]
-public sealed class DashboardController(HaulScoutDbContext db, ICurrentUserContext currentUser) : ControllerBase
+public sealed class DashboardController(HaulScoutDbContext db, ICurrentUserContext currentUser) : HaulScoutControllerBase
 {
     private static readonly SaleStatus[] ExcludedRevenueStatuses =
         [SaleStatus.Returned, SaleStatus.Refunded, SaleStatus.Cancelled];

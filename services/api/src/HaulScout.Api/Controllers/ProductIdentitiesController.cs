@@ -14,14 +14,14 @@ namespace HaulScout.Api.Controllers;
 [ApiController]
 [Route("api/product-identities")]
 [RequireOrganizationPermission(HaulScoutPermissions.ManageInventory)]
-public sealed class ProductIdentitiesController(HaulScoutDbContext db, ICurrentUserContext currentUser) : ControllerBase
+public sealed class ProductIdentitiesController(HaulScoutDbContext db, ICurrentUserContext currentUser) : HaulScoutControllerBase
 {
     [HttpPost]
     public async Task<ActionResult<ProductIdentityDto>> Create(UpsertProductIdentityRequest request, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(request.Title))
         {
-            return BadRequest("Product title is required.");
+            return Invalid("Product title is required.");
         }
 
         ProductIdentity product = new()
@@ -45,12 +45,12 @@ public sealed class ProductIdentitiesController(HaulScoutDbContext db, ICurrentU
 
         if (product is null)
         {
-            return NotFound();
+            return Missing();
         }
 
         if (string.IsNullOrWhiteSpace(request.Title))
         {
-            return BadRequest("Product title is required.");
+            return Invalid("Product title is required.");
         }
 
         Apply(request, product);
@@ -101,7 +101,7 @@ public sealed class ProductIdentitiesController(HaulScoutDbContext db, ICurrentU
 
         if (product is null)
         {
-            return NotFound();
+            return Missing();
         }
 
         db.ProductIdentities.Remove(product);

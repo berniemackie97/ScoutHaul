@@ -67,13 +67,4 @@ public sealed class OrdersController(OrdersWorkflowService orders) : HaulScoutCo
     }
 
 
-    private IActionResult ToActionResult(AppResult result) =>
-        result.Status switch
-        {
-            AppResultStatus.Ok => NoContent(),
-            AppResultStatus.NotFound => result.Message is null ? NotFound() : NotFound(result.Message),
-            AppResultStatus.Conflict => Conflict(result.Message),
-            AppResultStatus.Validation => BadRequest(result.Message),
-            _ => BadRequest(result.Message),
-        };
 }

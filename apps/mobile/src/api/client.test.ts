@@ -114,6 +114,35 @@ describe('parseErrorMessage', () => {
   });
 });
 
+describe('the API error envelope', () => {
+  // The API sends RFC 7807 ProblemDetails with a machine `code` on every refusal. These pin the
+  // shape from the client's side, so a change on either side of the boundary fails here.
+  const problem = (over: Record<string, unknown> = {}) =>
+    JSON.stringify({
+      type: 'about:blank',
+      title: 'Invalid request',
+      status: 400,
+      detail: 'Sold price must be positive.',
+      instance: '/api/sales',
+      code: 'validation_failed',
+      ...over,
+    });
+
+  it('shows the detail, not the title', () => {
+    expect(parseErrorMessage(problem())).toBe('Sold price must be positive.');
+  });
+
+  it('falls back to the title when there is no detail', () => {
+    expect(parseErrorMessage(problem({ detail: undefined }))).toBe('Invalid request');
+  });
+
+  it('still prefers a field-level validation error over both', () => {
+    expect(parseErrorMessage(problem({ errors: { soldPrice: ['Must be positive.'] } }))).toBe(
+      'Must be positive.',
+    );
+  });
+});
+
 describe('apiRequest', () => {
   it('sends the token and the active organization', async () => {
     mockFetch.mockResolvedValue(jsonResponse(200, { ok: true }));
@@ -148,8 +177,9 @@ describe('apiRequest', () => {
   });
 
   it('carries the server machine code through', async () => {
+    // Every refusal carries one now; the scanner branches on quota_exhausted specifically.
     mockFetch.mockImplementation(async () =>
-      jsonResponse(429, { code: 'quota_exhausted', detail: 'No credits' }),
+      jsonResponse(429, { title: 'AI vision unavailable', status: 429, code: 'quota_exhausted', detail: 'No credits' }),
     );
 
     const error = await failureOf(apiRequest('/api/vision/identify'));

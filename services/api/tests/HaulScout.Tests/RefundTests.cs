@@ -159,7 +159,7 @@ public class RefundTests
         ActionResult<SaleDto> result = await controller.RecordRefund(sale.Id,
             new RecordRefundRequest(RefundType.Partial, ItemAmount: 150m, Reason: "too much"), CancellationToken.None);
 
-        Assert.IsType<BadRequestObjectResult>(result.Result);
+        ProblemAssert.Invalid(result.Result);
         Assert.Empty(await db.Refunds.ToListAsync());
     }
 
@@ -171,9 +171,9 @@ public class RefundTests
         Sale sale = SeedSale(db, org);
         SalesController controller = SalesControllerFactory.Create(db, new StubCurrentUser(org, user));
 
-        Assert.IsType<BadRequestObjectResult>((await controller.RecordRefund(sale.Id,
+        ProblemAssert.Invalid((await controller.RecordRefund(sale.Id,
             new RecordRefundRequest(RefundType.Partial, 10m, "  "), CancellationToken.None)).Result);
-        Assert.IsType<BadRequestObjectResult>((await controller.RecordRefund(sale.Id,
+        ProblemAssert.Invalid((await controller.RecordRefund(sale.Id,
             new RecordRefundRequest(RefundType.Partial, 0m, "nothing refunded"), CancellationToken.None)).Result);
     }
 }

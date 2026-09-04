@@ -26,7 +26,7 @@ public sealed class StorefrontCartController(
     {
         if (await resolver.ResolveAsync(Request, cancellationToken) is not Guid organizationId)
         {
-            return NotFound();
+            return Missing();
         }
 
         return Ok(await cart.GetAsync(organizationId, CartToken(), cancellationToken));
@@ -38,7 +38,7 @@ public sealed class StorefrontCartController(
     {
         if (await resolver.ResolveAsync(Request, cancellationToken) is not Guid organizationId)
         {
-            return NotFound();
+            return Missing();
         }
 
         return ToActionResult(await cart.AddLineAsync(organizationId, CartToken(), request, cancellationToken));
@@ -52,7 +52,7 @@ public sealed class StorefrontCartController(
     {
         if (await resolver.ResolveAsync(Request, cancellationToken) is not Guid organizationId)
         {
-            return NotFound();
+            return Missing();
         }
 
         return ToActionResult(await cart.AddOfferLineAsync(
@@ -69,7 +69,7 @@ public sealed class StorefrontCartController(
     {
         if (await resolver.ResolveAsync(Request, cancellationToken) is not Guid organizationId)
         {
-            return NotFound();
+            return Missing();
         }
 
         return ToActionResult(await cart.RemoveLineAsync(organizationId, CartToken(), storeListingId, cancellationToken));

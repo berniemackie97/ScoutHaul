@@ -160,7 +160,7 @@ public class OrganizationSecurityTests
         ActionResult<OrganizationJoinResultDto> result = await NewController(db, org, user)
             .RedeemInviteCode(new RedeemOrganizationInviteCodeRequest("SH-EXPI-RED0-0000"), CancellationToken.None);
 
-        Assert.IsType<BadRequestObjectResult>(result.Result);
+        ProblemAssert.Invalid(result.Result);
         Assert.False(await db.OrganizationMembers.AnyAsync());
     }
 
@@ -174,7 +174,7 @@ public class OrganizationSecurityTests
         ActionResult<OrganizationJoinResultDto> result = await NewController(db, org, user)
             .RedeemInviteCode(new RedeemOrganizationInviteCodeRequest("SH-USED-UPPP-0000"), CancellationToken.None);
 
-        Assert.IsType<BadRequestObjectResult>(result.Result);
+        ProblemAssert.Invalid(result.Result);
         Assert.False(await db.OrganizationMembers.AnyAsync());
     }
 
@@ -188,7 +188,7 @@ public class OrganizationSecurityTests
         ActionResult<OrganizationJoinResultDto> result = await NewController(db, org, user)
             .RedeemInviteCode(new RedeemOrganizationInviteCodeRequest("SH-DEAD-0000-0000"), CancellationToken.None);
 
-        Assert.IsType<BadRequestObjectResult>(result.Result);
+        ProblemAssert.Invalid(result.Result);
     }
 
     [Fact]
@@ -200,7 +200,7 @@ public class OrganizationSecurityTests
         ActionResult<OrganizationJoinResultDto> result = await NewController(db, org, user)
             .RedeemInviteCode(new RedeemOrganizationInviteCodeRequest("SH-NOPE-NOPE-NOPE"), CancellationToken.None);
 
-        Assert.IsType<BadRequestObjectResult>(result.Result);
+        ProblemAssert.Invalid(result.Result);
     }
 
     [Fact]
@@ -214,7 +214,7 @@ public class OrganizationSecurityTests
             new UpsertOrganizationRoleRequest("Bad role", null, ["inventory.manage", "totally.made.up"], false),
             CancellationToken.None);
 
-        Assert.IsType<BadRequestObjectResult>(result.Result);
+        ProblemAssert.Invalid(result.Result);
         Assert.False(await db.OrganizationRoles.AnyAsync());
     }
 
@@ -229,7 +229,7 @@ public class OrganizationSecurityTests
             new UpsertOrganizationRoleRequest("Empty role", null, [], false),
             CancellationToken.None);
 
-        Assert.IsType<BadRequestObjectResult>(result.Result);
+        ProblemAssert.Invalid(result.Result);
     }
 
     /// <summary>The heart of it: a non-owner must not be able to mint themselves owner-level access.</summary>
@@ -285,7 +285,7 @@ public class OrganizationSecurityTests
         clock.SetUtcNow(expiry);                             // exactly on it: expired (<=)
         ActionResult<OrganizationJoinResultDto> tooLate = await NewController(db, org, user, clock)
             .RedeemInviteCode(new RedeemOrganizationInviteCodeRequest("SH-EDGE-0000-0000"), CancellationToken.None);
-        Assert.IsType<BadRequestObjectResult>(tooLate.Result);
+        ProblemAssert.Invalid(tooLate.Result);
     }
 
     /// <summary>A code cannot be minted already dead — the same clock decides both ends.</summary>
@@ -303,7 +303,7 @@ public class OrganizationSecurityTests
             CancellationToken.None);
 
         // Reaches the expiry rule (not the permission gate) and is refused on the injected clock.
-        Assert.IsType<BadRequestObjectResult>(result.Result);
+        ProblemAssert.Invalid(result.Result);
         Assert.False(await db.OrganizationInviteCodes.AnyAsync());
     }
 }

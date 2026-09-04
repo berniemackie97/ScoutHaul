@@ -16,7 +16,7 @@ namespace HaulScout.Api.Controllers;
 [ApiController]
 [Route("api/storefront")]
 [AllowAnonymous]
-public sealed class StorefrontController(StorefrontStoreResolver resolver, StorefrontCatalogService catalog) : ControllerBase
+public sealed class StorefrontController(StorefrontStoreResolver resolver, StorefrontCatalogService catalog) : HaulScoutControllerBase
 {
     [HttpGet("listings")]
     public async Task<ActionResult<StorefrontPageDto<StorefrontListingDto>>> Browse(
@@ -28,7 +28,7 @@ public sealed class StorefrontController(StorefrontStoreResolver resolver, Store
     {
         if (await resolver.ResolveAsync(Request, cancellationToken) is not Guid organizationId)
         {
-            return BadRequest("Unknown store.");
+            return Invalid("Unknown store.");
         }
 
         return await catalog.BrowseAsync(organizationId, category, search, page, pageSize, cancellationToken);
@@ -39,7 +39,7 @@ public sealed class StorefrontController(StorefrontStoreResolver resolver, Store
     {
         if (await resolver.ResolveAsync(Request, cancellationToken) is not Guid organizationId)
         {
-            return BadRequest("Unknown store.");
+            return Invalid("Unknown store.");
         }
 
         StorefrontListingDetailDto? detail = await catalog.FindDetailAsync(organizationId, slug, cancellationToken);
@@ -51,7 +51,7 @@ public sealed class StorefrontController(StorefrontStoreResolver resolver, Store
     {
         if (await resolver.ResolveAsync(Request, cancellationToken) is not Guid organizationId)
         {
-            return BadRequest("Unknown store.");
+            return Invalid("Unknown store.");
         }
 
         return Ok(await catalog.ListCategoriesAsync(organizationId, cancellationToken));
@@ -66,7 +66,7 @@ public sealed class StorefrontController(StorefrontStoreResolver resolver, Store
         PublicPhoto? photo = await catalog.FindPublicPhotoAsync(photoId, full, cancellationToken);
         if (photo is null)
         {
-            return NotFound();
+            return Missing();
         }
 
         Response.Headers.CacheControl = "public, max-age=31536000, immutable";

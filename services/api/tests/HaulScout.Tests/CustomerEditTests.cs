@@ -101,8 +101,8 @@ public class CustomerEditTests
             new UpdateCustomerRequest("Second", "TAKEN@example.com", null, AcceptsMarketing: false),
             CancellationToken.None);
 
-        ConflictObjectResult conflict = Assert.IsType<ConflictObjectResult>(result.Result);
-        Assert.Contains("already uses that email", conflict.Value?.ToString() ?? "", StringComparison.OrdinalIgnoreCase);
+        ProblemDetails conflict = ProblemAssert.Blocked(result.Result);
+        Assert.Contains("already uses that email", conflict.Detail ?? "", StringComparison.OrdinalIgnoreCase);
 
         // Nothing was written.
         Customer unchanged = await db.Customers.SingleAsync(candidate => candidate.Id == second.Id);
@@ -139,7 +139,7 @@ public class CustomerEditTests
             new UpdateCustomerRequest("Someone", "not-an-email", null, AcceptsMarketing: false),
             CancellationToken.None);
 
-        Assert.IsType<BadRequestObjectResult>(result.Result);
+        ProblemAssert.Invalid(result.Result);
         Assert.Equal("good@example.com", (await db.Customers.SingleAsync()).Email);
     }
 
@@ -156,6 +156,6 @@ public class CustomerEditTests
             new UpdateCustomerRequest("Hacked", "hacked@example.com", null, AcceptsMarketing: true),
             CancellationToken.None);
 
-        Assert.IsType<NotFoundResult>(result.Result);
+        ProblemAssert.Missing(result.Result);
     }
 }

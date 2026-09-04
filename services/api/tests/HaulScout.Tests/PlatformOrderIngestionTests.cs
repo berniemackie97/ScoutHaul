@@ -385,7 +385,7 @@ public class PlatformOrderIngestionTests
         ActionResult<PlatformOrderReconcileResultDto> result = await controller.Reconcile(order.Id,
             new ReconcilePlatformOrderRequest([new ReconcilePlatformOrderLineMap(lineA.Id, a.Id)]), CancellationToken.None);
 
-        Assert.IsType<BadRequestObjectResult>(result.Result);
+        ProblemAssert.Invalid(result.Result);
         Assert.Empty(await db.Sales.ToListAsync());
         Assert.Equal(PlatformOrderStatus.Imported, (await db.PlatformOrders.SingleAsync()).Status);
     }
@@ -1060,7 +1060,7 @@ Brass Lamp,377251318593,1,$0.00,$0.00,$0.00,$0.00,$0.00,$12.34,$0.00,$0.00,$16.9
         IngestPlatformOrderLineInput[] lines = [new("Item", 10m)];
         ActionResult<IngestPlatformOrdersResultDto> result = await controller.Ingest(new IngestPlatformOrdersRequest("eBay", [Order("ORD-6", lines, fee: -1m)]), CancellationToken.None);
 
-        Assert.IsType<BadRequestObjectResult>(result.Result);
+        ProblemAssert.Invalid(result.Result);
         Assert.Empty(await db.PlatformOrders.ToListAsync());
     }
 

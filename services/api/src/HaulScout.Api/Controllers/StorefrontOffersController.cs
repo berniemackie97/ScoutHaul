@@ -23,7 +23,7 @@ public sealed class StorefrontOffersController(
     {
         if (await resolver.ResolveAsync(Request, cancellationToken) is not Guid organizationId)
         {
-            return BadRequest("Unknown store.");
+            return Invalid("Unknown store.");
         }
 
         return ToActionResult(await offers.SubmitAsync(
@@ -38,7 +38,7 @@ public sealed class StorefrontOffersController(
     {
         if (await resolver.ResolveAsync(Request, cancellationToken) is not Guid organizationId)
         {
-            return BadRequest("Unknown store.");
+            return Invalid("Unknown store.");
         }
 
         return Ok(await offers.ListCustomerAsync(organizationId, customerIdentity.Resolve(), cancellationToken));

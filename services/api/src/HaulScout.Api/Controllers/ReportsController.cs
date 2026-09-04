@@ -15,7 +15,7 @@ namespace HaulScout.Api.Controllers;
 [ApiController]
 [Route("api/reports")]
 [RequireOrganizationPermission(HaulScoutPermissions.ViewReports)]
-public sealed class ReportsController(HaulScoutDbContext db, ICurrentUserContext currentUser) : ControllerBase
+public sealed class ReportsController(HaulScoutDbContext db, ICurrentUserContext currentUser) : HaulScoutControllerBase
 {
     private static readonly InventoryStatus[] ReportableInventoryStatuses =
     [
@@ -37,7 +37,7 @@ public sealed class ReportsController(HaulScoutDbContext db, ICurrentUserContext
     {
         if (!TryResolveRange(from, to, out ReportRange range, out string? error))
         {
-            return BadRequest(error);
+            return Invalid(error ?? "The report could not be produced.");
         }
 
         return await BuildReport(range, cancellationToken);
@@ -51,7 +51,7 @@ public sealed class ReportsController(HaulScoutDbContext db, ICurrentUserContext
     {
         if (!TryResolveRange(from, to, out ReportRange range, out string? error))
         {
-            return BadRequest(error);
+            return Invalid(error ?? "The report could not be produced.");
         }
 
         BusinessReportDto report = await BuildReport(range, cancellationToken);

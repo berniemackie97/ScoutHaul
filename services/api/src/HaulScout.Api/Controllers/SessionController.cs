@@ -6,7 +6,7 @@ namespace HaulScout.Api.Controllers;
 
 [ApiController]
 [Route("api/session")]
-public sealed class SessionController(SessionBootstrapService bootstrap) : ControllerBase
+public sealed class SessionController(SessionBootstrapService bootstrap) : HaulScoutControllerBase
 {
     [HttpGet("bootstrap")]
     public async Task<ActionResult<SessionBootstrapDto>> Bootstrap(CancellationToken cancellationToken) =>

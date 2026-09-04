@@ -9,14 +9,14 @@ namespace HaulScout.Api.Controllers;
 [ApiController]
 [Route("api/marketplace-links")]
 [RequireOrganizationPermission(HaulScoutPermissions.ManageInventory)]
-public sealed class MarketplaceLinksController(IMarketplaceSearchLinkGenerator linkGenerator) : ControllerBase
+public sealed class MarketplaceLinksController(IMarketplaceSearchLinkGenerator linkGenerator) : HaulScoutControllerBase
 {
     [HttpGet]
     public ActionResult<MarketplaceSearchLinksDto> Get([FromQuery] string query)
     {
         if (string.IsNullOrWhiteSpace(query))
         {
-            return BadRequest("Search query is required.");
+            return Invalid("Search query is required.");
         }
 
         return linkGenerator.Generate(query);

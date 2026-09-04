@@ -35,11 +35,7 @@ public sealed class InventoryController(
         CancellationToken cancellationToken)
     {
         AppResult<InventoryItemDto> result = await upserts.CreateAsync(request, cancellationToken);
-        return result.Status switch
-        {
-            AppResultStatus.Ok when result.Value is not null => CreatedAtAction(nameof(Get), new { id = result.Value.Id }, result.Value),
-            _ => ToActionResult(result),
-        };
+        return ToActionResult(result, value => CreatedAtAction(nameof(Get), new { id = value.Id }, value));
     }
 
     [HttpPut("{id:guid}")]
@@ -69,11 +65,7 @@ public sealed class InventoryController(
         CancellationToken cancellationToken)
     {
         AppResult<InventoryItemDto> result = await bundles.CreateAsync(request, cancellationToken);
-        return result.Status switch
-        {
-            AppResultStatus.Ok when result.Value is not null => CreatedAtAction(nameof(Get), new { id = result.Value.Id }, result.Value),
-            _ => ToActionResult(result),
-        };
+        return ToActionResult(result, value => CreatedAtAction(nameof(Get), new { id = value.Id }, value));
     }
 
     [HttpPost("{id:guid}/photos")]
@@ -194,11 +186,7 @@ public sealed class InventoryController(
         CancellationToken cancellationToken)
     {
         AppResult<InventoryIssueDto> result = await issues.CreateAsync(id, request, cancellationToken);
-        return result.Status switch
-        {
-            AppResultStatus.Ok when result.Value is not null => CreatedAtAction(nameof(ListIssues), new { id }, result.Value),
-            _ => ToActionResult(result),
-        };
+        return ToActionResult(result, value => CreatedAtAction(nameof(ListIssues), new { id }, value));
     }
 
     [HttpPut("{id:guid}/issues/{issueId:guid}")]
@@ -240,13 +228,4 @@ public sealed class InventoryController(
     }
 
 
-    private IActionResult ToActionResult(AppResult result) =>
-        result.Status switch
-        {
-            AppResultStatus.Ok => NoContent(),
-            AppResultStatus.NotFound => NotFound(result.Message),
-            AppResultStatus.Conflict => Conflict(result.Message),
-            AppResultStatus.Validation => BadRequest(result.Message),
-            _ => BadRequest(result.Message),
-        };
 }

@@ -20,7 +20,7 @@ namespace HaulScout.Api.Controllers;
 [ApiController]
 [Route("api/acquisition-lots")]
 [RequireOrganizationPermission(HaulScoutPermissions.ManageFinance)]
-public sealed class AcquisitionLotsController(HaulScoutDbContext db, ICurrentUserContext currentUser) : ControllerBase
+public sealed class AcquisitionLotsController(HaulScoutDbContext db, ICurrentUserContext currentUser) : HaulScoutControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<AcquisitionLotDto>>> List(CancellationToken cancellationToken)
@@ -69,12 +69,12 @@ public sealed class AcquisitionLotsController(HaulScoutDbContext db, ICurrentUse
     {
         if (request.Items is null || request.Items.Count == 0)
         {
-            return BadRequest("Provide at least one item to add to the lot.");
+            return Invalid("Provide at least one item to add to the lot.");
         }
 
         if (request.Items.Any(item => string.IsNullOrWhiteSpace(item.Title)))
         {
-            return BadRequest("Every new lot item needs a title.");
+            return Invalid("Every new lot item needs a title.");
         }
 
         AcquisitionLot? lot = await db.AcquisitionLots
@@ -82,7 +82,7 @@ public sealed class AcquisitionLotsController(HaulScoutDbContext db, ICurrentUse
             .SingleOrDefaultAsync(item => item.Id == id && item.OrganizationId == currentUser.OrganizationId, cancellationToken);
         if (lot is null)
         {
-            return NotFound();
+            return Missing();
         }
 
         // Creating the items and re-allocating must be atomic: if allocation fails (e.g. a manual lot no
@@ -169,12 +169,12 @@ public sealed class AcquisitionLotsController(HaulScoutDbContext db, ICurrentUse
         string? validation = Validate(request);
         if (validation is not null)
         {
-            return BadRequest(validation);
+            return Invalid(validation);
         }
 
         if (!await ReferencesBelongToOrganization(request, cancellationToken))
         {
-            return BadRequest("One or more acquisition references do not belong to this organization.");
+            return Invalid("One or more acquisition references do not belong to this organization.");
         }
 
         Guid[] inventoryItemIds = request.Items.Select(item => item.InventoryItemId).Distinct().ToArray();
@@ -183,7 +183,7 @@ public sealed class AcquisitionLotsController(HaulScoutDbContext db, ICurrentUse
             .ToListAsync(cancellationToken);
         if (items.Count != inventoryItemIds.Length)
         {
-            return NotFound("One or more inventory items were not found.");
+            return Missing("One or more inventory items were not found.");
         }
 
         List<AcquisitionLotItem> existingAssignments = await db.AcquisitionLotItems
@@ -194,7 +194,7 @@ public sealed class AcquisitionLotsController(HaulScoutDbContext db, ICurrentUse
             .ToListAsync(cancellationToken);
         if (existingAssignments.Count > 0)
         {
-            return Conflict($"These items already belong to an acquisition lot: {string.Join(", ", existingAssignments.Select(item => item.InventoryItem?.Title ?? item.InventoryItemId.ToString()))}.");
+            return Blocked($"These items already belong to an acquisition lot: {string.Join(", ", existingAssignments.Select(item => item.InventoryItem?.Title ?? item.InventoryItemId.ToString()))}.");
         }
 
         AcquisitionLot lot;
@@ -206,7 +206,7 @@ public sealed class AcquisitionLotsController(HaulScoutDbContext db, ICurrentUse
                 .SingleOrDefaultAsync(item => item.Id == existingLotId.Value && item.OrganizationId == currentUser.OrganizationId, cancellationToken);
             if (existingLot is null)
             {
-                return NotFound();
+                return Missing();
             }
 
             lot = existingLot;

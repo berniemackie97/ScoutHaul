@@ -16,7 +16,7 @@ public sealed class MarketplaceLookupController(
     MarketplaceLookupPersistenceService persistenceService,
     IEnumerable<IMarketplacePricingProvider> pricingProviders,
     IResaleEstimator resaleEstimator,
-    IVisionIdentificationService visionService) : ControllerBase
+    IVisionIdentificationService visionService) : HaulScoutControllerBase
 {
     /// <summary>
     /// Lookup barcode: runs product identification, pricing providers, and saves reusable comp observations.
@@ -26,7 +26,7 @@ public sealed class MarketplaceLookupController(
     {
         if (string.IsNullOrWhiteSpace(barcode))
         {
-            return BadRequest("Barcode is required.");
+            return Invalid("Barcode is required.");
         }
 
         MarketplaceLookupResult marketplace = await lookupService.SearchByBarcodeAsync(barcode, cancellationToken);
@@ -38,7 +38,7 @@ public sealed class MarketplaceLookupController(
     {
         if (string.IsNullOrWhiteSpace(q))
         {
-            return BadRequest("Search query is required.");
+            return Invalid("Search query is required.");
         }
 
         return await lookupService.SearchByKeywordAsync(q, cancellationToken);

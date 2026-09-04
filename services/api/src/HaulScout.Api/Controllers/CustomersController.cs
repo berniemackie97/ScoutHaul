@@ -14,7 +14,7 @@ namespace HaulScout.Api.Controllers;
 [ApiController]
 [Route("api/customers")]
 [RequireOrganizationPermission(HaulScoutPermissions.ManageOrders)]
-public sealed class CustomersController(HaulScoutDbContext db, ICurrentUserContext currentUser) : ControllerBase
+public sealed class CustomersController(HaulScoutDbContext db, ICurrentUserContext currentUser) : HaulScoutControllerBase
 {
     /// <summary>Buyers from every channel — a storefront shopper (email) and an eBay/Depop buyer (username) are
     /// both customers here. Pass <paramref name="channel"/> to narrow to one platform.</summary>
@@ -86,13 +86,13 @@ public sealed class CustomersController(HaulScoutDbContext db, ICurrentUserConte
             .SingleOrDefaultAsync(item => item.Id == id && item.OrganizationId == currentUser.OrganizationId, cancellationToken);
         if (customer is null)
         {
-            return NotFound();
+            return Missing();
         }
 
         string? email = Trim(request.Email);
         if (email is not null && !MailAddress.TryCreate(email, out _))
         {
-            return BadRequest("Enter a valid email address.");
+            return Invalid("Enter a valid email address.");
         }
 
         // Email is unique per organization. Checking here turns a would-be 500 from the unique index
@@ -107,7 +107,7 @@ public sealed class CustomersController(HaulScoutDbContext db, ICurrentUserConte
                     && other.Email.ToLower() == email.ToLower(),
                 cancellationToken))
         {
-            return Conflict("Another customer already uses that email address.");
+            return Blocked("Another customer already uses that email address.");
         }
 
         customer.DisplayName = Trim(request.DisplayName);

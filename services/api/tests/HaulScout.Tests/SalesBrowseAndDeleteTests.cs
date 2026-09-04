@@ -154,6 +154,6 @@ public class SalesBrowseAndDeleteTests
         await using HaulScoutDbContext _ = db;
         SalesController controller = SalesControllerFactory.Create(db, new StubCurrentUser(org, user));
 
-        Assert.IsType<NotFoundResult>(await controller.Delete(Guid.NewGuid(), CancellationToken.None));
+        ProblemAssert.Missing(await controller.Delete(Guid.NewGuid(), CancellationToken.None));
     }
 }

@@ -136,7 +136,7 @@ public class SaleAccountingTests
         ActionResult<SaleDto> result = await controller.Update(sale.Id, new UpdateSaleRequest(
             "eBay", 120m, 0m, 16m, 3.80m, 8m, 0m, 0m, 9.90m, true, sale.SoldAt, null, "  "), CancellationToken.None);
 
-        Assert.IsType<BadRequestObjectResult>(result.Result);
+        ProblemAssert.Invalid(result.Result);
         Assert.Empty(await db.SaleCorrections.ToListAsync());
     }
 
@@ -160,7 +160,7 @@ public class SaleAccountingTests
             item.Id, null, "eBay", 240m, 31m, 7m, 20m, 2m, 0m,
             DateTimeOffset.UtcNow.AddDays(1), null), CancellationToken.None);
 
-        Assert.IsType<BadRequestObjectResult>(result.Result);
+        ProblemAssert.Invalid(result.Result);
         Assert.Empty(await db.Sales.ToListAsync());
         Assert.Equal(InventoryStatus.Listed, item.Status);
         Assert.Null(item.SoldAt);
@@ -203,9 +203,9 @@ public class SaleAccountingTests
         ActionResult<SaleDto> chronologicallyInvalid = await controller.Transition(sale.Id, new SaleStatusTransitionRequest(SaleStatus.Shipped, sale.SoldAt.AddDays(1), null, null, null), CancellationToken.None);
         ActionResult<SaleDto> cancelledWithoutReason = await controller.Transition(sale.Id, new SaleStatusTransitionRequest(SaleStatus.Cancelled, null, null, null, null), CancellationToken.None);
 
-        Assert.IsType<ConflictObjectResult>(skipped.Result);
-        Assert.IsType<BadRequestObjectResult>(chronologicallyInvalid.Result);
-        Assert.IsType<BadRequestObjectResult>(cancelledWithoutReason.Result);
+        ProblemAssert.Blocked(skipped.Result);
+        ProblemAssert.Invalid(chronologicallyInvalid.Result);
+        ProblemAssert.Invalid(cancelledWithoutReason.Result);
     }
 
     [Fact]

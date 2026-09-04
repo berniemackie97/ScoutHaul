@@ -14,14 +14,14 @@ namespace HaulScout.Api.Controllers;
 [ApiController]
 [Route("api/tasks")]
 [RequireOrganizationPermission(HaulScoutPermissions.ManageTasks)]
-public sealed class TasksController(HaulScoutDbContext db, ICurrentUserContext currentUser) : ControllerBase
+public sealed class TasksController(HaulScoutDbContext db, ICurrentUserContext currentUser) : HaulScoutControllerBase
 {
     [HttpPost]
     public async Task<ActionResult<ResaleTaskDto>> Create(CreateTaskRequest request, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(request.Title))
         {
-            return BadRequest("Task title is required.");
+            return Invalid("Task title is required.");
         }
 
         ResaleTask task = new()
@@ -46,7 +46,7 @@ public sealed class TasksController(HaulScoutDbContext db, ICurrentUserContext c
         ResaleTask? task = await FindTask(id, cancellationToken);
         if (task is null)
         {
-            return NotFound();
+            return Missing();
         }
 
         task.AssignedToUserId = request.AssignedToUserId;
@@ -60,7 +60,7 @@ public sealed class TasksController(HaulScoutDbContext db, ICurrentUserContext c
         ResaleTask? task = await FindTask(id, cancellationToken);
         if (task is null)
         {
-            return NotFound();
+            return Missing();
         }
 
         task.Status = request.Status;
@@ -89,7 +89,7 @@ public sealed class TasksController(HaulScoutDbContext db, ICurrentUserContext c
         ResaleTask? task = await FindTask(id, cancellationToken);
         if (task is null)
         {
-            return NotFound();
+            return Missing();
         }
 
         db.Tasks.Remove(task);

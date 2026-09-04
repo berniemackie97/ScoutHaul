@@ -21,11 +21,7 @@ public sealed class SourcingTripsController(
     public async Task<ActionResult<SourcingTripDto>> Create(CreateSourcingTripRequest request, CancellationToken cancellationToken)
     {
         AppResult<SourcingTripDto> result = await trips.CreateAsync(request, cancellationToken);
-        return result.Status switch
-        {
-            AppResultStatus.Ok when result.Value is not null => CreatedAtAction(nameof(GetSummary), new { id = result.Value.Id }, result.Value),
-            _ => ToActionResult(result),
-        };
+        return ToActionResult(result, value => CreatedAtAction(nameof(GetSummary), new { id = value.Id }, value));
     }
 
     [HttpPut("{id:guid}")]
@@ -74,11 +70,7 @@ public sealed class SourcingTripsController(
     public async Task<ActionResult<SourcingTripStopDto>> CreateStop(Guid id, UpsertSourcingTripStopRequest request, CancellationToken cancellationToken)
     {
         AppResult<SourcingTripStopDto> result = await stops.CreateAsync(id, request, cancellationToken);
-        return result.Status switch
-        {
-            AppResultStatus.Ok when result.Value is not null => CreatedAtAction(nameof(GetRoute), new { id }, result.Value),
-            _ => ToActionResult(result),
-        };
+        return ToActionResult(result, value => CreatedAtAction(nameof(GetRoute), new { id }, value));
     }
 
     [HttpPut("{id:guid}/stops/{stopId:guid}")]
@@ -128,12 +120,5 @@ public sealed class SourcingTripsController(
 
 
     private IActionResult ToNoContentResult(AppResult result) =>
-        result.Status switch
-        {
-            AppResultStatus.Ok => NoContent(),
-            // A message-less NotFound stays a bare 404 — adding a null body would change the response shape.
-            AppResultStatus.NotFound => result.Message is null ? NotFound() : NotFound(result.Message),
-            AppResultStatus.Conflict => Conflict(result.Message),
-            _ => BadRequest(result.Message),
-        };
+        ToActionResult(result);
 }
