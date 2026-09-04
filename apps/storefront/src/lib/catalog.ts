@@ -39,6 +39,23 @@ export type Specimen = {
 // Storefront data access — the live API only. No sample/fallback data: the store shows
 // the org's real listings or an honest empty state, never placeholder products.
 
+/**
+ * The catalog could not be reached.
+ *
+ * Every read here used to answer a failure the same way it answers an absence — `null` for one item,
+ * `[]` for a list. So a backend blip made a real, in-stock, one-of-a-kind piece disappear exactly as
+ * if someone had just bought it, and turned a full shop into an empty one, with nothing anywhere
+ * saying a request had failed. Throwing lets the page tell a shopper the truth: we cannot see the
+ * shelf right now, not "it is gone".
+ */
+export class CatalogUnavailableError extends Error {
+  constructor(cause: unknown) {
+    super("The catalog could not be reached.");
+    this.name = "CatalogUnavailableError";
+    this.cause = cause;
+  }
+}
+
 export async function getListings(opts?: { category?: string; search?: string }): Promise<Specimen[]> {
   if (!liveCatalogEnabled) return [];
   try {
@@ -64,12 +81,18 @@ export async function getListings(opts?: { category?: string; search?: string })
         image: imageUrl(dto.imageUrl),
       }),
     );
-  } catch {
-    return [];
+  } catch (error) {
+    throw new CatalogUnavailableError(error);
   }
 }
 
-/** The real number of items on the floor right now — the storefront never advertises a made-up count. */
+/**
+ * The real number of items on the floor right now — the storefront never advertises a made-up count.
+ *
+ * This one still answers a failure with null, and deliberately: the count is a flourish on the home
+ * page, and null already means "say nothing". Taking the whole home page down because a decorative
+ * number could not be fetched would be the wrong trade.
+ */
 export async function getShelfCount(): Promise<number | null> {
   if (!liveCatalogEnabled) return null;
   try {
@@ -118,8 +141,9 @@ export async function getListing(slug: string): Promise<Specimen | null> {
       images: (data.imageUrls ?? []).map(imageUrl).filter((url): url is string => Boolean(url)),
       availability: data.availability ?? "Available",
     };
-  } catch {
-    return null;
+  } catch (error) {
+    // Not `null`: the caller turns null into notFound(), and a blip is not a missing product.
+    throw new CatalogUnavailableError(error);
   }
 }
 

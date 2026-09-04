@@ -7,7 +7,7 @@ vi.mock("./store", async () => {
   return { ...actual, liveCatalogEnabled: true, storefrontApi: () => ({ GET: get }) };
 });
 
-import { getListing, getListings, getShelfCount } from "./catalog";
+import { CatalogUnavailableError, getListing, getListings, getShelfCount } from "./catalog";
 import { STORE } from "./store";
 
 beforeEach(() => vi.clearAllMocks());
@@ -65,8 +65,15 @@ describe("getListings", () => {
     expect(item.image).toBeUndefined();
   });
 
-  it("shows an empty shop rather than an error when the API is unreachable", async () => {
+  it("says the catalog is unreachable rather than showing an empty shop", async () => {
+    // This used to resolve to []. A backend blip turned a full shop into an empty one with nothing
+    // saying a request had failed.
     get.mockRejectedValue(new Error("network down"));
+    await expect(getListings()).rejects.toBeInstanceOf(CatalogUnavailableError);
+  });
+
+  it("still reports a genuinely empty catalog as empty", async () => {
+    get.mockResolvedValue({ data: { items: [] } });
     await expect(getListings()).resolves.toEqual([]);
   });
 
@@ -97,6 +104,21 @@ describe("getListing", () => {
     await expect(getListing("nope")).resolves.toBeNull();
   });
 
+  it("does not turn an unreachable catalog into a missing product", async () => {
+    // The page calls notFound() on null, so returning null here made a real, in-stock,
+    // one-of-a-kind piece vanish exactly as if someone had just bought it.
+    get.mockRejectedValue(new Error("network down"));
+    await expect(getListing("brass-lamp")).rejects.toBeInstanceOf(CatalogUnavailableError);
+  });
+
+  it("keeps the underlying failure for logging", async () => {
+    const cause = new Error("ECONNREFUSED");
+    get.mockRejectedValue(cause);
+
+    const error = await getListing("brass-lamp").catch((e: unknown) => e);
+    expect((error as CatalogUnavailableError).cause).toBe(cause);
+  });
+
   it("keeps every gallery image absolute", async () => {
     get.mockResolvedValue({
       data: {
@@ -111,5 +133,14 @@ describe("getListing", () => {
       `${STORE.apiBaseUrl}/uploads/a.jpg`,
       "https://cdn.example.com/b.jpg",
     ]);
+  });
+});
+
+describe("the shelf count", () => {
+  it("says nothing rather than taking the home page down with it", async () => {
+    // Deliberately different from the reads above: the count is a flourish, and null already means
+    // "say nothing". Throwing here would blank the home page over a decorative number.
+    get.mockRejectedValue(new Error("network down"));
+    await expect(getShelfCount()).resolves.toBeNull();
   });
 });

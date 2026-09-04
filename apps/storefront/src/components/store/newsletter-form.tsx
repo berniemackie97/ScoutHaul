@@ -1,49 +1,33 @@
-"use client";
+import { ArrowRight } from "lucide-react";
 
-import { useState, type FormEvent } from "react";
-import { ArrowRight, Check } from "lucide-react";
+const CONTACT_EMAIL = "overhaultradingco@gmail.com";
 
+/**
+ * First dibs, without pretending there is a mailing list.
+ *
+ * This used to be an email field whose submit handler did nothing but `setDone(true)` behind a
+ * `// TODO: wire to the list provider once chosen`. Every shopper who signed up was told "You're on
+ * the list — watch your inbox", no request was ever made, and every one of those leads was lost. A
+ * false confirmation is worse than no form: it costs the sale *and* the trust.
+ *
+ * No list provider is configured and picking one is the owner's decision, not something to guess at
+ * here. So this asks for the same thing through the address the site already publishes on its contact
+ * page and in its footer — which actually reaches someone. When a provider is chosen, this becomes a
+ * real form again.
+ */
 export function NewsletterForm() {
-  const [email, setEmail] = useState("");
-  const [done, setDone] = useState(false);
-
-  function onSubmit(e: FormEvent) {
-    e.preventDefault();
-    if (!email.trim()) return;
-    // TODO: wire to the list provider once chosen. Optimistic confirm for now.
-    setDone(true);
-  }
-
-  if (done) {
-    return (
-      <p className="mt-8 inline-flex items-center gap-2 font-mono text-[12px] uppercase tracking-[0.16em] text-copper">
-        <Check className="h-4 w-4" aria-hidden />
-        You&rsquo;re on the list — watch your inbox.
-      </p>
-    );
-  }
-
   return (
-    <form onSubmit={onSubmit} className="mx-auto mt-8 flex max-w-md flex-col gap-3 sm:flex-row">
-      <label htmlFor="newsletter-email" className="sr-only">
-        Email address
-      </label>
-      <input
-        id="newsletter-email"
-        type="email"
-        required
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        placeholder="you@email.com"
-        className="flex-1 border border-rule bg-background px-4 py-3 text-sm text-ink outline-none transition-colors placeholder:text-slate/55 focus:border-copper"
-      />
-      <button
-        type="submit"
+    <div className="mt-8 flex flex-col items-center gap-3">
+      <a
+        href={`mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent("First dibs")}&body=${encodeURIComponent(
+          "Add me to the list for new finds.",
+        )}`}
         className="group inline-flex items-center justify-center gap-2 bg-ink px-6 py-3 text-sm font-semibold uppercase tracking-[0.12em] text-background transition-colors hover:bg-copper"
       >
-        Get first dibs
+        Email us for first dibs
         <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" aria-hidden />
-      </button>
-    </form>
+      </a>
+      <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-slate/70">{CONTACT_EMAIL}</p>
+    </div>
   );
 }
