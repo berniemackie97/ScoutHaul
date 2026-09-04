@@ -68,8 +68,7 @@ public sealed class StorePublishingWorkflowService(
             return AppResult<StoreListingDto>.Validation($"This item is not ready for the storefront: {string.Join(" ", reasons)}");
         }
 
-        item.Status = InventoryStatus.Listed;
-        item.ListedAt ??= timeProvider.GetUtcNow();
+        item.MarkListed(timeProvider.GetUtcNow());
         await store.SaveChangesAsync(cancellationToken);   // the synchronizer creates/activates the listing here
 
         StoreListing? listing = await store.FindListingByItemAsync(organizationId, item.Id, cancellationToken);

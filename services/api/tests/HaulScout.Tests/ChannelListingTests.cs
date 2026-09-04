@@ -41,6 +41,64 @@ public class ChannelListingTests
         new(account, status, price, Quantity: null, ExternalListingId: null, ExternalUrl: url, ImageHash: null);
 
     [Fact]
+    public async Task Going_live_on_a_channel_marks_the_item_listed()
+    {
+        // Until this, the channel path was the only one of three that never touched the item's status,
+        // so an item live on eBay still read as ReadyToList and kept reappearing in the listing queue.
+        (HaulScoutDbContext db, ChannelListingsController controller, _, Guid item, Guid account) = Setup();
+        InventoryItem before = await db.InventoryItems.SingleAsync(candidate => candidate.Id == item);
+        before.Status = InventoryStatus.ReadyToList;
+        await db.SaveChangesAsync();
+
+        await controller.Upsert(item, Req(account, ChannelListingStatus.Active), CancellationToken.None);
+
+        InventoryItem after = await db.InventoryItems.SingleAsync(candidate => candidate.Id == item);
+        Assert.Equal(InventoryStatus.Listed, after.Status);
+        Assert.NotNull(after.ListedAt);
+    }
+
+    [Fact]
+    public async Task Going_live_on_a_channel_does_not_walk_a_sold_item_backwards()
+    {
+        (HaulScoutDbContext db, ChannelListingsController controller, _, Guid item, Guid account) = Setup();
+        InventoryItem before = await db.InventoryItems.SingleAsync(candidate => candidate.Id == item);
+        before.Status = InventoryStatus.Shipped;
+        await db.SaveChangesAsync();
+
+        await controller.Upsert(item, Req(account, ChannelListingStatus.Active), CancellationToken.None);
+
+        InventoryItem after = await db.InventoryItems.SingleAsync(candidate => candidate.Id == item);
+        Assert.Equal(InventoryStatus.Shipped, after.Status);
+    }
+
+    [Fact]
+    public async Task A_channel_status_that_is_not_live_leaves_the_item_alone()
+    {
+        (HaulScoutDbContext db, ChannelListingsController controller, _, Guid item, Guid account) = Setup();
+
+        await controller.Upsert(item, Req(account, ChannelListingStatus.Draft), CancellationToken.None);
+
+        InventoryItem after = await db.InventoryItems.SingleAsync(candidate => candidate.Id == item);
+        Assert.NotEqual(InventoryStatus.Listed, after.Status);
+    }
+
+    [Fact]
+    public async Task Selling_on_a_channel_does_not_mark_the_item_sold()
+    {
+        // Sold means money, and money comes through the sale workflow. Setting it here would leave a
+        // sold item with no Sale behind it. The admin console surfaces the mismatch instead.
+        (HaulScoutDbContext db, ChannelListingsController controller, _, Guid item, Guid account) = Setup();
+        InventoryItem before = await db.InventoryItems.SingleAsync(candidate => candidate.Id == item);
+        before.Status = InventoryStatus.Listed;
+        await db.SaveChangesAsync();
+
+        await controller.Upsert(item, Req(account, ChannelListingStatus.Sold), CancellationToken.None);
+
+        InventoryItem after = await db.InventoryItems.SingleAsync(candidate => candidate.Id == item);
+        Assert.Equal(InventoryStatus.Listed, after.Status);
+    }
+
+    [Fact]
     public async Task Upsert_creates_then_updates_a_single_row_per_account()
     {
         (HaulScoutDbContext db, ChannelListingsController controller, _, Guid item, Guid account) = Setup();

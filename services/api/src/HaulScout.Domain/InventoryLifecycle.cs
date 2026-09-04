@@ -63,6 +63,17 @@ public static class InventoryLifecycle
             or InventoryStatus.Shipped
             or InventoryStatus.Delivered;
 
+    /// <summary>
+    /// Whether an item going live somewhere — a channel, the storefront, a manual listing — should move
+    /// it to <see cref="InventoryStatus.Listed"/>.
+    ///
+    /// False once it has reached Listed or anything after, so publishing a second channel cannot walk a
+    /// sold item back to Listed and erase that it went. Bundled is excluded deliberately: a component of
+    /// a bundle is not listed on its own, and the bundle is what goes on sale.
+    /// </summary>
+    public static bool ShouldAdvanceToListed(InventoryStatus status) =>
+        status != InventoryStatus.Bundled && Rank(status) < Rank(InventoryStatus.Listed);
+
     public static InventoryLifecycleGroup Group(InventoryStatus status) => status switch
     {
         InventoryStatus.Sold or InventoryStatus.Packed or InventoryStatus.Shipped or InventoryStatus.Delivered

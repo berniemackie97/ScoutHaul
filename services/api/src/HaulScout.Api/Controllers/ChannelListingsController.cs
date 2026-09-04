@@ -72,6 +72,10 @@ public sealed class ChannelListingsController(HaulScoutDbContext db, ICurrentUse
         if (request.Status == ChannelListingStatus.Active)
         {
             listing.ListedAt ??= DateTimeOffset.UtcNow;
+            // The item is on sale somewhere now, and nothing here used to say so: it stayed at
+            // ReadyToList and kept reappearing in the listing queue for an operator to list again.
+            // MarkListed leaves an item that has already sold alone.
+            await MarkItemListed(itemId, cancellationToken);
         }
         if (request.Status == ChannelListingStatus.Sold)
         {
@@ -95,6 +99,15 @@ public sealed class ChannelListingsController(HaulScoutDbContext db, ICurrentUse
 
         ChannelListing saved = await Query(itemId).SingleAsync(item => item.Id == listing.Id, cancellationToken);
         return saved.ToDto();
+    }
+
+    /// <summary>Moves the item to Listed when going live on a channel is the first thing that put it on sale.</summary>
+    private async Task MarkItemListed(Guid itemId, CancellationToken cancellationToken)
+    {
+        InventoryItem? item = await db.InventoryItems.SingleOrDefaultAsync(
+            candidate => candidate.Id == itemId && candidate.OrganizationId == currentUser.OrganizationId,
+            cancellationToken);
+        item?.MarkListed(DateTimeOffset.UtcNow);
     }
 
     [HttpDelete("{id:guid}")]

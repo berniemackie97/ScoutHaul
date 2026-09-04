@@ -118,8 +118,7 @@ public sealed class ListingsController(HaulScoutDbContext db, ICurrentUserContex
         DateTimeOffset now = DateTimeOffset.UtcNow;
         listing.Status = ListingStatus.Active;
         listing.ListedAt ??= now;
-        listing.InventoryItem!.Status = InventoryStatus.Listed;
-        listing.InventoryItem.ListedAt ??= now;
+        listing.InventoryItem!.MarkListed(now);
         await db.SaveChangesAsync(cancellationToken);
 
         return listing.ToDto();
