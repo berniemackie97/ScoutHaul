@@ -95,6 +95,25 @@ public sealed class InventoryItem : EntityBase, IOrganizationScoped
     public bool IsBundle { get; set; }
     public DateTimeOffset? PurchasedAt { get; set; }
     public DateTimeOffset? ListedAt { get; set; }
+
+    /// <summary>
+    /// Records that this item is now live for sale somewhere.
+    ///
+    /// Three paths put an item on sale — a manual listing, the storefront, and a marketplace channel —
+    /// and they each decided for themselves what that meant for the item's own status. The channel path
+    /// decided nothing at all, so an item live on eBay still read as "ready to list" and kept coming back
+    /// round the listing queue. This is the one answer all three ask for.
+    /// </summary>
+    public void MarkListed(DateTimeOffset now)
+    {
+        if (!InventoryLifecycle.ShouldAdvanceToListed(Status))
+        {
+            return;
+        }
+
+        Status = InventoryStatus.Listed;
+        ListedAt ??= now;
+    }
     public int Quantity { get; set; } = 1;
     public DateTimeOffset? SoldAt { get; set; }
     public ICollection<MarketObservation> MarketObservations { get; set; } = [];
