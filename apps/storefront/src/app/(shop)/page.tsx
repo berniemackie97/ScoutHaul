@@ -325,7 +325,7 @@ export default async function HomePage() {
               The good stuff goes fast.
             </h2>
             <p className="mx-auto mt-4 max-w-md leading-relaxed text-slate">
-              New finds drop every week. Get them in your inbox before they hit the floor.
+              New finds drop every week. Send us a line and we&rsquo;ll tell you before they hit the floor.
             </p>
             <NewsletterForm />
           </Reveal>

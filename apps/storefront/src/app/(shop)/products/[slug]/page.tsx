@@ -5,7 +5,7 @@ import { ProductGallery } from "@/components/store/product-gallery";
 import { ProductCard } from "@/components/store/product-card";
 import { ProductCommercePanel } from "@/components/store/product-commerce-panel";
 import { Reveal } from "@/components/ui/reveal";
-import { getListing, getRelated } from "@/lib/catalog";
+import { CatalogUnavailableError, getListing, getRelated } from "@/lib/catalog";
 import { STORE } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
@@ -17,7 +17,12 @@ function fullSize(url: string) {
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const item = await getListing(slug);
+  // Metadata is not worth failing a page over. If the catalog is unreachable the render below throws
+  // and the error boundary explains it to the shopper — the tab title is not where that is said.
+  const item = await getListing(slug).catch((error) => {
+    if (error instanceof CatalogUnavailableError) return null;
+    throw error;
+  });
   if (!item) return { title: "Not found" };
 
   const description = formatDescription(item.blurb).replace(/\n+/g, " ").slice(0, 160);
