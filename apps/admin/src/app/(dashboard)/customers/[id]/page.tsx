@@ -1,16 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Check } from "lucide-react";
-import { Badge, Card, CardContent, CardHeader, CardTitle } from "@overhaul/ui";
+import { Badge, Card, CardContent, CardHeader, CardTitle, formatCurrency, formatDate } from "@overhaul/ui";
 import { getApiClient } from "@/lib/api";
 import { CustomerEditor } from "./customer-editor";
 
 export const dynamic = "force-dynamic";
 
-const money = (value: number | null | undefined) =>
-  typeof value === "number" ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value) : "—";
-const date = (value: string | null | undefined) =>
-  value ? new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(new Date(value)) : "—";
 
 const orderStatusVariant = (status: string | undefined) => {
   if (status === "Delivered") return "success" as const;
@@ -30,10 +26,10 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
   const orders = customer.orders ?? [];
 
   const stats: Array<[string, string]> = [
-    ["Lifetime spend", money(customer.lifetimeSpend)],
+    ["Lifetime spend", formatCurrency(customer.lifetimeSpend)],
     ["Orders", String(customer.orderCount)],
-    ["Store credit", money(customer.storeCreditBalance)],
-    ["Last order", date(customer.lastOrderAt)],
+    ["Store credit", formatCurrency(customer.storeCreditBalance)],
+    ["Last order", formatDate(customer.lastOrderAt)],
   ];
 
   return (
@@ -52,7 +48,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
         </div>
         <p className="text-muted-foreground mt-1 text-sm">
           {customer.email}
-          {customer.phone ? ` · ${customer.phone}` : ""} · joined {date(customer.createdAt)}
+          {customer.phone ? ` · ${customer.phone}` : ""} · joined {formatDate(customer.createdAt)}
         </p>
         <div className="mt-3">
           <CustomerEditor
@@ -102,8 +98,8 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
                           {order.orderNumber}
                         </Link>
                       </td>
-                      <td className="text-muted-foreground px-4 py-3">{date(order.createdAt)}</td>
-                      <td className="px-4 py-3 text-right tabular-nums">{money(order.grandTotal)}</td>
+                      <td className="text-muted-foreground px-4 py-3">{formatDate(order.createdAt)}</td>
+                      <td className="px-4 py-3 text-right tabular-nums">{formatCurrency(order.grandTotal)}</td>
                       <td className="px-4 py-3">
                         <Badge variant={orderStatusVariant(order.status)}>{order.status}</Badge>
                       </td>

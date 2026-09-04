@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import type { components } from "@overhaul/api-client";
 import { getApiClient } from "@/lib/api";
 import { failedFormState, type FailedFormState, type FieldErrors } from "@/lib/form-state";
+import { errorMessage } from "@/lib/api-error";
+import { formatCurrency } from "@overhaul/ui";
 
 type UpdateSaleRequest = components["schemas"]["UpdateSaleRequest"];
 type SaleStatusTransitionRequest = components["schemas"]["SaleStatusTransitionRequest"];
@@ -57,19 +59,8 @@ function numberValue(formData: FormData, name: string, label: string, fieldError
   return parsed;
 }
 
-function errorMessage(error: unknown, fallback: string): string {
-  if (typeof error === "string" && error.trim()) return error;
-  if (error && typeof error === "object") {
-    for (const key of ["detail", "title", "message"] as const) {
-      const value = (error as Record<string, unknown>)[key];
-      if (typeof value === "string" && value.trim()) return value;
-    }
-  }
-  return fallback;
-}
 
-const money = (value: number | null | undefined) =>
-  new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value ?? 0);
+const money = (value: number | null | undefined) => formatCurrency(value ?? 0);
 
 export async function updateSale(id: string, _previous: SaleActionResult, formData: FormData): Promise<SaleActionResult> {
   const fieldErrors: FieldErrors = {};

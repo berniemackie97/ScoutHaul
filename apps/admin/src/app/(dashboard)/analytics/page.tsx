@@ -13,7 +13,7 @@ import {
   TrendingUp,
   WalletCards,
 } from "lucide-react";
-import { Badge, Card } from "@overhaul/ui";
+import { Badge, Card, formatCurrency, formatDate } from "@overhaul/ui";
 import { getApiClient } from "@/lib/api";
 import { AgingChart, InventoryStatusChart, PerformanceChart, PlatformChart } from "./report-charts";
 
@@ -21,11 +21,12 @@ export const dynamic = "force-dynamic";
 
 type ReportChange = components["schemas"]["ReportChangeDto"];
 
+// Reported totals: an aggregate of nothing is nought, not unknown.
 const money = (value: number | null | undefined, digits = 0) =>
-  new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: digits, maximumFractionDigits: digits }).format(value ?? 0);
+  formatCurrency(value ?? 0, { maximumFractionDigits: digits });
 const number = (value: number | null | undefined) => new Intl.NumberFormat("en-US").format(value ?? 0);
 const percent = (value: number | null | undefined) => `${(value ?? 0).toFixed(1)}%`;
-const dateLabel = (value: string | null | undefined) => value ? new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(new Date(value)) : "—";
+const dateLabel = (value: string | null | undefined) => formatDate(value);
 
 function isoDaysAgo(days: number) {
   const value = new Date();

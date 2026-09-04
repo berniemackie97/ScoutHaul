@@ -3,7 +3,7 @@
 import { useActionState, useMemo, useState } from "react";
 import { useFormStatus } from "react-dom";
 import type { components } from "@overhaul/api-client";
-import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Label, Textarea } from "@overhaul/ui";
+import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Label, Textarea, formatCurrency } from "@overhaul/ui";
 import { recordBundledSale, type BundledResult } from "./actions";
 
 type Candidate = components["schemas"]["SaleCandidateDto"];
@@ -11,7 +11,7 @@ type Channel = components["schemas"]["SaleChannelOptionDto"];
 
 const initial: BundledResult = { ok: false, message: "" };
 const selectClass = "h-10 w-full rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring";
-const currency = (value: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value);
+const currency = (value: number) => formatCurrency(value);
 const localDate = () => new Date(Date.now() - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
 
 function SaveButton({ count }: { count: number }) {

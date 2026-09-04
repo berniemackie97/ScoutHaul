@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import type { components } from "@overhaul/api-client";
 import { getApiClient } from "@/lib/api";
 import { failedFormState, type FailedFormState, type FieldErrors } from "@/lib/form-state";
+import { errorMessage } from "@/lib/api-error";
 
 type CreateInventoryBundleRequest = components["schemas"]["CreateInventoryBundleRequest"];
 
@@ -24,16 +25,6 @@ function number(formData: FormData, name: string): number | null {
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
 }
 
-function errorMessage(error: unknown): string {
-  if (typeof error === "string" && error.trim()) return error;
-  if (error && typeof error === "object") {
-    for (const key of ["detail", "title", "message"] as const) {
-      const value = (error as Record<string, unknown>)[key];
-      if (typeof value === "string" && value.trim()) return value;
-    }
-  }
-  return "The bundle could not be created.";
-}
 
 function selectedComponentIds(formData: FormData) {
   return formData.getAll("componentInventoryItemId").filter((value): value is string => typeof value === "string" && value.length > 0);
@@ -82,7 +73,7 @@ export async function createBundle(_previous: BundleActionResult, formData: Form
 
   const api = await getApiClient();
   const result = await api.POST("/api/inventory/bundles", { body });
-  if (!result.data?.id) return failure(errorMessage(result.error), formData);
+  if (!result.data?.id) return failure(errorMessage(result.error, "The bundle could not be created."), formData);
 
   revalidatePath("/inventory");
   redirect(`/inventory/${result.data.id}`);

@@ -5,7 +5,7 @@ import { useFormStatus } from "react-dom";
 import { useRouter } from "next/navigation";
 import { Copy, Mail, Pencil, Shield, Trash2, UserPlus, X } from "lucide-react";
 import type { components } from "@overhaul/api-client";
-import { Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Label } from "@overhaul/ui";
+import { Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Label, formatDate } from "@overhaul/ui";
 import {
   inviteMember, resendInvite, changeMemberRole, removeMember,
   createRole, updateRole, createInviteCode, deactivateInviteCode, type TeamResult,
@@ -17,7 +17,7 @@ type InviteCode = components["schemas"]["OrganizationInviteCodeDto"];
 
 const initial: TeamResult = { ok: false, message: "" };
 const selectClass = "h-9 rounded-lg border border-input bg-background px-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring";
-const date = (value: string | null | undefined) => (value ? new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(new Date(value)) : "—");
+const date = (value: string | null | undefined) => (formatDate(value));
 
 function Submit({ label }: { label: string }) {
   const { pending } = useFormStatus();

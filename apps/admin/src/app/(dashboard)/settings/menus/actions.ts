@@ -2,19 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { getApiClient } from "@/lib/api";
+import { errorMessage } from "@/lib/api-error";
 
 export type MenuResult = { ok: boolean; message: string };
 
-function errorMessage(error: unknown, fallback: string): string {
-  if (typeof error === "string" && error.trim()) return error;
-  if (error && typeof error === "object") {
-    for (const key of ["detail", "title", "message"] as const) {
-      const value = (error as Record<string, unknown>)[key];
-      if (typeof value === "string" && value.trim()) return value;
-    }
-  }
-  return fallback;
-}
 
 function revalidate() {
   revalidatePath("/settings/menus");

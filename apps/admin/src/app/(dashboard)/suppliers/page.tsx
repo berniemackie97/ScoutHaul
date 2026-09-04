@@ -1,14 +1,10 @@
 import Link from "next/link";
 import { Building2, ReceiptText, TrendingUp } from "lucide-react";
-import { Card } from "@overhaul/ui";
+import { Card, formatCurrency, formatDate } from "@overhaul/ui";
 import { getApiClient } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
 
-const money = (value: number | null | undefined) =>
-  typeof value === "number" ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value) : "—";
-const date = (value: string | null | undefined) =>
-  value ? new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(new Date(value)) : "—";
 
 type SupplierRollup = { supplier: string; attributed: boolean; lots: number; items: number; spend: number; lastPurchase: string | null };
 
@@ -35,8 +31,8 @@ export default async function SuppliersPage() {
 
   const kpis = [
     { label: "Suppliers", value: String(namedCount), detail: "Distinct attributed sources", icon: Building2 },
-    { label: "Total sourced spend", value: money(totalSpend), detail: `${lots.length} acquisition lots`, icon: ReceiptText },
-    { label: "Avg per supplier", value: money(namedCount ? totalSpend / namedCount : 0), detail: "Landed cost per source", icon: TrendingUp },
+    { label: "Total sourced spend", value: formatCurrency(totalSpend), detail: `${lots.length} acquisition lots`, icon: ReceiptText },
+    { label: "Avg per supplier", value: formatCurrency(namedCount ? totalSpend / namedCount : 0), detail: "Landed cost per source", icon: TrendingUp },
   ];
 
   return (
@@ -91,8 +87,8 @@ export default async function SuppliersPage() {
                   </td>
                   <td className="px-4 py-3 text-right tabular-nums">{supplier.lots}</td>
                   <td className="px-4 py-3 text-right tabular-nums">{supplier.items}</td>
-                  <td className="px-4 py-3 text-right font-medium tabular-nums">{money(supplier.spend)}</td>
-                  <td className="text-muted-foreground px-4 py-3">{date(supplier.lastPurchase)}</td>
+                  <td className="px-4 py-3 text-right font-medium tabular-nums">{formatCurrency(supplier.spend)}</td>
+                  <td className="text-muted-foreground px-4 py-3">{formatDate(supplier.lastPurchase)}</td>
                 </tr>
               ))}
             </tbody>

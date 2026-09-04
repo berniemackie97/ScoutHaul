@@ -1,14 +1,10 @@
 import Link from "next/link";
 import { Mail, Users, Wallet } from "lucide-react";
-import { Card } from "@overhaul/ui";
+import { Card, formatCurrency, formatDate } from "@overhaul/ui";
 import { getApiClient } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
 
-const money = (value: number | null | undefined) =>
-  typeof value === "number" ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value) : "—";
-const date = (value: string | null | undefined) =>
-  value ? new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(new Date(value)) : "—";
 
 export default async function CustomersPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
   const { q } = await searchParams;
@@ -22,7 +18,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
   const kpis = [
     { label: "Customers", value: String(customers.length), detail: q ? `Matching “${q}”` : "Storefront shoppers", icon: Users },
     { label: "Marketing opt-ins", value: String(marketingOptIns), detail: "Consented to marketing", icon: Mail },
-    { label: "Store credit liability", value: money(creditLiability), detail: "Outstanding customer credit", icon: Wallet },
+    { label: "Store credit liability", value: formatCurrency(creditLiability), detail: "Outstanding customer credit", icon: Wallet },
   ];
 
   return (
@@ -100,10 +96,10 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
                     </Link>
                   </td>
                   <td className="px-4 py-3 text-right tabular-nums">{customer.orderCount}</td>
-                  <td className="px-4 py-3 text-right font-medium tabular-nums">{money(customer.lifetimeSpend)}</td>
-                  <td className="px-4 py-3 text-right tabular-nums">{money(customer.storeCreditBalance)}</td>
-                  <td className="text-muted-foreground px-4 py-3">{date(customer.lastOrderAt)}</td>
-                  <td className="text-muted-foreground px-4 py-3">{date(customer.createdAt)}</td>
+                  <td className="px-4 py-3 text-right font-medium tabular-nums">{formatCurrency(customer.lifetimeSpend)}</td>
+                  <td className="px-4 py-3 text-right tabular-nums">{formatCurrency(customer.storeCreditBalance)}</td>
+                  <td className="text-muted-foreground px-4 py-3">{formatDate(customer.lastOrderAt)}</td>
+                  <td className="text-muted-foreground px-4 py-3">{formatDate(customer.createdAt)}</td>
                 </tr>
               ))}
             </tbody>

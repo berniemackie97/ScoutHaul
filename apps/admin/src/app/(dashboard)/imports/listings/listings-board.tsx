@@ -3,7 +3,7 @@
 import { useActionState, useMemo, useState } from "react";
 import { useFormStatus } from "react-dom";
 import type { components } from "@overhaul/api-client";
-import { Badge, Button, Input } from "@overhaul/ui";
+import { Badge, Button, Input, formatCurrency } from "@overhaul/ui";
 import {
   ignoreListing,
   reconcileListing,
@@ -24,10 +24,6 @@ const initial: ListingActionResult = { ok: false, message: "" };
 const selectClass =
   "h-9 w-full rounded-lg border border-input bg-background px-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring";
 
-const money = (value: number | null | undefined) =>
-  typeof value === "number"
-    ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value)
-    : "—";
 
 const statusVariant = (status: string | undefined) => {
   if (status === "Active") return "success" as const;
@@ -148,7 +144,7 @@ function ListingRow({
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant={statusVariant(listing.status)}>{listing.status}</Badge>
             <Badge variant="outline">{listing.platform}</Badge>
-            <span className="font-medium tabular-nums">{money(listing.price)}</span>
+            <span className="font-medium tabular-nums">{formatCurrency(listing.price)}</span>
           </div>
           <p className="mt-2 truncate font-medium">{listing.title}</p>
           <p className="text-muted-foreground mt-1 text-xs">

@@ -1,6 +1,7 @@
 "use client";
 
 import type { components } from "@overhaul/api-client";
+import { formatCurrency } from "@overhaul/ui";
 import {
   Area,
   Bar,
@@ -21,7 +22,7 @@ import {
 type BusinessReport = components["schemas"]["BusinessReportDto"];
 
 const colors = ["#2563eb", "#16a34a", "#f59e0b", "#7c3aed", "#dc2626", "#0891b2", "#64748b"];
-const currency = (value: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(value);
+const currency = (value: number) => formatCurrency(value, { maximumFractionDigits: 0 });
 const compact = (value: number) => new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(value);
 
 export function PerformanceChart({ series }: { series: NonNullable<BusinessReport["series"]> }) {

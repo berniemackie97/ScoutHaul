@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useFormStatus } from "react-dom";
 import { CornerUpLeft, RotateCcw, Check } from "lucide-react";
 import type { components } from "@overhaul/api-client";
-import { Badge, Button, Input, Label, Textarea } from "@overhaul/ui";
+import { Badge, Button, Input, Label, Textarea, formatCurrency, formatDate } from "@overhaul/ui";
 import { recordRefund, voidRefund, type SaleActionResult } from "./sale-actions";
 import {
   openReturn,
@@ -23,9 +23,9 @@ type ReturnDto = components["schemas"]["ReturnDto"];
 type ReturnStatus = components["schemas"]["ReturnStatus"];
 
 const money = (value: number | null | undefined) =>
-  new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value ?? 0);
+  formatCurrency(value ?? 0);
 const day = (value: string | null | undefined) =>
-  value ? new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(new Date(value)) : "—";
+  formatDate(value);
 const today = new Date().toISOString().slice(0, 10);
 const OPEN_STATUSES: ReturnStatus[] = ["Requested", "LabelIssued", "Received"];
 const STAGES: { key: ReturnStatus; label: string }[] = [

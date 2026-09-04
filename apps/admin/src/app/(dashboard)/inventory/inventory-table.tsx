@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import { Archive, ArrowDown, ArrowUp, ChevronLeft, ChevronRight, ImageIcon, Trash2 } from "lucide-react";
-import { Badge, Button } from "@overhaul/ui";
+import { Badge, Button, formatCurrency } from "@overhaul/ui";
 import {
   getInventoryCost,
   getProjectedMetrics,
@@ -18,10 +18,6 @@ export type InventoryTableRow = InventoryItem & {
   thumbnailUrl: string | null;
 };
 
-const money = (value: number | null | undefined) =>
-  typeof value === "number"
-    ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value)
-    : "—";
 
 const badgeVariant = (status: string | undefined) => {
   if (["Listed", "Delivered"].includes(status ?? "")) return "success" as const;
@@ -214,9 +210,9 @@ export function InventoryTable({
                   </td>
                   <td className="px-4 py-3"><Badge variant={badgeVariant(item.status)}>{inventoryStatusLabel(item.status)}</Badge></td>
                   <td className="hidden px-4 py-3 text-muted-foreground xl:table-cell">{item.storageLocation ?? "—"}</td>
-                  <td className="hidden px-4 py-3 text-right tabular-nums md:table-cell">{money(cost)}</td>
-                  <td className="hidden px-4 py-3 text-right tabular-nums lg:table-cell">{money(item.estimatedSalePrice)}</td>
-                  <td className={`px-4 py-3 text-right font-medium tabular-nums ${projectedProfit != null && projectedProfit < 0 ? "text-destructive" : ""}`}>{money(projectedProfit)}</td>
+                  <td className="hidden px-4 py-3 text-right tabular-nums md:table-cell">{formatCurrency(cost)}</td>
+                  <td className="hidden px-4 py-3 text-right tabular-nums lg:table-cell">{formatCurrency(item.estimatedSalePrice)}</td>
+                  <td className={`px-4 py-3 text-right font-medium tabular-nums ${projectedProfit != null && projectedProfit < 0 ? "text-destructive" : ""}`}>{formatCurrency(projectedProfit)}</td>
                 </tr>
               );
             })}

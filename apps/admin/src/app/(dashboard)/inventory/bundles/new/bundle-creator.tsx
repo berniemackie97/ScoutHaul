@@ -2,15 +2,13 @@
 
 import { useActionState, useEffect, useMemo, useState } from "react";
 import { useFormStatus } from "react-dom";
-import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Label, Textarea } from "@overhaul/ui";
+import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Label, Textarea, formatCurrency } from "@overhaul/ui";
 import { inventoryStatusLabel, type InventoryItem, type InventoryStatus } from "@/features/inventory/inventory-operations";
 import { readinessBlockers } from "@/features/inventory/lifecycle-readiness";
 import { ReadinessChecklist } from "@/features/inventory/readiness-checklist";
 import { createBundle, type BundleActionResult } from "./actions";
 
 const initial: BundleActionResult = { ok: false, message: "" };
-const money = (value: number | null | undefined) =>
-  typeof value === "number" ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value) : "—";
 
 function SubmitButton({ disabledReason }: { disabledReason?: string }) {
   const { pending } = useFormStatus();
@@ -168,8 +166,8 @@ export function BundleCreator({ candidates }: { candidates: InventoryItem[] }) {
                             </label>
                           </td>
                           <td className="px-3 py-2 text-muted-foreground">{inventoryStatusLabel(item.status)}</td>
-                          <td className="px-3 py-2 text-right tabular-nums">{money(item.purchasePrice)}</td>
-                          <td className="px-3 py-2 text-right tabular-nums">{money(item.estimatedSalePrice)}</td>
+                          <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(item.purchasePrice)}</td>
+                          <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(item.estimatedSalePrice)}</td>
                         </tr>
                       );
                     })}
@@ -189,11 +187,11 @@ export function BundleCreator({ candidates }: { candidates: InventoryItem[] }) {
       <aside className="space-y-4 xl:sticky xl:top-6 xl:self-start">
         <Card className="p-6">
           <p className="text-sm text-muted-foreground">Bundle cost basis</p>
-          <p className="mt-2 text-4xl font-semibold tabular-nums">{money(cost)}</p>
+          <p className="mt-2 text-4xl font-semibold tabular-nums">{formatCurrency(cost)}</p>
           <div className="mt-5 space-y-2 border-t pt-4 text-sm">
             <div className="flex justify-between"><span className="text-muted-foreground">Components</span><span>{selectedItems.length}</span></div>
-            <div className="flex justify-between"><span className="text-muted-foreground">Expected total</span><span>{money(expected)}</span></div>
-            <div className="flex justify-between"><span className="text-muted-foreground">Projected spread</span><span>{expected > 0 ? money(expected - cost) : "—"}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Expected total</span><span>{formatCurrency(expected)}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Projected spread</span><span>{expected > 0 ? formatCurrency(expected - cost) : "—"}</span></div>
           </div>
         </Card>
         <ReadinessChecklist targetStatus={status} facts={readinessFacts} compact />

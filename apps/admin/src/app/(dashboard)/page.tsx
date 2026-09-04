@@ -1,13 +1,13 @@
 import Link from "next/link";
 import { ArrowUpRight, Boxes, CircleDollarSign, PackageOpen, Tags, TrendingUp, TriangleAlert, Wallet } from "lucide-react";
-import { Card } from "@overhaul/ui";
+import { Card, formatCurrency } from "@overhaul/ui";
 import { getApiClient } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
 
+// Whole dollars on the tiles, and $0 rather than a dash: an aggregate of no sales really is nought.
 const money = (value: number | null | undefined) =>
-  new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 })
-    .format(value ?? 0);
+  formatCurrency(value ?? 0, { maximumFractionDigits: 0 });
 
 export default async function DashboardPage() {
   const api = await getApiClient();

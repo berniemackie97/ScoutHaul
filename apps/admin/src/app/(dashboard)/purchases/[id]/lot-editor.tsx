@@ -3,15 +3,13 @@
 import { useActionState, useMemo, useState } from "react";
 import { useFormStatus } from "react-dom";
 import type { components } from "@overhaul/api-client";
-import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Label, Textarea } from "@overhaul/ui";
+import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Label, Textarea, formatCurrency } from "@overhaul/ui";
 import { updateLot, type LotActionResult } from "./actions";
 
 type AcquisitionLot = components["schemas"]["AcquisitionLotDto"];
 type AllocationMethod = components["schemas"]["AcquisitionLotAllocationMethod"];
 
 const initial: LotActionResult = { ok: false, message: "" };
-const money = (value: number | null | undefined) =>
-  typeof value === "number" ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value) : "—";
 const dateInput = (iso: string | null | undefined) => (iso ? new Date(iso).toISOString().slice(0, 10) : "");
 
 function SubmitButton() {
@@ -126,9 +124,9 @@ export function LotEditor({ lot }: { lot: AcquisitionLot }) {
                         <span className="font-medium">{item.inventoryItemTitle}</span>
                         <span className="block text-xs text-muted-foreground">{item.inventoryItemStatus}</span>
                       </td>
-                      <td className="px-3 py-2 text-right tabular-nums">{money(item.allocatedCost)}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(item.allocatedCost)}</td>
                       <td className="px-3 py-2">
-                        <Input name={`manualCost:${itemId}`} type="number" step="0.01" min="0" defaultValue={allocationMethod === "Manual" ? String(item.allocatedCost) : ""} disabled={!checked || allocationMethod !== "Manual"} placeholder={allocationMethod === "Equal" ? money(equalEach) : ""} />
+                        <Input name={`manualCost:${itemId}`} type="number" step="0.01" min="0" defaultValue={allocationMethod === "Manual" ? String(item.allocatedCost) : ""} disabled={!checked || allocationMethod !== "Manual"} placeholder={allocationMethod === "Equal" ? formatCurrency(equalEach) : ""} />
                       </td>
                       <td className="px-3 py-2">
                         <Input name={`weight:${itemId}`} type="number" step="0.01" min="0" defaultValue={item.allocationWeight != null ? String(item.allocationWeight) : ""} disabled={!checked || allocationMethod !== "WeightedByExpectedValue"} />
@@ -147,8 +145,8 @@ export function LotEditor({ lot }: { lot: AcquisitionLot }) {
 
           <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-4 text-sm">
             <span className="text-muted-foreground">
-              Landed cost <span className="text-foreground font-semibold tabular-nums">{money(landed)}</span> · keeping {keptCount} item{keptCount === 1 ? "" : "s"}
-              {allocationMethod === "Equal" && keptCount > 0 ? ` · ${money(equalEach)} each` : ""}
+              Landed cost <span className="text-foreground font-semibold tabular-nums">{formatCurrency(landed)}</span> · keeping {keptCount} item{keptCount === 1 ? "" : "s"}
+              {allocationMethod === "Equal" && keptCount > 0 ? ` · ${formatCurrency(equalEach)} each` : ""}
             </span>
             <SubmitButton />
           </div>

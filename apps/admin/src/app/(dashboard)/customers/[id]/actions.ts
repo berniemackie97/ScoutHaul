@@ -2,19 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { getApiClient } from "@/lib/api";
+import { errorMessage } from "@/lib/api-error";
 
 export type CustomerActionResult = { ok: boolean; message: string };
 
-function errorMessage(error: unknown, fallback: string): string {
-  if (typeof error === "string" && error.trim()) return error;
-  if (error && typeof error === "object") {
-    for (const key of ["detail", "title", "message"] as const) {
-      const value = (error as Record<string, unknown>)[key];
-      if (typeof value === "string" && value.trim()) return value;
-    }
-  }
-  return fallback;
-}
 
 /**
  * Corrects a customer's details. Customers arrive from checkout and from marketplace imports spelled

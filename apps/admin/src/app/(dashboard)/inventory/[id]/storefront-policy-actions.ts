@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import type { components } from "@overhaul/api-client";
 import { getApiClient } from "@/lib/api";
 import { failedFormState, type FailedFormState, type FieldErrors } from "@/lib/form-state";
+import { errorMessage } from "@/lib/api-error";
 
 type ShippingPolicy = components["schemas"]["StoreShippingPolicy"];
 type UpdateStoreListingCommerceRequest = components["schemas"]["UpdateStoreListingCommerceRequest"];
@@ -35,16 +36,6 @@ function moneyValue(formData: FormData, name: string, label: string, fieldErrors
   return parsed;
 }
 
-function errorMessage(error: unknown, fallback: string): string {
-  if (typeof error === "string" && error.trim()) return error;
-  if (error && typeof error === "object") {
-    for (const key of ["detail", "title", "message"] as const) {
-      const value = (error as Record<string, unknown>)[key];
-      if (typeof value === "string" && value.trim()) return value;
-    }
-  }
-  return fallback;
-}
 
 export async function updateStorefrontPolicy(
   itemId: string,

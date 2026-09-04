@@ -1,18 +1,12 @@
 import Link from "next/link";
 import { ArrowLeft, FileSpreadsheet, PlugZap, ScanLine, Wallet } from "lucide-react";
-import { Badge, Card } from "@overhaul/ui";
+import { Badge, Card, formatCurrency, formatDate } from "@overhaul/ui";
 import { getApiClient } from "@/lib/api";
 import { PlatformOrderReconciler } from "./reconciler";
 import { AutoMatchPanel } from "./auto-match-panel";
 
 export const dynamic = "force-dynamic";
 
-const money = (value: number | null | undefined) =>
-  typeof value === "number"
-    ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value)
-    : "—";
-const date = (value: string | null | undefined) =>
-  value ? new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(new Date(value)) : "—";
 
 export default async function PlatformOrdersPage() {
   const api = await getApiClient();
@@ -137,16 +131,16 @@ export default async function PlatformOrdersPage() {
                     <td className="text-muted-foreground px-4 py-3">
                       {order.buyerName ?? order.buyerReference ?? "—"}
                     </td>
-                    <td className="text-muted-foreground px-4 py-3">{date(order.orderedAt)}</td>
+                    <td className="text-muted-foreground px-4 py-3">{formatDate(order.orderedAt)}</td>
                     <td className="text-muted-foreground px-4 py-3">
                       {order.trackingNumber ?? "—"}
                     </td>
                     <td className="px-4 py-3 text-right tabular-nums">
-                      {money(order.itemsSubtotal)}
+                      {formatCurrency(order.itemsSubtotal)}
                     </td>
-                    <td className="px-4 py-3 text-right tabular-nums">-{money(order.feeTotal)}</td>
+                    <td className="px-4 py-3 text-right tabular-nums">-{formatCurrency(order.feeTotal)}</td>
                     <td className="px-4 py-3 text-right tabular-nums">
-                      {money(order.payoutAmount)}
+                      {formatCurrency(order.payoutAmount)}
                     </td>
                     <td className="px-4 py-3">
                       <Badge variant="success">Reconciled</Badge>

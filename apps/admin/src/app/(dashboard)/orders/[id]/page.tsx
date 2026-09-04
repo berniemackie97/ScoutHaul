@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import type { components } from "@overhaul/api-client";
-import { Badge, Card, CardContent, CardHeader, CardTitle } from "@overhaul/ui";
+import { Badge, Card, CardContent, CardHeader, CardTitle, formatCurrency } from "@overhaul/ui";
 import { getApiClient } from "@/lib/api";
 import { OrderStatusControl } from "./order-status-control";
 import { OrderTrackingCard } from "./order-tracking-card";
@@ -11,10 +11,6 @@ import { LineItems } from "./line-items";
 
 export const dynamic = "force-dynamic";
 
-const money = (value: number | null | undefined) =>
-  typeof value === "number"
-    ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value)
-    : "—";
 const dateTime = (value: string | null | undefined) =>
   value
     ? new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" }).format(
@@ -243,7 +239,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
         <aside className="space-y-4">
           <Card className="p-5">
             <p className="text-muted-foreground text-sm">Order total</p>
-            <p className="mt-1 text-3xl font-semibold tabular-nums">{money(order.grandTotal)}</p>
+            <p className="mt-1 text-3xl font-semibold tabular-nums">{formatCurrency(order.grandTotal)}</p>
             <div className="mt-4 space-y-1 border-t pt-3 text-sm">
               {totals.map(([label, value, strong]) => (
                 <div
@@ -251,26 +247,26 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                   className={`flex justify-between ${strong ? "border-t pt-2 font-semibold" : ""}`}
                 >
                   <span className="text-muted-foreground">{label}</span>
-                  <span className="tabular-nums">{money(value)}</span>
+                  <span className="tabular-nums">{formatCurrency(value)}</span>
                 </div>
               ))}
               {(order.totalRefunded ?? 0) > 0 && (
                 <>
                   <div className="flex justify-between text-amber-700">
                     <span>Refunded to buyer</span>
-                    <span className="tabular-nums">-{money(order.totalRefunded)}</span>
+                    <span className="tabular-nums">-{formatCurrency(order.totalRefunded)}</span>
                   </div>
                   <div className="flex justify-between border-t pt-2 font-semibold">
                     <span>Net received</span>
                     <span className="tabular-nums">
-                      {money((order.grandTotal ?? 0) - (order.totalRefunded ?? 0))}
+                      {formatCurrency((order.grandTotal ?? 0) - (order.totalRefunded ?? 0))}
                     </span>
                   </div>
                 </>
               )}
               <div className="text-muted-foreground flex justify-between pt-2 text-xs">
                 <span>Merchandise margin (ex tax/ship)</span>
-                <span className="tabular-nums">{money(order.grossMargin)}</span>
+                <span className="tabular-nums">{formatCurrency(order.grossMargin)}</span>
               </div>
             </div>
           </Card>
@@ -381,7 +377,7 @@ function FinancialRow({
       <span className={muted ? "text-muted-foreground/70" : "text-muted-foreground"}>{label}</span>
       <span className={`tabular-nums ${value < 0 ? "text-destructive" : ""}`}>
         {negative && value > 0 ? "-" : ""}
-        {money(value)}
+        {formatCurrency(value)}
       </span>
     </div>
   );
