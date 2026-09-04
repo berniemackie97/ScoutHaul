@@ -11,7 +11,7 @@ namespace HaulScout.Api.Controllers;
 [ApiController]
 [Route("api/channel-accounts")]
 [RequireOrganizationPermission(HaulScoutPermissions.ManageListings)]
-public sealed class ChannelAccountsController(IChannelAccountService channels, ICurrentUserContext currentUser) : ControllerBase
+public sealed class ChannelAccountsController(IChannelAccountService channels, ICurrentUserContext currentUser) : HaulScoutControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<ChannelAccountDto>>> List(CancellationToken cancellationToken)
@@ -48,13 +48,4 @@ public sealed class ChannelAccountsController(IChannelAccountService channels, I
         };
     }
 
-    private ActionResult<ChannelAccountDto> ToActionResult(AppResult<ChannelAccountDto> result) =>
-        result.Status switch
-        {
-            AppResultStatus.Ok when result.Value is not null => result.Value,
-            AppResultStatus.NotFound => NotFound(),
-            AppResultStatus.Conflict => Conflict(result.Message),
-            AppResultStatus.Validation => BadRequest(result.Message),
-            _ => BadRequest(result.Message),
-        };
 }

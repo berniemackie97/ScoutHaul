@@ -19,7 +19,7 @@ public sealed class PlatformOrdersController(
     PlatformOrderWorkflowService platformOrders,
     MarketplaceRefundImportService marketplaceRefundImportService,
     PlatformOrderImportWorkflowService platformOrderImports,
-    PlatformOrderAutoMatchService autoMatch) : ControllerBase
+    PlatformOrderAutoMatchService autoMatch) : HaulScoutControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<PlatformOrderDto>>> List(
@@ -86,13 +86,4 @@ public sealed class PlatformOrdersController(
     public async Task<ActionResult<PlatformOrderDto>> Ignore(Guid id, CancellationToken cancellationToken) =>
         ToActionResult(await platformOrders.IgnoreAsync(id, cancellationToken));
 
-    private ActionResult<T> ToActionResult<T>(AppResult<T> result) =>
-        result.Status switch
-        {
-            AppResultStatus.Ok when result.Value is not null => result.Value,
-            AppResultStatus.NotFound => result.Message is null ? NotFound() : NotFound(result.Message),
-            AppResultStatus.Conflict => Conflict(result.Message),
-            AppResultStatus.Validation => BadRequest(result.Message),
-            _ => Problem("Unexpected platform-order workflow result.")
-        };
 }

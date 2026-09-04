@@ -10,7 +10,7 @@ namespace HaulScout.Api.Controllers;
 [ApiController]
 [Route("api/orders")]
 [RequireOrganizationPermission(HaulScoutPermissions.ManageOrders)]
-public sealed class OrdersController(OrdersWorkflowService orders) : ControllerBase
+public sealed class OrdersController(OrdersWorkflowService orders) : HaulScoutControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<OrderSummaryDto>>> List(
@@ -66,15 +66,6 @@ public sealed class OrdersController(OrdersWorkflowService orders) : ControllerB
         return ToActionResult(result);
     }
 
-    private ActionResult<T> ToActionResult<T>(AppResult<T> result) where T : class =>
-        result.Status switch
-        {
-            AppResultStatus.Ok when result.Value is not null => result.Value,
-            AppResultStatus.NotFound => result.Message is null ? NotFound() : NotFound(result.Message),
-            AppResultStatus.Conflict => Conflict(result.Message),
-            AppResultStatus.Validation => BadRequest(result.Message),
-            _ => BadRequest(result.Message),
-        };
 
     private IActionResult ToActionResult(AppResult result) =>
         result.Status switch

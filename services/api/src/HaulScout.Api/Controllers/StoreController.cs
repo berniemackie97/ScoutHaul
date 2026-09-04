@@ -16,7 +16,7 @@ namespace HaulScout.Api.Controllers;
 [ApiController]
 [Route("api/store")]
 [RequireOrganizationPermission(HaulScoutPermissions.ManageListings)]
-public sealed class StoreController(StorePublishingWorkflowService publishing) : ControllerBase
+public sealed class StoreController(StorePublishingWorkflowService publishing) : HaulScoutControllerBase
 {
     [HttpGet("categories")]
     public async Task<ActionResult<IReadOnlyList<StoreCategoryDto>>> ListCategories(CancellationToken cancellationToken) =>
@@ -66,13 +66,4 @@ public sealed class StoreController(StorePublishingWorkflowService publishing) :
     public async Task<ActionResult<ReconcileStoreCatalogResultDto>> Reconcile(CancellationToken cancellationToken) =>
         Ok(await publishing.ReconcileAsync(cancellationToken));
 
-    private ActionResult<T> ToActionResult<T>(AppResult<T> result) where T : class =>
-        result.Status switch
-        {
-            AppResultStatus.Ok when result.Value is not null => result.Value,
-            AppResultStatus.NotFound => NotFound(result.Message),
-            AppResultStatus.Conflict => Conflict(result.Message),
-            AppResultStatus.Validation => BadRequest(result.Message),
-            _ => BadRequest(result.Message),
-        };
 }

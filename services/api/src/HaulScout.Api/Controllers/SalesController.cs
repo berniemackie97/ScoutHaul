@@ -21,7 +21,7 @@ public sealed class SalesController(
     SaleTransitionWorkflowService transitions,
     SaleCorrectionWorkflowService corrections,
     SaleRefundWorkflowService refunds,
-    SaleReturnWorkflowService returns) : ControllerBase
+    SaleReturnWorkflowService returns) : HaulScoutControllerBase
 {
     // ── Reference ──────────────────────────────────────────────────────────
     [HttpGet("reference-data")]
@@ -197,13 +197,4 @@ public sealed class SalesController(
     public async Task<ActionResult<ReturnDto>> CancelReturn(Guid returnId, CancellationToken cancellationToken) =>
         ToActionResult(await returns.CancelAsync(returnId, cancellationToken));
 
-    private ActionResult<T> ToActionResult<T>(AppResult<T> result) where T : class =>
-        result.Status switch
-        {
-            AppResultStatus.Ok when result.Value is not null => result.Value,
-            AppResultStatus.NotFound => NotFound(result.Message),
-            AppResultStatus.Conflict => Conflict(result.Message),
-            AppResultStatus.Validation => BadRequest(result.Message),
-            _ => BadRequest(result.Message),
-        };
 }
