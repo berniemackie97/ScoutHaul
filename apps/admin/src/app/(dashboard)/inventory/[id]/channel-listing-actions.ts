@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import type { components } from "@overhaul/api-client";
 import { getApiClient } from "@/lib/api";
+import { errorMessage } from "@/lib/api-error";
 
 type Status = components["schemas"]["ChannelListingStatus"];
 
@@ -20,16 +21,6 @@ function number(formData: FormData, name: string): number | null {
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
 }
 
-function errorMessage(error: unknown, fallback: string): string {
-  if (typeof error === "string" && error.trim()) return error;
-  if (error && typeof error === "object") {
-    for (const key of ["detail", "title", "message"] as const) {
-      const value = (error as Record<string, unknown>)[key];
-      if (typeof value === "string" && value.trim()) return value;
-    }
-  }
-  return fallback;
-}
 
 export async function upsertChannelListing(itemId: string, _previous: ListingActionResult, formData: FormData): Promise<ListingActionResult> {
   const channelAccountId = text(formData, "channelAccountId");

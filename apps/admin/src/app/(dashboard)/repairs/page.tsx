@@ -1,12 +1,10 @@
 import Link from "next/link";
 import { Wrench, UserCog, AlertTriangle } from "lucide-react";
-import { Badge, Card } from "@overhaul/ui";
+import { Badge, Card, formatCurrency } from "@overhaul/ui";
 import { getApiClient } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
 
-const money = (value: number | null | undefined) =>
-  typeof value === "number" ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value) : "—";
 
 // Functional states that mean the item needs bench work before it can be listed.
 const REPAIR_STATES = ["Untested", "FunctionalWithIssues", "Intermittent", "NonFunctional"];
@@ -93,7 +91,7 @@ export default async function RepairsPage() {
                   <td className="text-muted-foreground px-4 py-3">
                     {item.ownershipType === "CustomerRepair" ? "Customer" : "Own stock"}
                   </td>
-                  <td className="px-4 py-3 text-right tabular-nums">{money(item.estimatedSalePrice)}</td>
+                  <td className="px-4 py-3 text-right tabular-nums">{formatCurrency(item.estimatedSalePrice)}</td>
                 </tr>
               ))}
             </tbody>

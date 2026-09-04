@@ -5,14 +5,14 @@ import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
 import { CircleDollarSign } from "lucide-react";
 import type { components } from "@overhaul/api-client";
-import { Button, Card, CardContent, CardHeader, CardTitle, Input, Label } from "@overhaul/ui";
+import { Button, Card, CardContent, CardHeader, CardTitle, Input, Label, formatCurrency } from "@overhaul/ui";
 import { recordSaleForItem, type SellResult } from "./sell-actions";
 
 type Channel = components["schemas"]["SaleChannelOptionDto"];
 
 const initial: SellResult = { ok: false, message: "" };
 const selectClass = "h-10 w-full rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring";
-const currency = (value: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value);
+const currency = (value: number) => formatCurrency(value);
 const today = () => new Date(Date.now() - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
 
 function SaveButton() {

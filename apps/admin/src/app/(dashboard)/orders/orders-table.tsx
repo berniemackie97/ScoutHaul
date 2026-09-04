@@ -5,7 +5,7 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { GitMerge } from "lucide-react";
 import type { components } from "@overhaul/api-client";
-import { Badge, Button } from "@overhaul/ui";
+import { Badge, Button, formatCurrency, formatDate } from "@overhaul/ui";
 import { mergeOrders, type MergeOrdersResult } from "./actions";
 
 export type OrderRow = components["schemas"]["OrderSummaryDto"] & {
@@ -15,12 +15,6 @@ export type OrderRow = components["schemas"]["OrderSummaryDto"] & {
   deliveredAt?: string | null;
 };
 
-const money = (value: number | null | undefined) =>
-  typeof value === "number"
-    ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value)
-    : "—";
-const date = (value: string | null | undefined) =>
-  value ? new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(new Date(value)) : "—";
 
 // The stage the API derived, said the way an operator would say it.
 const stageLabels: Record<string, string> = {
@@ -161,9 +155,9 @@ export function OrdersTable({ orders, emptyLabel }: { orders: OrderRow[]; emptyL
                 <td className="text-muted-foreground px-4 py-3">
                   {order.customerName || order.buyerReference || order.email || "—"}
                 </td>
-                <td className="text-muted-foreground px-4 py-3">{date(order.createdAt)}</td>
+                <td className="text-muted-foreground px-4 py-3">{formatDate(order.createdAt)}</td>
                 <td className="px-4 py-3 text-right tabular-nums">{order.itemCount}</td>
-                <td className="px-4 py-3 text-right font-medium tabular-nums">{money(order.grandTotal)}</td>
+                <td className="px-4 py-3 text-right font-medium tabular-nums">{formatCurrency(order.grandTotal)}</td>
                 <td className="text-muted-foreground px-4 py-3">
                   {order.isLocalPickup ? (
                     "Pickup"
@@ -173,7 +167,7 @@ export function OrdersTable({ orders, emptyLabel }: { orders: OrderRow[]; emptyL
                       <span className="block max-w-[180px] truncate text-xs">{order.trackingNumber}</span>
                     </span>
                   ) : order.shippedAt ? (
-                    <span>Shipped {date(order.shippedAt)}</span>
+                    <span>Shipped {formatDate(order.shippedAt)}</span>
                   ) : (
                     "—"
                   )}

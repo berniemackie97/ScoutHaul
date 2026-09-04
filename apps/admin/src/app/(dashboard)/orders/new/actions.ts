@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import type { components } from "@overhaul/api-client";
 import { getApiClient } from "@/lib/api";
 import { failedFormState, type FailedFormState, type FieldErrors } from "@/lib/form-state";
+import { errorMessage } from "@/lib/api-error";
 
 type RecordSaleRequest = components["schemas"]["RecordSaleRequest"];
 
@@ -31,7 +32,7 @@ function failure(message: string, formData: FormData, fieldErrors: FieldErrors =
   };
 }
 
-function money(formData: FormData, name: string, label: string, fieldErrors: FieldErrors, options: MoneyOptions = {}): number | null {
+function moneyField(formData: FormData, name: string, label: string, fieldErrors: FieldErrors, options: MoneyOptions = {}): number | null {
   const value = text(formData, name);
   if (value === null) {
     if (options.required) fieldErrors[name] = `${label} is required.`;
@@ -54,16 +55,6 @@ function money(formData: FormData, name: string, label: string, fieldErrors: Fie
   return parsed;
 }
 
-function errorMessage(error: unknown): string {
-  if (typeof error === "string" && error.trim()) return error;
-  if (error && typeof error === "object") {
-    for (const key of ["detail", "title", "message"] as const) {
-      const value = (error as Record<string, unknown>)[key];
-      if (typeof value === "string" && value.trim()) return value;
-    }
-  }
-  return "The sale could not be recorded.";
-}
 
 export async function createSale(_previous: CreateSaleResult, formData: FormData): Promise<CreateSaleResult> {
   const inventoryItemId = text(formData, "inventoryItemId");
@@ -72,14 +63,14 @@ export async function createSale(_previous: CreateSaleResult, formData: FormData
   if (!inventoryItemId) fieldErrors.inventoryItemId = "Select an inventory item.";
   if (!platform) fieldErrors.platform = "Select a sales channel.";
 
-  const soldPrice = money(formData, "soldPrice", "Sold price", fieldErrors, { required: true, positive: true });
-  const shippingCharged = money(formData, "shippingCharged", "Buyer shipping charged", fieldErrors);
-  const platformFees = money(formData, "platformFees", "Platform fees", fieldErrors);
-  const paymentFees = money(formData, "paymentFees", "Payment fees", fieldErrors);
-  const shippingCost = money(formData, "shippingCost", "Shipping label cost", fieldErrors);
-  const suppliesCost = money(formData, "suppliesCost", "Packing supplies", fieldErrors);
-  const otherCosts = money(formData, "otherCosts", "Other costs", fieldErrors);
-  const salesTaxCollected = money(formData, "salesTaxCollected", "Sales tax collected", fieldErrors);
+  const soldPrice = moneyField(formData, "soldPrice", "Sold price", fieldErrors, { required: true, positive: true });
+  const shippingCharged = moneyField(formData, "shippingCharged", "Buyer shipping charged", fieldErrors);
+  const platformFees = moneyField(formData, "platformFees", "Platform fees", fieldErrors);
+  const paymentFees = moneyField(formData, "paymentFees", "Payment fees", fieldErrors);
+  const shippingCost = moneyField(formData, "shippingCost", "Shipping label cost", fieldErrors);
+  const suppliesCost = moneyField(formData, "suppliesCost", "Packing supplies", fieldErrors);
+  const otherCosts = moneyField(formData, "otherCosts", "Other costs", fieldErrors);
+  const salesTaxCollected = moneyField(formData, "salesTaxCollected", "Sales tax collected", fieldErrors);
 
   const soldDate = text(formData, "soldAt");
   const soldAt = soldDate ? new Date(`${soldDate}T12:00:00Z`) : new Date();
@@ -114,7 +105,7 @@ export async function createSale(_previous: CreateSaleResult, formData: FormData
 
   const api = await getApiClient();
   const result = await api.POST("/api/sales", { body });
-  if (!result.data?.id) return failure(errorMessage(result.error), formData);
+  if (!result.data?.id) return failure(errorMessage(result.error, "The sale could not be recorded."), formData);
 
   revalidatePath("/orders");
   revalidatePath("/inventory");

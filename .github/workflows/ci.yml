@@ -150,7 +150,7 @@ jobs:
       # These suites existed and passed, and nothing ran them — so nothing was protecting the
       # behaviour they describe. A test that never runs in CI is a comment.
       - name: Test
-        run: pnpm --filter @overhaul/storefront --filter @overhaul/admin test
+        run: pnpm --filter @overhaul/ui --filter @overhaul/storefront --filter @overhaul/admin test
 
       - name: Build storefront + admin
         run: pnpm --filter @overhaul/storefront --filter @overhaul/admin build

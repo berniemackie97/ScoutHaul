@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Boxes, DollarSign, PackageCheck, Plus, Search } from "lucide-react";
-import { Card, Input } from "@overhaul/ui";
+import { Card, Input, formatCurrency } from "@overhaul/ui";
 import {
   INVENTORY_STATUSES,
   LIFECYCLE_FILTERS,
@@ -26,10 +26,6 @@ const ATTENTION_LABELS: Record<InventoryAttention, string> = {
   MissingLocation: "Missing storage location",
 };
 
-const money = (value: number | null | undefined) =>
-  typeof value === "number"
-    ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value)
-    : "—";
 
 export default async function InventoryPage({
   searchParams,
@@ -96,7 +92,7 @@ export default async function InventoryPage({
       <div className="grid gap-4 sm:grid-cols-3">
         <Card className="p-4"><div className="flex items-center justify-between text-sm text-muted-foreground"><span>Active items</span><Boxes className="h-4 w-4" /></div><p className="mt-2 text-2xl font-semibold tabular-nums">{activeItems}</p></Card>
         <Card className="p-4"><div className="flex items-center justify-between text-sm text-muted-foreground"><span>Ready / listed</span><PackageCheck className="h-4 w-4" /></div><p className="mt-2 text-2xl font-semibold tabular-nums">{readyItems}</p></Card>
-        <Card className="p-4"><div className="flex items-center justify-between text-sm text-muted-foreground"><span>Capital deployed</span><DollarSign className="h-4 w-4" /></div><p className="mt-2 text-2xl font-semibold tabular-nums">{money(inventoryCost)}</p></Card>
+        <Card className="p-4"><div className="flex items-center justify-between text-sm text-muted-foreground"><span>Capital deployed</span><DollarSign className="h-4 w-4" /></div><p className="mt-2 text-2xl font-semibold tabular-nums">{formatCurrency(inventoryCost)}</p></Card>
       </div>
 
       <form className="grid gap-3 rounded-xl border bg-card p-4 sm:grid-cols-[minmax(0,1fr)_180px_200px_auto]">

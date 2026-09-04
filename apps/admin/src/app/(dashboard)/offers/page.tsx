@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Handshake, Mail, Phone, Tags } from "lucide-react";
 import type { components } from "@overhaul/api-client";
-import { Card } from "@overhaul/ui";
+import { Card, formatCurrency, formatDateTime } from "@overhaul/ui";
 import { getApiClient } from "@/lib/api";
 import { decideOffer } from "./actions";
 
@@ -12,13 +12,9 @@ type StorefrontOffer = components["schemas"]["StorefrontOfferDto"];
 const FILTERS = ["All", "New", "Accepted", "Countered", "Declined", "Expired", "Converted"] as const;
 type OfferStatusFilter = Exclude<(typeof FILTERS)[number], "All">;
 
-const money = (value: number | null | undefined) =>
-  typeof value === "number"
-    ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value)
-    : "—";
 
 const date = (value: string | null | undefined) =>
-  value ? new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)) : "—";
+  formatDateTime(value);
 
 export default async function OffersPage({
   searchParams,
@@ -44,7 +40,7 @@ export default async function OffersPage({
   const kpis = [
     { label: "Offers in view", value: String(offers.length), detail: active === "All" ? "All statuses" : active, icon: Handshake },
     { label: "New offers", value: String(newOffers), detail: "Needs operator reply", icon: Mail },
-    { label: "Average offer", value: money(averageOffer), detail: "Buyer proposed value", icon: Tags },
+    { label: "Average offer", value: formatCurrency(averageOffer), detail: "Buyer proposed value", icon: Tags },
   ];
 
   return (
@@ -115,9 +111,9 @@ export default async function OffersPage({
                       {offer.listingTitle}
                     </Link>
                   </td>
-                  <td className="px-4 py-3 text-right font-semibold tabular-nums">{money(offer.offerAmount)}</td>
+                  <td className="px-4 py-3 text-right font-semibold tabular-nums">{formatCurrency(offer.offerAmount)}</td>
                   <td className="text-muted-foreground px-4 py-3 text-right tabular-nums">
-                    {money(offer.listingPriceSnapshot)}
+                    {formatCurrency(offer.listingPriceSnapshot)}
                   </td>
                   <td className="px-4 py-3">
                     <span className="font-medium">{offer.buyerName}</span>
@@ -137,7 +133,7 @@ export default async function OffersPage({
                   </td>
                   <td className="text-muted-foreground max-w-sm px-4 py-3">
                     {offer.responseAmount != null ? (
-                      <span className="text-foreground block font-medium">{money(offer.responseAmount)}</span>
+                      <span className="text-foreground block font-medium">{formatCurrency(offer.responseAmount)}</span>
                     ) : null}
                     {offer.responseMessage || "—"}
                     {offer.expiresAt ? <span className="block text-xs">Expires {date(offer.expiresAt)}</span> : null}

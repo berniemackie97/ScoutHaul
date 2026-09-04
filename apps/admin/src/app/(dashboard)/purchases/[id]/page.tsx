@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
-import { Badge, Card } from "@overhaul/ui";
+import { Badge, Card, formatCurrency, formatDate } from "@overhaul/ui";
 import type { InventoryItem } from "@/features/inventory/inventory-operations";
 import { getApiClient } from "@/lib/api";
 import { ItemizeForm } from "./itemize-form";
@@ -10,10 +10,6 @@ import { AttachItems } from "./attach-items";
 
 export const dynamic = "force-dynamic";
 
-const money = (value: number | null | undefined) =>
-  typeof value === "number" ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value) : "—";
-const date = (value: string | null | undefined) =>
-  value ? new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(new Date(value)) : "—";
 const methodLabel: Record<string, string> = {
   Equal: "Equal split",
   WeightedByExpectedValue: "Weighted by expected value",
@@ -52,7 +48,7 @@ export default async function AcquisitionLotDetailPage({ params }: { params: Pro
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">{lot.name}</h1>
             <p className="text-muted-foreground mt-1 text-sm">
-              {[lot.supplierName, lot.externalReference].filter(Boolean).join(" · ") || "No supplier / reference"} · purchased {date(lot.purchasedAt)}
+              {[lot.supplierName, lot.externalReference].filter(Boolean).join(" · ") || "No supplier / reference"} · purchased {formatDate(lot.purchasedAt)}
             </p>
           </div>
           <Badge variant="secondary">{methodLabel[lot.allocationMethod ?? "Equal"] ?? lot.allocationMethod}</Badge>
@@ -62,21 +58,21 @@ export default async function AcquisitionLotDetailPage({ params }: { params: Pro
       <div className="grid gap-4 sm:grid-cols-3">
         <Card className="p-5">
           <p className="text-muted-foreground text-sm">Total landed cost</p>
-          <p className="mt-3 text-3xl font-semibold tabular-nums">{money(lot.totalLandedCost)}</p>
+          <p className="mt-3 text-3xl font-semibold tabular-nums">{formatCurrency(lot.totalLandedCost)}</p>
           <div className="mt-4 space-y-1 border-t pt-3 text-sm">
             {costLines.map(([label, value]) => (
               <div key={label} className="flex justify-between">
                 <span className="text-muted-foreground">{label}</span>
-                <span className="tabular-nums">{money(value)}</span>
+                <span className="tabular-nums">{formatCurrency(value)}</span>
               </div>
             ))}
           </div>
         </Card>
         <Card className="p-5">
           <p className="text-muted-foreground text-sm">Allocated to items</p>
-          <p className="mt-3 text-3xl font-semibold tabular-nums">{money(allocated)}</p>
+          <p className="mt-3 text-3xl font-semibold tabular-nums">{formatCurrency(allocated)}</p>
           <p className="text-muted-foreground mt-2 text-xs">
-            {Math.abs(unallocated) < 0.01 ? "Fully allocated across all items." : `${money(unallocated)} not yet allocated.`}
+            {Math.abs(unallocated) < 0.01 ? "Fully allocated across all items." : `${formatCurrency(unallocated)} not yet allocated.`}
           </p>
         </Card>
         <Card className="p-5">
@@ -112,7 +108,7 @@ export default async function AcquisitionLotDetailPage({ params }: { params: Pro
                       </Link>
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">{item.inventoryItemStatus}</td>
-                    <td className="px-4 py-3 text-right tabular-nums">{money(item.allocatedCost)}</td>
+                    <td className="px-4 py-3 text-right tabular-nums">{formatCurrency(item.allocatedCost)}</td>
                     <td className="px-4 py-3 text-right tabular-nums">{item.allocationWeight ?? "—"}</td>
                   </tr>
                 ))}

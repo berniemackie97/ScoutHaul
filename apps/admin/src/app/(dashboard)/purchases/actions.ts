@@ -5,7 +5,8 @@ import { redirect } from "next/navigation";
 import type { components } from "@overhaul/api-client";
 import { getApiClient } from "@/lib/api";
 import { failedFormState, type FailedFormState, type FieldErrors } from "@/lib/form-state";
-import { apiErrorMessage, moneyField, purchasedAtIso, textField } from "./form-helpers";
+import { moneyField, purchasedAtIso, textField } from "./form-helpers";
+import { errorMessage } from "@/lib/api-error";
 
 type UpsertAcquisitionLotRequest = components["schemas"]["UpsertAcquisitionLotRequest"];
 type AcquisitionLotAllocationMethod = components["schemas"]["AcquisitionLotAllocationMethod"];
@@ -98,7 +99,7 @@ export async function createPurchaseLot(_previous: PurchaseActionResult, formDat
 
   const api = await getApiClient();
   const result = await api.POST("/api/acquisition-lots", { body });
-  if (!result.data?.id) return failure(apiErrorMessage(result.error, "The acquisition lot could not be saved."), formData);
+  if (!result.data?.id) return failure(errorMessage(result.error, "The acquisition lot could not be saved."), formData);
 
   revalidatePath("/purchases");
   revalidatePath("/inventory");

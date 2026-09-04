@@ -15,16 +15,6 @@ export function moneyField(formData: FormData, name: string): number {
 }
 
 /** Extracts an API problem-details message, falling back to a caller-supplied default. */
-export function apiErrorMessage(error: unknown, fallback: string): string {
-  if (typeof error === "string" && error.trim()) return error;
-  if (error && typeof error === "object") {
-    for (const key of ["detail", "title", "message"] as const) {
-      const value = (error as Record<string, unknown>)[key];
-      if (typeof value === "string" && value.trim()) return value;
-    }
-  }
-  return fallback;
-}
 
 /**
  * Normalizes a yyyy-MM-dd date input to an ISO instant at midday UTC (avoids off-by-one from
@@ -36,3 +26,6 @@ export function purchasedAtIso(value: string | null): string | null {
   const parsed = new Date(`${value}T12:00:00Z`);
   return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
 }
+
+// One implementation, in @/lib/api-error. Re-exported so existing importers keep working.
+export { errorMessage } from "@/lib/api-error";

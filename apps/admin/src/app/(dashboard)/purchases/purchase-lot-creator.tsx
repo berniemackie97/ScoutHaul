@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useMemo, useState } from "react";
 import { useFormStatus } from "react-dom";
-import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Label, Textarea } from "@overhaul/ui";
+import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Label, Textarea, formatCurrency } from "@overhaul/ui";
 import type { InventoryItem } from "@/features/inventory/inventory-operations";
 import { createPurchaseLot, type PurchaseActionResult } from "./actions";
 
@@ -10,8 +10,6 @@ type AllocationMethod = "Equal" | "WeightedByExpectedValue" | "Manual";
 type PurchaseKind = "Single" | "Lot";
 
 const initial: PurchaseActionResult = { ok: false, message: "" };
-const money = (value: number | null | undefined) =>
-  typeof value === "number" ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value) : "—";
 const today = () => new Date(Date.now() - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
 
 function SubmitButton({ kind }: { kind: PurchaseKind }) {
@@ -233,8 +231,8 @@ export function PurchaseLotCreator({ candidates }: { candidates: InventoryItem[]
                               </span>
                             </label>
                           </td>
-                          <td className="px-3 py-2 text-right tabular-nums">{money(item.purchasePrice)}</td>
-                          <td className="px-3 py-2 text-right tabular-nums">{money(item.estimatedSalePrice)}</td>
+                          <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(item.purchasePrice)}</td>
+                          <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(item.estimatedSalePrice)}</td>
                           <td className="px-3 py-2">
                             <Input
                               key={`manualCost:${item.id}:${formKey}`}
@@ -243,7 +241,7 @@ export function PurchaseLotCreator({ candidates }: { candidates: InventoryItem[]
                               step="0.01"
                               min="0"
                               disabled={!checked || purchaseKind === "Single" || allocationMethod !== "Manual"}
-                              placeholder={allocationMethod === "Equal" ? money(equalAllocation) : ""}
+                              placeholder={allocationMethod === "Equal" ? formatCurrency(equalAllocation) : ""}
                               defaultValue={valueFor(`manualCost:${item.id}`)}
                               aria-invalid={fieldErrors[`manualCost:${item.id}`] ? "true" : undefined}
                             />
@@ -282,10 +280,10 @@ export function PurchaseLotCreator({ candidates }: { candidates: InventoryItem[]
       <aside className="space-y-4 xl:sticky xl:top-6 xl:self-start">
         <Card className="p-6">
           <p className="text-sm text-muted-foreground">Total landed cost</p>
-          <p className="mt-2 text-4xl font-semibold tabular-nums">{money(landedCost)}</p>
+          <p className="mt-2 text-4xl font-semibold tabular-nums">{formatCurrency(landedCost)}</p>
           <div className="mt-5 space-y-2 border-t pt-4 text-sm">
             <div className="flex justify-between"><span className="text-muted-foreground">Selected items</span><span>{selectedItems.length}</span></div>
-            <div className="flex justify-between"><span className="text-muted-foreground">Equal cost each</span><span>{selectedItems.length ? money(equalAllocation) : "—"}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Equal cost each</span><span>{selectedItems.length ? formatCurrency(equalAllocation) : "—"}</span></div>
             <div className="flex justify-between"><span className="text-muted-foreground">Method</span><span>{purchaseKind === "Single" ? "Single item" : allocationMethod}</span></div>
           </div>
         </Card>

@@ -1,17 +1,13 @@
 import Link from "next/link";
 import { ArrowRight, ReceiptText } from "lucide-react";
-import { Badge, Card } from "@overhaul/ui";
+import { Badge, Card, formatCurrency, formatDate } from "@overhaul/ui";
 import type { InventoryItem } from "@/features/inventory/inventory-operations";
 import { getApiClient } from "@/lib/api";
 import { PurchaseLotCreator } from "./purchase-lot-creator";
 
 export const dynamic = "force-dynamic";
 
-const money = (value: number | null | undefined) =>
-  typeof value === "number" ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value) : "—";
 
-const date = (value: string | null | undefined) =>
-  value ? new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(new Date(value)) : "—";
 
 export default async function PurchasesPage() {
   const api = await getApiClient();
@@ -41,8 +37,8 @@ export default async function PurchasesPage() {
       </header>
 
       <div className="grid gap-4 sm:grid-cols-3">
-        <Card className="p-5"><div className="flex items-center justify-between text-sm text-muted-foreground"><span>Total purchase spend</span><ReceiptText className="h-4 w-4" /></div><p className="mt-3 text-3xl font-semibold tabular-nums">{money(totalSpend)}</p></Card>
-        <Card className="p-5"><p className="text-sm text-muted-foreground">Allocated COGS</p><p className="mt-3 text-3xl font-semibold tabular-nums">{money(allocated)}</p></Card>
+        <Card className="p-5"><div className="flex items-center justify-between text-sm text-muted-foreground"><span>Total purchase spend</span><ReceiptText className="h-4 w-4" /></div><p className="mt-3 text-3xl font-semibold tabular-nums">{formatCurrency(totalSpend)}</p></Card>
+        <Card className="p-5"><p className="text-sm text-muted-foreground">Allocated COGS</p><p className="mt-3 text-3xl font-semibold tabular-nums">{formatCurrency(allocated)}</p></Card>
         <Card className="p-5"><p className="text-sm text-muted-foreground">Open candidates</p><p className="mt-3 text-3xl font-semibold tabular-nums">{candidates.length}</p></Card>
       </div>
 
@@ -75,11 +71,11 @@ export default async function PurchasesPage() {
                       <Link href={`/purchases/${lot.id}`} className="font-medium hover:underline">{lot.name || "Untitled purchase"}</Link>
                       <p className="text-xs text-muted-foreground">{[lot.supplierName, lot.externalReference].filter(Boolean).join(" · ") || "No supplier/reference"}</p>
                     </td>
-                    <td className="px-4 py-3 text-muted-foreground">{date(lot.purchasedAt)}</td>
+                    <td className="px-4 py-3 text-muted-foreground">{formatDate(lot.purchasedAt)}</td>
                     <td className="px-4 py-3"><Badge variant="secondary">{lot.allocationMethod}</Badge></td>
                     <td className="px-4 py-3 text-right tabular-nums">{lot.items?.length ?? 0}</td>
-                    <td className="px-4 py-3 text-right tabular-nums">{money(lot.totalLandedCost)}</td>
-                    <td className="px-4 py-3 text-right tabular-nums">{money(lot.totalAllocatedCost)}</td>
+                    <td className="px-4 py-3 text-right tabular-nums">{formatCurrency(lot.totalLandedCost)}</td>
+                    <td className="px-4 py-3 text-right tabular-nums">{formatCurrency(lot.totalAllocatedCost)}</td>
                   </tr>
                 ))}
               </tbody>

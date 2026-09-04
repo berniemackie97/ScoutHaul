@@ -1,13 +1,11 @@
 import Link from "next/link";
 import { Handshake, Package, Tag } from "lucide-react";
-import { Badge, Card } from "@overhaul/ui";
+import { Badge, Card, formatCurrency } from "@overhaul/ui";
 import { inventoryStatusLabel } from "@/features/inventory/inventory-operations";
 import { getApiClient } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
 
-const money = (value: number | null | undefined) =>
-  typeof value === "number" ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value) : "—";
 
 export default async function ConsignmentsPage() {
   const api = await getApiClient();
@@ -19,8 +17,8 @@ export default async function ConsignmentsPage() {
 
   const kpis = [
     { label: "Consigned items", value: String(consigned.length), detail: "Owned by a consignor", icon: Handshake },
-    { label: "Asking value", value: money(askingValue), detail: "Sum of consignor asks", icon: Tag },
-    { label: "Estimated resale", value: money(estimatedValue), detail: "Projected sale value", icon: Package },
+    { label: "Asking value", value: formatCurrency(askingValue), detail: "Sum of consignor asks", icon: Tag },
+    { label: "Estimated resale", value: formatCurrency(estimatedValue), detail: "Projected sale value", icon: Package },
   ];
 
   return (
@@ -76,8 +74,8 @@ export default async function ConsignmentsPage() {
                   <td className="px-4 py-3">
                     <Badge variant="secondary">{inventoryStatusLabel(item.status)}</Badge>
                   </td>
-                  <td className="px-4 py-3 text-right tabular-nums">{money(item.sellerAskingPrice)}</td>
-                  <td className="px-4 py-3 text-right tabular-nums">{money(item.estimatedSalePrice)}</td>
+                  <td className="px-4 py-3 text-right tabular-nums">{formatCurrency(item.sellerAskingPrice)}</td>
+                  <td className="px-4 py-3 text-right tabular-nums">{formatCurrency(item.estimatedSalePrice)}</td>
                 </tr>
               ))}
             </tbody>

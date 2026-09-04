@@ -4,7 +4,7 @@ import { Fragment, useState } from "react";
 import Link from "next/link";
 import { ChevronDown, ChevronRight, History } from "lucide-react";
 import type { components } from "@overhaul/api-client";
-import { Badge, Button } from "@overhaul/ui";
+import { Badge, Button, formatCurrency, formatDateTime } from "@overhaul/ui";
 import { SaleEditor } from "./sale-editor";
 import { LineWorkspace } from "./line-workspace";
 
@@ -14,12 +14,8 @@ type ReturnDto = components["schemas"]["ReturnDto"];
 type Channel = components["schemas"]["SaleChannelOptionDto"];
 type Correction = components["schemas"]["SaleCorrectionDto"];
 
-const money = (value: number | null | undefined) =>
-  typeof value === "number"
-    ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value)
-    : "—";
 const dateTime = (value: string | null | undefined) =>
-  value ? new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)) : "—";
+  formatDateTime(value);
 function netFrom(json: string | null | undefined): number | null {
   if (!json) return null;
   try {
@@ -110,17 +106,17 @@ export function LineItems({
                       <span className="text-muted-foreground text-xs">No sale line</span>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-right tabular-nums">{money(line.unitPrice)}</td>
-                  <td className="px-4 py-3 text-right tabular-nums">{money(sale?.shippingCharged)}</td>
+                  <td className="px-4 py-3 text-right tabular-nums">{formatCurrency(line.unitPrice)}</td>
+                  <td className="px-4 py-3 text-right tabular-nums">{formatCurrency(sale?.shippingCharged)}</td>
                   <td className="px-4 py-3 text-right tabular-nums">
-                    {sale ? (fees > 0 ? `-${money(fees)}` : money(0)) : "—"}
+                    {sale ? (fees > 0 ? `-${formatCurrency(fees)}` : formatCurrency(0)) : "—"}
                   </td>
                   <td className="px-4 py-3 text-right tabular-nums">
-                    {money(sale?.costOfGoods ?? line.unitCostSnapshot)}
+                    {formatCurrency(sale?.costOfGoods ?? line.unitCostSnapshot)}
                   </td>
                   <td className="px-4 py-3 text-right tabular-nums">
                     {refunded > 0 ? (
-                      <span className="text-amber-700">-{money(refunded)}</span>
+                      <span className="text-amber-700">-{formatCurrency(refunded)}</span>
                     ) : (
                       <span className="text-muted-foreground text-xs">—</span>
                     )}
@@ -129,7 +125,7 @@ export function LineItems({
                   <td
                     className={`px-4 py-3 text-right font-medium tabular-nums ${(sale?.netProfit ?? 0) < 0 ? "text-destructive" : ""}`}
                   >
-                    {money(sale?.netProfit)}
+                    {formatCurrency(sale?.netProfit)}
                   </td>
                 </tr>
                 {open && sale?.id && (
@@ -189,7 +185,7 @@ function CorrectionHistory({ corrections }: { corrections: Correction[] }) {
               {before !== null && after !== null && (
                 <>
                   {" "}
-                  · net {money(before)} → <span className="text-foreground font-medium">{money(after)}</span>
+                  · net {formatCurrency(before)} → <span className="text-foreground font-medium">{formatCurrency(after)}</span>
                 </>
               )}
             </p>

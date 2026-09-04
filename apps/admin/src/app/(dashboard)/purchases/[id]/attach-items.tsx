@@ -4,12 +4,10 @@ import { useActionState, useMemo, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { Link2 } from "lucide-react";
 import type { InventoryItem } from "@/features/inventory/inventory-operations";
-import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input } from "@overhaul/ui";
+import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, formatCurrency } from "@overhaul/ui";
 import { attachItemsToLot, type LotActionResult } from "./actions";
 
 const initial: LotActionResult = { ok: false, message: "" };
-const money = (value: number | null | undefined) =>
-  typeof value === "number" ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value) : "—";
 
 function SubmitButton({ count }: { count: number }) {
   const { pending } = useFormStatus();
@@ -61,7 +59,7 @@ export function AttachItems({ lotId, candidates }: { lotId: string; candidates: 
                             <span><span className="font-medium">{item.title}</span><span className="text-muted-foreground block text-xs">{[item.status, item.category].filter(Boolean).join(" · ")}</span></span>
                           </label>
                         </td>
-                        <td className="px-3 py-2 text-right tabular-nums">{money(item.purchasePrice)}</td>
+                        <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(item.purchasePrice)}</td>
                       </tr>
                     );
                   })}

@@ -22,4 +22,4 @@ export {
   DropdownMenuPortal, DropdownMenuSub, DropdownMenuSubContent,
   DropdownMenuSubTrigger, DropdownMenuRadioGroup,
 } from "./components/dropdown-menu";
-export { cn, formatCurrency, formatDate, truncate } from "./lib/utils";
+export { ABSENT, cn, formatCurrency, formatDate, formatDateTime, truncate } from "./lib/utils";

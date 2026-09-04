@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import type { components } from "@overhaul/api-client";
 import { getApiClient } from "@/lib/api";
 import { failedFormState, type FailedFormState, type FieldErrors } from "@/lib/form-state";
+import { errorMessage } from "@/lib/api-error";
 
 type UpsertInventoryItemRequest = components["schemas"]["UpsertInventoryItemRequest"];
 type OwnershipType = components["schemas"]["InventoryOwnershipType"];
@@ -71,16 +72,6 @@ function optionalNumber(
   return parsed;
 }
 
-function errorMessage(error: unknown, fallback: string): string {
-  if (typeof error === "string" && error.trim()) return error;
-  if (error && typeof error === "object") {
-    for (const key of ["detail", "title", "message"] as const) {
-      const value = (error as Record<string, unknown>)[key];
-      if (typeof value === "string" && value.trim()) return value;
-    }
-  }
-  return fallback;
-}
 
 export async function createInventoryItem(_previous: NewInventoryResult, formData: FormData): Promise<NewInventoryResult> {
   const title = text(formData, "title");

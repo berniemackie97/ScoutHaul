@@ -1,16 +1,12 @@
 import Link from "next/link";
 import { PackageCheck, Plus, ShoppingBag, Truck } from "lucide-react";
 import type { components } from "@overhaul/api-client";
-import { Card } from "@overhaul/ui";
+import { Card, formatCurrency } from "@overhaul/ui";
 import { getApiClient } from "@/lib/api";
 import { OrdersTable } from "./orders-table";
 
 export const dynamic = "force-dynamic";
 
-const money = (value: number | null | undefined) =>
-  typeof value === "number"
-    ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value)
-    : "—";
 
 /**
  * Queues, not statuses. The operator's question is "what do I do next", and the answer is the stage
@@ -75,7 +71,7 @@ export default async function OrdersPage({
     },
     {
       label: "Captured revenue",
-      value: money(revenue),
+      value: formatCurrency(revenue),
       detail: "Paid orders",
       icon: PackageCheck,
       href: undefined,

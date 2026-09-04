@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import type { components } from "@overhaul/api-client";
 import { getApiClient } from "@/lib/api";
+import { errorMessage } from "@/lib/api-error";
 
 type UpsertChannelAccountRequest = components["schemas"]["UpsertChannelAccountRequest"];
 
@@ -13,16 +14,6 @@ function text(formData: FormData, name: string): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
-function errorMessage(error: unknown, fallback: string): string {
-  if (typeof error === "string" && error.trim()) return error;
-  if (error && typeof error === "object") {
-    for (const key of ["detail", "title", "message"] as const) {
-      const value = (error as Record<string, unknown>)[key];
-      if (typeof value === "string" && value.trim()) return value;
-    }
-  }
-  return fallback;
-}
 
 export async function saveChannelAccount(_previous: ChannelActionResult, formData: FormData): Promise<ChannelActionResult> {
   const channel = text(formData, "channel");

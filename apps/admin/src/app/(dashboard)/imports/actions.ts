@@ -3,19 +3,10 @@
 import { Buffer } from "node:buffer";
 import { revalidatePath } from "next/cache";
 import { getApiAccessToken, getApiBaseUrl, getApiClient } from "@/lib/api";
+import { errorMessage } from "@/lib/api-error";
 
 export type ImportResult = { ok: boolean; message: string };
 
-function errorMessage(error: unknown, fallback: string): string {
-  if (typeof error === "string" && error.trim()) return error;
-  if (error && typeof error === "object") {
-    for (const key of ["detail", "title", "message"] as const) {
-      const value = (error as Record<string, unknown>)[key];
-      if (typeof value === "string" && value.trim()) return value;
-    }
-  }
-  return fallback;
-}
 
 async function readCsv(formData: FormData): Promise<string> {
   const file = formData.get("file");

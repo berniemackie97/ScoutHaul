@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ExternalLink, Radio, Trash2 } from "lucide-react";
 import type { components } from "@overhaul/api-client";
-import { Badge, Card, CardContent, CardDescription, CardHeader, CardTitle, Input } from "@overhaul/ui";
+import { Badge, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, formatCurrency } from "@overhaul/ui";
 import { upsertChannelListing, removeChannelListing, type ListingActionResult } from "./channel-listing-actions";
 
 type Account = components["schemas"]["ChannelAccountDto"];
@@ -22,7 +22,7 @@ const STATUS_LABELS: Record<(typeof STATUSES)[number], string> = {
 };
 const selectClass = "h-9 rounded-lg border border-input bg-background px-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring";
 const money = (value: number | null | undefined) =>
-  typeof value === "number" ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value) : "";
+  formatCurrency(value, { whenAbsent: "" });
 
 const statusVariant = (status: string | undefined) => {
   if (status === "Active") return "success" as const;

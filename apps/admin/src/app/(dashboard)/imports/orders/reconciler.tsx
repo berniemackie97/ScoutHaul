@@ -3,7 +3,7 @@
 import { useActionState, useMemo, useState } from "react";
 import { useFormStatus } from "react-dom";
 import type { components } from "@overhaul/api-client";
-import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Textarea } from "@overhaul/ui";
+import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Textarea, formatCurrency, formatDate } from "@overhaul/ui";
 import { reconcilePlatformOrder, ignorePlatformOrder, type ActionResult } from "./actions";
 
 type PlatformOrder = components["schemas"]["PlatformOrderDto"];
@@ -14,12 +14,7 @@ export type MatchTarget = { id: string; title: string; isSold: boolean };
 const initial: ActionResult = { ok: false, message: "" };
 const selectClass =
   "h-9 w-full rounded-lg border border-input bg-background px-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring";
-const currency = (value: number | null | undefined) =>
-  typeof value === "number"
-    ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value)
-    : "—";
-const date = (value: string | null | undefined) =>
-  value ? new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(new Date(value)) : "—";
+const currency = formatCurrency;
 
 function ReconcileButton({
   disabled,
@@ -115,7 +110,7 @@ function OrderCard({ order, targets }: { order: PlatformOrder; targets: MatchTar
               {order.platform} · order {order.externalOrderId}
             </CardTitle>
             <p className="text-muted-foreground mt-1 text-xs">
-              {date(order.orderedAt)}
+              {formatDate(order.orderedAt)}
               {order.buyerName ? ` · ${order.buyerName}` : ""}
               {order.trackingNumber
                 ? ` · ${order.carrier ?? "tracking"} ${order.trackingNumber}`

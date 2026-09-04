@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import type { components } from "@overhaul/api-client";
 import { getApiClient } from "@/lib/api";
-import { apiErrorMessage, moneyField, purchasedAtIso, textField } from "../form-helpers";
+import { moneyField, purchasedAtIso, textField } from "../form-helpers";
+import { errorMessage } from "@/lib/api-error";
 
 type UpsertAcquisitionLotRequest = components["schemas"]["UpsertAcquisitionLotRequest"];
 type AcquisitionLotAllocationMethod = components["schemas"]["AcquisitionLotAllocationMethod"];
@@ -64,7 +65,7 @@ export async function updateLot(id: string, _previous: LotActionResult, formData
 
   const api = await getApiClient();
   const result = await api.PUT("/api/acquisition-lots/{id}", { params: { path: { id } }, body });
-  if (!result.data) return { ok: false, message: apiErrorMessage(result.error, "The lot could not be updated.") };
+  if (!result.data) return { ok: false, message: errorMessage(result.error, "The lot could not be updated.") };
 
   revalidateLot(id);
   return { ok: true, message: "Lot updated and cost basis re-allocated." };
@@ -78,7 +79,7 @@ export async function attachItemsToLot(id: string, _previous: LotActionResult, f
   const api = await getApiClient();
   const current = await api.GET("/api/acquisition-lots/{id}", { params: { path: { id } } });
   const lot = current.data;
-  if (!lot) return { ok: false, message: apiErrorMessage(current.error, "The lot could not be loaded.") };
+  if (!lot) return { ok: false, message: errorMessage(current.error, "The lot could not be loaded.") };
 
   const manual = lot.allocationMethod === "Manual";
   const existing = (lot.items ?? []).map((item) => ({
@@ -110,7 +111,7 @@ export async function attachItemsToLot(id: string, _previous: LotActionResult, f
   };
 
   const result = await api.PUT("/api/acquisition-lots/{id}", { params: { path: { id } }, body });
-  if (!result.data) return { ok: false, message: apiErrorMessage(result.error, "Items could not be attached. Manual-allocation lots need per-item costs — set them in the lot editor.") };
+  if (!result.data) return { ok: false, message: errorMessage(result.error, "Items could not be attached. Manual-allocation lots need per-item costs — set them in the lot editor.") };
 
   revalidateLot(id);
   return { ok: true, message: `Attached ${additions.length} item${additions.length === 1 ? "" : "s"} and re-allocated.` };
@@ -161,7 +162,7 @@ export async function addLotItems(id: string, _previous: LotActionResult, formDa
 
   const api = await getApiClient();
   const result = await api.POST("/api/acquisition-lots/{id}/items", { params: { path: { id } }, body: { items } });
-  if (!result.data) return { ok: false, message: apiErrorMessage(result.error, "Items could not be added to the lot.") };
+  if (!result.data) return { ok: false, message: errorMessage(result.error, "Items could not be added to the lot.") };
 
   revalidateLot(id);
   return { ok: true, message: `Added ${items.length} item${items.length === 1 ? "" : "s"} and re-allocated cost basis.` };
