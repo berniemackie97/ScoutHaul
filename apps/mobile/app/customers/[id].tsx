@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Stack, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { Stack, router, useLocalSearchParams } from 'expo-router';
+import { useCallback } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { api } from '../../src/api';
 import { Card } from '../../src/components/Card';
@@ -14,7 +14,8 @@ import { StatusPill } from '../../src/components/StatusPill';
 import { Text } from '../../src/components/Text';
 import { spacing } from '../../src/components/theme';
 import { useColors } from '../../src/context/ThemeContext';
-import type { CustomerAddress, CustomerDetail, OrderSummary } from '../../src/domain/types';
+import { useApiResource } from '../../src/hooks/useApiResource';
+import type { CustomerAddress, OrderSummary } from '../../src/domain/types';
 import { formatMoney } from '../../src/utils/money';
 import { orderStatusTone } from '../../src/utils/statusTone';
 
@@ -24,26 +25,11 @@ const dateLabel = (value: string | null | undefined) =>
 export default function CustomerDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const c = useColors();
-  const [customer, setCustomer] = useState<CustomerDetail | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-
-  const load = useCallback(async (showRefresh = false) => {
-    if (!id) return;
-    if (showRefresh) setRefreshing(true);
-    try {
-      setCustomer(await api.customer(id));
-      setError(null);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Customer unavailable.');
-    } finally {
-      setIsLoading(false);
-      setRefreshing(false);
-    }
-  }, [id]);
-
-  useFocusEffect(useCallback(() => { void load(); }, [load]));
+  const fetchCustomer = useCallback(
+    (signal: AbortSignal) => api.customer(id, { signal }),
+    [id],
+  );
+  const { data: customer, error, isLoading, isRefreshing, refresh, reload } = useApiResource(fetchCustomer);
 
   if (isLoading) {
     return <Screen><LoadingState message="Loading customer..." /></Screen>;
@@ -52,7 +38,7 @@ export default function CustomerDetailScreen() {
   if (!customer) {
     return (
       <Screen>
-        <ErrorBanner message={error ?? 'Customer not found.'} onRetry={() => void load()} />
+        <ErrorBanner message={error ?? 'Customer not found.'} onRetry={reload} />
       </Screen>
     );
   }
@@ -60,7 +46,7 @@ export default function CustomerDetailScreen() {
   const name = customer.displayName || customer.email || customer.channelIdentities?.[0]?.externalUserId || 'Buyer';
 
   return (
-    <Screen refreshing={refreshing} onRefresh={() => void load(true)}>
+    <Screen refreshing={isRefreshing} onRefresh={refresh}>
       <Stack.Screen options={{ title: name }} />
       <Pressable onPress={() => router.back()} style={styles.backRow} hitSlop={8}>
         <Ionicons name="chevron-back" size={18} color={c.textSecondary} />
@@ -75,7 +61,7 @@ export default function CustomerDetailScreen() {
         {customer.acceptsMarketing ? <StatusPill label="Marketing" tone="info" size="sm" /> : null}
       </View>
 
-      {error ? <ErrorBanner message={error} onRetry={() => void load()} /> : null}
+      {error ? <ErrorBanner message={error} onRetry={reload} /> : null}
 
       <View style={styles.metricRow}>
         <MetricCard label="Lifetime" value={formatMoney(customer.lifetimeSpend ?? 0)} icon="wallet-outline" tone="success" />

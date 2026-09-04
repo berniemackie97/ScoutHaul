@@ -1,4 +1,4 @@
-import { apiRequest } from './client';
+import { apiRequest, type CallOptions } from './client';
 import type { CustomerDetail, CustomerSummary } from '../domain/types';
 
 type CustomerListFilters = {
@@ -15,6 +15,10 @@ function query(filters: CustomerListFilters = {}) {
 }
 
 export const customersApi = {
-  list: (filters?: CustomerListFilters) => apiRequest<CustomerSummary[]>(`/api/customers${query(filters)}`),
-  get: (id: string) => apiRequest<CustomerDetail>(`/api/customers/${id}`),
+  // `options` carries the caller's abort signal, so a screen that closes mid-request stops waiting
+  // for it. Every read should take it; these are the two the resource hook uses so far.
+  list: (filters?: CustomerListFilters, options?: CallOptions) =>
+    apiRequest<CustomerSummary[]>(`/api/customers${query(filters)}`, options),
+  get: (id: string, options?: CallOptions) =>
+    apiRequest<CustomerDetail>(`/api/customers/${id}`, options),
 };
