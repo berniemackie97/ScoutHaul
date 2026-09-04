@@ -1,4 +1,5 @@
-import { storefrontApi, liveCatalogEnabled, STORE } from "./store";
+import { imageUrl } from "./commerce";
+import { storefrontApi, liveCatalogEnabled } from "./store";
 
 // One catalog item, projected from the org's real inventory via /api/storefront/*.
 export type Specimen = {
@@ -60,7 +61,7 @@ export async function getListings(opts?: { category?: string; search?: string })
         shippingPolicy: dto.shippingPolicy,
         shippingAmountOverride: dto.shippingAmountOverride ?? null,
         blurb: dto.subtitle ?? "",
-        image: dto.imageUrl ? STORE.apiBaseUrl + dto.imageUrl : undefined,
+        image: imageUrl(dto.imageUrl),
       }),
     );
   } catch {
@@ -113,8 +114,8 @@ export async function getListing(slug: string): Promise<Specimen | null> {
       shippingPolicy: data.shippingPolicy,
       shippingAmountOverride: data.shippingAmountOverride ?? null,
       blurb: data.description ?? data.subtitle ?? "",
-      image: data.imageUrl ? STORE.apiBaseUrl + data.imageUrl : undefined,
-      images: (data.imageUrls ?? []).map((url) => STORE.apiBaseUrl + url),
+      image: imageUrl(data.imageUrl),
+      images: (data.imageUrls ?? []).map(imageUrl).filter((url): url is string => Boolean(url)),
       availability: data.availability ?? "Available",
     };
   } catch {
@@ -166,7 +167,7 @@ export async function getAllListings(): Promise<ListingSummary[]> {
         out.push({
           slug: dto.slug ?? "",
           category: dto.category ?? "",
-          image: dto.imageUrl ? STORE.apiBaseUrl + dto.imageUrl : undefined,
+          image: imageUrl(dto.imageUrl),
         });
       }
       const total = typeof data?.total === "number" ? data.total : out.length;
