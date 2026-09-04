@@ -27,7 +27,12 @@ export function AttachItems({ lotId, candidates }: { lotId: string; candidates: 
   }, [candidates, query]);
 
   function toggle(id: string) {
-    setSelected((cur) => { const next = new Set(cur); next.has(id) ? next.delete(id) : next.add(id); return next; });
+    setSelected((cur) => {
+      const next = new Set(cur);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   }
 
   return (

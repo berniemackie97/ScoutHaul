@@ -14,8 +14,6 @@ const MAX_PHOTOS = 6;
 const MAX_PHOTO_BYTES = 5 * 1024 * 1024; // 5 MB per photo, post client-side compression
 const MAX_FIELD_LEN = 5000;
 
-type Kind = "consignment" | "repair";
-
 type IncomingPhoto = { name?: string; dataUrl?: string };
 type IncomingBody = {
   kind?: string;

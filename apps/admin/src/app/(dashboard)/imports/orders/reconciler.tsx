@@ -59,7 +59,9 @@ function IgnoreButton() {
 function OrderCard({ order, targets }: { order: PlatformOrder; targets: MatchTarget[] }) {
   const [reconcileState, reconcileAction] = useActionState(reconcilePlatformOrder, initial);
   const [ignoreState, ignoreAction] = useActionState(ignorePlatformOrder, initial);
-  const lines = order.lines ?? [];
+  // `?? []` produced a fresh array on every render, so the useMemo keyed on `lines` below
+  // recomputed every time and memoized nothing.
+  const lines = useMemo(() => order.lines ?? [], [order.lines]);
 
   const soldById = useMemo(
     () => new Map(targets.map((target) => [target.id, target.isSold])),
