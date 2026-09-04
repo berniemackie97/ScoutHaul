@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { router, useFocusEffect } from 'expo-router';
+import { router } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { api } from '../../src/api';
@@ -15,6 +15,7 @@ import { Text } from '../../src/components/Text';
 import { TextField } from '../../src/components/TextField';
 import { spacing } from '../../src/components/theme';
 import { useColors } from '../../src/context/ThemeContext';
+import { useApiResource } from '../../src/hooks/useApiResource';
 import type { CustomerSummary } from '../../src/domain/types';
 import { formatMoney } from '../../src/utils/money';
 
@@ -23,27 +24,19 @@ const shortDate = (value: string | null | undefined) =>
 
 export default function CustomersScreen() {
   const c = useColors();
-  const [customers, setCustomers] = useState<CustomerSummary[]>([]);
   const [search, setSearch] = useState('');
   const [submittedSearch, setSubmittedSearch] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
 
-  const load = useCallback(async (showRefresh = false, nextSearch = submittedSearch) => {
-    if (showRefresh) setRefreshing(true);
-    try {
-      setCustomers(await api.customers({ search: nextSearch }));
-      setError(null);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Customers unavailable.');
-    } finally {
-      setIsLoading(false);
-      setRefreshing(false);
-    }
-  }, [submittedSearch]);
-
-  useFocusEffect(useCallback(() => { void load(); }, [load]));
+  // The search term is the key. Changing it makes a new fetcher, which is the one thing that
+  // triggers a reload — the previous version both re-ran the focus effect and called load() by
+  // hand, so every search fetched twice.
+  const fetchCustomers = useCallback(
+    (signal: AbortSignal) => api.customers({ search: submittedSearch }, { signal }),
+    [submittedSearch],
+  );
+  const { data, error, isLoading, isRefreshing, refresh, reload } = useApiResource(fetchCustomers);
+  // useMemo below keys on this, so it must not be a fresh array on every render.
+  const customers = useMemo(() => data ?? [], [data]);
 
   const metrics = useMemo(() => {
     const marketing = customers.filter((customer) => customer.acceptsMarketing).length;
@@ -53,21 +46,16 @@ export default function CustomersScreen() {
   }, [customers]);
 
   function applySearch() {
-    const next = search.trim();
-    setSubmittedSearch(next);
-    setIsLoading(true);
-    void load(false, next);
+    setSubmittedSearch(search.trim());
   }
 
   function clearSearch() {
     setSearch('');
     setSubmittedSearch('');
-    setIsLoading(true);
-    void load(false, '');
   }
 
   return (
-    <Screen refreshing={refreshing} onRefresh={() => void load(true)}>
+    <Screen refreshing={isRefreshing} onRefresh={refresh}>
       <View style={styles.header}>
         <View style={styles.headerText}>
           <Text variant="title">Customers</Text>
@@ -106,7 +94,7 @@ export default function CustomersScreen() {
         </View>
       </Card>
 
-      {error ? <ErrorBanner message={error} onRetry={() => void load()} /> : null}
+      {error ? <ErrorBanner message={error} onRetry={reload} /> : null}
 
       <SectionHeader title={submittedSearch ? `Matching “${submittedSearch}”` : 'Customer records'} />
       {isLoading ? (
