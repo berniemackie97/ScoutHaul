@@ -11,6 +11,7 @@ import { ThemeProvider, useColors } from '../src/context/ThemeContext';
 import { initializeAuthSession, authStore } from '../src/services/auth';
 import { bootstrapSignedInWorkspace } from '../src/services/sessionBootstrap';
 import { useAppFonts } from '../src/hooks/useFonts';
+import { useSyncOnReconnect } from '../src/hooks/useSyncOnReconnect';
 
 function BrandedSplash() {
   const c = useColors();
@@ -159,6 +160,10 @@ function StartupGate() {
   const router = useRouter();
   const pathname = usePathname();
   const [isReady, setIsReady] = useState(false);
+
+  // Cold boot below is not enough on its own: it is skipped whenever the bootstrap throws, and it
+  // never fires for the ordinary case of the signal coming back mid-session.
+  useSyncOnReconnect();
 
   useEffect(() => {
     let isMounted = true;

@@ -2,7 +2,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
-import { api } from '../src/api';
 import { Button } from '../src/components/Button';
 import { Card } from '../src/components/Card';
 import { ErrorBanner } from '../src/components/ErrorBanner';
@@ -13,7 +12,7 @@ import { Text } from '../src/components/Text';
 import { TextField } from '../src/components/TextField';
 import { radius, spacing } from '../src/components/theme';
 import { useColors } from '../src/context/ThemeContext';
-import { enqueueComp } from '../src/db/localStore';
+import { describeCompOutcome, saveComp } from '../src/services/saveComp';
 import type { MarketObservationType } from '../src/domain/types';
 import { useConnectivity } from '../src/hooks/useConnectivity';
 import { parseOptionalNumber } from '../src/utils/money';
@@ -50,7 +49,7 @@ export default function CompCaptureScreen() {
   const [error, setError] = useState<string | null>(null);
   const [showOptional, setShowOptional] = useState(false);
 
-  async function saveComp() {
+  async function submitComp() {
     const hasAttachment = Boolean(params.productIdentityId || params.inventoryItemId);
     if (!hasAttachment) {
       setError('Save to inventory first so the comp has a product link.');
@@ -79,25 +78,15 @@ export default function CompCaptureScreen() {
       notes: notes || null,
     };
 
-    if (!connectivity.isOnline) {
-      await enqueueComp(body);
-      setMessage('Queued for sync. Will not affect pricing until synced.');
-      setError(null);
+    const outcome = await saveComp(body);
+    if (outcome.status === 'rejected') {
+      setError(describeCompOutcome(outcome));
+      setMessage(null);
       return;
     }
 
-    try {
-      await api.addComp(body);
-      setMessage('Comp saved.');
-      setError(null);
-    } catch (e) {
-      await enqueueComp(body);
-      setMessage(
-        e instanceof Error
-          ? `Queued after error: ${e.message}`
-          : 'Queued after error.',
-      );
-    }
+    setMessage(describeCompOutcome(outcome));
+    setError(null);
   }
 
   return (
@@ -177,7 +166,7 @@ export default function CompCaptureScreen() {
         icon="checkmark-outline"
         size="lg"
         fullWidth
-        onPress={() => void saveComp()}
+        onPress={() => void submitComp()}
       />
     </Screen>
   );
