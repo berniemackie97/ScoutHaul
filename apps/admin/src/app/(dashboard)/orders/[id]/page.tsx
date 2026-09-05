@@ -37,8 +37,8 @@ const stageLabels: Record<string, string> = {
   NeedsAttention: "Needs attention",
   Closed: "Closed",
 };
-const stageLabel = (stage: string | undefined) => (stage ? (stageLabels[stage] ?? stage) : undefined);
-const stageVariant = (stage: string | undefined) => {
+const stageLabel = (stage: string | null | undefined) => (stage ? (stageLabels[stage] ?? stage) : undefined);
+const stageVariant = (stage: string | null | undefined) => {
   if (stage === "NeedsAttention") return "destructive" as const;
   if (stage === "Delivered" || stage === "Closed") return "success" as const;
   if (stage === "AwaitingPayment") return "warning" as const;
