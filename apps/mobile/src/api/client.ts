@@ -2,7 +2,7 @@ import * as Network from 'expo-network';
 import { appConfig } from '../config';
 import { authStore, refreshAuthSession } from '../services/auth';
 import { getActiveOrganizationId } from '../services/workspaceSession';
-import { ApiError, type ApiFailureReason } from './apiError';
+import { ApiError, REQUEST_IN_FLIGHT, type ApiFailureReason } from './apiError';
 
 
 /**
@@ -29,7 +29,7 @@ type RequestOptions = {
   timeoutMs?: number;
 };
 
-export { ApiError } from './apiError';
+export { ApiError, REQUEST_IN_FLIGHT } from './apiError';
 export type { ApiFailureReason } from './apiError';
 
 /** The transport knobs a caller can pass through any endpoint wrapper. */
@@ -49,9 +49,19 @@ export function isRepeatable(method: string, idempotencyKey?: string): boolean {
 }
 
 /** Whether the failure is the kind that a later attempt might get past. */
-export function isTransient(reason: ApiFailureReason, status: number | null): boolean {
+export function isTransient(
+  reason: ApiFailureReason,
+  status: number | null,
+  code: string | null = null,
+): boolean {
   if (reason === 'timeout' || reason === 'network') return true;
   if (reason !== 'http' || status === null) return false;
+
+  // A 409 normally means the state will not allow this and never will. This one is the exception:
+  // the server is already running the request we are retrying, and asking again shortly is exactly
+  // the right move. Treating it as permanent would send a perfectly good write to the dead letter.
+  if (code === REQUEST_IN_FLIGHT) return true;
+
   // 408 request timeout, 429 too many requests, and anything the server calls its own fault.
   return status === 408 || status === 429 || status >= 500;
 }
@@ -265,7 +275,7 @@ async function send<T>(
       const canRetry =
         options.repeatable &&
         attemptNumber < MAX_RETRIES &&
-        isTransient(error.reason, error.status) &&
+        isTransient(error.reason, error.status, error.code) &&
         !options.signal?.aborted;
 
       if (!canRetry) throw error;

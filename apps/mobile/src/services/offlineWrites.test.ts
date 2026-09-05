@@ -34,6 +34,19 @@ describe('isWorthQueueing', () => {
     expect(isWorthQueueing(failure('unauthenticated'))).toBe(false);
   });
 
+  it('keeps a write the server is already running', () => {
+    // Our retry overtook the original. The work is in progress, not refused.
+    expect(isWorthQueueing(
+      new ApiError({ reason: 'http', status: 409, code: 'request_in_flight', message: 'Already in progress' }),
+    )).toBe(true);
+  });
+
+  it('still drops an ordinary conflict', () => {
+    expect(isWorthQueueing(
+      new ApiError({ reason: 'http', status: 409, code: 'conflict', message: 'Already refunded.' }),
+    )).toBe(false);
+  });
+
   it('does not queue on something that is not an API failure at all', () => {
     expect(isWorthQueueing(new Error('boom'))).toBe(false);
     expect(isWorthQueueing('boom')).toBe(false);

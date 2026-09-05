@@ -80,6 +80,14 @@ describe('retry policy', () => {
     expect(isTransient('http', 429)).toBe(true);
   });
 
+  it('counts the server already running our request as transient', () => {
+    // A 409 is normally permanent. This one means the retry overtook the original, and asking again
+    // shortly is the right move — treating it as final would abandon a write about to succeed.
+    expect(isTransient('http', 409, 'request_in_flight')).toBe(true);
+    expect(isTransient('http', 409, 'conflict')).toBe(false);
+    expect(isTransient('http', 409)).toBe(false);
+  });
+
   it('does not count the caller being wrong as transient', () => {
     expect(isTransient('http', 400)).toBe(false);
     expect(isTransient('http', 404)).toBe(false);
