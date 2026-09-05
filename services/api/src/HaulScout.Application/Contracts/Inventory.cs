@@ -155,13 +155,23 @@ public sealed record InventoryItemDto(
     WeightUnit WeightUnit);
 
 /// <summary>Aggregate over a filtered inventory set (whole result, not just the page) for the inventory KPIs.</summary>
+/// <param name="EstimatedResaleValue">What the set is expected to sell for, falling back to the seller's ask.</param>
+/// <param name="AskingValue">
+/// The asks alone, with no fallback. Consigned stock is reported both ways — what the consignor wants
+/// for it and what we expect to get — and one number cannot stand in for the other.
+/// </param>
+/// <param name="NeedsBenchWork">How many of the set are waiting on repair, per <see cref="InventoryBenchWork"/>.</param>
 public sealed record InventorySummaryDto(
     int Total,
     int ActiveItems,
     int ReadyOrListed,
     int Sold,
     decimal CapitalDeployed,
-    decimal EstimatedResaleValue);
+    decimal EstimatedResaleValue,
+    decimal AskingValue,
+    int NeedsBenchWork,
+    int CustomerOwned,
+    int NonFunctional);
 
 /// <summary>A searchable, sortable, paged page of inventory plus the summary over the whole filtered set.</summary>
 public sealed record InventoryListDto(IReadOnlyList<InventoryItemDto> Items, int Total, int Page, int PageSize, int PageCount, InventorySummaryDto Summary);
@@ -171,6 +181,31 @@ public sealed record AcquisitionLotItemInputDto(
     decimal? ManualAllocatedCost = null,
     decimal? AllocationWeight = null,
     string? Notes = null);
+
+/// <summary>
+/// Everything bought from one source, rolled up.
+///
+/// Suppliers are not a first-class entity yet — they are the name attributed on each acquisition lot
+/// — so this is the rollup, computed over every lot rather than over whichever page of lots a caller
+/// happened to fetch. The admin portal used to do this in the browser across the newest 200 lots and
+/// present the result as total spend.
+/// </summary>
+/// <param name="Attributed">False for the single bucket holding lots with no supplier named.</param>
+public sealed record SupplierRollupDto(
+    string Supplier,
+    bool Attributed,
+    int Lots,
+    int Items,
+    decimal Spend,
+    DateTimeOffset? LastPurchase);
+
+/// <param name="TotalSpend">Landed cost across every lot, attributed or not.</param>
+/// <param name="AttributedSuppliers">How many distinct named sources there are — the unattributed bucket is not one.</param>
+public sealed record SupplierRollupListDto(
+    IReadOnlyList<SupplierRollupDto> Suppliers,
+    int TotalLots,
+    decimal TotalSpend,
+    int AttributedSuppliers);
 
 public sealed record UpsertAcquisitionLotRequest(
     string Name,

@@ -34,6 +34,50 @@ public sealed class AcquisitionLotsController(HaulScoutDbContext db, ICurrentUse
         return lots.Select(item => item.ToDto()).ToList();
     }
 
+    /// <summary>
+    /// Spend per source, over every lot.
+    ///
+    /// The admin portal built this in the browser from the newest 200 lots and labelled the result
+    /// "Total sourced spend". Rolled up here it is the whole business, and it is one query rather
+    /// than a full page of lots and their items shipped to a browser to be summed.
+    /// </summary>
+    [HttpGet("suppliers")]
+    public async Task<ActionResult<SupplierRollupListDto>> Suppliers(CancellationToken cancellationToken)
+    {
+        var rows = await db.AcquisitionLots
+            .Where(lot => lot.OrganizationId == currentUser.OrganizationId)
+            .GroupBy(lot => lot.SupplierName)
+            .Select(group => new
+            {
+                Supplier = group.Key,
+                Lots = group.Count(),
+                Items = group.Sum(lot => lot.Items.Count),
+                Spend = group.Sum(lot => lot.PurchaseSubtotal + lot.ShippingCost + lot.TaxCost + lot.FeeCost + lot.OtherCost),
+                LastPurchase = group.Max(lot => lot.PurchasedAt),
+            })
+            .ToListAsync(cancellationToken);
+
+        // Null and blank both mean "nobody wrote down where this came from", and they have to land in
+        // the same bucket — grouped in SQL they do not, because "" and null are distinct keys there.
+        List<SupplierRollupDto> suppliers = rows
+            .GroupBy(row => TrimToNull(row.Supplier))
+            .Select(group => new SupplierRollupDto(
+                group.Key ?? "Unattributed",
+                Attributed: group.Key is not null,
+                group.Sum(row => row.Lots),
+                group.Sum(row => row.Items),
+                group.Sum(row => row.Spend),
+                group.Max(row => row.LastPurchase)))
+            .OrderByDescending(supplier => supplier.Spend)
+            .ToList();
+
+        return new SupplierRollupListDto(
+            suppliers,
+            suppliers.Sum(supplier => supplier.Lots),
+            suppliers.Sum(supplier => supplier.Spend),
+            suppliers.Count(supplier => supplier.Attributed));
+    }
+
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<AcquisitionLotDto>> Get(Guid id, CancellationToken cancellationToken)
     {

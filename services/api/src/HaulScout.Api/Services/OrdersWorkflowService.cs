@@ -18,19 +18,107 @@ public sealed class OrdersWorkflowService(
     ICurrentUserContext currentUser,
     OrderAssembler orderWriter)
 {
+    /// <summary>Matches the inventory browse cap, so one page cannot be asked to carry the whole book.</summary>
+    private const int MaxPageSize = 200;
+
     private static readonly SaleStatus[] FinancialSaleStatuses =
         [SaleStatus.Returned, SaleStatus.Refunded, SaleStatus.PartiallyRefunded, SaleStatus.Cancelled];
 
-    public async Task<IReadOnlyList<OrderSummaryDto>> ListAsync(
-        string? status,
+    /// <summary>
+    /// A page of orders, filtered the way the operator asked, plus the queue summary over the whole book.
+    ///
+    /// Mirrors <c>/api/inventory/browse</c>: the page is the page, and the figures beside it span every
+    /// match rather than the rows on screen. The admin portal used to fetch the newest 200 orders,
+    /// bucket them in the browser and label the result "Captured revenue · Paid orders" — a number
+    /// that stopped being true on the two-hundred-and-first order and never said so.
+    ///
+    /// The stage is derived rather than stored, so it cannot be a WHERE or a GROUP BY without
+    /// restating <see cref="OrderWorkflow"/> in SQL and letting the two drift. Instead only the
+    /// columns that rule reads are projected — no lines, no customer, no addresses — the stages are
+    /// computed from them, and the resulting ids drive the page.
+    /// </summary>
+    public async Task<OrderListDto> BrowseAsync(
+        string? stage,
         string? search,
         string? channel,
+        int page,
+        int pageSize,
         CancellationToken cancellationToken)
     {
-        IQueryable<Order> query = db.Orders
+        page = Math.Max(1, page);
+        pageSize = Math.Clamp(pageSize, 1, MaxPageSize);
+
+        IQueryable<Order> matching = FilteredOrders(status: null, search, channel);
+        IReadOnlyDictionary<Guid, OrderWorkflowStage> stages = await StagesAsync(cancellationToken);
+
+        List<Guid> ordered = await matching
+            .OrderByDescending(order => order.CreatedAt)
+            .Select(order => order.Id)
+            .ToListAsync(cancellationToken);
+
+        OrderQueueSummaryDto summary = Summarize(ordered, stages, await PaidTotalsAsync(cancellationToken));
+
+        if (!string.IsNullOrWhiteSpace(stage) && Enum.TryParse(stage, ignoreCase: true, out OrderWorkflowStage wanted))
+        {
+            ordered = ordered.Where(id => stages.GetValueOrDefault(id) == wanted).ToList();
+        }
+
+        int total = ordered.Count;
+        int pageCount = Math.Max(1, (int)Math.Ceiling(total / (double)pageSize));
+        Guid[] pageIds = ordered.Skip((page - 1) * pageSize).Take(pageSize).ToArray();
+
+        List<Order> orders = await db.Orders
             .Include(order => order.Customer)
             .Include(order => order.Lines)
-            .Where(order => order.OrganizationId == currentUser.OrganizationId);
+            .Where(order => pageIds.Contains(order.Id))
+            .ToListAsync(cancellationToken);
+
+        HashSet<Guid> openReturns = await OpenReturnOrderIdsAsync(cancellationToken);
+
+        // The page keeps the order the ids were sorted in; the id-based fetch above does not preserve it.
+        List<OrderSummaryDto> items = pageIds
+            .Select(id => orders.SingleOrDefault(order => order.Id == id))
+            .Where(order => order is not null)
+            .Select(order => order!.ToSummaryDto(openReturns.Contains(order!.Id)))
+            .ToList();
+
+        return new OrderListDto(items, total, page, pageSize, pageCount, summary);
+    }
+
+    private static OrderQueueSummaryDto Summarize(
+        IReadOnlyList<Guid> orderIds,
+        IReadOnlyDictionary<Guid, OrderWorkflowStage> stages,
+        IReadOnlyDictionary<Guid, decimal> paidTotals)
+    {
+        Dictionary<OrderWorkflowStage, int> counts = [];
+        foreach (Guid id in orderIds)
+        {
+            OrderWorkflowStage stage = stages.GetValueOrDefault(id);
+            counts[stage] = counts.GetValueOrDefault(stage) + 1;
+        }
+
+        // Every stage is reported, including the empty ones: a queue that reads zero is information,
+        // and a queue that is simply absent makes the caller guess which it is.
+        List<OrderQueueCountDto> stageCounts = Enum.GetValues<OrderWorkflowStage>()
+            .Select(stage => new OrderQueueCountDto(stage.ToString(), counts.GetValueOrDefault(stage)))
+            .ToList();
+
+        int openWork = counts.GetValueOrDefault(OrderWorkflowStage.ToPack)
+            + counts.GetValueOrDefault(OrderWorkflowStage.ToShip)
+            + counts.GetValueOrDefault(OrderWorkflowStage.ReadyForPickup);
+
+        return new OrderQueueSummaryDto(
+            stageCounts,
+            orderIds.Count,
+            openWork,
+            counts.GetValueOrDefault(OrderWorkflowStage.NeedsAttention),
+            orderIds.Sum(id => paidTotals.GetValueOrDefault(id)));
+    }
+
+    /// <summary>The orders a caller asked for, before paging and before anything is hydrated.</summary>
+    private IQueryable<Order> FilteredOrders(string? status, string? search, string? channel)
+    {
+        IQueryable<Order> query = db.Orders.Where(order => order.OrganizationId == currentUser.OrganizationId);
 
         if (!string.IsNullOrWhiteSpace(status) && Enum.TryParse(status, ignoreCase: true, out OrderStatus parsed))
         {
@@ -53,7 +141,73 @@ public sealed class OrdersWorkflowService(
                 || (order.ExternalOrderId != null && EF.Functions.ILike(order.ExternalOrderId, $"%{term}%")));
         }
 
-        List<Order> orders = await query
+        return query;
+    }
+
+    /// <summary>Every order's workflow stage, computed from the narrowest projection the rule needs.</summary>
+    private async Task<IReadOnlyDictionary<Guid, OrderWorkflowStage>> StagesAsync(CancellationToken cancellationToken)
+    {
+        HashSet<Guid> openReturns = await OpenReturnOrderIdsAsync(cancellationToken);
+
+        var rows = await db.Orders
+            .Where(order => order.OrganizationId == currentUser.OrganizationId)
+            .Select(order => new
+            {
+                order.Id,
+                order.Status,
+                order.PaymentStatus,
+                order.IsLocalPickup,
+                order.PackedAt,
+                order.ShippingCarrier,
+                order.TrackingNumber,
+                order.ShipToLine1,
+                order.ShippedAt,
+                order.DeliveredAt,
+            })
+            .ToListAsync(cancellationToken);
+
+        return rows.ToDictionary(
+            row => row.Id,
+            row => OrderWorkflow.StageFor(new OrderWorkflowFacts(
+                row.Status,
+                row.PaymentStatus,
+                row.IsLocalPickup,
+                IsPacked: row.PackedAt is not null,
+                HasCarrier: !string.IsNullOrWhiteSpace(row.ShippingCarrier),
+                HasTrackingNumber: !string.IsNullOrWhiteSpace(row.TrackingNumber),
+                HasShippingAddress: !string.IsNullOrWhiteSpace(row.ShipToLine1),
+                IsShipped: row.ShippedAt is not null,
+                IsDelivered: row.DeliveredAt is not null,
+                HasOpenReturn: openReturns.Contains(row.Id))));
+    }
+
+    /// <summary>What each paid order brought in. Unpaid orders are absent rather than zero.</summary>
+    private async Task<IReadOnlyDictionary<Guid, decimal>> PaidTotalsAsync(CancellationToken cancellationToken) =>
+        await db.Orders
+            .Where(order => order.OrganizationId == currentUser.OrganizationId && order.PaymentStatus == PaymentStatus.Paid)
+            .Select(order => new { order.Id, order.GrandTotal })
+            .ToDictionaryAsync(row => row.Id, row => row.GrandTotal, cancellationToken);
+
+    private async Task<HashSet<Guid>> OpenReturnOrderIdsAsync(CancellationToken cancellationToken) =>
+        [.. await db.Returns
+            .Where(entry => entry.OrganizationId == currentUser.OrganizationId
+                && entry.OrderId != null
+                && (entry.Status == ReturnStatus.Requested
+                    || entry.Status == ReturnStatus.LabelIssued
+                    || entry.Status == ReturnStatus.Received))
+            .Select(entry => entry.OrderId!.Value)
+            .Distinct()
+            .ToListAsync(cancellationToken)];
+
+    public async Task<IReadOnlyList<OrderSummaryDto>> ListAsync(
+        string? status,
+        string? search,
+        string? channel,
+        CancellationToken cancellationToken)
+    {
+        List<Order> orders = await FilteredOrders(status, search, channel)
+            .Include(order => order.Customer)
+            .Include(order => order.Lines)
             .OrderByDescending(order => order.CreatedAt)
             .Take(200)
             .ToListAsync(cancellationToken);

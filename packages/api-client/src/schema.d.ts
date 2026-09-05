@@ -68,6 +68,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/acquisition-lots/suppliers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SupplierRollupListDto"];
+                        "application/json": components["schemas"]["SupplierRollupListDto"];
+                        "text/json": components["schemas"]["SupplierRollupListDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/acquisition-lots/{id}": {
         parameters: {
             query?: never;
@@ -1430,6 +1467,8 @@ export interface paths {
                     desc?: boolean;
                     page?: number;
                     pageSize?: number;
+                    ownership?: components["schemas"]["InventoryOwnershipType"];
+                    needsBenchWork?: boolean;
                 };
                 header?: never;
                 path?: never;
@@ -2231,6 +2270,49 @@ export interface paths {
                         "text/plain": components["schemas"]["OrderSummaryDto"][];
                         "application/json": components["schemas"]["OrderSummaryDto"][];
                         "text/json": components["schemas"]["OrderSummaryDto"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orders/browse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    stage?: string;
+                    search?: string;
+                    channel?: string;
+                    page?: number;
+                    pageSize?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["OrderListDto"];
+                        "application/json": components["schemas"]["OrderListDto"];
+                        "text/json": components["schemas"]["OrderListDto"];
                     };
                 };
             };
@@ -8451,6 +8533,14 @@ export interface components {
             capitalDeployed?: number;
             /** Format: double */
             estimatedResaleValue?: number;
+            /** Format: double */
+            askingValue?: number;
+            /** Format: int32 */
+            needsBenchWork?: number;
+            /** Format: int32 */
+            customerOwned?: number;
+            /** Format: int32 */
+            nonFunctional?: number;
         };
         IssueReturnLabelRequest: {
             /** Format: double */
@@ -8719,6 +8809,34 @@ export interface components {
             /** Format: double */
             unitCostSnapshot?: number | null;
             sale?: components["schemas"]["SaleDto"];
+        };
+        OrderListDto: {
+            items?: components["schemas"]["OrderSummaryDto"][] | null;
+            /** Format: int32 */
+            total?: number;
+            /** Format: int32 */
+            page?: number;
+            /** Format: int32 */
+            pageSize?: number;
+            /** Format: int32 */
+            pageCount?: number;
+            summary?: components["schemas"]["OrderQueueSummaryDto"];
+        };
+        OrderQueueCountDto: {
+            stage?: string | null;
+            /** Format: int32 */
+            count?: number;
+        };
+        OrderQueueSummaryDto: {
+            stages?: components["schemas"]["OrderQueueCountDto"][] | null;
+            /** Format: int32 */
+            totalOrders?: number;
+            /** Format: int32 */
+            openWork?: number;
+            /** Format: int32 */
+            needsAttention?: number;
+            /** Format: double */
+            capturedRevenue?: number;
         };
         /** @enum {string} */
         OrderStatus: "Pending" | "Paid" | "Fulfilling" | "Shipped" | "Delivered" | "Cancelled" | "Refunded";
@@ -10047,6 +10165,27 @@ export interface components {
             /** Format: double */
             unitPrice?: number;
             imageUrl?: string | null;
+        };
+        SupplierRollupDto: {
+            supplier?: string | null;
+            attributed?: boolean;
+            /** Format: int32 */
+            lots?: number;
+            /** Format: int32 */
+            items?: number;
+            /** Format: double */
+            spend?: number;
+            /** Format: date-time */
+            lastPurchase?: string | null;
+        };
+        SupplierRollupListDto: {
+            suppliers?: components["schemas"]["SupplierRollupDto"][] | null;
+            /** Format: int32 */
+            totalLots?: number;
+            /** Format: double */
+            totalSpend?: number;
+            /** Format: int32 */
+            attributedSuppliers?: number;
         };
         UngroupSalesRequest: {
             saleIds?: string[] | null;

@@ -43,12 +43,14 @@ public sealed class InventoryQueryService(IInventoryStore inventory, ICurrentUse
         bool desc,
         int page,
         int pageSize,
+        InventoryOwnershipType? ownership,
+        bool needsBenchWork,
         CancellationToken cancellationToken)
     {
         page = Math.Max(1, page);
         pageSize = Math.Clamp(pageSize, 1, MaxPageSize);
 
-        InventoryFilter filter = new(status, lifecycle, includeArchived, TrimToNull(search), attention);
+        InventoryFilter filter = new(status, lifecycle, includeArchived, TrimToNull(search), attention, ownership, needsBenchWork);
         Guid organizationId = currentUser.OrganizationId;
 
         IReadOnlyList<InventoryScalars> scalars = await inventory.ListScalarsAsync(organizationId, filter, cancellationToken);
@@ -71,7 +73,11 @@ public sealed class InventoryQueryService(IInventoryStore inventory, ICurrentUse
         scalars.Count(item => item.Status is InventoryStatus.ReadyToList or InventoryStatus.Listed),
         scalars.Count(item => InventoryLifecycle.IsSold(item.Status)),
         scalars.Sum(item => item.PurchasePrice ?? 0),
-        scalars.Sum(item => item.EstimatedSalePrice ?? item.SellerAskingPrice ?? 0));
+        scalars.Sum(item => item.EstimatedSalePrice ?? item.SellerAskingPrice ?? 0),
+        scalars.Sum(item => item.SellerAskingPrice ?? 0),
+        scalars.Count(item => InventoryBenchWork.IsQueued(item.FunctionalStatus, item.OwnershipType)),
+        scalars.Count(item => item.OwnershipType == InventoryOwnershipType.CustomerRepair),
+        scalars.Count(item => item.FunctionalStatus == InventoryFunctionalStatus.NonFunctional));
 
     /// <summary>An unrecognised sort key falls back to most-recently-updated rather than failing — and, because the
     /// result is a closed enum, a caller's string can never reach the database as a column name.</summary>
