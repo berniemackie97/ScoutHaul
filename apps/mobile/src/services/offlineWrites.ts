@@ -1,4 +1,4 @@
-import { ApiError } from '../api/apiError';
+import { ApiError, REQUEST_IN_FLIGHT } from '../api/apiError';
 
 /**
  * Whether a failed write is worth keeping for later.
@@ -19,6 +19,9 @@ export function isWorthQueueing(error: unknown): boolean {
     case 'unauthenticated':
       return false;
     case 'http':
+      // The server already has this exact write in flight — ours is the retry that overtook it.
+      // Keep it queued and ask again rather than giving up on work that is about to succeed.
+      if (error.code === REQUEST_IN_FLIGHT) return true;
       return error.status === 408 || error.status === 429 || (error.status ?? 0) >= 500;
   }
 }

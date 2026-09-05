@@ -31,6 +31,12 @@ public static class AppErrorCode
     /// <summary>Something on this side went wrong. Never the caller's fault.</summary>
     public const string Unexpected = "unexpected";
 
+    /// <summary>
+    /// A request carrying this idempotency key is already running. The caller should ask again
+    /// rather than treat it as a failure — retrying is safe, doing the work twice is not.
+    /// </summary>
+    public const string RequestInFlight = "request_in_flight";
+
     /// <summary>The default reason for a status, for callers that have nothing more specific to say.</summary>
     public static string ForStatus(AppResultStatus status) => status switch
     {

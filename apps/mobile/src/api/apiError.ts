@@ -38,3 +38,11 @@ export class ApiError extends Error {
     this.code = init.code ?? null;
   }
 }
+
+/**
+ * The server's code for "a request carrying this key is already running".
+ *
+ * A 409 normally means the state will not allow this and never will. This one is the exception: our
+ * retry overtook the original, and asking again shortly is the right move.
+ */
+export const REQUEST_IN_FLIGHT = 'request_in_flight';
