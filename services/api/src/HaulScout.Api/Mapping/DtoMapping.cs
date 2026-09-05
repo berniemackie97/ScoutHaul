@@ -123,7 +123,9 @@ public static class DtoMapping
         item.Status,
         item.ListedAt,
         item.EndedAt,
-        item.Notes);
+        item.Notes,
+        item.Title,
+        item.Description);
 
     public static SaleDto ToDto(this Sale item) => new(
         item.Id,

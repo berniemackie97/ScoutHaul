@@ -809,6 +809,8 @@ export interface paths {
             requestBody?: {
                 content: {
                     "application/json": components["schemas"]["UpdateCustomerRequest"];
+                    "text/json": components["schemas"]["UpdateCustomerRequest"];
+                    "application/*+json": components["schemas"]["UpdateCustomerRequest"];
                 };
             };
             responses: {
@@ -1206,6 +1208,51 @@ export interface paths {
                 };
             };
         };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/inventory/{id}/photos/from-url": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["ImportInventoryPhotoRequest"];
+                    "text/json": components["schemas"]["ImportInventoryPhotoRequest"];
+                    "application/*+json": components["schemas"]["ImportInventoryPhotoRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["InventoryPhotoUploadResultDto"];
+                        "application/json": components["schemas"]["InventoryPhotoUploadResultDto"];
+                        "text/json": components["schemas"]["InventoryPhotoUploadResultDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -3663,11 +3710,87 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
+                        "text/plain": components["schemas"]["PlatformOrderDeletedDto"];
                         "application/json": components["schemas"]["PlatformOrderDeletedDto"];
+                        "text/json": components["schemas"]["PlatformOrderDeletedDto"];
                     };
                 };
             };
         };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/platform-orders/auto-match/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["AutoMatchPreviewDto"];
+                        "application/json": components["schemas"]["AutoMatchPreviewDto"];
+                        "text/json": components["schemas"]["AutoMatchPreviewDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/platform-orders/auto-match": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["AutoMatchAppliedDto"];
+                        "application/json": components["schemas"]["AutoMatchAppliedDto"];
+                        "text/json": components["schemas"]["AutoMatchAppliedDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -7456,119 +7579,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/inventory/{id}/photos/from-url": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    id: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: {
-                content: {
-                    "application/json": components["schemas"]["ImportInventoryPhotoRequest"];
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["InventoryPhotoUploadResultDto"];
-                        "application/json": components["schemas"]["InventoryPhotoUploadResultDto"];
-                        "text/json": components["schemas"]["InventoryPhotoUploadResultDto"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/platform-orders/auto-match/preview": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["AutoMatchPreviewDto"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/platform-orders/auto-match": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["AutoMatchAppliedDto"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -7676,6 +7686,25 @@ export interface components {
         AssignTaskRequest: {
             /** Format: uuid */
             assignedToUserId?: string | null;
+        };
+        AutoMatchAppliedDto: {
+            /** Format: int32 */
+            settled?: number;
+        };
+        AutoMatchPreviewDto: {
+            /** Format: int32 */
+            pendingOrders?: number;
+            /** Format: int32 */
+            canSettle?: number;
+            orders?: components["schemas"]["AutoMatchPreviewOrderDto"][] | null;
+        };
+        AutoMatchPreviewOrderDto: {
+            /** Format: uuid */
+            platformOrderId?: string;
+            externalOrderId?: string | null;
+            platform?: string | null;
+            /** Format: int32 */
+            lineCount?: number;
         };
         BudgetDto: {
             /** Format: uuid */
@@ -7864,6 +7893,8 @@ export interface components {
             /** Format: double */
             listPrice?: number;
             notes?: string | null;
+            title?: string | null;
+            description?: string | null;
         };
         CreateOrganizationInviteCodeRequest: {
             name?: string | null;
@@ -8062,6 +8093,10 @@ export interface components {
             saleIds?: string[] | null;
             orderReference?: string | null;
         };
+        ImportInventoryPhotoRequest: {
+            url?: string | null;
+            isHero?: boolean;
+        };
         ImportMarketplaceRefundsCsvRequest: {
             platform?: string | null;
             csv?: string | null;
@@ -8218,6 +8253,8 @@ export interface components {
             autoReconciled?: number;
             orders?: components["schemas"]["PlatformOrderDto"][] | null;
         };
+        /** @enum {string} */
+        InventoryAttention: "Unlisted" | "Aged" | "MissingPhotos" | "MissingCost" | "MissingValue" | "MissingLocation";
         /** @enum {string} */
         InventoryAuthenticityStatus: "NotAssessed" | "Authentic" | "LikelyAuthentic" | "NeedsVerification" | "Replica" | "Counterfeit";
         InventoryBundleComponentDto: {
@@ -8437,6 +8474,8 @@ export interface components {
             /** Format: date-time */
             endedAt?: string | null;
             notes?: string | null;
+            title?: string | null;
+            description?: string | null;
         };
         /** @enum {string} */
         ListingStatus: "Draft" | "Active" | "Ended" | "Sold" | "Cancelled";
@@ -8648,6 +8687,8 @@ export interface components {
             /** Format: date-time */
             paidAt?: string | null;
             /** Format: date-time */
+            packedAt?: string | null;
+            /** Format: date-time */
             shippedAt?: string | null;
             /** Format: date-time */
             deliveredAt?: string | null;
@@ -8660,9 +8701,7 @@ export interface components {
             buyerReference?: string | null;
             /** Format: double */
             totalRefunded?: number;
-            workflow?: components["schemas"]["OrderWorkflowStateDto"] | null;
-            /** Format: date-time */
-            packedAt?: string | null;
+            workflow?: components["schemas"]["OrderWorkflowStateDto"];
         };
         OrderLineDto: {
             /** Format: uuid */
@@ -8714,6 +8753,11 @@ export interface components {
             externalOrderId?: string | null;
             buyerReference?: string | null;
             stage?: string | null;
+        };
+        OrderWorkflowStateDto: {
+            stage?: string | null;
+            availableActions?: string[] | null;
+            blockers?: string[] | null;
         };
         OrgReferenceOverrideDto: {
             /** Format: uuid */
@@ -8914,6 +8958,10 @@ export interface components {
         PlatformListingReconcileStatus: "Pending" | "Linked" | "Ignored";
         /** @enum {string} */
         PlatformListingStatus: "Active" | "Draft" | "Scheduled" | "Ended" | "Sold" | "Unsold" | "OutOfStock";
+        PlatformOrderDeletedDto: {
+            /** Format: uuid */
+            platformOrderId?: string;
+        };
         PlatformOrderDto: {
             /** Format: uuid */
             id?: string;
@@ -10006,6 +10054,12 @@ export interface components {
         UpdateChecklistItemRequest: {
             isCompleted?: boolean;
         };
+        UpdateCustomerRequest: {
+            displayName?: string | null;
+            email?: string | null;
+            phone?: string | null;
+            acceptsMarketing?: boolean;
+        };
         UpdateListingRequest: {
             platform?: string | null;
             listingUrl?: string | null;
@@ -10013,6 +10067,8 @@ export interface components {
             listPrice?: number;
             status?: components["schemas"]["ListingStatus"];
             notes?: string | null;
+            title?: string | null;
+            description?: string | null;
         };
         UpdateOrderStatusRequest: {
             status?: components["schemas"]["OrderStatus"];
@@ -10323,46 +10379,6 @@ export interface components {
         WeightUnit: "Ounces" | "Pounds" | "Grams" | "Kilograms";
         /** @enum {string} */
         WorkTaskStatus: "Open" | "InProgress" | "Blocked" | "Completed" | "Cancelled";
-        /** @enum {string} */
-        InventoryAttention: "Unlisted" | "Aged" | "MissingPhotos" | "MissingCost" | "MissingValue" | "MissingLocation";
-        ImportInventoryPhotoRequest: {
-            url?: string | null;
-            isHero?: boolean;
-        };
-        AutoMatchPreviewOrderDto: {
-            /** Format: uuid */
-            platformOrderId?: string;
-            externalOrderId?: string | null;
-            platform?: string | null;
-            /** Format: int32 */
-            lineCount?: number;
-        };
-        AutoMatchPreviewDto: {
-            /** Format: int32 */
-            pendingOrders?: number;
-            /** Format: int32 */
-            canSettle?: number;
-            orders?: components["schemas"]["AutoMatchPreviewOrderDto"][] | null;
-        };
-        AutoMatchAppliedDto: {
-            /** Format: int32 */
-            settled?: number;
-        };
-        UpdateCustomerRequest: {
-            displayName?: string | null;
-            email?: string | null;
-            phone?: string | null;
-            acceptsMarketing?: boolean;
-        };
-        PlatformOrderDeletedDto: {
-            /** Format: uuid */
-            platformOrderId?: string;
-        };
-        OrderWorkflowStateDto: {
-            stage: string;
-            availableActions: string[];
-            blockers: string[];
-        };
     };
     responses: never;
     parameters: never;

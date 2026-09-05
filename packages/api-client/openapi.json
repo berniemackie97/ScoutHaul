@@ -982,6 +982,16 @@
               "schema": {
                 "$ref": "#/components/schemas/UpdateCustomerRequest"
               }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCustomerRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCustomerRequest"
+              }
             }
           }
         },
@@ -1447,6 +1457,65 @@
             }
           }
         ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/InventoryPhotoUploadResultDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InventoryPhotoUploadResultDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InventoryPhotoUploadResultDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/inventory/{id}/photos/from-url": {
+      "post": {
+        "tags": [
+          "Inventory"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportInventoryPhotoRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportInventoryPhotoRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportInventoryPhotoRequest"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "OK",
@@ -4643,9 +4712,77 @@
           "200": {
             "description": "OK",
             "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformOrderDeletedDto"
+                }
+              },
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/PlatformOrderDeletedDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformOrderDeletedDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/platform-orders/auto-match/preview": {
+      "get": {
+        "tags": [
+          "PlatformOrders"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutoMatchPreviewDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutoMatchPreviewDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutoMatchPreviewDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/platform-orders/auto-match": {
+      "post": {
+        "tags": [
+          "PlatformOrders"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutoMatchAppliedDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutoMatchAppliedDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutoMatchAppliedDto"
                 }
               }
             }
@@ -9198,93 +9335,6 @@
           }
         }
       }
-    },
-    "/api/inventory/{id}/photos/from-url": {
-      "post": {
-        "tags": [
-          "Inventory"
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ImportInventoryPhotoRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/InventoryPhotoUploadResultDto"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/InventoryPhotoUploadResultDto"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/InventoryPhotoUploadResultDto"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/platform-orders/auto-match/preview": {
-      "get": {
-        "tags": [
-          "PlatformOrders"
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AutoMatchPreviewDto"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/platform-orders/auto-match": {
-      "post": {
-        "tags": [
-          "PlatformOrders"
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AutoMatchAppliedDto"
-                }
-              }
-            }
-          }
-        }
-      }
     }
   },
   "components": {
@@ -9565,6 +9615,59 @@
             "type": "string",
             "format": "uuid",
             "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "AutoMatchAppliedDto": {
+        "type": "object",
+        "properties": {
+          "settled": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "AutoMatchPreviewDto": {
+        "type": "object",
+        "properties": {
+          "pendingOrders": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "canSettle": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "orders": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AutoMatchPreviewOrderDto"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "AutoMatchPreviewOrderDto": {
+        "type": "object",
+        "properties": {
+          "platformOrderId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "externalOrderId": {
+            "type": "string",
+            "nullable": true
+          },
+          "platform": {
+            "type": "string",
+            "nullable": true
+          },
+          "lineCount": {
+            "type": "integer",
+            "format": "int32"
           }
         },
         "additionalProperties": false
@@ -10141,6 +10244,14 @@
             "format": "double"
           },
           "notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "description": {
             "type": "string",
             "nullable": true
           }
@@ -10740,6 +10851,19 @@
         },
         "additionalProperties": false
       },
+      "ImportInventoryPhotoRequest": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "nullable": true
+          },
+          "isHero": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
       "ImportMarketplaceRefundsCsvRequest": {
         "type": "object",
         "properties": {
@@ -11226,6 +11350,17 @@
           }
         },
         "additionalProperties": false
+      },
+      "InventoryAttention": {
+        "enum": [
+          "Unlisted",
+          "Aged",
+          "MissingPhotos",
+          "MissingCost",
+          "MissingValue",
+          "MissingLocation"
+        ],
+        "type": "string"
       },
       "InventoryAuthenticityStatus": {
         "enum": [
@@ -11940,6 +12075,14 @@
           "notes": {
             "type": "string",
             "nullable": true
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -12588,6 +12731,11 @@
             "format": "date-time",
             "nullable": true
           },
+          "packedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
           "shippedAt": {
             "type": "string",
             "format": "date-time",
@@ -12631,17 +12779,7 @@
             "format": "double"
           },
           "workflow": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/OrderWorkflowStateDto"
-              }
-            ],
-            "nullable": true
-          },
-          "packedAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
+            "$ref": "#/components/schemas/OrderWorkflowStateDto"
           }
         },
         "additionalProperties": false
@@ -12789,6 +12927,30 @@
           },
           "stage": {
             "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "OrderWorkflowStateDto": {
+        "type": "object",
+        "properties": {
+          "stage": {
+            "type": "string",
+            "nullable": true
+          },
+          "availableActions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "blockers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
             "nullable": true
           }
         },
@@ -13381,6 +13543,16 @@
           "OutOfStock"
         ],
         "type": "string"
+      },
+      "PlatformOrderDeletedDto": {
+        "type": "object",
+        "properties": {
+          "platformOrderId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
       },
       "PlatformOrderDto": {
         "type": "object",
@@ -16429,6 +16601,27 @@
         },
         "additionalProperties": false
       },
+      "UpdateCustomerRequest": {
+        "type": "object",
+        "properties": {
+          "displayName": {
+            "type": "string",
+            "nullable": true
+          },
+          "email": {
+            "type": "string",
+            "nullable": true
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true
+          },
+          "acceptsMarketing": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
       "UpdateListingRequest": {
         "type": "object",
         "properties": {
@@ -16448,6 +16641,14 @@
             "$ref": "#/components/schemas/ListingStatus"
           },
           "notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "description": {
             "type": "string",
             "nullable": true
           }
@@ -17401,135 +17602,6 @@
           "Cancelled"
         ],
         "type": "string"
-      },
-      "InventoryAttention": {
-        "enum": [
-          "Unlisted",
-          "Aged",
-          "MissingPhotos",
-          "MissingCost",
-          "MissingValue",
-          "MissingLocation"
-        ],
-        "type": "string"
-      },
-      "ImportInventoryPhotoRequest": {
-        "type": "object",
-        "properties": {
-          "url": {
-            "type": "string",
-            "nullable": true
-          },
-          "isHero": {
-            "type": "boolean"
-          }
-        },
-        "additionalProperties": false
-      },
-      "AutoMatchPreviewOrderDto": {
-        "type": "object",
-        "properties": {
-          "platformOrderId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "externalOrderId": {
-            "type": "string",
-            "nullable": true
-          },
-          "platform": {
-            "type": "string",
-            "nullable": true
-          },
-          "lineCount": {
-            "type": "integer",
-            "format": "int32"
-          }
-        }
-      },
-      "AutoMatchPreviewDto": {
-        "type": "object",
-        "properties": {
-          "pendingOrders": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "canSettle": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "orders": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/AutoMatchPreviewOrderDto"
-            },
-            "nullable": true
-          }
-        }
-      },
-      "AutoMatchAppliedDto": {
-        "type": "object",
-        "properties": {
-          "settled": {
-            "type": "integer",
-            "format": "int32"
-          }
-        }
-      },
-      "UpdateCustomerRequest": {
-        "type": "object",
-        "properties": {
-          "displayName": {
-            "type": "string",
-            "nullable": true
-          },
-          "email": {
-            "type": "string",
-            "nullable": true
-          },
-          "phone": {
-            "type": "string",
-            "nullable": true
-          },
-          "acceptsMarketing": {
-            "type": "boolean"
-          }
-        },
-        "additionalProperties": false
-      },
-      "PlatformOrderDeletedDto": {
-        "type": "object",
-        "properties": {
-          "platformOrderId": {
-            "type": "string",
-            "format": "uuid"
-          }
-        }
-      },
-      "OrderWorkflowStateDto": {
-        "type": "object",
-        "properties": {
-          "stage": {
-            "type": "string"
-          },
-          "availableActions": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "blockers": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          }
-        },
-        "required": [
-          "stage",
-          "availableActions",
-          "blockers"
-        ]
       }
     }
   },
