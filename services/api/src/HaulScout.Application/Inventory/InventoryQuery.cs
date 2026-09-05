@@ -9,12 +9,20 @@ namespace HaulScout.Application.Inventory;
 /// asked for while Infrastructure owns <em>how</em> it becomes a query.
 /// </summary>
 /// <param name="Search">Free-text match over title/brand/model/category/barcode/location. Null means no filter.</param>
+/// <param name="Ownership">Whose item it is. Null means every ownership type.</param>
+/// <param name="NeedsBenchWork">
+/// Only items waiting on repair, per <see cref="InventoryBenchWork"/>. False means no filter — it is
+/// a switch rather than a nullable flag because "only items that need no bench work" is not a queue
+/// anyone asks for.
+/// </param>
 public sealed record InventoryFilter(
     InventoryStatus? Status = null,
     InventoryLifecycleGroup? Lifecycle = null,
     bool IncludeArchived = false,
     string? Search = null,
-    InventoryAttention? Attention = null);
+    InventoryAttention? Attention = null,
+    InventoryOwnershipType? Ownership = null,
+    bool NeedsBenchWork = false);
 
 /// <summary>The sortable columns, as a closed set. A string sort key from the wire is mapped onto this by the
 /// Application, so an unknown value can never reach the database as a column name.</summary>
@@ -38,4 +46,6 @@ public sealed record InventoryScalars(
     InventoryStatus Status,
     decimal? PurchasePrice,
     decimal? EstimatedSalePrice,
-    decimal? SellerAskingPrice);
+    decimal? SellerAskingPrice,
+    InventoryFunctionalStatus FunctionalStatus = InventoryFunctionalStatus.Unknown,
+    InventoryOwnershipType OwnershipType = InventoryOwnershipType.Owned);

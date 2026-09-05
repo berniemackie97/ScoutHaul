@@ -1,6 +1,9 @@
 import Link from "next/link";
-import { ArrowRight, ReceiptText } from "lucide-react";
-import { Badge, Card, formatCurrency, formatDate } from "@overhaul/ui";
+import { ArrowRight, Boxes, Coins, ReceiptText } from "lucide-react";
+import { Badge, formatCurrency, formatDate } from "@overhaul/ui";
+import { ListEmpty, ListSearch, PageHeader } from "@/components/list/list-search";
+import { Pager } from "@/components/list/pager";
+import { StatCard, StatRow } from "@/components/list/stat-card";
 import type { InventoryItem } from "@/features/inventory/inventory-operations";
 import { getApiClient } from "@/lib/api";
 import { PurchaseLotCreator } from "./purchase-lot-creator";
@@ -9,38 +12,71 @@ export const dynamic = "force-dynamic";
 
 
 
-export default async function PurchasesPage() {
+/**
+ * Purchase records and their landed cost.
+ *
+ * The money on this page used to be summed in the browser from whatever lots the list endpoint
+ * returned — 200 at most, newest first — and labelled "Total purchase spend". The summary now comes
+ * back with the page and covers every lot ever recorded.
+ */
+export default async function PurchasesPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const query = await searchParams;
+  const search = typeof query.q === "string" ? query.q.trim() : "";
+  const page = Math.max(1, Number(query.page) || 1);
+
   const api = await getApiClient();
   const [{ data: lots }, { data: inventory }] = await Promise.all([
-    api.GET("/api/acquisition-lots"),
+    api.GET("/api/acquisition-lots/browse", {
+      params: { query: { search: search || undefined, page, pageSize: 25 } },
+    }),
     api.GET("/api/inventory", { params: { query: { lifecycle: "Active", includeArchived: false } } }),
   ]);
 
-  const acquisitionLots = lots ?? [];
+  const acquisitionLots = lots?.items ?? [];
+  const summary = lots?.summary;
   const candidates = ((inventory ?? []) as InventoryItem[]).filter((item) => !item.acquisitionLotId && item.status !== "Bundled");
-  const totalSpend = acquisitionLots.reduce((sum, lot) => sum + (lot.totalLandedCost ?? 0), 0);
-  const allocated = acquisitionLots.reduce((sum, lot) => sum + (lot.totalAllocatedCost ?? 0), 0);
+  const totalSpend = summary?.totalSpend ?? 0;
+  const allocated = summary?.totalAllocated ?? 0;
+  const unallocated = summary?.unallocated ?? 0;
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-        <div>
-          <p className="text-sm text-muted-foreground">Operations</p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight">Purchases &amp; acquisition lots</h1>
-          <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-            Record a single-item purchase or a multi-item receipt, pallet, haul, auction pickup, or loose lot, then allocate landed cost into inventory for accurate COGS and historical profit.
-          </p>
-        </div>
-        <Link href="/inventory" className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border px-4 text-sm font-medium hover:bg-muted">
-          Inventory <ArrowRight className="h-4 w-4" />
-        </Link>
-      </header>
+      <PageHeader
+        eyebrow="Operations"
+        title="Purchases & acquisition lots"
+        description="Record a single-item purchase or a multi-item receipt, pallet, haul, auction pickup, or loose lot, then allocate landed cost into inventory for accurate COGS and historical profit."
+        action={
+          <Link href="/inventory" className="hover:bg-muted inline-flex h-10 items-center justify-center gap-2 rounded-lg border px-4 text-sm font-medium">
+            Inventory <ArrowRight className="h-4 w-4" />
+          </Link>
+        }
+      />
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Card className="p-5"><div className="flex items-center justify-between text-sm text-muted-foreground"><span>Total purchase spend</span><ReceiptText className="h-4 w-4" /></div><p className="mt-3 text-3xl font-semibold tabular-nums">{formatCurrency(totalSpend)}</p></Card>
-        <Card className="p-5"><p className="text-sm text-muted-foreground">Allocated COGS</p><p className="mt-3 text-3xl font-semibold tabular-nums">{formatCurrency(allocated)}</p></Card>
-        <Card className="p-5"><p className="text-sm text-muted-foreground">Open candidates</p><p className="mt-3 text-3xl font-semibold tabular-nums">{candidates.length}</p></Card>
-      </div>
+      <StatRow>
+        <StatCard
+          label="Total purchase spend"
+          value={formatCurrency(totalSpend)}
+          detail={`Landed cost across all ${summary?.totalLots ?? 0} lots`}
+          icon={ReceiptText}
+        />
+        <StatCard
+          label="Allocated COGS"
+          value={formatCurrency(allocated)}
+          detail={unallocated > 0.009 ? `${formatCurrency(unallocated)} still to allocate` : "Fully allocated"}
+          icon={Coins}
+          tone={unallocated > 0.009 ? "warning" : "default"}
+        />
+        <StatCard
+          label="Open candidates"
+          value={String(candidates.length)}
+          detail="Active items not yet in a lot"
+          icon={Boxes}
+        />
+      </StatRow>
 
       <PurchaseLotCreator candidates={candidates} />
 
@@ -49,8 +85,10 @@ export default async function PurchasesPage() {
           <h2 className="text-lg font-semibold">Recorded purchase records</h2>
           <p className="text-sm text-muted-foreground">Each record creates one purchase expense and allocated item-level cost basis.</p>
         </div>
-        {acquisitionLots.length === 0 ? (
-          <p className="rounded-xl border border-dashed bg-muted/20 p-10 text-center text-sm text-muted-foreground">No purchase records recorded yet.</p>
+        <ListSearch defaultValue={search} placeholder="Search purchase name, supplier, or reference" />
+
+        {(lots?.total ?? 0) === 0 ? (
+          <ListEmpty>{search ? "No purchase records match that search." : "No purchase records recorded yet."}</ListEmpty>
         ) : (
           <div className="overflow-x-auto rounded-xl border bg-card">
             <table className="w-full text-sm">
@@ -82,6 +120,9 @@ export default async function PurchasesPage() {
             </table>
           </div>
         )}
+        {(lots?.total ?? 0) > 0 ? (
+          <Pager page={lots?.page ?? 1} pageCount={lots?.pageCount ?? 1} total={lots?.total ?? 0} noun="purchase record" />
+        ) : null}
       </section>
     </div>
   );

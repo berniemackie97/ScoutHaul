@@ -62,7 +62,13 @@ public sealed class EfInventoryStore(HaulScoutDbContext db) : IInventoryStore
         InventoryFilter filter,
         CancellationToken cancellationToken) =>
         await Filtered(organizationId, filter)
-            .Select(item => new InventoryScalars(item.Status, item.PurchasePrice, item.EstimatedSalePrice, item.SellerAskingPrice))
+            .Select(item => new InventoryScalars(
+                item.Status,
+                item.PurchasePrice,
+                item.EstimatedSalePrice,
+                item.SellerAskingPrice,
+                item.FunctionalStatus,
+                item.OwnershipType))
             .ToListAsync(cancellationToken);
 
     public async Task<IReadOnlyList<InventoryItem>> ListBundleCandidatesAsync(
@@ -272,6 +278,21 @@ public sealed class EfInventoryStore(HaulScoutDbContext db) : IInventoryStore
         {
             InventoryStatus[] groupStatuses = InventoryLifecycle.InGroup(filter.Lifecycle.Value).ToArray();
             query = query.Where(item => groupStatuses.Contains(item.Status));
+        }
+
+        if (filter.Ownership.HasValue)
+        {
+            query = query.Where(item => item.OwnershipType == filter.Ownership.Value);
+        }
+
+        if (filter.NeedsBenchWork)
+        {
+            // The domain owns what "needs bench work" means; this only translates it into SQL, so the
+            // queue and its count cannot disagree with each other or with anything else that asks.
+            InventoryFunctionalStatus[] blocking = InventoryBenchWork.BlockingStates;
+            query = query.Where(item =>
+                item.OwnershipType == InventoryOwnershipType.CustomerRepair
+                || blocking.Contains(item.FunctionalStatus));
         }
 
         if (filter.Search is not null)

@@ -23,6 +23,22 @@ public sealed class OrdersController(OrdersWorkflowService orders) : HaulScoutCo
         return result.ToArray();
     }
 
+    /// <summary>
+    /// A filtered, paged page of orders plus the queue summary over the whole book.
+    ///
+    /// Mirrors <c>/api/inventory/browse</c>. The array endpoint above stays for callers that want the
+    /// recent list and nothing else.
+    /// </summary>
+    [HttpGet("browse")]
+    public async Task<ActionResult<OrderListDto>> Browse(
+        [FromQuery] string? stage,
+        [FromQuery] string? search,
+        [FromQuery] string? channel,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 25,
+        CancellationToken cancellationToken = default) =>
+        await orders.BrowseAsync(stage, search, channel, page, pageSize, cancellationToken);
+
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<OrderDetailDto>> Get(Guid id, CancellationToken cancellationToken)
     {

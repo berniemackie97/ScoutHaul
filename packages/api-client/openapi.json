@@ -89,6 +89,91 @@
         }
       }
     },
+    "/api/acquisition-lots/browse": {
+      "get": {
+        "tags": [
+          "AcquisitionLots"
+        ],
+        "parameters": [
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 25
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcquisitionLotListDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcquisitionLotListDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcquisitionLotListDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/acquisition-lots/suppliers": {
+      "get": {
+        "tags": [
+          "AcquisitionLots"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupplierRollupListDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupplierRollupListDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupplierRollupListDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/acquisition-lots/{id}": {
       "get": {
         "tags": [
@@ -1773,6 +1858,21 @@
               "format": "int32",
               "default": 25
             }
+          },
+          {
+            "name": "ownership",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/InventoryOwnershipType"
+            }
+          },
+          {
+            "name": "needsBenchWork",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
           }
         ],
         "responses": {
@@ -2803,6 +2903,76 @@
                   "items": {
                     "$ref": "#/components/schemas/OrderSummaryDto"
                   }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/orders/browse": {
+      "get": {
+        "tags": [
+          "Orders"
+        ],
+        "parameters": [
+          {
+            "name": "stage",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "channel",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 25
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderListDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderListDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderListDto"
                 }
               }
             }
@@ -9496,6 +9666,60 @@
         },
         "additionalProperties": false
       },
+      "AcquisitionLotListDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AcquisitionLotDto"
+            },
+            "nullable": true
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/AcquisitionLotSummaryDto"
+          }
+        },
+        "additionalProperties": false
+      },
+      "AcquisitionLotSummaryDto": {
+        "type": "object",
+        "properties": {
+          "totalLots": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalSpend": {
+            "type": "number",
+            "format": "double"
+          },
+          "totalAllocated": {
+            "type": "number",
+            "format": "double"
+          },
+          "unallocated": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "additionalProperties": false
+      },
       "AddCartLineRequest": {
         "type": "object",
         "properties": {
@@ -12011,6 +12235,22 @@
           "estimatedResaleValue": {
             "type": "number",
             "format": "double"
+          },
+          "askingValue": {
+            "type": "number",
+            "format": "double"
+          },
+          "needsBenchWork": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "customerOwned": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "nonFunctional": {
+            "type": "integer",
+            "format": "int32"
           }
         },
         "additionalProperties": false
@@ -12822,6 +13062,81 @@
           },
           "sale": {
             "$ref": "#/components/schemas/SaleDto"
+          }
+        },
+        "additionalProperties": false
+      },
+      "OrderListDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrderSummaryDto"
+            },
+            "nullable": true
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/OrderQueueSummaryDto"
+          }
+        },
+        "additionalProperties": false
+      },
+      "OrderQueueCountDto": {
+        "type": "object",
+        "properties": {
+          "stage": {
+            "type": "string",
+            "nullable": true
+          },
+          "count": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "OrderQueueSummaryDto": {
+        "type": "object",
+        "properties": {
+          "stages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrderQueueCountDto"
+            },
+            "nullable": true
+          },
+          "totalOrders": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "openWork": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "needsAttention": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "capturedRevenue": {
+            "type": "number",
+            "format": "double"
           }
         },
         "additionalProperties": false
@@ -16574,6 +16889,61 @@
           "imageUrl": {
             "type": "string",
             "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "SupplierRollupDto": {
+        "type": "object",
+        "properties": {
+          "supplier": {
+            "type": "string",
+            "nullable": true
+          },
+          "attributed": {
+            "type": "boolean"
+          },
+          "lots": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "items": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "spend": {
+            "type": "number",
+            "format": "double"
+          },
+          "lastPurchase": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "SupplierRollupListDto": {
+        "type": "object",
+        "properties": {
+          "suppliers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SupplierRollupDto"
+            },
+            "nullable": true
+          },
+          "totalLots": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalSpend": {
+            "type": "number",
+            "format": "double"
+          },
+          "attributedSuppliers": {
+            "type": "integer",
+            "format": "int32"
           }
         },
         "additionalProperties": false

@@ -166,9 +166,12 @@ public sealed class InventoryController(
         [FromQuery] bool desc = true,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 25,
+        [FromQuery] InventoryOwnershipType? ownership = null,
+        [FromQuery] bool needsBenchWork = false,
         CancellationToken cancellationToken = default)
     {
-        InventoryListDto result = await queries.BrowseAsync(status, lifecycle, includeArchived, search, attention, sort, desc, page, pageSize, cancellationToken);
+        InventoryListDto result = await queries.BrowseAsync(
+            status, lifecycle, includeArchived, search, attention, sort, desc, page, pageSize, ownership, needsBenchWork, cancellationToken);
         return result;
     }
 

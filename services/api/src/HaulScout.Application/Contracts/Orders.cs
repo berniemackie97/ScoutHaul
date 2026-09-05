@@ -97,6 +97,34 @@ public sealed record OrderDetailDto(
     decimal TotalRefunded = 0,
     OrderWorkflowStateDto? Workflow = null);
 
+/// <param name="Stage">The workflow stage, as <c>OrderWorkflowStage</c> names it.</param>
+public sealed record OrderQueueCountDto(string Stage, int Count);
+
+/// <summary>
+/// The order book at a glance: how much work is waiting in each stage, and the money behind it.
+///
+/// These are counts over every order, not over a page of them. The admin portal used to fetch the
+/// newest 200 orders, bucket them in the browser, and label the result "Captured revenue · Paid
+/// orders" — a figure that stopped being true on the two-hundred-and-first order and never said so.
+/// </summary>
+/// <param name="CapturedRevenue">Grand total of every paid order.</param>
+/// <param name="OpenWork">Orders in a stage that is waiting on someone here — to pack, to ship, ready for pickup.</param>
+public sealed record OrderQueueSummaryDto(
+    IReadOnlyList<OrderQueueCountDto> Stages,
+    int TotalOrders,
+    int OpenWork,
+    int NeedsAttention,
+    decimal CapturedRevenue);
+
+/// <summary>A filtered, paged page of orders plus the queue summary over the whole book.</summary>
+public sealed record OrderListDto(
+    IReadOnlyList<OrderSummaryDto> Items,
+    int Total,
+    int Page,
+    int PageSize,
+    int PageCount,
+    OrderQueueSummaryDto Summary);
+
 public sealed record UpdateOrderStatusRequest(OrderStatus Status);
 
 /// <summary>Combine several orders into one (e.g. items a buyer purchased together but recorded as separate sales).
