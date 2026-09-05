@@ -48,15 +48,20 @@ public sealed class OrdersWorkflowService(
         page = Math.Max(1, page);
         pageSize = Math.Clamp(pageSize, 1, MaxPageSize);
 
-        IQueryable<Order> matching = FilteredOrders(status: null, search, channel);
         IReadOnlyDictionary<Guid, OrderWorkflowStage> stages = await StagesAsync(cancellationToken);
 
-        List<Guid> ordered = await matching
+        // The summary spans every order, never the filtered set. Narrowing the list is a question
+        // about what to look at; it is not a claim that the rest of the book stopped existing, and a
+        // "Captured revenue" that falls while you type a search is worse than no figure at all.
+        OrderQueueSummaryDto summary = Summarize(
+            [.. stages.Keys],
+            stages,
+            await PaidTotalsAsync(cancellationToken));
+
+        List<Guid> ordered = await FilteredOrders(status: null, search, channel)
             .OrderByDescending(order => order.CreatedAt)
             .Select(order => order.Id)
             .ToListAsync(cancellationToken);
-
-        OrderQueueSummaryDto summary = Summarize(ordered, stages, await PaidTotalsAsync(cancellationToken));
 
         if (!string.IsNullOrWhiteSpace(stage) && Enum.TryParse(stage, ignoreCase: true, out OrderWorkflowStage wanted))
         {
