@@ -1,10 +1,15 @@
 import { ApiError } from '../api/apiError';
-import { apiRequest } from '../api';
+import { api, apiRequest } from '../api';
 import { getDatabase } from './database';
+import { deletePhoto, getPhotos } from '../utils/photos';
 import { processSyncQueue } from './syncQueue';
 import { MAX_ATTEMPTS } from './syncQueueRules';
 
-jest.mock('../api', () => ({ apiRequest: jest.fn() }));
+jest.mock('../api', () => ({
+  apiRequest: jest.fn(),
+  api: { uploadInventoryPhoto: jest.fn() },
+}));
+jest.mock('../utils/photos', () => ({ getPhotos: jest.fn(async () => []), deletePhoto: jest.fn() }));
 jest.mock('./database', () => ({ getDatabase: jest.fn() }));
 
 const mockRequest = apiRequest as jest.Mock;
@@ -169,5 +174,63 @@ describe('processSyncQueue', () => {
 
     await expect(processSyncQueue(NOW)).resolves.toEqual({ synced: 1, failed: 0, stuck: 1 });
     expect(db.rows.find((r) => r.id === 'good')!.status).toBe('synced');
+  });
+});
+
+describe('photos held for a queued write', () => {
+  const mockUpload = api.uploadInventoryPhoto as jest.Mock;
+  const mockGetPhotos = getPhotos as jest.Mock;
+  const mockDeletePhoto = deletePhoto as jest.Mock;
+
+  beforeEach(() => {
+    mockGetPhotos.mockResolvedValue([]);
+    mockUpload.mockResolvedValue({});
+  });
+
+  it('uploads them once the item exists', async () => {
+    // They could not travel in the queued JSON — they are files, and there was no record to attach
+    // them to. Without this an item created with no signal arrived with no photos, permanently.
+    mockGetPhotos.mockResolvedValue([
+      { id: 'p1', localUri: 'file:///a.jpg', isHero: true },
+      { id: 'p2', localUri: 'file:///b.jpg', isHero: false },
+    ]);
+    mockGetDatabase.mockResolvedValue(fakeDb([row({ id: 'sync-1' })]));
+    mockRequest.mockResolvedValue({ id: 'item-99' });
+
+    await processSyncQueue(NOW);
+
+    expect(mockUpload).toHaveBeenNthCalledWith(1, 'item-99', 'file:///a.jpg', true);
+    expect(mockUpload).toHaveBeenNthCalledWith(2, 'item-99', 'file:///b.jpg', false);
+  });
+
+  it('lets go of a photo only once it is uploaded', async () => {
+    mockGetPhotos.mockResolvedValue([{ id: 'p1', localUri: 'file:///a.jpg', isHero: true }]);
+    mockGetDatabase.mockResolvedValue(fakeDb([row()]));
+    mockRequest.mockResolvedValue({ id: 'item-99' });
+
+    await processSyncQueue(NOW);
+
+    expect(mockDeletePhoto).toHaveBeenCalledWith('p1');
+  });
+
+  it('keeps a photo whose upload failed, so the next drain retries it', async () => {
+    mockGetPhotos.mockResolvedValue([{ id: 'p1', localUri: 'file:///a.jpg', isHero: true }]);
+    mockUpload.mockRejectedValue(new Error('upload failed'));
+    mockGetDatabase.mockResolvedValue(fakeDb([row()]));
+    mockRequest.mockResolvedValue({ id: 'item-99' });
+
+    await processSyncQueue(NOW);
+
+    expect(mockDeletePhoto).not.toHaveBeenCalled();
+  });
+
+  it('does not look for photos when the write created nothing', async () => {
+    // An update returns no id, and a status change has no photos of its own.
+    mockGetDatabase.mockResolvedValue(fakeDb([row({ operationType: 'UpdateInventory' })]));
+    mockRequest.mockResolvedValue(undefined);
+
+    await processSyncQueue(NOW);
+
+    expect(mockGetPhotos).not.toHaveBeenCalled();
   });
 });

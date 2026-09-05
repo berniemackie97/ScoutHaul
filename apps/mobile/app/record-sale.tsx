@@ -15,6 +15,9 @@ import { ordersApi } from '../src/api/orders';
 import type { ChannelFeeProfile, ChannelFeeRule, SaleCandidate, SaleChannelOption } from '../src/domain/order.types';
 import { useHaptics } from '../src/hooks/useHaptics';
 import { formatMoney, parseOptionalNumber } from '../src/utils/money';
+import { QueuedBanner } from '../src/components/QueuedBanner';
+import { enqueueOperation } from '../src/db/localStore';
+import { isWorthQueueing } from '../src/services/offlineWrites';
 
 const localDateValue = () => new Date(Date.now() - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
 const round2 = (value: number) => Math.round(value * 100) / 100;
@@ -87,6 +90,7 @@ export default function RecordSaleScreen() {
   const [notes, setNotes] = useState('');
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
+  const [queuedNotice, setQueuedNotice] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
@@ -246,33 +250,46 @@ export default function RecordSaleScreen() {
       return;
     }
 
+    const body = {
+      inventoryItemId: candidateId,
+      listingId: listingId || null,
+      platform,
+      soldPrice: validation.soldPrice,
+      shippingCharged: moneyValue(shippingCharged, 'shippingCharged', {}),
+      platformFees: moneyValue(platformFees, 'platformFees', {}),
+      paymentFees: moneyValue(paymentFees, 'paymentFees', {}),
+      shippingCost: moneyValue(shippingCost, 'shippingCost', {}),
+      suppliesCost: moneyValue(suppliesCost, 'suppliesCost', {}),
+      otherCosts: moneyValue(otherCosts, 'otherCosts', {}),
+      salesTaxCollected: moneyValue(salesTax, 'salesTax', {}),
+      taxRemittedByPlatform: taxRemitted,
+      soldAt: new Date(`${soldAt}T12:00:00Z`).toISOString(),
+      notes: notes.trim() || null,
+      externalOrderId: externalOrderId.trim() || null,
+      buyerReference: buyerReference.trim() || null,
+      buyerName: buyerName.trim() || null,
+      shippingCarrier: shippingCarrier.trim() || null,
+      trackingNumber: trackingNumber.trim() || null,
+    };
+
     try {
       setIsSaving(true);
       setError(null);
-      const sale = await ordersApi.recordSale({
-        inventoryItemId: candidateId,
-        listingId: listingId || null,
-        platform,
-        soldPrice: validation.soldPrice,
-        shippingCharged: moneyValue(shippingCharged, 'shippingCharged', {}),
-        platformFees: moneyValue(platformFees, 'platformFees', {}),
-        paymentFees: moneyValue(paymentFees, 'paymentFees', {}),
-        shippingCost: moneyValue(shippingCost, 'shippingCost', {}),
-        suppliesCost: moneyValue(suppliesCost, 'suppliesCost', {}),
-        otherCosts: moneyValue(otherCosts, 'otherCosts', {}),
-        salesTaxCollected: moneyValue(salesTax, 'salesTax', {}),
-        taxRemittedByPlatform: taxRemitted,
-        soldAt: new Date(`${soldAt}T12:00:00Z`).toISOString(),
-        notes: notes.trim() || null,
-        externalOrderId: externalOrderId.trim() || null,
-        buyerReference: buyerReference.trim() || null,
-        buyerName: buyerName.trim() || null,
-        shippingCarrier: shippingCarrier.trim() || null,
-        trackingNumber: trackingNumber.trim() || null,
-      }, compactId());
+      const sale = await ordersApi.recordSale(body, compactId());
       haptics.success();
       router.replace(sale.orderId ? `/orders/${sale.orderId}` : '/(tabs)/orders');
     } catch (e) {
+      // A sale recorded in the field is the most expensive thing this app captures — price, fees,
+      // buyer, tracking, all typed by hand. This screen had no offline handling at all, so any
+      // network failure threw the whole form away: the sale went unrecorded while the item still
+      // read as available. Keep it, the way inventory and comps already are.
+      if (isWorthQueueing(e)) {
+        await enqueueOperation('RecordSale', '/api/sales', 'POST', body);
+        haptics.warning();
+        setQueuedNotice("Saved on this phone. It'll sync when you're back online.");
+        return;
+      }
+
       haptics.error();
       setError(e instanceof Error ? e.message : 'Unable to record sale.');
     } finally {
@@ -283,6 +300,7 @@ export default function RecordSaleScreen() {
   return (
     <Screen>
       {error ? <ErrorBanner message={error} /> : null}
+      {queuedNotice ? <QueuedBanner message={queuedNotice} /> : null}
 
       <View style={[styles.heroCard, { backgroundColor: c.surface, borderColor: c.borderLight, ...s.md }]}>
         <Text variant="caption" numberOfLines={1}>

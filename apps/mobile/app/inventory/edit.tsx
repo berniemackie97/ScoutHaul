@@ -20,6 +20,7 @@ import { useAppTheme } from '../../src/context/ThemeContext';
 import { useHaptics } from '../../src/hooks/useHaptics';
 import { enqueueOperation } from '../../src/db/localStore';
 import { isWorthQueueing } from '../../src/services/offlineWrites';
+import { savePhoto } from '../../src/utils/photos';
 import { takeIdentifyHandoff } from '../../src/features/scanner/identifyHandoff';
 import {
   categoryAttributeFields,
@@ -573,15 +574,17 @@ export default function EditInventoryScreen() {
       const keepForLater = !savedItem && isWorthQueueing(e);
 
       if (keepForLater && params.sourcingTripId) {
-        await enqueueOperation('CreateRouteStopPurchase', '/api/inventory', 'POST', body);
+        const queueId = await enqueueOperation('CreateRouteStopPurchase', '/api/inventory', 'POST', body);
+        await holdPhotosForSync(queueId);
         router.replace({ pathname: '/active-route', params: { tripId: params.sourcingTripId } });
         return;
       }
 
       if (keepForLater) {
-        await (isEdit && params.id
+        const queueId = await (isEdit && params.id
           ? enqueueOperation('UpdateInventory', `/api/inventory/${params.id}`, 'PUT', body)
           : enqueueOperation('CreateInventory', '/api/inventory', 'POST', body));
+        await holdPhotosForSync(queueId);
         // Deliberately not setError: this succeeded. Reporting it as an error put a red banner with
         // a Retry button on a write that was already queued, and tapping it created the item twice.
         setQueuedNotice("Saved on this phone. It'll sync when you're back online.");
@@ -591,6 +594,26 @@ export default function EditInventoryScreen() {
       setError(e instanceof Error ? e.message : 'Unable to save item.');
     } finally {
       setIsSaving(false);
+    }
+  }
+
+  /**
+   * Copies the photos that have not been uploaded yet into the app's own storage, against the queued
+   * write that will eventually carry them.
+   *
+   * They live in the camera's cache until this happens, which the system is free to clear, and they
+   * only existed in this component's state — so a queued item reached the server with no photos at
+   * all, silently and for good. Photos are the one thing that cannot be recaptured: by the time it
+   * syncs, the item is back on the shelf.
+   */
+  async function holdPhotosForSync(queueId: string) {
+    for (const photo of photos.filter((candidate) => !candidate.isRemote)) {
+      try {
+        await savePhoto(queueId, photo.uri, photo.isHero);
+      } catch (photoError) {
+        // One unreadable file must not cost the others, or the item.
+        console.warn('Could not hold a photo for sync:', photoError);
+      }
     }
   }
 
