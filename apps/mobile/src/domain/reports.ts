@@ -2,17 +2,30 @@ import type { BusinessReport, ReportDimension, ReportSeriesPoint } from './repor
 
 export type ReportRangeKey = '30d' | '90d' | 'ytd';
 
+/**
+ * The reports endpoint takes a calendar day, not an instant: `DateOnly? from` on the server. Sending
+ * a full timestamp meant it could not be bound at all, and every range on the reports screen came
+ * back with "The value '2026-09-05T03:09:37.178Z' is not valid" — the screen has never worked.
+ */
+function asCalendarDay(value: Date): string {
+  return value.toISOString().slice(0, 10);
+}
+
 export function reportRange(key: ReportRangeKey, now = new Date()): { from: string; to: string; label: string } {
   const to = new Date(now);
   const from = new Date(now);
 
   if (key === 'ytd') {
     const yearStart = new Date(Date.UTC(to.getUTCFullYear(), 0, 1, 0, 0, 0, 0));
-    return { from: yearStart.toISOString(), to: to.toISOString(), label: 'Year to date' };
+    return { from: asCalendarDay(yearStart), to: asCalendarDay(to), label: 'Year to date' };
   }
 
   from.setUTCDate(from.getUTCDate() - (key === '30d' ? 30 : 90));
-  return { from: from.toISOString(), to: to.toISOString(), label: key === '30d' ? 'Last 30 days' : 'Last 90 days' };
+  return {
+    from: asCalendarDay(from),
+    to: asCalendarDay(to),
+    label: key === '30d' ? 'Last 30 days' : 'Last 90 days',
+  };
 }
 
 export function reportGrossMargin(report: BusinessReport): number | null {

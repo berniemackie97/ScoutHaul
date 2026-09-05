@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Linking from 'expo-linking';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, View } from 'react-native';
 import { api } from '../src/api';
 import { Button } from '../src/components/Button';
 import { Card } from '../src/components/Card';
@@ -400,7 +400,24 @@ export default function ActiveRouteScreen() {
           {route.trip.status === 'Active' ? (
             <Button label="Pause Route" icon="pause-circle-outline" variant="secondary" fullWidth onPress={() => void pauseRoute()} />
           ) : null}
-          <Button label="End Route" icon="stop-circle-outline" variant="danger" fullWidth onPress={() => void completeRoute()} />
+          {/* Ends the whole trip, sits directly under Pause, and had no confirmation — while every
+              delete on the trips screens asks first. A mis-tap here closes out a sourcing run. */}
+          <Button
+            label="End Route"
+            icon="stop-circle-outline"
+            variant="danger"
+            fullWidth
+            onPress={() =>
+              Alert.alert(
+                'End this route?',
+                'The trip will be closed out. Stops you have not visited stay unvisited.',
+                [
+                  { text: 'Keep going', style: 'cancel' },
+                  { text: 'End route', style: 'destructive', onPress: () => void completeRoute() },
+                ],
+              )
+            }
+          />
         </View>
       </View>
     </Screen>

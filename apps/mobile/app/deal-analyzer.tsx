@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { api } from '../src/api';
@@ -14,6 +14,7 @@ import { Text } from '../src/components/Text';
 import { TextField } from '../src/components/TextField';
 import { radius, spacing } from '../src/components/theme';
 import { useColors } from '../src/context/ThemeContext';
+import { useHaptics } from '../src/hooks/useHaptics';
 import type { MarketAnalysisResponse, PricingBasisType } from '../src/domain/types';
 import { useConnectivity } from '../src/hooks/useConnectivity';
 import { parseOptionalNumber } from '../src/utils/money';
@@ -40,6 +41,7 @@ export default function DealAnalyzerScreen() {
     barcode?: string;
   }>();
   const c = useColors();
+  const haptics = useHaptics();
   const connectivity = useConnectivity();
 
   const [expectedSalePrice, setExpectedSalePrice] = useState(params.expectedSalePrice ?? '');
@@ -283,6 +285,27 @@ export default function DealAnalyzerScreen() {
               ))}
             </Card>
           ) : null}
+
+          {/* The screen answered "should I buy this" and then stopped, so the only way to act on a
+              Buy was to back out and start the item again by hand — retyping the price it had just
+              been given. It carries what it knows straight into the item. */}
+          <Button
+            label="Add to inventory"
+            icon="add-circle-outline"
+            fullWidth
+            onPress={() => {
+              haptics.success();
+              router.push({
+                pathname: '/inventory/edit',
+                params: {
+                  ...(params.query ? { title: params.query } : {}),
+                  ...(params.barcode ? { barcode: params.barcode } : {}),
+                  ...(askingPrice.trim() ? { purchasePrice: askingPrice.trim() } : {}),
+                  ...(expectedSalePrice.trim() ? { estimatedSalePrice: expectedSalePrice.trim() } : {}),
+                },
+              });
+            }}
+          />
         </>
       ) : null}
     </Screen>

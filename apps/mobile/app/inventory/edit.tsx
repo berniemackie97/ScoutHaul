@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Alert, StyleSheet, View } from 'react-native';
 import { api } from '../../src/api';
 import type { InventoryReferenceData } from '../../src/api/inventory';
 import { Button } from '../../src/components/Button';
@@ -86,6 +86,7 @@ export default function EditInventoryScreen() {
     photoUri?: string;
     productIdentityId?: string;
     estimatedSalePrice?: string;
+    purchasePrice?: string;
     condition?: string;
     sourcingTripId?: string;
     sourcingTripStopId?: string;
@@ -118,7 +119,7 @@ export default function EditInventoryScreen() {
   const [damageType, setDamageType] = useState('');
   const [damageSeverity, setDamageSeverity] = useState('');
   const [damageNote, setDamageNote] = useState('');
-  const [purchasePrice, setPurchasePrice] = useState('');
+  const [purchasePrice, setPurchasePrice] = useState(params.purchasePrice ?? '');
   const [estimatedSalePrice, setEstimatedSalePrice] = useState(params.estimatedSalePrice ?? '');
   const [barcode, setBarcode] = useState(params.barcode ?? '');
   const [manufacturerPartNumber, setManufacturerPartNumber] = useState('');
@@ -382,14 +383,31 @@ export default function EditInventoryScreen() {
   }
 
   function removePhoto(index: number) {
-    haptics.warning();
-    setPhotos((prev) => {
-      const next = prev.filter((_, i) => i !== index);
-      if (next.length > 0 && !next.some((p) => p.isHero)) {
-        next[0].isHero = true;
-      }
-      return next;
-    });
+    // The only destructive action on this form, and it used to happen on the first tap of a 22pt
+    // target sitting on the corner of a thumbnail. A photo taken in a shop cannot be retaken later.
+    Alert.alert(
+      'Remove this photo?',
+      photos[index]?.isRemote
+        ? 'It will be deleted from the item when you save.'
+        : 'This photo has not been uploaded yet, so it will be lost.',
+      [
+        { text: 'Keep', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: () => {
+            haptics.warning();
+            setPhotos((prev) => {
+              const next = prev.filter((_, i) => i !== index);
+              if (next.length > 0 && !next.some((p) => p.isHero)) {
+                next[0].isHero = true;
+              }
+              return next;
+            });
+          },
+        },
+      ],
+    );
   }
 
   function setHero(index: number) {
@@ -516,8 +534,24 @@ export default function EditInventoryScreen() {
         item = await api.createInventory(body);
       }
       savedItem = item;
-      await persistPhotoChanges(item.id);
-      await persistIssueChanges(item.id);
+
+      // Past this point the item exists on the server. A failure attaching photos or issues must
+      // never look like "the save failed", because the operator's only move then is to press save
+      // again — which creates the item a second time and leaves the first as an orphan with no
+      // photos. Report it as what it is: saved, with something still to finish.
+      try {
+        await persistPhotoChanges(item.id);
+        await persistIssueChanges(item.id);
+      } catch (attachmentError) {
+        haptics.warning();
+        setQueuedNotice(
+          attachmentError instanceof Error
+            ? `Item saved, but its photos did not finish uploading: ${attachmentError.message}`
+            : 'Item saved, but its photos did not finish uploading.',
+        );
+        router.replace(`/inventory/${item.id}`);
+        return;
+      }
       if (isEdit && loadedStatus && status !== loadedStatus && !isCommerceManagedStage) {
         item = await api.changeInventoryStatus(item.id, status);
         savedItem = item;
@@ -533,7 +567,10 @@ export default function EditInventoryScreen() {
       haptics.error();
       // Only keep a write that could plausibly succeed later. Queuing a rejection — bad data, no
       // permission — builds a backlog that can never drain and hides the real problem from the user.
-      const keepForLater = !isEdit && !savedItem && isWorthQueueing(e);
+      // An edit is worth queueing too. Only a create that already succeeded must not be repeated —
+      // that is what would duplicate the item. Editing an existing one offline used to be dropped
+      // on the floor: no queue, no notice, the change simply gone.
+      const keepForLater = !savedItem && isWorthQueueing(e);
 
       if (keepForLater && params.sourcingTripId) {
         await enqueueOperation('CreateRouteStopPurchase', '/api/inventory', 'POST', body);
@@ -542,7 +579,9 @@ export default function EditInventoryScreen() {
       }
 
       if (keepForLater) {
-        await enqueueOperation('CreateInventory', '/api/inventory', 'POST', body);
+        await (isEdit && params.id
+          ? enqueueOperation('UpdateInventory', `/api/inventory/${params.id}`, 'PUT', body)
+          : enqueueOperation('CreateInventory', '/api/inventory', 'POST', body));
         // Deliberately not setError: this succeeded. Reporting it as an error put a red banner with
         // a Retry button on a write that was already queued, and tapping it created the item twice.
         setQueuedNotice("Saved on this phone. It'll sync when you're back online.");
