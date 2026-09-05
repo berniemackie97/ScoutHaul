@@ -4,6 +4,7 @@ using HaulScout.Application.Sales;
 using HaulScout.Application.Security;
 using HaulScout.Infrastructure.Orders;
 using HaulScout.Infrastructure.Sales;
+using HaulScout.Infrastructure.Common;
 using HaulScout.Infrastructure.Persistence;
 
 namespace HaulScout.Tests;
@@ -24,7 +25,7 @@ internal static class SalesControllerFactory
             new SaleRecordingWorkflowService(db, currentUser, assembler, channels),
             new SaleQueryService(db, currentUser),
             new SaleGroupingWorkflowService(db, currentUser, assembler),
-            new SaleDeletionWorkflowService(db, currentUser, assembler),
+            new SaleDeletionWorkflowService(db, currentUser, assembler, new EfUnitOfWork(db)),
             new SaleTransitionWorkflowService(db, currentUser, assembler, saleState),
             new SaleCorrectionWorkflowService(db, currentUser, assembler, channels, saleState),
             new SaleRefundWorkflowService(db, currentUser, saleState),

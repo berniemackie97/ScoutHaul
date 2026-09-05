@@ -8,6 +8,7 @@ using HaulScout.Application.Security;
 using HaulScout.Application.Storefront;
 using HaulScout.Domain;
 using HaulScout.Domain.Entities;
+using HaulScout.Infrastructure.Common;
 using HaulScout.Infrastructure.Persistence;
 using HaulScout.Infrastructure.Storefront;
 
@@ -38,7 +39,7 @@ public class StorePublishingTests
         tenant.SetOrganization(org);
         HaulScoutDbContext db = new(options, tenant);
         StubCurrentUser user = new(org);
-        StorePublishingWorkflowService publishing = new(new EfStoreListingStore(db, TimeProvider.System), user, TimeProvider.System);
+        StorePublishingWorkflowService publishing = new(new EfStoreListingStore(db, TimeProvider.System), user, TimeProvider.System, new EfUnitOfWork(db));
         return (db, new StoreController(publishing), org);
     }
 

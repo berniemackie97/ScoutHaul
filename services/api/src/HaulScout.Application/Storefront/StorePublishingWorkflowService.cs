@@ -15,7 +15,8 @@ namespace HaulScout.Application.Storefront;
 public sealed class StorePublishingWorkflowService(
     IStoreListingStore store,
     ICurrentUserContext currentUser,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    IUnitOfWork unitOfWork)
 {
     public async Task<IReadOnlyList<StoreListingDto>> ListListingsAsync(StoreListingStatus? status, CancellationToken cancellationToken) =>
         (await store.ListListingsAsync(currentUser.OrganizationId, status, cancellationToken))
@@ -34,7 +35,18 @@ public sealed class StorePublishingWorkflowService(
         return listing is null ? AppResult<StoreListingDto>.NotFound() : AppResult<StoreListingDto>.Ok(listing.ToDto());
     }
 
-    public async Task<AppResult<StoreListingDto>> PublishAsync(PublishListingRequest request, CancellationToken cancellationToken)
+    /// <summary>
+    /// Puts an item on the storefront.
+    ///
+    /// Two writes, and they have to be in that order: marking the item Listed is what makes the
+    /// synchroniser create the listing, and only then is there a listing to apply the presentation
+    /// to. One transaction, so a failure decorating it cannot leave an item advertised as Listed
+    /// with a listing nobody finished.
+    /// </summary>
+    public Task<AppResult<StoreListingDto>> PublishAsync(PublishListingRequest request, CancellationToken cancellationToken) =>
+        unitOfWork.InTransactionAsync(token => PublishCoreAsync(request, token), cancellationToken);
+
+    private async Task<AppResult<StoreListingDto>> PublishCoreAsync(PublishListingRequest request, CancellationToken cancellationToken)
     {
         if (request.ListPrice < 0)
         {

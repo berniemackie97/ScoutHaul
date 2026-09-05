@@ -17,9 +17,20 @@ namespace HaulScout.Api.Services;
 public sealed class SaleDeletionWorkflowService(
     HaulScoutDbContext db,
     ICurrentUserContext currentUser,
-    OrderAssembler orderWriter)
+    OrderAssembler orderWriter,
+    IUnitOfWork unitOfWork)
 {
-    public async Task<AppResult> DeleteAsync(Guid id, CancellationToken cancellationToken)
+    /// <summary>
+    /// Deletes a sale and, if that emptied the marketplace order it belonged to, the order with it.
+    ///
+    /// This has to write twice: the emptiness check is only accurate once the removal is persisted.
+    /// Both writes go in one transaction, so a failure pruning the order cannot leave the money gone
+    /// and an empty phantom order behind.
+    /// </summary>
+    public Task<AppResult> DeleteAsync(Guid id, CancellationToken cancellationToken) =>
+        unitOfWork.InTransactionAsync(token => DeleteCoreAsync(id, token), cancellationToken);
+
+    private async Task<AppResult> DeleteCoreAsync(Guid id, CancellationToken cancellationToken)
     {
         Sale? sale = await db.Sales
             .Include(item => item.InventoryItem)
