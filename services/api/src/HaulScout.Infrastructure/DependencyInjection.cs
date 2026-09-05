@@ -15,6 +15,7 @@ using HaulScout.Infrastructure.Inventory;
 using HaulScout.Infrastructure.Marketplace;
 using HaulScout.Infrastructure.Organizations;
 using HaulScout.Infrastructure.Orders;
+using HaulScout.Infrastructure.Common;
 using HaulScout.Infrastructure.Persistence;
 using HaulScout.Infrastructure.PlatformOrders;
 using HaulScout.Infrastructure.ReferenceData;
@@ -40,6 +41,8 @@ public static class DependencyInjection
         services.AddScoped<IChannelAccountService, EfChannelAccountService>();
         services.AddScoped<IInventoryReferenceDataStore, EfInventoryReferenceDataStore>();
         services.AddScoped<IAuditTrail, EfAuditTrail>();
+        // The transaction seam. Scoped, so it shares the request's DbContext and its ambient transaction.
+        services.AddScoped<IUnitOfWork, EfUnitOfWork>();
         services.AddScoped<IInventoryStore, EfInventoryStore>();
         services.AddScoped<IStorefrontCartStore, EfStorefrontCartStore>();
         services.AddScoped<IStorefrontCheckoutStore, EfStorefrontCheckoutStore>();
