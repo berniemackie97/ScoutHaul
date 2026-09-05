@@ -1,21 +1,13 @@
 import { apiRequest } from './client';
-import type { Budget, BudgetSummary, Expense, ExpenseCategory, Listing, ListingStatus } from '../domain/types';
+import type { CreateListingRequest, UpdateListingRequest } from './listingRequests';
+import type { Budget, BudgetSummary, Expense, ExpenseCategory, Listing } from '../domain/types';
 
-export type CreateListingRequest = {
-  inventoryItemId: string;
-  platform: string;
-  listingUrl?: string | null;
-  listPrice: number;
-  notes?: string | null;
-};
-
-export type UpdateListingRequest = {
-  platform: string;
-  listingUrl?: string | null;
-  listPrice: number;
-  status?: ListingStatus;
-  notes?: string | null;
-};
+export type {
+  CreateListingRequest,
+  ListingEdits,
+  UpdateListingRequest,
+} from './listingRequests';
+export { listingUpdateFrom } from './listingRequests';
 
 export type CreateBudgetRequest = {
   name: string;

@@ -24,10 +24,13 @@ type TrackingOrder = {
   packedAt?: string | null;
   shippedAt?: string | null;
   deliveredAt?: string | null;
+  // Shaped like the generated client describes it, not like the API happens to behave. Asserting
+  // non-null here only moved the lie one file along: the client says these can be absent, and this
+  // component already falls back when they are.
   workflow?: {
-    stage: string;
-    availableActions: string[];
-    blockers: string[];
+    stage?: string | null;
+    availableActions?: string[] | null;
+    blockers?: string[] | null;
   } | null;
 };
 

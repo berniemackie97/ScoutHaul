@@ -34,6 +34,11 @@ public sealed class ListingsController(HaulScoutDbContext db, ICurrentUserContex
             return Invalid("Platform and positive list price are required.");
         }
 
+        if (ContentTooLong(request.Title, request.Description) is string contentProblem)
+        {
+            return Invalid(contentProblem);
+        }
+
         Listing listing = new()
         {
             OrganizationId = currentUser.OrganizationId,
@@ -43,7 +48,9 @@ public sealed class ListingsController(HaulScoutDbContext db, ICurrentUserContex
             ListingUrl = TrimToNull(request.ListingUrl),
             ListPrice = request.ListPrice,
             Status = ListingStatus.Draft,
-            Notes = TrimToNull(request.Notes)
+            Notes = TrimToNull(request.Notes),
+            Title = TrimToNull(request.Title),
+            Description = TrimToNull(request.Description)
         };
 
         db.Listings.Add(listing);
@@ -66,11 +73,18 @@ public sealed class ListingsController(HaulScoutDbContext db, ICurrentUserContex
             return Invalid("Platform and positive list price are required.");
         }
 
+        if (ContentTooLong(request.Title, request.Description) is string contentProblem)
+        {
+            return Invalid(contentProblem);
+        }
+
         listing.Platform = request.Platform.Trim();
         listing.ListingUrl = TrimToNull(request.ListingUrl);
         listing.ListPrice = request.ListPrice;
         listing.Status = request.Status;
         listing.Notes = TrimToNull(request.Notes);
+        listing.Title = TrimToNull(request.Title);
+        listing.Description = TrimToNull(request.Description);
         listing.ListedAt ??= request.Status == ListingStatus.Active ? DateTimeOffset.UtcNow : null;
         listing.EndedAt ??= request.Status is ListingStatus.Ended or ListingStatus.Sold or ListingStatus.Cancelled ? DateTimeOffset.UtcNow : null;
 
@@ -138,6 +152,14 @@ public sealed class ListingsController(HaulScoutDbContext db, ICurrentUserContex
 
         return NoContent();
     }
+
+    private static string? ContentTooLong(string? title, string? description) => title?.Trim().Length switch
+    {
+        > ListingLimits.TitleMaxLength => $"Title must be {ListingLimits.TitleMaxLength} characters or fewer.",
+        _ => description?.Trim().Length > ListingLimits.DescriptionMaxLength
+            ? $"Description must be {ListingLimits.DescriptionMaxLength} characters or fewer."
+            : null
+    };
 
     private Task<Listing?> FindListing(Guid id, CancellationToken cancellationToken) =>
         db.Listings

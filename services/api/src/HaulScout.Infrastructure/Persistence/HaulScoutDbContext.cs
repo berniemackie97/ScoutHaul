@@ -424,6 +424,8 @@ public sealed class HaulScoutDbContext(
             entity.ToTable("Listings");
             entity.Property(item => item.Platform).HasMaxLength(80).IsRequired();
             entity.Property(item => item.ListingUrl).HasMaxLength(1500);
+            entity.Property(item => item.Title).HasMaxLength(ListingLimits.TitleMaxLength);
+            entity.Property(item => item.Description).HasMaxLength(ListingLimits.DescriptionMaxLength);
             entity.Property(item => item.Status).HasConversion<string>().HasMaxLength(32);
             ConfigureMoney(entity.Property(item => item.ListPrice));
             entity.HasIndex(item => new { item.OrganizationId, item.Status });

@@ -70,6 +70,17 @@ public sealed class Listing : EntityBase, IOrganizationScoped
     public required string Platform { get; set; }
     public string? ListingUrl { get; set; }
     public decimal ListPrice { get; set; }
+
+    /// <summary>
+    /// The words that go on the marketplace: what the buyer reads.
+    ///
+    /// A listing had a price, a platform and a URL but nowhere to keep what it actually says, so the
+    /// listing generator could produce a title and description and then had nothing to save them to
+    /// — the operator copied them out by hand or lost them. Null until written.
+    /// </summary>
+    public string? Title { get; set; }
+    public string? Description { get; set; }
+
     public ListingStatus Status { get; set; } = ListingStatus.Draft;
     public DateTimeOffset? ListedAt { get; set; }
     public DateTimeOffset? EndedAt { get; set; }
