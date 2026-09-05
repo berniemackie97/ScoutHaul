@@ -13,6 +13,11 @@ import { Text } from '../src/components/Text';
 import { spacing } from '../src/components/theme';
 import { useColors } from '../src/context/ThemeContext';
 import type { InventoryItem } from '../src/domain/types';
+import {
+  describeListingCopyOutcome,
+  saveListingCopy,
+  type ListingCopySaveOutcome,
+} from '../src/services/saveListingCopy';
 
 const money = (value: number | null | undefined) =>
   typeof value === 'number' ? `$${value.toFixed(2)}` : '—';
@@ -24,10 +29,13 @@ export default function GenerateListingScreen() {
   const [listing, setListing] = useState<GeneratedListing | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState<ListingCopySaveOutcome | null>(null);
 
   const generate = useCallback(async (inv: InventoryItem) => {
     setLoading(true);
     setError(null);
+    setSaved(null);
     try {
       const result = await api.generateListing({
         title: inv.title,
@@ -46,6 +54,29 @@ export default function GenerateListingScreen() {
       setError(e instanceof Error ? e.message : 'Could not generate a listing. Try again.');
     } finally {
       setLoading(false);
+    }
+  }, []);
+
+  const save = useCallback(async (inv: InventoryItem, generated: GeneratedListing) => {
+    setSaving(true);
+    setError(null);
+    try {
+      setSaved(
+        await saveListingCopy({
+          inventoryItemId: inv.id,
+          title: generated.listingTitle,
+          description: generated.listingDescription,
+          // Only used if the item has no listing yet and one has to be created to hold the copy.
+          listPrice:
+            generated.suggestedListPrice ??
+            inv.estimatedSalePrice ??
+            inv.sellerAskingPrice ??
+            inv.purchasePrice ??
+            0,
+        }),
+      );
+    } finally {
+      setSaving(false);
     }
   }, []);
 
@@ -139,10 +170,27 @@ export default function GenerateListingScreen() {
           ) : null}
 
           <Button
+            label={saving ? 'Saving…' : 'Save to listing'}
+            icon="bookmark-outline"
+            disabled={loading || saving || !item}
+            onPress={() => item && void save(item, listing)}
+          />
+
+          {saved ? (
+            <Text
+              variant="caption"
+              color={saved.status === 'rejected' ? c.danger : c.textMuted}
+              style={styles.outcome}
+            >
+              {describeListingCopyOutcome(saved)}
+            </Text>
+          ) : null}
+
+          <Button
             label="Regenerate"
             icon="refresh-outline"
             variant="secondary"
-            disabled={loading}
+            disabled={loading || saving}
             onPress={() => item && void generate(item)}
           />
         </>
@@ -162,6 +210,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   headerText: { flex: 1 },
+  outcome: { marginTop: -spacing.xs, marginBottom: spacing.xs, textAlign: 'center' },
   loading: { alignItems: 'center', paddingVertical: spacing.xl },
   compRow: {
     flexDirection: 'row',

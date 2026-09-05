@@ -3,6 +3,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
 import { api } from '../src/api';
+import { listingUpdateFrom } from '../src/api/commerce';
 import { Button } from '../src/components/Button';
 import { Card } from '../src/components/Card';
 import { EmptyState } from '../src/components/EmptyState';
@@ -115,13 +116,7 @@ export default function ListingQueueScreen() {
 
   async function endListing(listing: Listing) {
     try {
-      await api.updateListing(listing.id, {
-        platform: listing.platform,
-        listingUrl: listing.listingUrl,
-        listPrice: listing.listPrice,
-        status: 'Ended',
-        notes: listing.notes ?? null,
-      });
+      await api.updateListing(listing.id, listingUpdateFrom(listing, { status: 'Ended' }));
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unable to end listing.');

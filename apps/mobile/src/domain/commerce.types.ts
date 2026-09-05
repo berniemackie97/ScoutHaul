@@ -23,6 +23,9 @@ export type Listing = {
   listedAt?: string | null;
   endedAt?: string | null;
   notes?: string | null;
+  /** What the buyer reads on the marketplace. Null until the copy has been written. */
+  title?: string | null;
+  description?: string | null;
 };
 
 export type ResaleTask = {
