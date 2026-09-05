@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using HaulScout.Application.Common;
 using HaulScout.Application.Inventory;
+using HaulScout.Application.Search;
 using HaulScout.Application.Organizations;
 using HaulScout.Application.PlatformOrders;
 using HaulScout.Application.ReferenceData;
@@ -22,6 +23,7 @@ public static class DependencyInjection
         services.AddScoped<IConfidenceScorer, ConfidenceScorer>();
         services.AddScoped<InventoryReferenceDataService>();
         services.AddScoped<InventoryQueryService>();
+        services.AddScoped<SearchService>();
         services.AddScoped<StorefrontShippingCalculator>();
         services.AddScoped<CartWorkflowService>();
         services.AddScoped<CheckoutWorkflowService>();

@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using HaulScout.Application.Common;
 using HaulScout.Application.Inventory;
+using HaulScout.Application.Search;
 using HaulScout.Application.Organizations;
 using HaulScout.Application.PlatformOrders;
 using HaulScout.Application.ReferenceData;
@@ -12,6 +13,7 @@ using HaulScout.Application.Services;
 using HaulScout.Application.Storefront;
 using HaulScout.Infrastructure.Channels;
 using HaulScout.Infrastructure.Inventory;
+using HaulScout.Infrastructure.Search;
 using HaulScout.Infrastructure.Marketplace;
 using HaulScout.Infrastructure.Organizations;
 using HaulScout.Infrastructure.Orders;
@@ -44,6 +46,7 @@ public static class DependencyInjection
         // The transaction seam. Scoped, so it shares the request's DbContext and its ambient transaction.
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
         services.AddScoped<IInventoryStore, EfInventoryStore>();
+        services.AddScoped<ISearchStore, EfSearchStore>();
         services.AddScoped<IStorefrontCartStore, EfStorefrontCartStore>();
         services.AddScoped<IStorefrontCheckoutStore, EfStorefrontCheckoutStore>();
         services.AddScoped<IStorefrontCustomerStore, EfStorefrontCustomerStore>();

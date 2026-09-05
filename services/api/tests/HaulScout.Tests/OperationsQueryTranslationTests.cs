@@ -3,11 +3,14 @@ using HaulScout.Api.Controllers;
 using HaulScout.Api.Services;
 using HaulScout.Application.Contracts;
 using HaulScout.Application.Inventory;
+using HaulScout.Application.Organizations;
+using HaulScout.Application.Search;
 using HaulScout.Application.Security;
 using HaulScout.Domain;
 using HaulScout.Domain.Entities;
 using HaulScout.Infrastructure.Inventory;
 using HaulScout.Infrastructure.Orders;
+using HaulScout.Infrastructure.Search;
 using HaulScout.Infrastructure.Persistence;
 
 namespace HaulScout.Tests;
@@ -157,6 +160,54 @@ public sealed class OperationsQueryTranslationTests(PostgresFixture postgres)
         Assert.Equal(2, searched.Summary.TotalOrders);
         Assert.Equal(100m, searched.Summary.CapturedRevenue);
     }
+
+    [Fact]
+    public async Task Global_search_translates_to_sql()
+    {
+        // Four queries across four tables, all lowered and matched. If any of them cannot translate,
+        // the palette is broken everywhere at once rather than on one screen.
+        (HaulScoutDbContext db, Guid org, Guid user) = await postgres.NewOrganizationAsync();
+        await using HaulScoutDbContext _ = db;
+
+        db.InventoryItems.Add(new InventoryItem
+        {
+            OrganizationId = org,
+            Title = "Vintage brass banker's lamp",
+            Brand = "Emeralite",
+            Barcode = "0123456789",
+            StorageLocation = "Shelf B4",
+            Status = InventoryStatus.ReadyToList,
+        });
+        db.Orders.Add(new Order
+        {
+            OrganizationId = org,
+            OrderNumber = "SH-1042",
+            Channel = "Storefront",
+            ShipToName = "Dana Brooks",
+            Status = OrderStatus.Paid,
+        });
+        db.Customers.Add(new Customer { OrganizationId = org, DisplayName = "Dana Brooks", Email = "dana@example.com" });
+        db.AcquisitionLots.Add(new AcquisitionLot { OrganizationId = org, Name = "Maple St estate", PurchaseSubtotal = 100m });
+        await db.SaveChangesAsync();
+
+        SearchService controller = new(new EfSearchStore(db), new StubCurrentUser(org, user), new AllowAllAuthorizer());
+
+        Assert.Single(Hits(await controller.SearchAsync("BANKER", CancellationToken.None), "inventory"));
+        Assert.Single(Hits(await controller.SearchAsync("shelf b4", CancellationToken.None), "inventory"));
+        Assert.Single(Hits(await controller.SearchAsync("sh-1042", CancellationToken.None), "order"));
+        Assert.Single(Hits(await controller.SearchAsync("dana@", CancellationToken.None), "customer"));
+        Assert.Single(Hits(await controller.SearchAsync("maple", CancellationToken.None), "purchase"));
+    }
+
+    private sealed class AllowAllAuthorizer : IOrganizationAuthorizer
+    {
+        public Task RequirePermission(Guid organizationId, string permission, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task<bool> HasPermission(Guid organizationId, string permission, CancellationToken cancellationToken) => Task.FromResult(true);
+        public Task RequireOwner(Guid organizationId, CancellationToken cancellationToken) => Task.CompletedTask;
+    }
+
+    private static IReadOnlyList<SearchHitDto> Hits(SearchResultsDto result, string kind) =>
+        result.Groups.SingleOrDefault(group => group.Kind == kind)?.Hits ?? [];
 
     private static AcquisitionLotDto Single(ActionResult<AcquisitionLotListDto> result) =>
         Assert.Single(Value(result).Items);
