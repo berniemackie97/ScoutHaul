@@ -73,6 +73,7 @@ export const api = {
   // Acquisition lots / purchases
   acquisitionLots: acquisitionApi.lots,
   acquisitionLot: acquisitionApi.lot,
+  createAcquisitionLot: acquisitionApi.createLot,
 
   // Reports
   reportOverview: reportsApi.overview,

@@ -3,6 +3,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { api } from '../../src/api';
+import { Button } from '../../src/components/Button';
 import { Card } from '../../src/components/Card';
 import { EmptyState } from '../../src/components/EmptyState';
 import { ErrorBanner } from '../../src/components/ErrorBanner';
@@ -68,6 +69,8 @@ export default function PurchasesScreen() {
         <StatusPill label={`${lots.length} lot${lots.length === 1 ? '' : 's'}`} tone="primary" />
       </View>
 
+      <Button label="Record a purchase" icon="add-circle-outline" onPress={() => router.push('/purchases/new')} />
+
       {error ? <ErrorBanner message={error} onRetry={() => void load()} /> : null}
 
       {isLoading ? (
@@ -76,7 +79,9 @@ export default function PurchasesScreen() {
         <EmptyState
           icon="receipt-outline"
           title="No purchases recorded"
-          message="Create acquisition lots in the admin portal. Mobile will show the lot, item allocation, and cost context here."
+          message="Record what you buy as you buy it. Costs now, items once you have unpacked them."
+          actionLabel="Record a purchase"
+          onAction={() => router.push('/purchases/new')}
         />
       ) : (
         <>
