@@ -1,4 +1,5 @@
-import { apiRequest } from '../api';
+import { api, apiRequest } from '../api';
+import { deletePhoto, getPhotos } from '../utils/photos';
 import { createLocalId } from '../utils/id';
 import { getDatabase } from './database';
 import { classifyFailure } from './syncQueueRules';
@@ -21,12 +22,19 @@ export type SyncQueueRow = {
 /** Rows the queue still intends to send. `stuck` ones are excluded — they need a person, not a retry. */
 const RETRIABLE = `status in ('pending', 'failed')`;
 
+/**
+ * Queues a write for later, returning the row's id.
+ *
+ * The id is the handle for anything that has to travel with the write but will not fit in JSON —
+ * photos, in practice. They are stored against it and attached once the write has been delivered and
+ * there is a real record to attach them to.
+ */
 export async function enqueueOperation(
   operationType: string,
   endpoint: string,
   method: SyncQueueRow['method'],
   body: unknown,
-): Promise<void> {
+): Promise<string> {
   const db = await getDatabase();
   const id = createLocalId('sync');
   await db.runAsync(
@@ -34,6 +42,7 @@ export async function enqueueOperation(
       values (?, ?, ?, ?, ?, 'pending', ?, null)`,
     [id, operationType, endpoint, method, JSON.stringify(body), new Date().toISOString()],
   );
+  return id;
 }
 
 export async function enqueueComp(body: unknown, draftId?: string): Promise<void> {
@@ -101,11 +110,18 @@ export async function processSyncQueue(now: Date = new Date()): Promise<SyncResu
 
   for (const row of rows) {
     try {
-      await apiRequest(row.endpoint, {
+      const created = await apiRequest<{ id?: string } | undefined>(row.endpoint, {
         method: row.method,
         body: JSON.parse(row.bodyJson),
         idempotencyKey: row.id,
       });
+
+      // Photos could not travel in the queued JSON — they are files, and until the write lands there
+      // is no record to attach them to. They were saved against this row's id when it was queued.
+      if (created?.id) {
+        await attachQueuedPhotos(row.id, created.id);
+      }
+
       await db.runAsync(
         `update sync_queue set status = 'synced', lastError = null, nextAttemptAt = null where id = ?`,
         [row.id],
@@ -139,4 +155,21 @@ export async function processSyncQueue(now: Date = new Date()): Promise<SyncResu
   }
 
   return { synced, failed, stuck };
+}
+
+/**
+ * Uploads the photos held for a queued write, now that the record it creates exists.
+ *
+ * Without this an item created in a shop with no signal arrived on the server with no photos at all,
+ * silently and permanently — and photos are the one thing that cannot be recaptured, because by then
+ * the item is no longer in your hands.
+ *
+ * A photo that fails to upload is left in place rather than deleted, so the next drain retries it.
+ */
+async function attachQueuedPhotos(queueId: string, inventoryItemId: string): Promise<void> {
+  const held = await getPhotos(queueId);
+  for (const photo of held) {
+    await api.uploadInventoryPhoto(inventoryItemId, photo.localUri, photo.isHero);
+    await deletePhoto(photo.id);
+  }
 }
