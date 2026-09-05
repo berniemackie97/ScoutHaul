@@ -12,10 +12,8 @@ import { StatusPill } from '../src/components/StatusPill';
 import { Text } from '../src/components/Text';
 import { spacing } from '../src/components/theme';
 import { useAppTheme } from '../src/context/ThemeContext';
-import { discardOperation, getPendingSyncCount, getWorkspaceProfile, listItemDrafts, listStuckOperations, processSyncQueue, retryStuckOperation, saveWorkspaceProfile, type AppWorkspaceProfile, type SyncQueueRow } from '../src/db/localStore';
-import type { LocalItemDraft } from '../src/domain/types';
+import { discardOperation, getPendingSyncCount, getWorkspaceProfile, listStuckOperations, processSyncQueue, retryStuckOperation, saveWorkspaceProfile, type AppWorkspaceProfile, type SyncQueueRow } from '../src/db/localStore';
 import { useConnectivity } from '../src/hooks/useConnectivity';
-import { formatMoney } from '../src/utils/money';
 import { signOut } from '../src/services/auth';
 
 type ThemeMode = 'system' | 'light' | 'dark';
@@ -28,7 +26,6 @@ const themeModes: { value: ThemeMode; label: string; icon: keyof typeof Ionicons
 export default function SettingsScreen() {
   const { colors: c, mode, setMode } = useAppTheme();
   const connectivity = useConnectivity();
-  const [drafts, setDrafts] = useState<LocalItemDraft[]>([]);
   const [pendingSync, setPendingSync] = useState(0);
   const [stuck, setStuck] = useState<SyncQueueRow[]>([]);
   const [message, setMessage] = useState<string | null>(null);
@@ -37,7 +34,6 @@ export default function SettingsScreen() {
 
   async function load() {
     setWorkspaceProfile(await getWorkspaceProfile());
-    setDrafts(await listItemDrafts());
     setPendingSync(await getPendingSyncCount());
     setStuck(await listStuckOperations());
   }
@@ -246,26 +242,6 @@ export default function SettingsScreen() {
         </>
       ) : null}
 
-      <SectionHeader title={`Local Drafts (${drafts.length})`} />
-      {drafts.length === 0 ? (
-        <Card>
-          <Text variant="caption">No local drafts.</Text>
-        </Card>
-      ) : (
-        drafts.map((draft) => (
-          <Card key={draft.id}>
-            <View style={styles.draftRow}>
-              <Text variant="bodyBold" numberOfLines={1} style={styles.flex}>
-                {draft.title}
-              </Text>
-              <StatusPill label={draft.syncStatus} size="sm" />
-            </View>
-            <Text variant="caption">
-              {formatMoney(draft.sellerAskingPrice)} · {new Date(draft.updatedAt).toLocaleDateString()}
-            </Text>
-          </Card>
-        ))
-      )}
 
       <SectionHeader title="About" />
       <Card>

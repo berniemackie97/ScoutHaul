@@ -106,7 +106,11 @@ export function PhotoManager({
             <Pressable
               onPress={() => onRemove(i)}
               style={[styles.removeBtn, { backgroundColor: c.danger }]}
-              hitSlop={6}
+              // The visible dot stays small so it does not cover the thumbnail; the tappable area is
+              // padded out to the 44pt minimum, which it was 10pt short of.
+              hitSlop={11}
+              accessibilityRole="button"
+              accessibilityLabel={`Remove photo ${i + 1}`}
             >
               <Ionicons name="close" size={12} color={c.textInverse} />
             </Pressable>

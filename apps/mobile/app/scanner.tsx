@@ -219,6 +219,10 @@ export default function BarcodeScannerScreen() {
     haptics.medium();
     fireShutter();
 
+    // Held outside the try so a failure further down can still hand the photo to the results view
+    // rather than discarding what the operator just took.
+    let capturedUri: string | null = null;
+
     try {
       const photo = await cameraRef.current.takePictureAsync({ quality: 0.8 });
       if (!photo?.uri) {
@@ -227,6 +231,7 @@ export default function BarcodeScannerScreen() {
         return;
       }
 
+      capturedUri = photo.uri;
       setCapturedPhotoUri(photo.uri);
       setState({ phase: 'identifying', photoUri: photo.uri, step: 'Analyzing image…' });
 
@@ -280,10 +285,17 @@ export default function BarcodeScannerScreen() {
         // Nothing usable to search — still land on results with the photo + Refine to type a name.
         setState(makeDoneFromResult('', emptyLookupResult(''), photo.uri, overrides));
       }
-    } catch {
-      setCapturedPhotoUri(null);
+    } catch (error) {
+      // Every other failure in this screen lands on the results view, where the photo is still there
+      // and Refine is available. This one used to throw the photo away and reset to the camera with
+      // nothing said, so an operator who had just photographed something in a shop assumed they had
+      // mis-tapped and shot it again. Keep the photo, say what happened.
+      haptics.error();
       setShowCaptureOverlay(false);
-      setState({ phase: 'scanning' });
+      setState({
+        ...makeDoneError('', error),
+        photoUri: capturedUri,
+      });
     }
   }
 

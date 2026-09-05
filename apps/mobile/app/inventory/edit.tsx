@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Alert, StyleSheet, View } from 'react-native';
 import { api } from '../../src/api';
 import type { InventoryReferenceData } from '../../src/api/inventory';
 import { Button } from '../../src/components/Button';
@@ -86,6 +86,7 @@ export default function EditInventoryScreen() {
     photoUri?: string;
     productIdentityId?: string;
     estimatedSalePrice?: string;
+    purchasePrice?: string;
     condition?: string;
     sourcingTripId?: string;
     sourcingTripStopId?: string;
@@ -118,7 +119,7 @@ export default function EditInventoryScreen() {
   const [damageType, setDamageType] = useState('');
   const [damageSeverity, setDamageSeverity] = useState('');
   const [damageNote, setDamageNote] = useState('');
-  const [purchasePrice, setPurchasePrice] = useState('');
+  const [purchasePrice, setPurchasePrice] = useState(params.purchasePrice ?? '');
   const [estimatedSalePrice, setEstimatedSalePrice] = useState(params.estimatedSalePrice ?? '');
   const [barcode, setBarcode] = useState(params.barcode ?? '');
   const [manufacturerPartNumber, setManufacturerPartNumber] = useState('');
@@ -382,14 +383,31 @@ export default function EditInventoryScreen() {
   }
 
   function removePhoto(index: number) {
-    haptics.warning();
-    setPhotos((prev) => {
-      const next = prev.filter((_, i) => i !== index);
-      if (next.length > 0 && !next.some((p) => p.isHero)) {
-        next[0].isHero = true;
-      }
-      return next;
-    });
+    // The only destructive action on this form, and it used to happen on the first tap of a 22pt
+    // target sitting on the corner of a thumbnail. A photo taken in a shop cannot be retaken later.
+    Alert.alert(
+      'Remove this photo?',
+      photos[index]?.isRemote
+        ? 'It will be deleted from the item when you save.'
+        : 'This photo has not been uploaded yet, so it will be lost.',
+      [
+        { text: 'Keep', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: () => {
+            haptics.warning();
+            setPhotos((prev) => {
+              const next = prev.filter((_, i) => i !== index);
+              if (next.length > 0 && !next.some((p) => p.isHero)) {
+                next[0].isHero = true;
+              }
+              return next;
+            });
+          },
+        },
+      ],
+    );
   }
 
   function setHero(index: number) {
