@@ -35,6 +35,71 @@ public sealed class AcquisitionLotsController(HaulScoutDbContext db, ICurrentUse
     }
 
     /// <summary>
+    /// A searchable, paged page of lots plus the money position across all of them.
+    ///
+    /// Mirrors <c>/api/inventory/browse</c>. The array endpoint above returns the most recent 200 and
+    /// nothing else, which the purchases screen was summing into "Total purchase spend" — a figure
+    /// that stopped covering the business at the two-hundred-and-first lot.
+    /// </summary>
+    [HttpGet("browse")]
+    public async Task<ActionResult<AcquisitionLotListDto>> Browse(
+        [FromQuery] string? search,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 25,
+        CancellationToken cancellationToken = default)
+    {
+        page = Math.Max(1, page);
+        pageSize = Math.Clamp(pageSize, 1, 200);
+
+        IQueryable<AcquisitionLot> matching = db.AcquisitionLots
+            .Where(lot => lot.OrganizationId == currentUser.OrganizationId);
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            // Lowered rather than ILike, matching the inventory store: the same query then runs on any
+            // provider, which is what lets this be covered without standing up a database.
+            string term = search.Trim().ToLowerInvariant();
+            matching = matching.Where(lot =>
+                lot.Name.ToLower().Contains(term)
+                || (lot.SupplierName != null && lot.SupplierName.ToLower().Contains(term))
+                || (lot.ExternalReference != null && lot.ExternalReference.ToLower().Contains(term)));
+        }
+
+        // The summary spans every lot, not the filtered page — "total purchase spend" means all of it.
+        var totals = await db.AcquisitionLots
+            .Where(lot => lot.OrganizationId == currentUser.OrganizationId)
+            .GroupBy(lot => 1)
+            .Select(group => new
+            {
+                Lots = group.Count(),
+                Spend = group.Sum(lot => lot.PurchaseSubtotal + lot.ShippingCost + lot.TaxCost + lot.FeeCost + lot.OtherCost),
+                Allocated = group.Sum(lot => lot.Items.Sum(item => (decimal?)item.AllocatedCost) ?? 0),
+            })
+            .SingleOrDefaultAsync(cancellationToken);
+
+        AcquisitionLotSummaryDto summary = new(
+            totals?.Lots ?? 0,
+            totals?.Spend ?? 0,
+            totals?.Allocated ?? 0,
+            (totals?.Spend ?? 0) - (totals?.Allocated ?? 0));
+
+        int total = await matching.CountAsync(cancellationToken);
+        int pageCount = Math.Max(1, (int)Math.Ceiling(total / (double)pageSize));
+
+        List<AcquisitionLot> lots = await matching
+            .Include(lot => lot.Items)
+                .ThenInclude(item => item.InventoryItem)
+            .OrderByDescending(lot => lot.PurchasedAt)
+            .ThenByDescending(lot => lot.UpdatedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
+
+        return new AcquisitionLotListDto(
+            lots.Select(lot => lot.ToDto()).ToList(), total, page, pageSize, pageCount, summary);
+    }
+
+    /// <summary>
     /// Spend per source, over every lot.
     ///
     /// The admin portal built this in the browser from the newest 200 lots and labelled the result

@@ -233,6 +233,71 @@ public sealed class OperationsQueryTruthTests
         Assert.Equal(["Big", "Small"], rollup.Suppliers.Select(supplier => supplier.Supplier));
     }
 
+    [Fact]
+    public async Task Purchase_spend_covers_every_lot_not_the_page_shown()
+    {
+        Harness harness = NewHarness();
+        for (int index = 0; index < 250; index++)
+        {
+            harness.Db.AcquisitionLots.Add(new AcquisitionLot
+            {
+                OrganizationId = harness.Org,
+                Name = $"Lot {index}",
+                PurchaseSubtotal = 20m,
+            });
+        }
+        await harness.Db.SaveChangesAsync();
+
+        AcquisitionLotListDto result = Value(
+            await harness.Lots.Browse(search: null, page: 1, pageSize: 25, CancellationToken.None));
+
+        Assert.Equal(25, result.Items.Count);
+        Assert.Equal(250, result.Total);
+        Assert.Equal(250, result.Summary.TotalLots);
+        Assert.Equal(5000m, result.Summary.TotalSpend);
+    }
+
+    [Fact]
+    public async Task Unallocated_cost_is_the_work_still_to_do()
+    {
+        Harness harness = NewHarness();
+        InventoryItem item = new() { OrganizationId = harness.Org, Title = "Brass Lamp", Status = InventoryStatus.ReadyToList };
+        harness.Db.InventoryItems.Add(item);
+        AcquisitionLot lot = new() { OrganizationId = harness.Org, Name = "Estate sale", PurchaseSubtotal = 100m, ShippingCost = 20m };
+        lot.Items.Add(new AcquisitionLotItem
+        {
+            OrganizationId = harness.Org,
+            InventoryItemId = item.Id,
+            AllocatedCost = 80m,
+        });
+        harness.Db.AcquisitionLots.Add(lot);
+        await harness.Db.SaveChangesAsync();
+
+        AcquisitionLotListDto result = Value(
+            await harness.Lots.Browse(search: null, page: 1, pageSize: 25, CancellationToken.None));
+
+        Assert.Equal(120m, result.Summary.TotalSpend);
+        Assert.Equal(80m, result.Summary.TotalAllocated);
+        Assert.Equal(40m, result.Summary.Unallocated);
+    }
+
+    [Fact]
+    public async Task Narrowing_the_lot_list_does_not_narrow_the_money()
+    {
+        // The search filters what is listed. It must not quietly redefine "total purchase spend".
+        Harness harness = NewHarness();
+        harness.Db.AcquisitionLots.AddRange(
+            new AcquisitionLot { OrganizationId = harness.Org, Name = "Maple St estate", PurchaseSubtotal = 100m },
+            new AcquisitionLot { OrganizationId = harness.Org, Name = "Auction pickup", PurchaseSubtotal = 400m });
+        await harness.Db.SaveChangesAsync();
+
+        AcquisitionLotListDto result = Value(
+            await harness.Lots.Browse("Maple", page: 1, pageSize: 25, CancellationToken.None));
+
+        Assert.Equal(1, result.Total);
+        Assert.Equal(500m, result.Summary.TotalSpend);
+    }
+
     private static T Value<T>(ActionResult<T> result) => result.Value
         ?? throw new InvalidOperationException($"expected a value, got {result.Result?.GetType().Name}");
 }

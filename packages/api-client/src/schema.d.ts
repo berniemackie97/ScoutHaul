@@ -68,6 +68,47 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/acquisition-lots/browse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    search?: string;
+                    page?: number;
+                    pageSize?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["AcquisitionLotListDto"];
+                        "application/json": components["schemas"]["AcquisitionLotListDto"];
+                        "text/json": components["schemas"]["AcquisitionLotListDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/acquisition-lots/suppliers": {
         parameters: {
             query?: never;
@@ -7724,6 +7765,28 @@ export interface components {
             /** Format: double */
             allocationWeight?: number | null;
             notes?: string | null;
+        };
+        AcquisitionLotListDto: {
+            items?: components["schemas"]["AcquisitionLotDto"][] | null;
+            /** Format: int32 */
+            total?: number;
+            /** Format: int32 */
+            page?: number;
+            /** Format: int32 */
+            pageSize?: number;
+            /** Format: int32 */
+            pageCount?: number;
+            summary?: components["schemas"]["AcquisitionLotSummaryDto"];
+        };
+        AcquisitionLotSummaryDto: {
+            /** Format: int32 */
+            totalLots?: number;
+            /** Format: double */
+            totalSpend?: number;
+            /** Format: double */
+            totalAllocated?: number;
+            /** Format: double */
+            unallocated?: number;
         };
         AddCartLineRequest: {
             /** Format: uuid */

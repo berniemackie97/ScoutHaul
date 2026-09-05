@@ -182,6 +182,23 @@ public sealed record AcquisitionLotItemInputDto(
     decimal? AllocationWeight = null,
     string? Notes = null);
 
+/// <summary>The money position across every acquisition lot, whatever page of them is on screen.</summary>
+/// <param name="Unallocated">Landed cost not yet carried by an item — the work still to do, in money.</param>
+public sealed record AcquisitionLotSummaryDto(
+    int TotalLots,
+    decimal TotalSpend,
+    decimal TotalAllocated,
+    decimal Unallocated);
+
+/// <summary>A searchable, paged page of acquisition lots plus the summary over every lot.</summary>
+public sealed record AcquisitionLotListDto(
+    IReadOnlyList<AcquisitionLotDto> Items,
+    int Total,
+    int Page,
+    int PageSize,
+    int PageCount,
+    AcquisitionLotSummaryDto Summary);
+
 /// <summary>
 /// Everything bought from one source, rolled up.
 ///
