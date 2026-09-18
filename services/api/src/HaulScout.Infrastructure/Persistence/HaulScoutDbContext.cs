@@ -71,6 +71,9 @@ public sealed class HaulScoutDbContext(
     public DbSet<OrgReferenceOverride> OrgReferenceOverrides => Set<OrgReferenceOverride>();
     public DbSet<PlatformOrder> PlatformOrders => Set<PlatformOrder>();
     public DbSet<PlatformListing> PlatformListings => Set<PlatformListing>();
+    public DbSet<SyncRun> SyncRuns => Set<SyncRun>();
+    public DbSet<SyncRunIssue> SyncRunIssues => Set<SyncRunIssue>();
+    public DbSet<SyncArtifact> SyncArtifacts => Set<SyncArtifact>();
     public DbSet<PlatformListingQualitySnapshot> PlatformListingQualitySnapshots => Set<PlatformListingQualitySnapshot>();
     public DbSet<PlatformOrderLine> PlatformOrderLines => Set<PlatformOrderLine>();
 
@@ -103,6 +106,8 @@ public sealed class HaulScoutDbContext(
             entity.ToTable("Organizations");
             entity.Property(item => item.Name).HasMaxLength(200).IsRequired();
             entity.Property(item => item.StoreDomain).HasMaxLength(253);
+            entity.Property(item => item.TimeZoneId).HasMaxLength(64).IsRequired()
+                .HasDefaultValue(Organization.DefaultTimeZoneId);
             entity.HasIndex(item => item.Name);
             entity.HasIndex(item => item.StoreDomain).IsUnique();
         });
@@ -867,6 +872,40 @@ public sealed class HaulScoutDbContext(
             entity.HasIndex(item => item.PlatformOrderId);
             entity.HasOne(item => item.PlatformOrder).WithMany(item => item.Lines).HasForeignKey(item => item.PlatformOrderId).OnDelete(DeleteBehavior.Cascade);
             entity.HasOne(item => item.InventoryItem).WithMany().HasForeignKey(item => item.InventoryItemId).OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<SyncRun>(entity =>
+        {
+            entity.ToTable("SyncRuns");
+            entity.Property(item => item.FormatKey).HasMaxLength(80).IsRequired();
+            entity.Property(item => item.Platform).HasMaxLength(60).IsRequired();
+            entity.Property(item => item.Source).HasConversion<string>().HasMaxLength(16);
+            entity.Property(item => item.Status).HasConversion<string>().HasMaxLength(24);
+            entity.Property(item => item.Summary).HasMaxLength(500);
+            // History is read newest first, per organization; that is the only list query.
+            entity.HasIndex(item => new { item.OrganizationId, item.StartedAt });
+            entity.HasOne(item => item.ChannelAccount).WithMany().HasForeignKey(item => item.ChannelAccountId).OnDelete(DeleteBehavior.SetNull);
+            entity.HasOne(item => item.Artifact).WithMany().HasForeignKey(item => item.ArtifactId).OnDelete(DeleteBehavior.SetNull);
+            entity.HasMany(item => item.Issues).WithOne(item => item.SyncRun).HasForeignKey(item => item.SyncRunId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<SyncRunIssue>(entity =>
+        {
+            entity.ToTable("SyncRunIssues");
+            entity.Property(item => item.Severity).HasConversion<string>().HasMaxLength(16);
+            entity.Property(item => item.ExternalReference).HasMaxLength(200);
+            entity.Property(item => item.Message).HasMaxLength(1000).IsRequired();
+            entity.HasIndex(item => item.SyncRunId);
+        });
+
+        modelBuilder.Entity<SyncArtifact>(entity =>
+        {
+            entity.ToTable("SyncArtifacts");
+            entity.Property(item => item.FileName).HasMaxLength(260).IsRequired();
+            entity.Property(item => item.ContentType).HasMaxLength(120).IsRequired();
+            entity.Property(item => item.Sha256).HasMaxLength(64).IsRequired();
+            // "This exact file was imported before" is a lookup by hash within an organization.
+            entity.HasIndex(item => new { item.OrganizationId, item.Sha256 });
         });
 
         modelBuilder.Entity<PlatformListing>(entity =>
