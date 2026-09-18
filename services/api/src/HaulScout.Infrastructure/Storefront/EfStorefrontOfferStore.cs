@@ -8,8 +8,21 @@ namespace HaulScout.Infrastructure.Storefront;
 
 public sealed class EfStorefrontOfferStore(HaulScoutDbContext db) : IStorefrontOfferStore
 {
-    public Task<int> CountOffersAsync(Guid organizationId, StorefrontOfferStatus? status, CancellationToken cancellationToken) =>
-        OffersIn(organizationId, status).CountAsync(cancellationToken);
+    public async Task<IReadOnlyDictionary<StorefrontOfferStatus, int>> CountByStatusAsync(
+        Guid organizationId,
+        CancellationToken cancellationToken)
+    {
+        var rows = await OffersIn(organizationId, status: null)
+            .GroupBy(offer => offer.Status)
+            .Select(group => new { Status = group.Key, Count = group.Count() })
+            .ToListAsync(cancellationToken);
+
+        // Every status is present, zero included, so a caller never has to guess whether a missing
+        // status means none or means the query forgot it.
+        return Enum.GetValues<StorefrontOfferStatus>().ToDictionary(
+            status => status,
+            status => rows.SingleOrDefault(row => row.Status == status)?.Count ?? 0);
+    }
 
     /// <summary>The one definition of "offers in this status", shared by the list and the count.</summary>
     private IQueryable<StorefrontOffer> OffersIn(Guid organizationId, StorefrontOfferStatus? status)

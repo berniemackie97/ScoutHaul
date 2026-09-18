@@ -59,7 +59,8 @@ public sealed class OperatorConsoleService(
                 summary.Stages.SingleOrDefault(entry => entry.Stage == stage.ToString())?.Count ?? 0;
 
             queues.Add(new("orders.needsAttention", Attention, Stage(OrderWorkflowStage.NeedsAttention)));
-            queues.Add(new("offers.new", Attention, await offers.CountOffersAsync(organizationId, StorefrontOfferStatus.New, cancellationToken)));
+            IReadOnlyDictionary<StorefrontOfferStatus, int> offerCounts = await offers.CountByStatusAsync(organizationId, cancellationToken);
+            queues.Add(new("offers.new", Attention, offerCounts.GetValueOrDefault(StorefrontOfferStatus.New)));
             queues.Add(new("orders.toPack", Work, Stage(OrderWorkflowStage.ToPack)));
             queues.Add(new("orders.toShip", Work, Stage(OrderWorkflowStage.ToShip)));
             queues.Add(new("orders.readyForPickup", Work, Stage(OrderWorkflowStage.ReadyForPickup)));

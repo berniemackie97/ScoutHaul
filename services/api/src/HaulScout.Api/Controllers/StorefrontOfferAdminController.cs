@@ -23,6 +23,11 @@ public sealed class StorefrontOfferAdminController(
         return Ok(await offers.ListAsync(currentUser.OrganizationId, status, cancellationToken));
     }
 
+    /// <summary>Offers by status across every offer, for the figures beside the list.</summary>
+    [HttpGet("counts")]
+    public async Task<ActionResult<StorefrontOfferCountsDto>> Counts(CancellationToken cancellationToken) =>
+        await offers.CountsAsync(currentUser.OrganizationId, cancellationToken);
+
     [HttpPost("{offerId:guid}/decision")]
     public async Task<ActionResult<StorefrontOfferDto>> Decide(
         Guid offerId,

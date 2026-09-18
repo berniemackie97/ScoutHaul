@@ -225,8 +225,8 @@ public class StorefrontCheckoutTests
             CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<StorefrontOffer>>([]);
 
-        public Task<int> CountOffersAsync(Guid organizationId, StorefrontOfferStatus? status, CancellationToken cancellationToken) =>
-            Task.FromResult(0);
+        public Task<IReadOnlyDictionary<StorefrontOfferStatus, int>> CountByStatusAsync(Guid organizationId, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyDictionary<StorefrontOfferStatus, int>>(new Dictionary<StorefrontOfferStatus, int>());
 
         public Task<StorefrontOffer?> FindOfferAsync(Guid organizationId, Guid offerId, CancellationToken cancellationToken) =>
             Task.FromResult<StorefrontOffer?>(null);

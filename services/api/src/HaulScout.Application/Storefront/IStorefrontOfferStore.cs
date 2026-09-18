@@ -11,10 +11,11 @@ public interface IStorefrontOfferStore
         CancellationToken cancellationToken);
 
     /// <summary>
-    /// How many offers are in a status — over every offer, not the page the list returns. The
-    /// offers screen's "new offers" figure used to be a count of that page.
+    /// How many offers are in each status, over every offer rather than the page the list returns.
+    /// The offers screen's "new offers" figure used to be counted from the tab being viewed — so on
+    /// the Declined tab it read zero however many buyers were waiting.
     /// </summary>
-    Task<int> CountOffersAsync(Guid organizationId, StorefrontOfferStatus? status, CancellationToken cancellationToken);
+    Task<IReadOnlyDictionary<StorefrontOfferStatus, int>> CountByStatusAsync(Guid organizationId, CancellationToken cancellationToken);
 
     Task<StorefrontOffer?> FindOfferAsync(Guid organizationId, Guid offerId, CancellationToken cancellationToken);
 
