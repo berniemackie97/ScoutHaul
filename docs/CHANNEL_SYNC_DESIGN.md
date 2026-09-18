@@ -81,14 +81,28 @@ Adapters collect and act; matching, money and decisions live server-side where t
 
 ### 4.1 Sync agent (the extension, rebuilt)
 
-Manifest V3, TypeScript, bundled and tested — replacing today's plain-JS scaffold. One **adapter per
-marketplace**, each implementing up to four capabilities:
+**Cross-browser, Firefox first.** One TypeScript codebase built with [WXT](https://wxt.dev) into a
+Firefox add-on first, then Chrome and Edge, Safari later. Manifest V3 everywhere; the differences
+are handled in the build, not in the adapters:
+
+- **Portal ↔ extension** talk through a small content script on the portal's own pages
+  (`window.postMessage` bridge). Firefox does not support `externally_connectable`, and the bridge
+  works identically in every browser.
+- **Marketplace requests run inside a marketplace tab** (same-origin, the site's own first-party
+  cookies and CSRF tokens), not from the background script — Firefox's cookie partitioning makes
+  background requests unreliable, and the in-tab route behaves the same in every browser.
+- **Host permissions are optional and per marketplace** — the extension asks for Depop access when
+  Depop is connected, not for every site at install.
+- **Distribution:** Firefox — a signed, unlisted add-on through addons.mozilla.org with automatic
+  updates; Chrome/Edge — an unlisted store listing.
+
+One **adapter per marketplace**, each implementing up to five capabilities:
 
 | Capability | Default cadence | What it does |
 |---|---|---|
-| `scanSales` | every 10 min (5–60 configurable) | Recent sold orders since a cursor — the double-sell guard |
-| `snapshotListings` | every 4 h | Every live listing: id, title, price, quantity, status |
-| `pullReport` | daily, where one exists | Download the marketplace's **official export** (eBay All-Orders / Active Listings, Depop sales CSV, Poshmark report) through the session and send it to the server's **existing parsers** — full fees, payouts and refunds without a human downloading it. **Not Vinted** — it has none |
+| `scanSales` | off until enabled; suggested every 10 min | Recent sold orders since a cursor — the double-sell guard |
+| `snapshotListings` | off until enabled; suggested every 4 h | Every live listing: id, title, price, quantity, status |
+| `pullReport` | off until enabled; suggested daily, where one exists | Download the marketplace's **official export** (eBay All-Orders / Active Listings, Depop sales CSV, Poshmark report) through the session and send it to the server's **existing parsers** — full fees, payouts and refunds without a human downloading it. **Not Vinted** — it has none |
 | `backfillSales` | first connection, after gaps | Walk the sold history page by page from a date |
 | `delist` | on command | End a listing because it sold elsewhere |
 
@@ -133,10 +147,11 @@ Writes are commands, never side effects of a scan:
 - The reconciler creates `Delist(listing, account, because sale S)`.
 - An agent holding the account's lease claims it, executes, reports success or failure.
 - Idempotent by command id; expires if unclaimed; bounded retries; every step audited.
+- **Auto-delist is a setting per platform, off until the operator turns it on**, with three
+  positions: *Off* (every delist is a *Needs action* item), *Dry run* (records what it would delist),
+  *On*. Nothing acts on a marketplace by default.
 - **Only certain matches auto-delist** — the listing is linked to the sold item by id through a
-  settled match. Anything less becomes *Needs action* for a human.
-- **Dry-run first:** each platform starts in a mode that records what it *would* delist, until the
-  operator switches it on.
+  settled match. Anything less becomes *Needs action* for a human, whatever the setting.
 
 ### 4.6 Safety governor (in the agent, configured from the server)
 
@@ -257,7 +272,28 @@ Then the sales and reporting overhaul reads from all of it.
 
 ---
 
-## 8. Decisions (approved as recommended)
+### 4.11 Every automation is a setting
+
+Nothing in this design acts on the operator's behalf by default. Each behaviour is a visible,
+per-account (or per-platform) setting on the hub, off until switched on, with the suggested value
+shown beside it:
+
+| Setting | Default | Suggested |
+|---|---|---|
+| Scheduled sales scan | Off | Every 10 min |
+| Scheduled listings snapshot | Off | Every 4 h |
+| Scheduled report pull | Off | Daily |
+| Auto-delist | Off | Dry run for a week, then On |
+| Auto-settle certain matches (built, #180) | becomes a visible setting | On |
+| Raw export retention | 13 months | 13 months |
+
+## 8. Decisions (approved, with the operator's changes)
+
+Settled: automation defaults **off** and every behaviour is a setting (§4.11); **Poshmark in scope**;
+**Vinted = vinted.com, USD**; **Firefox first**, every browser eventually (§4.1). The recommendations
+below remain as the suggested values shown beside each setting.
+
+
 
 1. **Extension agent model**, with sync running while a paired computer is on — plus an always-on
    machine for 24/7? *(Recommendation: yes; a cheap mini-PC is the whole answer to "computer must
