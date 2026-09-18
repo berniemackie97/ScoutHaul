@@ -4,6 +4,7 @@ import { formatCurrency } from "@overhaul/ui";
 import { ListSearch, PageHeader } from "@/components/list/list-search";
 import { Pager } from "@/components/list/pager";
 import { StatCard, StatRow } from "@/components/list/stat-card";
+import { ORDER_STAGES } from "@/features/orders/order-stages";
 import { getApiClient } from "@/lib/api";
 import { OrdersTable } from "./orders-table";
 
@@ -15,17 +16,7 @@ export const dynamic = "force-dynamic";
  * OrderWorkflow derived — the raw status enum never said whether an order was waiting on a person.
  * "Needs attention" leads because it is the one that costs money to ignore.
  */
-const QUEUES = [
-  { key: "All", label: "All" },
-  { key: "NeedsAttention", label: "Needs attention" },
-  { key: "AwaitingPayment", label: "Awaiting payment" },
-  { key: "ToPack", label: "To pack" },
-  { key: "ToShip", label: "To ship" },
-  { key: "ReadyForPickup", label: "Ready for pickup" },
-  { key: "InTransit", label: "In transit" },
-  { key: "Delivered", label: "Delivered" },
-  { key: "Closed", label: "Closed" },
-] as const;
+const QUEUES = [{ key: "All", label: "All" }, ...ORDER_STAGES] as const;
 type QueueKey = (typeof QUEUES)[number]["key"];
 
 /** Switching queue keeps the search but drops the page — page 4 of a different queue is usually empty. */

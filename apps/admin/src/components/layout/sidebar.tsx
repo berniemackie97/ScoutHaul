@@ -7,6 +7,7 @@ import { useState } from "react";
 import { cn, Button } from "@overhaul/ui";
 import { CommandPaletteTrigger } from "@/components/search/command-palette-trigger";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import type { Operator } from "@/lib/session";
 import { isActiveHref, navGroups } from "./navigation";
 
 /**
@@ -15,10 +16,13 @@ import { isActiveHref, navGroups } from "./navigation";
  * prefixes so the mobile drawer always shows full labels.
  */
 export function Sidebar({
+  operator,
   mobileOpen = false,
   onClose,
   onOpenSearch,
 }: {
+  /** Who is signed in. Null only if the session could not be read — the footer then says so. */
+  operator: Operator | null;
   mobileOpen?: boolean;
   onClose?: () => void;
   onOpenSearch: () => void;
@@ -133,12 +137,20 @@ export function Sidebar({
         {/* Footer */}
         <div className="shrink-0 border-t p-4 pb-[calc(1rem_+_env(safe-area-inset-bottom))]">
           <div className={cn("flex items-center gap-3", collapsed && "lg:justify-center lg:gap-0")}>
-            <div className="bg-brand-200 text-brand-700 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold">
-              A
+            {/* The real account. This used to read "Operator" beside a hardcoded "A" for everyone, which on a
+                shared device is how someone works under another person's login without noticing. */}
+            <div
+              className="bg-brand-200 text-brand-700 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold"
+              title={operator ? `${operator.name}${operator.email && operator.email !== operator.name ? ` · ${operator.email}` : ""}` : undefined}
+              aria-hidden
+            >
+              {operator?.initials ?? "?"}
             </div>
             <div className={cn("min-w-0 flex-1", collapsed && "lg:hidden")}>
-              <p className="truncate text-xs font-medium">Operator</p>
-              <p className="text-muted-foreground truncate text-[10px]">Signed in</p>
+              <p className="truncate text-xs font-medium">{operator?.name ?? "Account unavailable"}</p>
+              <p className="text-muted-foreground truncate text-[10px]">
+                {operator?.organization ?? operator?.email ?? "Could not read the session"}
+              </p>
             </div>
             <Button
               variant="ghost"

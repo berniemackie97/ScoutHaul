@@ -9070,6 +9070,35 @@
         }
       }
     },
+    "/api/admin/storefront/offers/counts": {
+      "get": {
+        "tags": [
+          "StorefrontOfferAdmin"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorefrontOfferCountsDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorefrontOfferCountsDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorefrontOfferCountsDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/admin/storefront/offers/{offerId}/decision": {
       "post": {
         "tags": [
@@ -16894,6 +16923,40 @@
             "format": "int32"
           },
           "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "StorefrontOfferCountsDto": {
+        "type": "object",
+        "properties": {
+          "new": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "countered": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "accepted": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "declined": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "expired": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "converted": {
             "type": "integer",
             "format": "int32"
           },

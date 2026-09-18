@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { Handshake, Mail, Phone, Tags } from "lucide-react";
 import type { components } from "@overhaul/api-client";
-import { Card, formatCurrency, formatDateTime } from "@overhaul/ui";
+import { formatCurrency, formatDateTime } from "@overhaul/ui";
+import { StatCard, StatRow } from "@/components/list/stat-card";
 import { getApiClient } from "@/lib/api";
 import { decideOffer } from "./actions";
 
@@ -11,6 +12,11 @@ type StorefrontOffer = components["schemas"]["StorefrontOfferDto"];
 
 const FILTERS = ["All", "New", "Accepted", "Countered", "Declined", "Expired", "Converted"] as const;
 type OfferStatusFilter = Exclude<(typeof FILTERS)[number], "All">;
+type OfferCounts = components["schemas"]["StorefrontOfferCountsDto"];
+
+/** "Countered" → "countered": the counts DTO names each status in camelCase. */
+const lowerFirst = (value: OfferStatusFilter) =>
+  (value.charAt(0).toLowerCase() + value.slice(1)) as keyof Omit<OfferCounts, "total">;
 
 
 const date = (value: string | null | undefined) =>
@@ -27,21 +33,23 @@ export default async function OffersPage({
     : "All";
 
   const api = await getApiClient();
-  const { data } = await api.GET("/api/admin/storefront/offers", {
-    params: { query: active === "All" ? {} : { status: active as OfferStatusFilter } },
-  });
+  const [{ data }, { data: counts }] = await Promise.all([
+    api.GET("/api/admin/storefront/offers", {
+      params: { query: active === "All" ? {} : { status: active as OfferStatusFilter } },
+    }),
+    api.GET("/api/admin/storefront/offers/counts", {}),
+  ]);
   const offers = (data ?? []) as StorefrontOffer[];
 
-  const newOffers = offers.filter((offer) => offer.status === "New").length;
+  // "New offers" is a count of the whole book, not of the tab being viewed. It used to be counted
+  // from this page's list, so on the Declined tab it read zero however many buyers were waiting.
+  const newOffers = counts?.new ?? 0;
   const totalOffered = offers.reduce((sum, offer) => sum + (offer.offerAmount ?? 0), 0);
-  const averageOffer =
-    offers.length > 0 ? totalOffered / offers.length : 0;
-
-  const kpis = [
-    { label: "Offers in view", value: String(offers.length), detail: active === "All" ? "All statuses" : active, icon: Handshake },
-    { label: "New offers", value: String(newOffers), detail: "Needs operator reply", icon: Mail },
-    { label: "Average offer", value: formatCurrency(averageOffer), detail: "Buyer proposed value", icon: Tags },
-  ];
+  const averageOffer = offers.length > 0 ? totalOffered / offers.length : 0;
+  const countFor = (filter: (typeof FILTERS)[number]): number | null => {
+    if (!counts) return null;
+    return filter === "All" ? (counts.total ?? 0) : (counts[lowerFirst(filter)] ?? 0);
+  };
 
   return (
     <div className="space-y-6">
@@ -54,18 +62,23 @@ export default async function OffersPage({
         </p>
       </header>
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        {kpis.map((kpi) => (
-          <Card key={kpi.label} className="p-5">
-            <div className="flex items-center justify-between">
-              <span className="text-muted-foreground text-sm">{kpi.label}</span>
-              <kpi.icon className="text-muted-foreground h-4 w-4" aria-hidden />
-            </div>
-            <p className="mt-3 text-3xl font-semibold tabular-nums">{kpi.value}</p>
-            <p className="text-muted-foreground mt-1 text-xs">{kpi.detail}</p>
-          </Card>
-        ))}
-      </div>
+      <StatRow>
+        <StatCard
+          label="New offers"
+          value={String(newOffers)}
+          detail="Waiting for your reply — all offers, whichever tab is open"
+          icon={Mail}
+          href={active === "New" ? undefined : "/offers?status=New"}
+          tone={newOffers > 0 ? "warning" : "default"}
+        />
+        <StatCard label="All offers" value={String(counts?.total ?? 0)} detail="Every status" icon={Handshake} />
+        <StatCard
+          label="Average offer"
+          value={formatCurrency(averageOffer)}
+          detail={active === "All" ? "Across the offers shown" : `Across ${active.toLowerCase()} offers shown`}
+          icon={Tags}
+        />
+      </StatRow>
 
       <div className="flex flex-wrap gap-2">
         {FILTERS.map((filter) => (
@@ -79,6 +92,7 @@ export default async function OffersPage({
             }`}
           >
             {filter}
+            {countFor(filter) !== null ? <span className="ml-1.5 tabular-nums opacity-70">{countFor(filter)}</span> : null}
           </Link>
         ))}
       </div>

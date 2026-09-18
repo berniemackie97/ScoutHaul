@@ -7340,6 +7340,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/storefront/offers/counts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["StorefrontOfferCountsDto"];
+                        "application/json": components["schemas"]["StorefrontOfferCountsDto"];
+                        "text/json": components["schemas"]["StorefrontOfferCountsDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/storefront/offers/{offerId}/decision": {
         parameters: {
             query?: never;
@@ -10281,6 +10318,22 @@ export interface components {
             page?: number;
             /** Format: int32 */
             pageSize?: number;
+            /** Format: int32 */
+            total?: number;
+        };
+        StorefrontOfferCountsDto: {
+            /** Format: int32 */
+            new?: number;
+            /** Format: int32 */
+            countered?: number;
+            /** Format: int32 */
+            accepted?: number;
+            /** Format: int32 */
+            declined?: number;
+            /** Format: int32 */
+            expired?: number;
+            /** Format: int32 */
+            converted?: number;
             /** Format: int32 */
             total?: number;
         };
