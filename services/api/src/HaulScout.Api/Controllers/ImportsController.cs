@@ -56,6 +56,11 @@ public sealed class ImportsController(ReportImportService imports) : HaulScoutCo
         return await imports.ImportAsync(await ReadAsync(files, cancellationToken), cancellationToken);
     }
 
+    /// <summary>What imports have left for a person to match.</summary>
+    [HttpGet("queues")]
+    public async Task<ActionResult<ImportQueuesDto>> Queues(CancellationToken cancellationToken) =>
+        await imports.QueuesAsync(cancellationToken);
+
     /// <summary>Every import, newest first.</summary>
     [HttpGet("runs")]
     public async Task<ActionResult<SyncRunListDto>> Runs(

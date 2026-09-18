@@ -1019,6 +1019,282 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/imports/detect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "multipart/form-data": {
+                        files?: string[];
+                    };
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ReportDetectionDto"][];
+                        "application/json": components["schemas"]["ReportDetectionDto"][];
+                        "text/json": components["schemas"]["ReportDetectionDto"][];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/imports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "multipart/form-data": {
+                        files?: string[];
+                    };
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ImportResultDto"];
+                        "application/json": components["schemas"]["ImportResultDto"];
+                        "text/json": components["schemas"]["ImportResultDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/imports/queues": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ImportQueuesDto"];
+                        "application/json": components["schemas"]["ImportQueuesDto"];
+                        "text/json": components["schemas"]["ImportQueuesDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/imports/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    page?: number;
+                    pageSize?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SyncRunListDto"];
+                        "application/json": components["schemas"]["SyncRunListDto"];
+                        "text/json": components["schemas"]["SyncRunListDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/imports/runs/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SyncRunDetailDto"];
+                        "application/json": components["schemas"]["SyncRunDetailDto"];
+                        "text/json": components["schemas"]["SyncRunDetailDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/imports/runs/{id}/rerun": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SyncRunDto"];
+                        "application/json": components["schemas"]["SyncRunDto"];
+                        "text/json": components["schemas"]["SyncRunDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/imports/runs/{id}/file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/inventory": {
         parameters: {
             query?: never;
@@ -3529,7 +3805,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/platform-listings/import/ebay-csv": {
+    "/api/platform-listings/ingest": {
         parameters: {
             query?: never;
             header?: never;
@@ -3547,9 +3823,9 @@ export interface paths {
             };
             requestBody?: {
                 content: {
-                    "application/json": components["schemas"]["ImportPlatformListingsCsvRequest"];
-                    "text/json": components["schemas"]["ImportPlatformListingsCsvRequest"];
-                    "application/*+json": components["schemas"]["ImportPlatformListingsCsvRequest"];
+                    "application/json": components["schemas"]["IngestPlatformListingsRequest"];
+                    "text/json": components["schemas"]["IngestPlatformListingsRequest"];
+                    "application/*+json": components["schemas"]["IngestPlatformListingsRequest"];
                 };
             };
             responses: {
@@ -3615,7 +3891,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/platform-listings/ingest": {
+    "/api/platform-listings/import/ebay-csv": {
         parameters: {
             query?: never;
             header?: never;
@@ -3633,9 +3909,9 @@ export interface paths {
             };
             requestBody?: {
                 content: {
-                    "application/json": components["schemas"]["IngestPlatformListingsRequest"];
-                    "text/json": components["schemas"]["IngestPlatformListingsRequest"];
-                    "application/*+json": components["schemas"]["IngestPlatformListingsRequest"];
+                    "application/json": components["schemas"]["ImportPlatformListingsCsvRequest"];
+                    "text/json": components["schemas"]["ImportPlatformListingsCsvRequest"];
+                    "application/*+json": components["schemas"]["ImportPlatformListingsCsvRequest"];
                 };
             };
             responses: {
@@ -8377,6 +8653,11 @@ export interface components {
             saleIds?: string[] | null;
             orderReference?: string | null;
         };
+        ImportFileOutcomeDto: {
+            fileName?: string | null;
+            run?: components["schemas"]["SyncRunDto"];
+            problem?: string | null;
+        };
         ImportInventoryPhotoRequest: {
             url?: string | null;
             isHero?: boolean;
@@ -8417,6 +8698,15 @@ export interface components {
             platform?: string | null;
             csv?: string | null;
         };
+        ImportQueuesDto: {
+            /** Format: int32 */
+            ordersToMatch?: number | null;
+            /** Format: int32 */
+            listingsToMatch?: number | null;
+        };
+        ImportResultDto: {
+            files?: components["schemas"]["ImportFileOutcomeDto"][] | null;
+        };
         IngestPlatformListingInput: {
             externalListingId?: string | null;
             title?: string | null;
@@ -8455,6 +8745,8 @@ export interface components {
             /** Format: int32 */
             skipped?: number;
             listings?: components["schemas"]["PlatformListingDto"][] | null;
+            /** Format: int32 */
+            unchanged?: number;
         };
         IngestPlatformOrderInput: {
             externalOrderId?: string | null;
@@ -8536,6 +8828,8 @@ export interface components {
             /** Format: int32 */
             autoReconciled?: number;
             orders?: components["schemas"]["PlatformOrderDto"][] | null;
+            /** Format: int32 */
+            unchanged?: number;
         };
         /** @enum {string} */
         InventoryAttention: "Unlisted" | "Aged" | "MissingPhotos" | "MissingCost" | "MissingValue" | "MissingLocation";
@@ -9631,6 +9925,26 @@ export interface components {
             averageSaleValue?: components["schemas"]["ReportChangeDto"];
             operatingExpenses?: components["schemas"]["ReportChangeDto"];
         };
+        ReportDetectionDto: {
+            fileName?: string | null;
+            /** Format: int64 */
+            sizeBytes?: number;
+            formatKey?: string | null;
+            platform?: string | null;
+            label?: string | null;
+            /** Format: int32 */
+            records?: number;
+            /** Format: date-time */
+            coversFrom?: string | null;
+            /** Format: date-time */
+            coversTo?: string | null;
+            completeSnapshot?: boolean;
+            canImport?: boolean;
+            problem?: string | null;
+            issues?: components["schemas"]["SyncRunIssueDto"][] | null;
+            /** Format: date-time */
+            previouslyImportedAt?: string | null;
+        };
         ReportDimensionDto: {
             name?: string | null;
             /** Format: int32 */
@@ -10431,6 +10745,61 @@ export interface components {
             totalSpend?: number;
             /** Format: int32 */
             attributedSuppliers?: number;
+        };
+        SyncRunDetailDto: {
+            run?: components["schemas"]["SyncRunDto"];
+            issues?: components["schemas"]["SyncRunIssueDto"][] | null;
+        };
+        SyncRunDto: {
+            /** Format: uuid */
+            id?: string;
+            formatKey?: string | null;
+            platform?: string | null;
+            formatLabel?: string | null;
+            source?: string | null;
+            status?: string | null;
+            /** Format: date-time */
+            startedAt?: string;
+            /** Format: date-time */
+            finishedAt?: string | null;
+            /** Format: int32 */
+            created?: number;
+            /** Format: int32 */
+            updated?: number;
+            /** Format: int32 */
+            unchanged?: number;
+            /** Format: int32 */
+            rejected?: number;
+            /** Format: date-time */
+            coversFrom?: string | null;
+            /** Format: date-time */
+            coversTo?: string | null;
+            isCompleteSnapshot?: boolean;
+            summary?: string | null;
+            fileName?: string | null;
+            /** Format: int32 */
+            issueCount?: number;
+            /** Format: uuid */
+            rerunOfId?: string | null;
+            canRerun?: boolean;
+        };
+        SyncRunIssueDto: {
+            severity?: string | null;
+            /** Format: int32 */
+            rowNumber?: number | null;
+            externalReference?: string | null;
+            message?: string | null;
+        };
+        SyncRunListDto: {
+            items?: components["schemas"]["SyncRunDto"][] | null;
+            /** Format: int32 */
+            total?: number;
+            /** Format: int32 */
+            page?: number;
+            /** Format: int32 */
+            pageSize?: number;
+            /** Format: int32 */
+            pageCount?: number;
         };
         UngroupSalesRequest: {
             saleIds?: string[] | null;

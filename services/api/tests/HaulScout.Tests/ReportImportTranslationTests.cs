@@ -55,6 +55,7 @@ public sealed class ReportImportTranslationTests(PostgresFixture postgres)
             new PlatformOrderFeeEnrichmentService(orderStore, currentUser),
             new MarketplaceRefundImportService(orderStore, currentUser, TimeProvider.System),
             new PlatformListingImportService(db, currentUser),
+            orderStore,
             TimeProvider.System,
             NullLogger<ReportImportService>.Instance);
     }

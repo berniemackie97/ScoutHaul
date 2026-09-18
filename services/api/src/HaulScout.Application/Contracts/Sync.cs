@@ -54,3 +54,9 @@ public sealed record SyncRunListDto(IReadOnlyList<SyncRunDto> Items, int Total, 
 public sealed record ImportFileOutcomeDto(string FileName, SyncRunDto? Run, string? Problem);
 
 public sealed record ImportResultDto(IReadOnlyList<ImportFileOutcomeDto> Files);
+
+/// <summary>
+/// How much is waiting for a person after imports, counted over everything rather than a page of it.
+/// A count is null when the caller's role cannot act on that queue.
+/// </summary>
+public sealed record ImportQueuesDto(int? OrdersToMatch, int? ListingsToMatch);

@@ -323,6 +323,12 @@ public sealed class PlatformListingImportService(HaulScoutDbContext db, ICurrent
         snapshot.RawJson = JsonSerializer.Serialize(row.RawFields);
     }
 
+    /// <summary>Imported listings not yet linked to inventory or set aside — the listings match queue.</summary>
+    public Task<int> CountPendingAsync(CancellationToken cancellationToken) =>
+        db.PlatformListings.CountAsync(
+            listing => listing.OrganizationId == currentUser.OrganizationId && listing.ReconcileStatus == PlatformListingReconcileStatus.Pending,
+            cancellationToken);
+
     /// <summary>The imported facts of a listing, for telling a real refresh from an identical one.</summary>
     private static string ImportedFingerprint(PlatformListing listing) => ImportFingerprint.Of(
         listing.ChannelAccountId, listing.Title, listing.Price, listing.Quantity, listing.QuantitySold, listing.Currency,

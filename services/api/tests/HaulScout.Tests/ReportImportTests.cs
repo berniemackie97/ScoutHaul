@@ -81,6 +81,7 @@ public sealed class ReportImportTests
             new PlatformOrderFeeEnrichmentService(orderStore, currentUser),
             new MarketplaceRefundImportService(orderStore, currentUser, TimeProvider.System),
             new PlatformListingImportService(db, currentUser),
+            orderStore,
             TimeProvider.System,
             NullLogger<ReportImportService>.Instance);
 
@@ -311,6 +312,31 @@ public sealed class ReportImportTests
 
         Assert.Equal((0, 0, 2), (same.Created, same.Updated, same.Unchanged));
         Assert.Equal((0, 1, 1), (repriced.Created, repriced.Updated, repriced.Unchanged));
+    }
+
+    // ── Queues ─────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Counts_what_imports_left_for_a_person_to_match()
+    {
+        Harness harness = NewHarness(Everything);
+        await harness.Imports.ImportAsync([DepopFile(DepopRow("Jeans"), DepopRow("Coat")), PoshmarkFile("Blouse")], CancellationToken.None);
+
+        ImportQueuesDto queues = await harness.Imports.QueuesAsync(CancellationToken.None);
+
+        Assert.Equal(2, queues.OrdersToMatch);
+        Assert.Equal(1, queues.ListingsToMatch);
+    }
+
+    [Fact]
+    public async Task Hides_a_queue_the_caller_s_role_cannot_work()
+    {
+        Harness harness = NewHarness(HaulScoutPermissions.ManageListings);
+
+        ImportQueuesDto queues = await harness.Imports.QueuesAsync(CancellationToken.None);
+
+        Assert.Null(queues.OrdersToMatch);
+        Assert.Equal(0, queues.ListingsToMatch);
     }
 
     // ── Failure ────────────────────────────────────────────────────────────────

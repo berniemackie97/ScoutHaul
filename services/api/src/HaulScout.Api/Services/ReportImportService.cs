@@ -30,6 +30,7 @@ public sealed class ReportImportService(
     PlatformOrderFeeEnrichmentService feeEnrichment,
     MarketplaceRefundImportService refunds,
     PlatformListingImportService listings,
+    IPlatformOrderStore platformOrders,
     TimeProvider clock,
     ILogger<ReportImportService> logger)
 {
@@ -95,6 +96,19 @@ public sealed class ReportImportService(
         }
 
         return new ImportResultDto(outcomes);
+    }
+
+    /// <summary>The two queues imports feed, each counted over everything and shown only to a role that can work it.</summary>
+    public async Task<ImportQueuesDto> QueuesAsync(CancellationToken cancellationToken)
+    {
+        Guid organizationId = currentUser.OrganizationId;
+        int? orders = await access.HasPermission(organizationId, HaulScoutPermissions.ManageFinance, cancellationToken)
+            ? await platformOrders.CountAsync(organizationId, PlatformOrderStatus.Imported, cancellationToken)
+            : null;
+        int? pendingListings = await access.HasPermission(organizationId, HaulScoutPermissions.ManageListings, cancellationToken)
+            ? await listings.CountPendingAsync(cancellationToken)
+            : null;
+        return new ImportQueuesDto(orders, pendingListings);
     }
 
     /// <summary>Reads a past run's exact file again — after a parser fix, or once a refund's sale is recorded.</summary>
