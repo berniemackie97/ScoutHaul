@@ -10,6 +10,12 @@ public interface IStorefrontOfferStore
         StorefrontOfferStatus? status,
         CancellationToken cancellationToken);
 
+    /// <summary>
+    /// How many offers are in a status — over every offer, not the page the list returns. The
+    /// offers screen's "new offers" figure used to be a count of that page.
+    /// </summary>
+    Task<int> CountOffersAsync(Guid organizationId, StorefrontOfferStatus? status, CancellationToken cancellationToken);
+
     Task<StorefrontOffer?> FindOfferAsync(Guid organizationId, Guid offerId, CancellationToken cancellationToken);
 
     Task<IReadOnlyList<StorefrontOffer>> ListCustomerOffersAsync(

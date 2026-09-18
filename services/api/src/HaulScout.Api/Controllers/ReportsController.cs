@@ -1,46 +1,30 @@
 using System.Globalization;
 using System.Text;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using HaulScout.Api.Authorization;
 using HaulScout.Api.Services;
 using HaulScout.Application.Contracts;
 using HaulScout.Application.Security;
-using HaulScout.Application.Services;
-using HaulScout.Domain;
-using HaulScout.Infrastructure.Persistence;
 
 namespace HaulScout.Api.Controllers;
 
 [ApiController]
 [Route("api/reports")]
 [RequireOrganizationPermission(HaulScoutPermissions.ViewReports)]
-public sealed class ReportsController(HaulScoutDbContext db, ICurrentUserContext currentUser) : HaulScoutControllerBase
+public sealed class ReportsController(BusinessReportService reports) : HaulScoutControllerBase
 {
-    private static readonly InventoryStatus[] ReportableInventoryStatuses =
-    [
-        InventoryStatus.Purchased,
-        InventoryStatus.NeedsCleaning,
-        InventoryStatus.NeedsTesting,
-        InventoryStatus.NeedsRepair,
-        InventoryStatus.NeedsPhotos,
-        InventoryStatus.ReadyToList,
-        InventoryStatus.Listed,
-        InventoryStatus.Returned,
-    ];
-
     [HttpGet("overview")]
     public async Task<ActionResult<BusinessReportDto>> Overview(
         [FromQuery] DateOnly? from,
         [FromQuery] DateOnly? to,
         CancellationToken cancellationToken)
     {
-        if (!TryResolveRange(from, to, out ReportRange range, out string? error))
+        if (!BusinessReportService.TryResolveRange(from, to, out ReportRange range, out string? error))
         {
             return Invalid(error ?? "The report could not be produced.");
         }
 
-        return await BuildReport(range, cancellationToken);
+        return await reports.BuildAsync(range, cancellationToken);
     }
 
     [HttpGet("overview.csv")]
@@ -49,100 +33,15 @@ public sealed class ReportsController(HaulScoutDbContext db, ICurrentUserContext
         [FromQuery] DateOnly? to,
         CancellationToken cancellationToken)
     {
-        if (!TryResolveRange(from, to, out ReportRange range, out string? error))
+        if (!BusinessReportService.TryResolveRange(from, to, out ReportRange range, out string? error))
         {
             return Invalid(error ?? "The report could not be produced.");
         }
 
-        BusinessReportDto report = await BuildReport(range, cancellationToken);
+        BusinessReportDto report = await reports.BuildAsync(range, cancellationToken);
         byte[] csv = Encoding.UTF8.GetBytes(ToCsv(report));
         string fileName = $"haulscout-report-{range.From:yyyy-MM-dd}-to-{range.ToInclusive:yyyy-MM-dd}.csv";
         return File(csv, "text/csv; charset=utf-8", fileName);
-    }
-
-    private async Task<BusinessReportDto> BuildReport(ReportRange range, CancellationToken cancellationToken)
-    {
-        Guid organizationId = currentUser.OrganizationId;
-
-        List<ReportSaleInput> sales = await db.Sales
-            .AsNoTracking()
-            .Where(item => item.OrganizationId == organizationId && item.SoldAt >= range.PreviousFrom && item.SoldAt < range.ToExclusive)
-            .Select(item => new ReportSaleInput(
-                item.Id,
-                item.InventoryItemId,
-                item.InventoryItem == null ? "Unknown item" : item.InventoryItem.Title,
-                item.Platform,
-                item.SoldPrice,
-                item.ShippingCharged,
-                item.CostOfGoods,
-                item.PlatformFees,
-                item.PaymentFees,
-                item.ShippingCost,
-                item.SuppliesCost,
-                item.OtherCosts,
-                item.NetProfit,
-                item.Status,
-                item.SoldAt,
-                item.SalesTaxCollected,
-                item.TaxRemittedByPlatform))
-            .ToListAsync(cancellationToken);
-
-        List<ReportExpenseInput> expenses = await db.Expenses
-            .AsNoTracking()
-            .Where(item => item.OrganizationId == organizationId && item.OccurredAt >= range.PreviousFrom && item.OccurredAt < range.ToExclusive)
-            .Select(item => new ReportExpenseInput(item.Category, item.Amount, item.OccurredAt))
-            .ToListAsync(cancellationToken);
-
-        List<ReportInventoryInput> inventory = await db.InventoryItems
-            .AsNoTracking()
-            .Where(item => item.OrganizationId == organizationId && !item.IsArchived && ReportableInventoryStatuses.Contains(item.Status))
-            .Select(item => new ReportInventoryInput(
-                item.Category ?? "Uncategorized",
-                item.Status,
-                item.PurchasePrice ?? 0,
-                item.EstimatedSalePrice ?? item.SellerAskingPrice ?? 0,
-                item.PurchasedAt ?? item.CreatedAt,
-                item.PurchasePrice.HasValue,
-                item.EstimatedSalePrice > 0 || item.SellerAskingPrice > 0,
-                item.StorageLocation != null && item.StorageLocation != "",
-                item.Photos.Any()))
-            .ToListAsync(cancellationToken);
-
-        return BusinessReportCalculator.Build(
-            range.From,
-            range.ToExclusive,
-            sales.Where(item => item.SoldAt >= range.From).ToArray(),
-            sales.Where(item => item.SoldAt >= range.PreviousFrom && item.SoldAt < range.From).ToArray(),
-            expenses.Where(item => item.OccurredAt >= range.From).ToArray(),
-            expenses.Where(item => item.OccurredAt >= range.PreviousFrom && item.OccurredAt < range.From).ToArray(),
-            inventory,
-            DateTimeOffset.UtcNow);
-    }
-
-    private static bool TryResolveRange(DateOnly? from, DateOnly? to, out ReportRange range, out string? error)
-    {
-        DateOnly today = DateOnly.FromDateTime(DateTime.UtcNow);
-        DateOnly end = to ?? today;
-        DateOnly start = from ?? end.AddDays(-89);
-        int days = end.DayNumber - start.DayNumber + 1;
-
-        switch (days)
-        {
-            case <= 0:
-                range = default;
-                error = "The report start date must be on or before the end date.";
-                return false;
-            case > 731:
-                range = default;
-                error = "Report ranges are limited to 731 days.";
-                return false;
-        }
-
-        DateTimeOffset fromValue = new(start.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc));
-        DateTimeOffset toExclusive = new(end.AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc));
-        range = new ReportRange(fromValue, toExclusive, fromValue.AddDays(-days), end);
-        error = null;
-        return true;
     }
 
     private static string ToCsv(BusinessReportDto report)
@@ -185,5 +84,4 @@ public sealed class ReportsController(HaulScoutDbContext db, ICurrentUserContext
     private static string Money(decimal value) => value.ToString("0.00", CultureInfo.InvariantCulture);
     private static string Csv(string value) => $"\"{value.Replace("\"", "\"\"")}\"";
 
-    private readonly record struct ReportRange(DateTimeOffset From, DateTimeOffset ToExclusive, DateTimeOffset PreviousFrom, DateOnly ToInclusive);
 }

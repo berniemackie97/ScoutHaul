@@ -29,13 +29,11 @@ public class ArchitectureTests
         "BudgetsController",
         "ChannelListingsController",
         "CustomersController",
-        "DashboardController",
         "ListingsController",
         "MarketAnalysisController",
         "MarketObservationsController",
         "PlatformListingsController",
         "ProductIdentitiesController",
-        "ReportsController",
         "TasksController",
     ];
 

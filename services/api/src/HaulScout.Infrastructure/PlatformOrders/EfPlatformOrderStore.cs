@@ -26,19 +26,21 @@ public sealed class EfPlatformOrderStore(
         int take,
         CancellationToken cancellationToken)
     {
-        IQueryable<PlatformOrder> query = db.PlatformOrders
+        return await PlatformOrdersIn(organizationId, status)
             .Include(order => order.Lines).ThenInclude(line => line.InventoryItem)
-            .Where(order => order.OrganizationId == organizationId);
-
-        if (status.HasValue)
-        {
-            query = query.Where(order => order.Status == status.Value);
-        }
-
-        return await query
             .OrderByDescending(order => order.OrderedAt)
             .Take(take)
             .ToListAsync(cancellationToken);
+    }
+
+    public Task<int> CountAsync(Guid organizationId, PlatformOrderStatus? status, CancellationToken cancellationToken) =>
+        PlatformOrdersIn(organizationId, status).CountAsync(cancellationToken);
+
+    /// <summary>The one definition of "marketplace orders in this status", shared by the list and the count.</summary>
+    private IQueryable<PlatformOrder> PlatformOrdersIn(Guid organizationId, PlatformOrderStatus? status)
+    {
+        IQueryable<PlatformOrder> query = db.PlatformOrders.Where(order => order.OrganizationId == organizationId);
+        return status.HasValue ? query.Where(order => order.Status == status.Value) : query;
     }
 
     public Task<PlatformOrder?> GetAsync(Guid organizationId, Guid id, CancellationToken cancellationToken) =>

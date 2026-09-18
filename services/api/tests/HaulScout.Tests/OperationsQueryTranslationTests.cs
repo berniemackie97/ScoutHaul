@@ -11,6 +11,8 @@ using HaulScout.Domain.Entities;
 using HaulScout.Infrastructure.Inventory;
 using HaulScout.Infrastructure.Orders;
 using HaulScout.Infrastructure.Search;
+using HaulScout.Infrastructure.Storefront;
+using HaulScout.Infrastructure.PlatformOrders;
 using HaulScout.Infrastructure.Persistence;
 
 namespace HaulScout.Tests;
@@ -197,6 +199,57 @@ public sealed class OperationsQueryTranslationTests(PostgresFixture postgres)
         Assert.Single(Hits(await controller.SearchAsync("sh-1042", CancellationToken.None), "order"));
         Assert.Single(Hits(await controller.SearchAsync("dana@", CancellationToken.None), "customer"));
         Assert.Single(Hits(await controller.SearchAsync("maple", CancellationToken.None), "purchase"));
+    }
+
+    [Fact]
+    public async Task Operator_console_translates_to_sql()
+    {
+        // Counts through the inventory filters, a sum over each lot's items, a grouped sum over sales:
+        // every shape here has to survive translation, or the home page fails for everyone at once.
+        (HaulScoutDbContext db, Guid org, Guid user) = await postgres.NewOrganizationAsync();
+        await using HaulScoutDbContext _ = db;
+
+        InventoryItem lamp = new()
+        {
+            OrganizationId = org,
+            Title = "Brass lamp",
+            Status = InventoryStatus.ReadyToList,
+            PurchasePrice = 10m,
+            EstimatedSalePrice = 40m,
+            PurchasedAt = DateTimeOffset.UtcNow.AddDays(-90),
+        };
+        db.InventoryItems.Add(lamp);
+        AcquisitionLot lot = new() { OrganizationId = org, Name = "Estate sale", PurchaseSubtotal = 100m };
+        lot.Items.Add(new AcquisitionLotItem { OrganizationId = org, InventoryItemId = lamp.Id, AllocatedCost = 60m });
+        db.AcquisitionLots.Add(lot);
+        db.Orders.Add(new Order { OrganizationId = org, OrderNumber = "SH-1", Status = OrderStatus.Paid, PaymentStatus = PaymentStatus.Paid, GrandTotal = 80m });
+        await db.SaveChangesAsync();
+
+        StubCurrentUser currentUser = new(org, user);
+        OrderAssembler assembler = new(db, currentUser);
+        InventoryQueryService inventory = new(new EfInventoryStore(db), currentUser);
+        OperatorConsoleService console = new(
+            db,
+            currentUser,
+            new AllowAllAuthorizer(),
+            new OrdersWorkflowService(db, currentUser, assembler),
+            inventory,
+            new EfStorefrontOfferStore(db),
+            new EfPlatformOrderStore(db, assembler),
+            new BusinessReportService(db, currentUser),
+            TimeProvider.System);
+
+        OperatorConsoleDto result = await console.BuildAsync(CancellationToken.None);
+
+        Assert.Equal(1, result.Queues.Single(queue => queue.Key == "orders.toPack").Count);
+        Assert.Equal(1, result.Queues.Single(queue => queue.Key == "inventory.aged").Count);
+        Assert.Equal(40m, result.Queues.Single(queue => queue.Key == "purchases.unallocated").Amount);
+        Assert.Equal(1, result.Inventory!.ActiveItems);
+        Assert.NotNull(result.Money);
+
+        DashboardSummaryDto legacy = await console.LegacySummaryAsync(CancellationToken.None);
+        Assert.Equal(1, legacy.CurrentInventoryCount);
+        Assert.Equal(1, legacy.StaleInventoryCount);
     }
 
     private sealed class AllowAllAuthorizer : IOrganizationAuthorizer

@@ -912,6 +912,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/dashboard/console": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["OperatorConsoleDto"];
+                        "application/json": components["schemas"]["OperatorConsoleDto"];
+                        "text/json": components["schemas"]["OperatorConsoleDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/dashboard/summary": {
         parameters: {
             query?: never;
@@ -8046,6 +8083,32 @@ export interface components {
             reasons?: string[] | null;
             warnings?: string[] | null;
         };
+        ConsoleInventoryDto: {
+            /** Format: int32 */
+            activeItems?: number;
+            /** Format: double */
+            capitalDeployed?: number;
+            /** Format: double */
+            estimatedResaleValue?: number;
+        };
+        ConsoleMoneyDto: {
+            /** Format: int32 */
+            days?: number;
+            /** Format: date */
+            from?: string;
+            /** Format: date */
+            to?: string;
+            current?: components["schemas"]["ReportKpiDto"];
+            comparison?: components["schemas"]["ReportComparisonDto"];
+        };
+        ConsoleQueueDto: {
+            key?: string | null;
+            tier?: string | null;
+            /** Format: int32 */
+            count?: number;
+            /** Format: double */
+            amount?: number | null;
+        };
         CreateBudgetRequest: {
             name?: string | null;
             /** Format: double */
@@ -8834,6 +8897,13 @@ export interface components {
         OpenReturnRequest: {
             reason?: string | null;
             notes?: string | null;
+        };
+        OperatorConsoleDto: {
+            queues?: components["schemas"]["ConsoleQueueDto"][] | null;
+            inventory?: components["schemas"]["ConsoleInventoryDto"];
+            money?: components["schemas"]["ConsoleMoneyDto"];
+            /** Format: date-time */
+            generatedAt?: string;
         };
         OrderDetailDto: {
             /** Format: uuid */

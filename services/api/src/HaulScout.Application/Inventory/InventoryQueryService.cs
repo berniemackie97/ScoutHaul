@@ -65,6 +65,19 @@ public sealed class InventoryQueryService(IInventoryStore inventory, ICurrentUse
             pageItems.Select(item => item.ToDto()).ToList(), total, page, pageSize, pageCount, summary);
     }
 
+    /// <summary>
+    /// The browse summary for a filter, without fetching a page of items to go with it.
+    ///
+    /// For callers that show the figures and link to the list — the home console — so what they show
+    /// is the same computation the list's own summary cards run.
+    /// </summary>
+    public async Task<InventorySummaryDto> SummaryAsync(InventoryFilter filter, CancellationToken cancellationToken) =>
+        Summarize(await inventory.ListScalarsAsync(currentUser.OrganizationId, filter, cancellationToken));
+
+    /// <summary>How many items match a filter — the browse list's own count, for anything that links to it.</summary>
+    public Task<int> CountAsync(InventoryFilter filter, CancellationToken cancellationToken) =>
+        inventory.CountAsync(currentUser.OrganizationId, filter, cancellationToken);
+
     /// <summary>The summary spans every match, not just the page being shown — so it is computed from the filtered
     /// set's figures rather than from <c>pageItems</c>.</summary>
     private static InventorySummaryDto Summarize(IReadOnlyList<InventoryScalars> scalars) => new(

@@ -225,6 +225,9 @@ public class StorefrontCheckoutTests
             CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<StorefrontOffer>>([]);
 
+        public Task<int> CountOffersAsync(Guid organizationId, StorefrontOfferStatus? status, CancellationToken cancellationToken) =>
+            Task.FromResult(0);
+
         public Task<StorefrontOffer?> FindOfferAsync(Guid organizationId, Guid offerId, CancellationToken cancellationToken) =>
             Task.FromResult<StorefrontOffer?>(null);
 

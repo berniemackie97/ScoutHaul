@@ -39,6 +39,12 @@ public interface IInventoryStore
         int take,
         CancellationToken cancellationToken);
 
+    /// <summary>
+    /// How many items match — through the same filter the browse list applies, so a count shown
+    /// anywhere else can never disagree with the rows someone lands on when they follow it.
+    /// </summary>
+    Task<int> CountAsync(Guid organizationId, InventoryFilter filter, CancellationToken cancellationToken);
+
     /// <summary>Every match's summary figures — the whole filtered set, not just the page it is shown with.</summary>
     Task<IReadOnlyList<InventoryScalars>> ListScalarsAsync(
         Guid organizationId,

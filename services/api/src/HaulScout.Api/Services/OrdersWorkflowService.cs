@@ -53,10 +53,7 @@ public sealed class OrdersWorkflowService(
         // The summary spans every order, never the filtered set. Narrowing the list is a question
         // about what to look at; it is not a claim that the rest of the book stopped existing, and a
         // "Captured revenue" that falls while you type a search is worse than no figure at all.
-        OrderQueueSummaryDto summary = Summarize(
-            [.. stages.Keys],
-            stages,
-            await PaidTotalsAsync(cancellationToken));
+        OrderQueueSummaryDto summary = await SummarizeAsync(stages, cancellationToken);
 
         List<Guid> ordered = await FilteredOrders(status: null, search, channel)
             .OrderByDescending(order => order.CreatedAt)
@@ -89,6 +86,20 @@ public sealed class OrdersWorkflowService(
 
         return new OrderListDto(items, total, page, pageSize, pageCount, summary);
     }
+
+    /// <summary>
+    /// The queue counts and captured revenue across the whole book, without a page of orders.
+    ///
+    /// The same figures <see cref="BrowseAsync"/> returns beside its list, for callers — the home
+    /// console — that need the counts and would otherwise fetch a page only to throw it away.
+    /// </summary>
+    public async Task<OrderQueueSummaryDto> QueueSummaryAsync(CancellationToken cancellationToken) =>
+        await SummarizeAsync(await StagesAsync(cancellationToken), cancellationToken);
+
+    private async Task<OrderQueueSummaryDto> SummarizeAsync(
+        IReadOnlyDictionary<Guid, OrderWorkflowStage> stages,
+        CancellationToken cancellationToken) =>
+        Summarize([.. stages.Keys], stages, await PaidTotalsAsync(cancellationToken));
 
     private static OrderQueueSummaryDto Summarize(
         IReadOnlyList<Guid> orderIds,

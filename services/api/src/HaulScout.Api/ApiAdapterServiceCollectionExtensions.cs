@@ -25,6 +25,8 @@ public static class ApiAdapterServiceCollectionExtensions
         services.AddScoped<MarketplaceLookupPersistenceService>();
         services.AddScoped<IInventoryPhotoProcessor, InventoryPhotoStorageService>();
         services.AddScoped<OrdersWorkflowService>();
+        services.AddScoped<BusinessReportService>();
+        services.AddScoped<OperatorConsoleService>();
         services.AddScoped<SaleRecordingWorkflowService>();
         services.AddScoped<SaleFinancialStateService>();
         services.AddScoped<SaleReturnWorkflowService>();

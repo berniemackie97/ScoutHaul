@@ -8,21 +8,25 @@ namespace HaulScout.Infrastructure.Storefront;
 
 public sealed class EfStorefrontOfferStore(HaulScoutDbContext db) : IStorefrontOfferStore
 {
+    public Task<int> CountOffersAsync(Guid organizationId, StorefrontOfferStatus? status, CancellationToken cancellationToken) =>
+        OffersIn(organizationId, status).CountAsync(cancellationToken);
+
+    /// <summary>The one definition of "offers in this status", shared by the list and the count.</summary>
+    private IQueryable<StorefrontOffer> OffersIn(Guid organizationId, StorefrontOfferStatus? status)
+    {
+        IQueryable<StorefrontOffer> query = db.StorefrontOffers.Where(offer => offer.OrganizationId == organizationId);
+        return status is null ? query : query.Where(offer => offer.Status == status);
+    }
+
     public async Task<IReadOnlyList<StorefrontOffer>> ListOffersAsync(
         Guid organizationId,
         StorefrontOfferStatus? status,
         CancellationToken cancellationToken)
     {
-        IQueryable<StorefrontOffer> query = db.StorefrontOffers
+        IQueryable<StorefrontOffer> query = OffersIn(organizationId, status)
             .Include(offer => offer.Customer)
             .Include(offer => offer.StoreListing)
-            .Include(offer => offer.InventoryItem)
-            .Where(offer => offer.OrganizationId == organizationId);
-
-        if (status is not null)
-        {
-            query = query.Where(offer => offer.Status == status);
-        }
+            .Include(offer => offer.InventoryItem);
 
         return await query
             .OrderByDescending(offer => offer.OfferedAt)

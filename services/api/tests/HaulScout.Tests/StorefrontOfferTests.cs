@@ -42,6 +42,9 @@ public sealed class StorefrontOfferTests
                 .Where(offer => offer.OrganizationId == organizationId && (status is null || offer.Status == status))
                 .ToList());
 
+        public Task<int> CountOffersAsync(Guid organizationId, StorefrontOfferStatus? status, CancellationToken cancellationToken) =>
+            Task.FromResult(Offers.Count(offer => offer.OrganizationId == organizationId && (status is null || offer.Status == status)));
+
         public Task<StorefrontOffer?> FindOfferAsync(Guid organizationId, Guid offerId, CancellationToken cancellationToken) =>
             Task.FromResult(Offers.FirstOrDefault(offer => offer.OrganizationId == organizationId && offer.Id == offerId));
 
