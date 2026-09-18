@@ -153,7 +153,7 @@ public static class InventoryReferenceCatalog
             B(brands, category, "Other");
         }
         return brands
-            .DistinctBy(brand => $"{brand.ParentValue}{brand.Value}")
+            .DistinctBy(brand => $"{brand.ParentValue}\u001f{brand.Value}")
             .ToArray();
     }
 
@@ -193,7 +193,7 @@ public static class InventoryReferenceCatalog
         }
 
         return models
-            .DistinctBy(model => $"{model.ParentValue}{model.Value}")
+            .DistinctBy(model => $"{model.ParentValue}\u001f{model.Value}")
             .OrderBy(model => model.ParentValue)
             .ThenBy(model => model.Value)
             .ToArray();
