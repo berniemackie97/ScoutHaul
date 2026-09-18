@@ -1,7 +1,9 @@
 # Import & matching — redesign
 
-Status: **proposal, awaiting sign-off.** Two convergence bugs are already fixed separately; this is
-the redesign of the flow itself.
+Status: **built** — #178 (re-import re-syncs), #179 (one matching chain), #180 (auto-settle +
+renames), #181 (quality → Reports), #183. The remaining scope (single drop zone with detection,
+import history, multi-channel, scheduled reconciliation) continues in
+[CHANNEL_SYNC_DESIGN.md](CHANNEL_SYNC_DESIGN.md).
 
 ---
 
