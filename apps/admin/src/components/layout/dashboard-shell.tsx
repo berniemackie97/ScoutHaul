@@ -5,8 +5,16 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Menu, Package2 } from "lucide-react";
 import { Button } from "@overhaul/ui";
+import { CommandPalette } from "@/components/search/command-palette";
+import { CommandPaletteTrigger } from "@/components/search/command-palette-trigger";
 import { Sidebar } from "./sidebar";
 import { SessionKeepAlive } from "./session-keep-alive";
+
+/** Typing into a field must never be hijacked by a single-key shortcut like "/". */
+function isEditable(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  return target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName);
+}
 
 /**
  * Dashboard chrome. On desktop the sidebar is in-flow; below lg it collapses to a drawer opened from a compact top
@@ -16,6 +24,25 @@ import { SessionKeepAlive } from "./session-keep-alive";
 export function DashboardShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+
+  // ⌘K / Ctrl+K from anywhere, including from inside a field — it is not a text-editing chord.
+  // "/" too, the way most consoles do it, but only when the key would not otherwise be typed.
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if ((event.metaKey || event.ctrlKey) && !event.altKey && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setPaletteOpen((current) => !current);
+        return;
+      }
+      if (event.key === "/" && !event.metaKey && !event.ctrlKey && !event.altKey && !isEditable(event.target)) {
+        event.preventDefault();
+        setPaletteOpen(true);
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   useEffect(() => {
     setMobileOpen(false);
@@ -33,7 +60,15 @@ export function DashboardShell({ children }: { children: ReactNode }) {
   return (
     <div className="flex h-screen overflow-hidden">
       <SessionKeepAlive />
-      <Sidebar mobileOpen={mobileOpen} onClose={() => setMobileOpen(false)} />
+      <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
+      <Sidebar
+        mobileOpen={mobileOpen}
+        onClose={() => setMobileOpen(false)}
+        onOpenSearch={() => {
+          setMobileOpen(false);
+          setPaletteOpen(true);
+        }}
+      />
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Mobile top bar — the only way to reach the nav below lg. pt safe-area keeps the menu button clear of the
             iOS status bar / Dynamic Island when launched as an installed PWA. */}
@@ -53,6 +88,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
             </div>
             <span className="text-sm font-bold">HaulScout</span>
           </Link>
+          <CommandPaletteTrigger compact onOpen={() => setPaletteOpen(true)} className="ml-auto" />
         </header>
         <main className="flex-1 overflow-y-auto">
           <div className="p-4 pb-[calc(1rem_+_env(safe-area-inset-bottom))] sm:p-6 lg:p-8">{children}</div>
