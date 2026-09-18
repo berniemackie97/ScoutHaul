@@ -67,6 +67,49 @@ public sealed class CsvTable
         return negative ? -value : value;
     }
 
+    /// <summary>
+    /// Strict money: <c>true</c> with <c>null</c> for a cell that says "nothing" (empty, "N/A", "-",
+    /// "--"), <c>true</c> with the amount for a readable figure, and <c>false</c> for anything else.
+    ///
+    /// <see cref="Money"/> turns an unreadable cell into 0 without a word, which is how a real amount
+    /// can vanish from an import unnoticed. New parsers use this and report the row instead. Excel's
+    /// text-literal form (<c>="$1.50"</c>, <c>="-"</c>), which some exports emit, is unwrapped first.
+    /// </summary>
+    public bool TryMoney(IReadOnlyList<string> row, string column, out decimal? value)
+    {
+        value = null;
+        string text = Unwrap(Text(row, column));
+        if (text.Length == 0 || text is "-" or "--" || text.Equals("N/A", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        bool negative = (text.StartsWith('(') && text.EndsWith(')')) || text.StartsWith('-');
+        string digits = text.Trim('(', ')').TrimStart('-').Replace("$", "").Replace(",", "").Trim();
+        if (!decimal.TryParse(digits, NumberStyles.Number, CultureInfo.InvariantCulture, out decimal amount))
+        {
+            return false;
+        }
+
+        value = negative ? -amount : amount;
+        return true;
+    }
+
+    /// <summary>A cell that says "nothing" in any of the ways exports say it, as <c>null</c>.</summary>
+    public string? Meaningful(IReadOnlyList<string> row, string column)
+    {
+        string text = Unwrap(Text(row, column));
+        return text.Length == 0 || text is "-" or "--" || text.Equals("N/A", StringComparison.OrdinalIgnoreCase)
+            ? null
+            : text;
+    }
+
+    /// <summary>Excel's text-literal form — <c>="value"</c> — reduced to its value.</summary>
+    private static string Unwrap(string text) =>
+        text.StartsWith("=\"", StringComparison.Ordinal) && text.EndsWith('"') && text.Length >= 3
+            ? text[2..^1].Trim()
+            : text;
+
     public int Int(IReadOnlyList<string> row, string column, int fallback = 0) =>
         int.TryParse(Text(row, column), NumberStyles.Integer, CultureInfo.InvariantCulture, out int value) ? value : fallback;
 
