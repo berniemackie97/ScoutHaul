@@ -1,6 +1,6 @@
 # Channel sync & reconciliation — design
 
-Status: **proposal, revision 2, awaiting sign-off.** Revision 1 (eBay API + sale-email capture) was
+Status: **approved (revision 2), in build.** Decisions in §8 taken as recommended. Revision 1 (eBay API + sale-email capture) was
 rejected: eBay production API keys are not realistically obtainable for this business, and email
 parsing is brittle. This revision uses a **browser-extension sync agent**, the model the established
 reseller tools use. Supersedes the remaining scope of
@@ -181,10 +181,30 @@ logged into the marketplaces, set never to sleep. It is simply one more paired b
 it the one that does the work, and the laptop takes over if it drops. The *Silent channel* rule
 makes any gap visible rather than silent.
 
-### 4.9 UI — one "Channels & sync" hub (replaces Imports)
+### 4.9 Scanning on demand
+
+Every loop can also be run **now**, at any scope the operator needs:
+
+| Scope | Examples |
+|---|---|
+| What | **Sales** · **Listings** · **Reports** · **History backfill** (from a date) · **Everything** |
+| Where | One account · one platform · **all accounts** |
+
+- A trigger creates a **scan request** on the server; the agent holding that account's lease runs
+  it. Clicked from a browser that has the extension, the portal tells the extension directly, so it
+  starts **immediately**; other paired browsers pick it up on their next heartbeat (≤ 1 min).
+- The request shows its life on the hub — *Queued → Running on "Office mini-PC" → Done: 3 new
+  sales, 1 price change* — or *Waiting for a browser* when none is online, so a click never
+  disappears into nothing.
+- Requests for the same account and scope **coalesce**; the governor still applies, so a burst of
+  clicks cannot hammer a marketplace.
+- Available from the hub, from each account row, from the command palette ("Scan Depop sales"),
+  and from the extension popup itself.
+
+### 4.10 UI — one "Channels & sync" hub (replaces Imports)
 
 - **Accounts:** per channel — bound marketplace username, last scan per loop, next due, status,
-  dry-run / live toggle, **Sync now**.
+  dry-run / live toggle, and **Scan** with its scopes (§4.9).
 - **Browsers:** paired devices, last heartbeat, which accounts each is logged into; revoke.
 - **Drop zone:** manual files, detect-then-confirm.
 - **History:** every SyncRun, drill into row issues, re-run.
@@ -237,7 +257,7 @@ Then the sales and reporting overhaul reads from all of it.
 
 ---
 
-## 8. Decisions needed
+## 8. Decisions (approved as recommended)
 
 1. **Extension agent model**, with sync running while a paired computer is on — plus an always-on
    machine for 24/7? *(Recommendation: yes; a cheap mini-PC is the whole answer to "computer must
