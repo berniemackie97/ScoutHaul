@@ -425,8 +425,21 @@ public sealed class ReportImportService(
         _ => "listing-quality reports",
     };
 
-    private static string Counted(int created, int updated, int unchanged, string noun) =>
-        $"{created} new, {updated} updated, {unchanged} unchanged {noun}{Plural(created + updated + unchanged)}.";
+    /// <summary>"36 new orders." · "3 new, 40 unchanged listings." — only the parts that happened.</summary>
+    private static string Counted(int created, int updated, int unchanged, string noun)
+    {
+        int total = created + updated + unchanged;
+        if (total == 0)
+        {
+            return $"No {noun}s were imported.";
+        }
+
+        string[] parts = new[] { (created, "new"), (updated, "updated"), (unchanged, "unchanged") }
+            .Where(part => part.Item1 > 0)
+            .Select(part => $"{part.Item1} {part.Item2}")
+            .ToArray();
+        return $"{string.Join(", ", parts)} {noun}{Plural(total)}.";
+    }
 
     private static string Plural(int count) => count == 1 ? string.Empty : "s";
 

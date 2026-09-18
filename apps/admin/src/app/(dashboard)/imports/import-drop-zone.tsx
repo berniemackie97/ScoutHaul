@@ -239,7 +239,7 @@ function DetectedFile({ detection, onRemove }: { detection: ReportDetection; onR
         <FileSpreadsheet className="text-muted-foreground mt-0.5 h-5 w-5 shrink-0" aria-hidden />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <p className="truncate text-sm font-medium">{detection.label ?? detection.fileName}</p>
+            <p className="truncate text-sm font-medium">{detection.label ?? "Unrecognised file"}</p>
             {detection.canImport ? (
               <Badge variant="secondary">{recordsLabel(detection)}</Badge>
             ) : (
