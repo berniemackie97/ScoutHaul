@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { Menu, Package2 } from "lucide-react";
 import { Button } from "@overhaul/ui";
 import { CommandPalette } from "@/components/search/command-palette";
+import type { Operator } from "@/lib/session";
 import { CommandPaletteTrigger } from "@/components/search/command-palette-trigger";
 import { Sidebar } from "./sidebar";
 import { SessionKeepAlive } from "./session-keep-alive";
@@ -21,7 +22,7 @@ function isEditable(target: EventTarget | null): boolean {
  * bar. Owns the drawer's open state (shared with the top-bar trigger), closes it on navigation, and locks body
  * scroll while it is open.
  */
-export function DashboardShell({ children }: { children: ReactNode }) {
+export function DashboardShell({ children, operator }: { children: ReactNode; operator: Operator | null }) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -62,6 +63,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
       <SessionKeepAlive />
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
       <Sidebar
+        operator={operator}
         mobileOpen={mobileOpen}
         onClose={() => setMobileOpen(false)}
         onOpenSearch={() => {

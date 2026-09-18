@@ -17,6 +17,22 @@ public sealed class StorefrontOfferWorkflowService(
 {
     private const int ResponseExpiryDays = 7;
 
+    /// <summary>Offers in each status across the whole book — independent of whichever tab is being viewed.</summary>
+    public async Task<StorefrontOfferCountsDto> CountsAsync(Guid organizationId, CancellationToken cancellationToken)
+    {
+        IReadOnlyDictionary<StorefrontOfferStatus, int> counts = await store.CountByStatusAsync(organizationId, cancellationToken);
+        int Of(StorefrontOfferStatus status) => counts.GetValueOrDefault(status);
+
+        return new StorefrontOfferCountsDto(
+            Of(StorefrontOfferStatus.New),
+            Of(StorefrontOfferStatus.Countered),
+            Of(StorefrontOfferStatus.Accepted),
+            Of(StorefrontOfferStatus.Declined),
+            Of(StorefrontOfferStatus.Expired),
+            Of(StorefrontOfferStatus.Converted),
+            counts.Values.Sum());
+    }
+
     public async Task<IReadOnlyList<StorefrontOfferDto>> ListAsync(
         Guid organizationId,
         StorefrontOfferStatus? status,

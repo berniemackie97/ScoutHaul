@@ -95,3 +95,9 @@ public sealed record StorefrontOfferDto(
     DateTimeOffset? ConvertedAt,
     string? ResponseMessage,
     string? ResponseNotes);
+
+/// <summary>
+/// Offers by status, across every offer. The figures an offers screen shows beside its list, which
+/// must not change when the operator switches tabs.
+/// </summary>
+public sealed record StorefrontOfferCountsDto(int New, int Countered, int Accepted, int Declined, int Expired, int Converted, int Total);

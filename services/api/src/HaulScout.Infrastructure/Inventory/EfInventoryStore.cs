@@ -57,6 +57,9 @@ public sealed class EfInventoryStore(HaulScoutDbContext db) : IInventoryStore
             .Take(take)
             .ToListAsync(cancellationToken);
 
+    public Task<int> CountAsync(Guid organizationId, InventoryFilter filter, CancellationToken cancellationToken) =>
+        Filtered(organizationId, filter).CountAsync(cancellationToken);
+
     public async Task<IReadOnlyList<InventoryScalars>> ListScalarsAsync(
         Guid organizationId,
         InventoryFilter filter,

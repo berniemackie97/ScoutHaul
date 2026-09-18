@@ -42,6 +42,11 @@ public sealed class StorefrontOfferTests
                 .Where(offer => offer.OrganizationId == organizationId && (status is null || offer.Status == status))
                 .ToList());
 
+        public Task<IReadOnlyDictionary<StorefrontOfferStatus, int>> CountByStatusAsync(Guid organizationId, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyDictionary<StorefrontOfferStatus, int>>(Enum.GetValues<StorefrontOfferStatus>().ToDictionary(
+                status => status,
+                status => Offers.Count(offer => offer.OrganizationId == organizationId && offer.Status == status)));
+
         public Task<StorefrontOffer?> FindOfferAsync(Guid organizationId, Guid offerId, CancellationToken cancellationToken) =>
             Task.FromResult(Offers.FirstOrDefault(offer => offer.OrganizationId == organizationId && offer.Id == offerId));
 
@@ -91,6 +96,27 @@ public sealed class StorefrontOfferTests
         Assert.Equal(listing.Title, row.ListingTitle);
         Assert.Equal("buyer@example.com", row.BuyerEmail);
         Assert.Equal(80m, row.OfferAmount);
+    }
+
+    [Fact]
+    public async Task Counts_do_not_depend_on_which_tab_is_open()
+    {
+        // The offers screen counted "new offers" from the tab being viewed, so on the Declined tab it
+        // read zero however many buyers were waiting for a reply.
+        StoreListing listing = Listing();
+        FakeOfferStore store = new(listing);
+        StorefrontOfferWorkflowService service = new(store, new FakeCustomerStore(), TimeProvider.System);
+        for (int index = 0; index < 3; index++)
+        {
+            await service.SubmitAsync(Org, Buyer, new StorefrontOfferRequest(listing.Id, 80m + index, null), CancellationToken.None);
+        }
+        store.Offers[0].Status = StorefrontOfferStatus.Declined;
+
+        StorefrontOfferCountsDto counts = await service.CountsAsync(Org, CancellationToken.None);
+
+        Assert.Equal(2, counts.New);
+        Assert.Equal(1, counts.Declined);
+        Assert.Equal(3, counts.Total);
     }
 
     [Fact]

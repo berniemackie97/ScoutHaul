@@ -11,6 +11,9 @@ public interface IPlatformOrderStore
         int take,
         CancellationToken cancellationToken);
 
+    /// <summary>How many marketplace orders are in a status, across every one imported.</summary>
+    Task<int> CountAsync(Guid organizationId, PlatformOrderStatus? status, CancellationToken cancellationToken);
+
     Task<PlatformOrder?> GetAsync(Guid organizationId, Guid id, CancellationToken cancellationToken);
 
     Task<PlatformOrder?> GetForReconciliationAsync(Guid organizationId, Guid id, CancellationToken cancellationToken);

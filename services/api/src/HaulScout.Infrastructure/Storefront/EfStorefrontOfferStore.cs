@@ -8,21 +8,38 @@ namespace HaulScout.Infrastructure.Storefront;
 
 public sealed class EfStorefrontOfferStore(HaulScoutDbContext db) : IStorefrontOfferStore
 {
+    public async Task<IReadOnlyDictionary<StorefrontOfferStatus, int>> CountByStatusAsync(
+        Guid organizationId,
+        CancellationToken cancellationToken)
+    {
+        var rows = await OffersIn(organizationId, status: null)
+            .GroupBy(offer => offer.Status)
+            .Select(group => new { Status = group.Key, Count = group.Count() })
+            .ToListAsync(cancellationToken);
+
+        // Every status is present, zero included, so a caller never has to guess whether a missing
+        // status means none or means the query forgot it.
+        return Enum.GetValues<StorefrontOfferStatus>().ToDictionary(
+            status => status,
+            status => rows.SingleOrDefault(row => row.Status == status)?.Count ?? 0);
+    }
+
+    /// <summary>The one definition of "offers in this status", shared by the list and the count.</summary>
+    private IQueryable<StorefrontOffer> OffersIn(Guid organizationId, StorefrontOfferStatus? status)
+    {
+        IQueryable<StorefrontOffer> query = db.StorefrontOffers.Where(offer => offer.OrganizationId == organizationId);
+        return status is null ? query : query.Where(offer => offer.Status == status);
+    }
+
     public async Task<IReadOnlyList<StorefrontOffer>> ListOffersAsync(
         Guid organizationId,
         StorefrontOfferStatus? status,
         CancellationToken cancellationToken)
     {
-        IQueryable<StorefrontOffer> query = db.StorefrontOffers
+        IQueryable<StorefrontOffer> query = OffersIn(organizationId, status)
             .Include(offer => offer.Customer)
             .Include(offer => offer.StoreListing)
-            .Include(offer => offer.InventoryItem)
-            .Where(offer => offer.OrganizationId == organizationId);
-
-        if (status is not null)
-        {
-            query = query.Where(offer => offer.Status == status);
-        }
+            .Include(offer => offer.InventoryItem);
 
         return await query
             .OrderByDescending(offer => offer.OfferedAt)

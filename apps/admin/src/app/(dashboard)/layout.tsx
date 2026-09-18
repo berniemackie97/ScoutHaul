@@ -1,9 +1,12 @@
 import { DashboardShell } from "@/components/layout/dashboard-shell";
+import { getSession, operatorFrom } from "@/lib/session";
 
-export default function DashboardLayout({
+export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  return <DashboardShell>{children}</DashboardShell>;
+  // Cached per request, so the home page's own read of the session shares this one call.
+  const operator = operatorFrom(await getSession());
+  return <DashboardShell operator={operator}>{children}</DashboardShell>;
 }

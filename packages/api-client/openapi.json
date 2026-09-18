@@ -1104,6 +1104,35 @@
         }
       }
     },
+    "/api/dashboard/console": {
+      "get": {
+        "tags": [
+          "Dashboard"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorConsoleDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorConsoleDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorConsoleDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/dashboard/summary": {
       "get": {
         "tags": [
@@ -9041,6 +9070,35 @@
         }
       }
     },
+    "/api/admin/storefront/offers/counts": {
+      "get": {
+        "tags": [
+          "StorefrontOfferAdmin"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorefrontOfferCountsDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorefrontOfferCountsDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorefrontOfferCountsDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/admin/storefront/offers/{offerId}/decision": {
       "post": {
         "tags": [
@@ -10406,6 +10464,71 @@
             "items": {
               "type": "string"
             },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ConsoleInventoryDto": {
+        "type": "object",
+        "properties": {
+          "activeItems": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "capitalDeployed": {
+            "type": "number",
+            "format": "double"
+          },
+          "estimatedResaleValue": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ConsoleMoneyDto": {
+        "type": "object",
+        "properties": {
+          "days": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "from": {
+            "type": "string",
+            "format": "date"
+          },
+          "to": {
+            "type": "string",
+            "format": "date"
+          },
+          "current": {
+            "$ref": "#/components/schemas/ReportKpiDto"
+          },
+          "comparison": {
+            "$ref": "#/components/schemas/ReportComparisonDto"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ConsoleQueueDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "nullable": true
+          },
+          "tier": {
+            "type": "string",
+            "nullable": true
+          },
+          "count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "amount": {
+            "type": "number",
+            "format": "double",
             "nullable": true
           }
         },
@@ -12880,6 +13003,29 @@
           "notes": {
             "type": "string",
             "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "OperatorConsoleDto": {
+        "type": "object",
+        "properties": {
+          "queues": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConsoleQueueDto"
+            },
+            "nullable": true
+          },
+          "inventory": {
+            "$ref": "#/components/schemas/ConsoleInventoryDto"
+          },
+          "money": {
+            "$ref": "#/components/schemas/ConsoleMoneyDto"
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
           }
         },
         "additionalProperties": false
@@ -16777,6 +16923,40 @@
             "format": "int32"
           },
           "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "StorefrontOfferCountsDto": {
+        "type": "object",
+        "properties": {
+          "new": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "countered": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "accepted": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "declined": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "expired": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "converted": {
             "type": "integer",
             "format": "int32"
           },
