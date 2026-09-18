@@ -88,8 +88,17 @@ marketplace**, each implementing up to four capabilities:
 |---|---|---|
 | `scanSales` | every 10 min (5–60 configurable) | Recent sold orders since a cursor — the double-sell guard |
 | `snapshotListings` | every 4 h | Every live listing: id, title, price, quantity, status |
-| `pullReport` | daily | Download the marketplace's **official export** (eBay All-Orders / Active Listings, Depop sales CSV, Poshmark report) through the session and send it to the server's **existing parsers** — full fees, payouts and refunds without a human downloading it |
+| `pullReport` | daily, where one exists | Download the marketplace's **official export** (eBay All-Orders / Active Listings, Depop sales CSV, Poshmark report) through the session and send it to the server's **existing parsers** — full fees, payouts and refunds without a human downloading it. **Not Vinted** — it has none |
+| `backfillSales` | first connection, after gaps | Walk the sold history page by page from a date |
 | `delist` | on command | End a listing because it sold elsewhere |
+
+**Platforms without an official export — Vinted.** Vinted has no seller sales report: the only
+download is a GDPR account-data request that takes days and emails a confirmation each time, which
+is not a sync source. So the Vinted adapter has no `pullReport`; instead its `scanSales` captures the
+**full money detail** of each sale itself (price, shipping, buyer-protection and other fees, payout),
+and a `backfillSales` capability walks the sold history page by page — on first connection, and
+after any gap — so nothing sold while every computer was off is lost. Every adapter implements
+`backfillSales`; for Vinted it is the only route to history.
 
 How an adapter reads a marketplace is decided per platform at build time by inspecting that
 marketplace's own web app in our logged-in browser: its **own JSON endpoints** where they exist
@@ -191,7 +200,7 @@ makes any gap visible rather than silent.
 | Two browsers online | Lease: one scans, one delists |
 | Marketplace changes its site | Adapter fails its self-check → paused, kill switch, hub warning; other platforms unaffected |
 | Marketplace changes its export columns | Signature mismatch — refused loudly, raw file kept for re-run |
-| All computers off | Silent-channel warning; on wake, scans resume from the cursor with no gap |
+| All computers off | Silent-channel warning; on wake, `backfillSales` resumes from the cursor with no gap — the only safety net on Vinted, which has no export |
 | Sale detected, fees unknown yet | Landed as sale; daily report enriches it in place |
 | Wrong marketplace account logged in | Binding check refuses to sync; hub tells the operator |
 | Delist fails (listing already gone, page changed) | Command reports failure → *Needs action*; never retried blindly |
@@ -220,7 +229,8 @@ makes any gap visible rather than silent.
    (`scanSales`, `snapshotListings`).
 3. **Reconciler + commands** — exception model, rules, console wiring; command queue; **delist on
    eBay** in dry-run, then live.
-4. **Depop, Poshmark, Vinted adapters** — scan, snapshot, delist, each shipped in dry-run.
+4. **Depop, Poshmark, Vinted adapters** — scan, snapshot, backfill, delist, each shipped in dry-run.
+   Vinted's scan carries full sale money detail, since no export exists to supply it later.
 5. **Report pulls + money** — agent downloads official exports daily; payouts and fee matching.
 
 Then the sales and reporting overhaul reads from all of it.
@@ -242,6 +252,6 @@ Then the sales and reporting overhaul reads from all of it.
 
 ## 9. Needed from you
 
-- A **Vinted** export (whatever Vinted lets you download) — parsers are built from real files.
 - At build time for each adapter: a session in Chrome logged into that marketplace, so the adapter
-  is written against the real site, not a guess.
+  is written against the real site, not a guess. For Vinted this is the only input — there is no
+  file import for Vinted, by decision.
