@@ -67,16 +67,125 @@ public sealed class CsvTable
         return negative ? -value : value;
     }
 
+    /// <summary>
+    /// Strict money: <c>true</c> with <c>null</c> for a cell that says "nothing" (empty, "N/A", "-",
+    /// "--"), <c>true</c> with the amount for a readable figure, and <c>false</c> for anything else.
+    ///
+    /// <see cref="Money"/> turns an unreadable cell into 0 without a word, which is how a real amount
+    /// can vanish from an import unnoticed. New parsers use this and report the row instead. Excel's
+    /// text-literal form (<c>="$1.50"</c>, <c>="-"</c>), which some exports emit, is unwrapped first.
+    /// </summary>
+    public bool TryMoney(IReadOnlyList<string> row, string column, out decimal? value)
+    {
+        value = null;
+        string text = Unwrap(Text(row, column));
+        if (text.Length == 0 || text is "-" or "--" || text.Equals("N/A", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        bool negative = (text.StartsWith('(') && text.EndsWith(')')) || text.StartsWith('-');
+        string digits = text.Trim('(', ')').TrimStart('-').Replace("$", "").Replace(",", "").Trim();
+        if (!decimal.TryParse(digits, NumberStyles.Number, CultureInfo.InvariantCulture, out decimal amount))
+        {
+            return false;
+        }
+
+        value = negative ? -amount : amount;
+        return true;
+    }
+
+    /// <summary>A cell that says "nothing" in any of the ways exports say it, as <c>null</c>.</summary>
+    public string? Meaningful(IReadOnlyList<string> row, string column)
+    {
+        string text = Unwrap(Text(row, column));
+        return text.Length == 0 || text is "-" or "--" || text.Equals("N/A", StringComparison.OrdinalIgnoreCase)
+            ? null
+            : text;
+    }
+
+    /// <summary>Excel's text-literal form — <c>="value"</c> — reduced to its value.</summary>
+    private static string Unwrap(string text) =>
+        text.StartsWith("=\"", StringComparison.Ordinal) && text.EndsWith('"') && text.Length >= 3
+            ? text[2..^1].Trim()
+            : text;
+
     public int Int(IReadOnlyList<string> row, string column, int fallback = 0) =>
         int.TryParse(Text(row, column), NumberStyles.Integer, CultureInfo.InvariantCulture, out int value) ? value : fallback;
 
-    public DateTimeOffset? Date(IReadOnlyList<string> row, string column)
+    /// <summary>
+    /// A date or date-time, always returned in UTC.
+    ///
+    /// Two things this used to get wrong. eBay prints "Jun-10-26 13:11:11 PDT", which the general
+    /// parser cannot read, so every eBay listing's start and end date was silently dropped. And a
+    /// value that did parse kept its offset, which the database refuses to store — a single dated row
+    /// with an offset failed the whole import. Marketplace formats are now read explicitly, zone
+    /// abbreviation included, and everything is converted to UTC.
+    /// </summary>
+    public DateTimeOffset? Date(IReadOnlyList<string> row, string column) => ParseDate(Text(row, column));
+
+    public static DateTimeOffset? ParseDate(string text)
     {
-        string text = Text(row, column);
+        text = text.Trim();
         if (text.Length == 0) return null;
+        if (MarketplaceDate(text) is DateTimeOffset marketplace) return marketplace;
         return DateTimeOffset.TryParse(text, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var parsed)
-            ? parsed
+            ? parsed.ToUniversalTime()
             : null;
+    }
+
+    /// <summary>US and UK zone abbreviations marketplaces print after a time, as offsets from UTC.</summary>
+    private static readonly Dictionary<string, TimeSpan> ZoneAbbreviations = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["PST"] = TimeSpan.FromHours(-8),
+        ["PDT"] = TimeSpan.FromHours(-7),
+        ["MST"] = TimeSpan.FromHours(-7),
+        ["MDT"] = TimeSpan.FromHours(-6),
+        ["CST"] = TimeSpan.FromHours(-6),
+        ["CDT"] = TimeSpan.FromHours(-5),
+        ["EST"] = TimeSpan.FromHours(-5),
+        ["EDT"] = TimeSpan.FromHours(-4),
+        ["AKST"] = TimeSpan.FromHours(-9),
+        ["AKDT"] = TimeSpan.FromHours(-8),
+        ["HST"] = TimeSpan.FromHours(-10),
+        ["GMT"] = TimeSpan.Zero,
+        ["UTC"] = TimeSpan.Zero,
+        ["BST"] = TimeSpan.FromHours(1),
+        ["CET"] = TimeSpan.FromHours(1),
+        ["CEST"] = TimeSpan.FromHours(2),
+    };
+
+    private static readonly string[] MarketplaceDateFormats = ["MMM-dd-yy", "MMM-d-yy", "MMM-dd-yyyy", "MMM-d-yyyy"];
+    private static readonly string[] MarketplaceTimeFormats = ["H:mm:ss", "H:mm"];
+
+    /// <summary>eBay's "Jun-10-26", "Jun-10-26 13:11:11" and "Jun-10-26 13:11:11 PDT".</summary>
+    private static DateTimeOffset? MarketplaceDate(string text)
+    {
+        string[] parts = text.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length is < 1 or > 3
+            || !DateTime.TryParseExact(parts[0], MarketplaceDateFormats, CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime date))
+        {
+            return null;
+        }
+
+        TimeSpan time = TimeSpan.Zero;
+        if (parts.Length >= 2)
+        {
+            if (!DateTime.TryParseExact(parts[1], MarketplaceTimeFormats, CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime clock))
+            {
+                return null;
+            }
+            time = clock.TimeOfDay;
+        }
+
+        TimeSpan offset = TimeSpan.Zero;
+        if (parts.Length == 3 && !ZoneAbbreviations.TryGetValue(parts[2], out offset))
+        {
+            // An abbreviation we do not know is a time we cannot place; better absent than wrong.
+            return null;
+        }
+
+        return new DateTimeOffset(date.Date + time, offset).ToUniversalTime();
     }
 
     public string? TextOrNull(IReadOnlyList<string> row, string column)

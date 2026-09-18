@@ -50,6 +50,30 @@ public static class EbayReportParser
     private const string AllOrdersOrderNumberHeader = "Order Number";
     private const string AllOrdersItemNumberHeader = "Item Number";
 
+    /// <summary>Which eBay report this is, from its headers alone — without parsing the rows.</summary>
+    public static EbayReportKind DetectKind(string csv)
+    {
+        if (string.IsNullOrWhiteSpace(csv))
+        {
+            return EbayReportKind.Unknown;
+        }
+
+        foreach (List<string> fields in SplitRecords(csv).Take(40).Select(ParseCsvLine))
+        {
+            if (fields.Contains(AllOrdersOrderNumberHeader) && fields.Contains(AllOrdersItemNumberHeader))
+            {
+                return EbayReportKind.AllOrders;
+            }
+
+            if (fields.Contains(ListingSalesTitleHeader) && fields.Contains(ListingSalesItemIdHeader))
+            {
+                return EbayReportKind.ListingSales;
+            }
+        }
+
+        return EbayReportKind.Unknown;
+    }
+
     public static ParseResult ParseReport(string csv)
     {
         if (string.IsNullOrWhiteSpace(csv))

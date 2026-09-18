@@ -131,7 +131,15 @@ public sealed record AutoMatchPreviewOrderDto(Guid PlatformOrderId, string Exter
 public sealed record AutoMatchAppliedDto(int Settled);
 
 /// <param name="AutoReconciled">Orders settled during the import because every line matched exactly — work the operator never has to see.</param>
-public sealed record IngestPlatformOrdersResultDto(int Created, int Updated, int Skipped, int AutoReconciled, IReadOnlyList<PlatformOrderDto> Orders);
+/// <param name="Skipped">Orders the operator marked Not my inventory, left alone.</param>
+/// <param name="Unchanged">Orders re-imported with identical facts: nothing about them changed.</param>
+public sealed record IngestPlatformOrdersResultDto(
+    int Created,
+    int Updated,
+    int Skipped,
+    int AutoReconciled,
+    IReadOnlyList<PlatformOrderDto> Orders,
+    int Unchanged = 0);
 
 /// <summary>Import a marketplace's own CSV export (e.g. eBay Seller Hub → Performance → Sales report) — the
 /// authoritative fee source. Parsed server-side into the same idempotent ingest path as manual JSON.</summary>
@@ -213,7 +221,13 @@ public sealed record PlatformListingDto(
     bool SuggestedInventoryItemAlreadySold,
     DateTimeOffset ScrapedAt);
 
-public sealed record IngestPlatformListingsResultDto(int Created, int Updated, int Skipped, IReadOnlyList<PlatformListingDto> Listings);
+/// <param name="Unchanged">Listings re-imported with identical facts: nothing about them changed.</param>
+public sealed record IngestPlatformListingsResultDto(
+    int Created,
+    int Updated,
+    int Skipped,
+    IReadOnlyList<PlatformListingDto> Listings,
+    int Unchanged = 0);
 
 public sealed record PlatformListingQualitySnapshotDto(
     Guid Id,

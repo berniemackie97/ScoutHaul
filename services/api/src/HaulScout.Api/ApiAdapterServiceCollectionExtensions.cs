@@ -27,6 +27,8 @@ public static class ApiAdapterServiceCollectionExtensions
         services.AddScoped<OrdersWorkflowService>();
         services.AddScoped<BusinessReportService>();
         services.AddScoped<OperatorConsoleService>();
+        services.AddScoped<PlatformListingImportService>();
+        services.AddScoped<ReportImportService>();
         services.AddScoped<SaleRecordingWorkflowService>();
         services.AddScoped<SaleFinancialStateService>();
         services.AddScoped<SaleReturnWorkflowService>();

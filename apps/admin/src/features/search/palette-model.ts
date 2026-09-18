@@ -30,8 +30,9 @@ export const ACTIONS: PaletteCommand[] = [
   { id: "action:record-sale", label: "Record a sale", section: "Actions", href: "/orders/new", keywords: ["sold", "new order", "sell"] },
   { id: "action:bundled-sale", label: "Record a bundled sale", section: "Actions", href: "/orders/bundled", keywords: ["sold together", "multiple items"] },
   { id: "action:record-purchase", label: "Record a purchase", section: "Actions", href: "/purchases", keywords: ["bought", "acquisition", "receipt", "lot"] },
-  { id: "action:import-orders", label: "Import marketplace orders", section: "Actions", href: "/imports/orders", keywords: ["ebay csv", "upload orders", "reconcile"] },
-  { id: "action:import-listings", label: "Import marketplace listings", section: "Actions", href: "/imports/listings", keywords: ["ebay csv", "upload listings"] },
+  { id: "action:import", label: "Import marketplace exports", section: "Actions", href: "/imports", keywords: ["upload", "csv", "ebay report", "depop", "poshmark", "drop file"] },
+  { id: "action:match-orders", label: "Match imported orders", section: "Actions", href: "/imports/orders", keywords: ["reconcile", "record sales", "unmatched"] },
+  { id: "action:match-listings", label: "Match imported listings", section: "Actions", href: "/imports/listings", keywords: ["reconcile", "link listings", "unmatched"] },
 ];
 
 export const NAVIGATION: PaletteCommand[] = navGroups.flatMap((group) =>

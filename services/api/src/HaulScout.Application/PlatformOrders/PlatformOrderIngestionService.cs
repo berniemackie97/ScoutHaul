@@ -64,7 +64,7 @@ public sealed class PlatformOrderIngestionService(
             keys,
             cancellationToken)).ToList();
 
-        int created = 0, updated = 0, skipped = 0;
+        int created = 0, updated = 0, skipped = 0, unchanged = 0;
         List<Guid> touched = [];
         // Orders that stayed reconciled but whose imported figures may have moved; their sales are
         // re-synced after the save so corrected fees land without re-queuing them for a person.
@@ -92,8 +92,28 @@ public sealed class PlatformOrderIngestionService(
             }
             else if (order.Status != PlatformOrderStatus.Ignored)
             {
-                bool wasReconciled = order.Status == PlatformOrderStatus.Reconciled;
+                // An identical re-import changes nothing: no lines rewritten, no re-sync, and it is
+                // counted as unchanged. It used to count as updated and rewrite every line, so an
+                // import history could not say what an export actually changed.
+                string factsBefore = OrderFingerprint(order);
+                string linesBefore = LinesFingerprint(order.Lines.Select(line => new LineFacts(
+                    line.Title, line.UnitPrice, line.Quantity, line.ExternalItemId, line.Sku, line.ShippingCharged, line.TaxCollected,
+                    line.PlatformFees, line.SellerShippingCost, line.NetSales, line.TotalSales, line.FeeBreakdownJson)));
                 ApplyImportedFields(order, input, channelAccountId);
+                string linesAfter = LinesFingerprint(input.Lines.Select(line => new LineFacts(
+                    string.IsNullOrWhiteSpace(line.Title) ? "Untitled item" : line.Title.Trim(), line.UnitPrice,
+                    line.Quantity <= 0 ? 1 : line.Quantity, Text.TrimToNull(line.ExternalItemId), Text.TrimToNull(line.Sku),
+                    line.ShippingCharged, line.TaxCollected, line.PlatformFees, line.SellerShippingCost, line.NetSales,
+                    line.TotalSales, Text.TrimToNull(line.FeeBreakdownJson))));
+
+                if (OrderFingerprint(order) == factsBefore && linesAfter == linesBefore)
+                {
+                    unchanged++;
+                    touched.Add(order.Id);
+                    continue;
+                }
+
+                bool wasReconciled = order.Status == PlatformOrderStatus.Reconciled;
                 ReplaceLines(order, input, preserveExistingMappings: wasReconciled);
 
                 // Re-importing used to demote every reconciled order back into the queue, so a weekly
@@ -152,8 +172,38 @@ public sealed class PlatformOrderIngestionService(
         Dictionary<Guid, (Guid Id, string Title, bool AlreadySold)> suggestions =
             await suggestionService.BuildSuggestionsAsync(refreshed, cancellationToken);
         List<PlatformOrderDto> dtos = refreshed.Select(order => PlatformOrderDtoFactory.ToPlatformOrderDto(order, suggestions)).ToList();
-        return (new IngestPlatformOrdersResultDto(created, updated, skipped, autoReconciled, dtos), null);
+        return (new IngestPlatformOrdersResultDto(created, updated, skipped, autoReconciled, dtos, unchanged), null);
     }
+
+    private sealed record LineFacts(
+        string Title,
+        decimal UnitPrice,
+        int Quantity,
+        string? ExternalItemId,
+        string? Sku,
+        decimal? ShippingCharged,
+        decimal? TaxCollected,
+        decimal? PlatformFees,
+        decimal? SellerShippingCost,
+        decimal? NetSales,
+        decimal? TotalSales,
+        string? FeeBreakdownJson);
+
+    /// <summary>The order-level facts an import sets: everything ApplyImportedFields writes except evidence and timestamps.</summary>
+    private static string OrderFingerprint(PlatformOrder order) => ImportFingerprint.Of(
+        order.ChannelAccountId, order.BuyerName, order.BuyerReference, order.BuyerEmail, order.BuyerNote,
+        order.ShipToName, order.ShipToPhone, order.ShipToLine1, order.ShipToLine2, order.ShipToCity, order.ShipToRegion,
+        order.ShipToPostalCode, order.ShipToCountry, order.OrderedAt, order.PaidAt, order.ShippedAt, order.ItemsSubtotal,
+        order.ShippingCharged, order.TaxCollected, order.FeeTotal, order.SellerShippingCost, order.PayoutAmount, order.Currency,
+        order.TaxRemittedByPlatform, ImportFingerprint.Json(order.FeeBreakdownJson), order.Carrier, order.TrackingNumber);
+
+    /// <summary>Line facts in a stable order, so the same lines compare equal however they were listed.</summary>
+    private static string LinesFingerprint(IEnumerable<LineFacts> lines) =>
+        string.Join((char)0x1E, lines
+            .Select(line => ImportFingerprint.Of(line.Title, line.UnitPrice, line.Quantity, line.ExternalItemId, line.Sku,
+                line.ShippingCharged, line.TaxCollected, line.PlatformFees, line.SellerShippingCost, line.NetSales, line.TotalSales,
+                ImportFingerprint.Json(line.FeeBreakdownJson)))
+            .Order(StringComparer.Ordinal));
 
     private static void ApplyImportedFields(PlatformOrder order, IngestPlatformOrderInput input, Guid? channelAccountId)
     {

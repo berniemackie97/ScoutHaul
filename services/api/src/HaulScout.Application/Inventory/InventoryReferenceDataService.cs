@@ -34,7 +34,7 @@ public sealed class InventoryReferenceDataService(IInventoryReferenceDataStore r
     }
 
     private static string OverrideKey(string? value, string? parent) =>
-        $"{parent?.ToLowerInvariant()}{value?.ToLowerInvariant()}";
+        $"{parent?.ToLowerInvariant()}\u001f{value?.ToLowerInvariant()}";
 
     // Adds an org's custom values for a kind and removes the ones it has disabled. Never mutates the catalog.
     private static InventoryReferenceOptionDto[] ApplyOverrides(

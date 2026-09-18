@@ -13,6 +13,15 @@ public sealed class Organization : EntityBase
     /// </summary>
     public string? StoreDomain { get; set; }
 
+    /// <summary>
+    /// The IANA time zone the business works in. Marketplace exports that print local dates and times
+    /// with no offset — Depop's "Date of sale" and "Time of sale" — are read in this zone, and days
+    /// in reports are bucketed by it. Defaults to US Pacific, where the business is.
+    /// </summary>
+    public string TimeZoneId { get; set; } = DefaultTimeZoneId;
+
+    public const string DefaultTimeZoneId = "America/Los_Angeles";
+
     public ICollection<OrganizationMember> Members { get; set; } = [];
     public ICollection<OrganizationRoleDefinition> Roles { get; set; } = [];
     public ICollection<OrganizationTeam> Teams { get; set; } = [];

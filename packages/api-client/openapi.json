@@ -1174,6 +1174,300 @@
         }
       }
     },
+    "/api/imports/detect": {
+      "post": {
+        "tags": [
+          "Imports"
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "files": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "binary"
+                    }
+                  }
+                }
+              },
+              "encoding": {
+                "files": {
+                  "style": "form"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ReportDetectionDto"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ReportDetectionDto"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ReportDetectionDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/imports": {
+      "post": {
+        "tags": [
+          "Imports"
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "files": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "binary"
+                    }
+                  }
+                }
+              },
+              "encoding": {
+                "files": {
+                  "style": "form"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportResultDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportResultDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportResultDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/imports/queues": {
+      "get": {
+        "tags": [
+          "Imports"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportQueuesDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportQueuesDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportQueuesDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/imports/runs": {
+      "get": {
+        "tags": [
+          "Imports"
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 25
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncRunListDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncRunListDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncRunListDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/imports/runs/{id}": {
+      "get": {
+        "tags": [
+          "Imports"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncRunDetailDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncRunDetailDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncRunDetailDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/imports/runs/{id}/rerun": {
+      "post": {
+        "tags": [
+          "Imports"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncRunDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncRunDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncRunDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/imports/runs/{id}/file": {
+      "get": {
+        "tags": [
+          "Imports"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
     "/api/inventory": {
       "post": {
         "tags": [
@@ -4523,7 +4817,7 @@
         }
       }
     },
-    "/api/platform-listings/import/ebay-csv": {
+    "/api/platform-listings/ingest": {
       "post": {
         "tags": [
           "PlatformListings"
@@ -4532,17 +4826,17 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ImportPlatformListingsCsvRequest"
+                "$ref": "#/components/schemas/IngestPlatformListingsRequest"
               }
             },
             "text/json": {
               "schema": {
-                "$ref": "#/components/schemas/ImportPlatformListingsCsvRequest"
+                "$ref": "#/components/schemas/IngestPlatformListingsRequest"
               }
             },
             "application/*+json": {
               "schema": {
-                "$ref": "#/components/schemas/ImportPlatformListingsCsvRequest"
+                "$ref": "#/components/schemas/IngestPlatformListingsRequest"
               }
             }
           }
@@ -4619,7 +4913,7 @@
         }
       }
     },
-    "/api/platform-listings/ingest": {
+    "/api/platform-listings/import/ebay-csv": {
       "post": {
         "tags": [
           "PlatformListings"
@@ -4628,17 +4922,17 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/IngestPlatformListingsRequest"
+                "$ref": "#/components/schemas/ImportPlatformListingsCsvRequest"
               }
             },
             "text/json": {
               "schema": {
-                "$ref": "#/components/schemas/IngestPlatformListingsRequest"
+                "$ref": "#/components/schemas/ImportPlatformListingsCsvRequest"
               }
             },
             "application/*+json": {
               "schema": {
-                "$ref": "#/components/schemas/IngestPlatformListingsRequest"
+                "$ref": "#/components/schemas/ImportPlatformListingsCsvRequest"
               }
             }
           }
@@ -11236,6 +11530,23 @@
         },
         "additionalProperties": false
       },
+      "ImportFileOutcomeDto": {
+        "type": "object",
+        "properties": {
+          "fileName": {
+            "type": "string",
+            "nullable": true
+          },
+          "run": {
+            "$ref": "#/components/schemas/SyncRunDto"
+          },
+          "problem": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "ImportInventoryPhotoRequest": {
         "type": "object",
         "properties": {
@@ -11366,6 +11677,35 @@
         },
         "additionalProperties": false
       },
+      "ImportQueuesDto": {
+        "type": "object",
+        "properties": {
+          "ordersToMatch": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "listingsToMatch": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ImportResultDto": {
+        "type": "object",
+        "properties": {
+          "files": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ImportFileOutcomeDto"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "IngestPlatformListingInput": {
         "type": "object",
         "properties": {
@@ -11485,6 +11825,10 @@
               "$ref": "#/components/schemas/PlatformListingDto"
             },
             "nullable": true
+          },
+          "unchanged": {
+            "type": "integer",
+            "format": "int32"
           }
         },
         "additionalProperties": false
@@ -11732,6 +12076,10 @@
               "$ref": "#/components/schemas/PlatformOrderDto"
             },
             "nullable": true
+          },
+          "unchanged": {
+            "type": "integer",
+            "format": "int32"
           }
         },
         "additionalProperties": false
@@ -15030,6 +15378,68 @@
         },
         "additionalProperties": false
       },
+      "ReportDetectionDto": {
+        "type": "object",
+        "properties": {
+          "fileName": {
+            "type": "string",
+            "nullable": true
+          },
+          "sizeBytes": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "formatKey": {
+            "type": "string",
+            "nullable": true
+          },
+          "platform": {
+            "type": "string",
+            "nullable": true
+          },
+          "label": {
+            "type": "string",
+            "nullable": true
+          },
+          "records": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "coversFrom": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "coversTo": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "completeSnapshot": {
+            "type": "boolean"
+          },
+          "canImport": {
+            "type": "boolean"
+          },
+          "problem": {
+            "type": "string",
+            "nullable": true
+          },
+          "issues": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SyncRunIssueDto"
+            },
+            "nullable": true
+          },
+          "previouslyImportedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "ReportDimensionDto": {
         "type": "object",
         "properties": {
@@ -17237,6 +17647,162 @@
         },
         "additionalProperties": false
       },
+      "SyncRunDetailDto": {
+        "type": "object",
+        "properties": {
+          "run": {
+            "$ref": "#/components/schemas/SyncRunDto"
+          },
+          "issues": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SyncRunIssueDto"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "SyncRunDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "formatKey": {
+            "type": "string",
+            "nullable": true
+          },
+          "platform": {
+            "type": "string",
+            "nullable": true
+          },
+          "formatLabel": {
+            "type": "string",
+            "nullable": true
+          },
+          "source": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "nullable": true
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "finishedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "created": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "updated": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "unchanged": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "rejected": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "coversFrom": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "coversTo": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "isCompleteSnapshot": {
+            "type": "boolean"
+          },
+          "summary": {
+            "type": "string",
+            "nullable": true
+          },
+          "fileName": {
+            "type": "string",
+            "nullable": true
+          },
+          "issueCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "rerunOfId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "canRerun": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "SyncRunIssueDto": {
+        "type": "object",
+        "properties": {
+          "severity": {
+            "type": "string",
+            "nullable": true
+          },
+          "rowNumber": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "externalReference": {
+            "type": "string",
+            "nullable": true
+          },
+          "message": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "SyncRunListDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SyncRunDto"
+            },
+            "nullable": true
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageCount": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
       "UngroupSalesRequest": {
         "type": "object",
         "properties": {
@@ -18285,6 +18851,9 @@
     },
     {
       "name": "HaulScout.Api, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+    },
+    {
+      "name": "Imports"
     },
     {
       "name": "Inventory"
