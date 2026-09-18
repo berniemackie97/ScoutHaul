@@ -2,76 +2,27 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import {
-  LayoutDashboard,
-  Package,
-  ShoppingCart,
-  Users,
-  Wrench,
-  HandCoins,
-  Handshake,
-  Truck,
-  BarChart3,
-  Settings,
-  ChevronLeft,
-  ChevronRight,
-  LogOut,
-  Package2,
-  ReceiptText,
-  Radio,
-  FileSpreadsheet,
-  X,
-} from "lucide-react";
+import { ChevronLeft, ChevronRight, LogOut, Package2, X } from "lucide-react";
 import { useState } from "react";
 import { cn, Button } from "@overhaul/ui";
+import { CommandPaletteTrigger } from "@/components/search/command-palette-trigger";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
-
-const navGroups = [
-  {
-    label: "Control",
-    items: [
-      { name: "Command Center", href: "/", icon: LayoutDashboard },
-      { name: "Inventory", href: "/inventory", icon: Package },
-    ],
-  },
-  {
-    label: "Commerce",
-    items: [
-      { name: "Orders", href: "/orders", icon: ShoppingCart },
-      { name: "Offers", href: "/offers", icon: Handshake },
-      { name: "Customers", href: "/customers", icon: Users },
-      { name: "Channels", href: "/channels", icon: Radio },
-    ],
-  },
-  {
-    label: "Operations",
-    items: [
-      { name: "Purchases", href: "/purchases", icon: ReceiptText },
-      { name: "Repairs", href: "/repairs", icon: Wrench },
-      { name: "Consignments", href: "/consignments", icon: HandCoins },
-      { name: "Suppliers", href: "/suppliers", icon: Truck },
-    ],
-  },
-  {
-    label: "Data",
-    items: [{ name: "Imports", href: "/imports", icon: FileSpreadsheet }],
-  },
-  {
-    label: "Intelligence",
-    items: [{ name: "Reports", href: "/analytics", icon: BarChart3 }],
-  },
-  {
-    label: "System",
-    items: [{ name: "Settings", href: "/settings", icon: Settings }],
-  },
-];
+import { isActiveHref, navGroups } from "./navigation";
 
 /**
  * Below lg the sidebar is an off-canvas drawer (fixed, slides in over a backdrop, controlled by `mobileOpen`); at lg+
  * it is the in-flow, collapsible rail. `collapsed` is a desktop-only concept — its label-hiding is applied with `lg:`
  * prefixes so the mobile drawer always shows full labels.
  */
-export function Sidebar({ mobileOpen = false, onClose }: { mobileOpen?: boolean; onClose?: () => void }) {
+export function Sidebar({
+  mobileOpen = false,
+  onClose,
+  onOpenSearch,
+}: {
+  mobileOpen?: boolean;
+  onClose?: () => void;
+  onOpenSearch: () => void;
+}) {
   const pathname = usePathname();
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
@@ -130,6 +81,18 @@ export function Sidebar({ mobileOpen = false, onClose }: { mobileOpen?: boolean;
           </Button>
         </div>
 
+        {/* Search — the fastest way to anywhere, so it sits above everything it can reach. */}
+        <div className={cn("shrink-0 px-2 pt-3", collapsed && "lg:flex lg:justify-center")}>
+          {collapsed ? (
+            <>
+              <CommandPaletteTrigger compact onOpen={onOpenSearch} className="hidden lg:flex" />
+              <CommandPaletteTrigger onOpen={onOpenSearch} className="lg:hidden" />
+            </>
+          ) : (
+            <CommandPaletteTrigger onOpen={onOpenSearch} />
+          )}
+        </div>
+
         {/* Nav */}
         <nav className="flex-1 space-y-1 overflow-y-auto px-2 py-4">
           {navGroups.map((group) => (
@@ -143,7 +106,7 @@ export function Sidebar({ mobileOpen = false, onClose }: { mobileOpen?: boolean;
                 {group.label}
               </p>
               {group.items.map((item) => {
-                const isActive = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
+                const isActive = isActiveHref(pathname, item.href);
                 return (
                   <Link
                     key={item.href}

@@ -5571,6 +5571,45 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    q?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SearchResultsDto"];
+                        "application/json": components["schemas"]["SearchResultsDto"];
+                        "text/json": components["schemas"]["SearchResultsDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/session/bootstrap": {
         parameters: {
             query?: never;
@@ -9806,6 +9845,26 @@ export interface components {
             salesTaxOwed?: number;
             /** Format: double */
             totalRefunded?: number;
+        };
+        SearchGroupDto: {
+            kind?: string | null;
+            label?: string | null;
+            hits?: components["schemas"]["SearchHitDto"][] | null;
+            truncated?: boolean;
+        };
+        SearchHitDto: {
+            kind?: string | null;
+            /** Format: uuid */
+            id?: string;
+            label?: string | null;
+            sublabel?: string | null;
+            badge?: string | null;
+        };
+        SearchResultsDto: {
+            query?: string | null;
+            groups?: components["schemas"]["SearchGroupDto"][] | null;
+            /** Format: int32 */
+            totalHits?: number;
         };
         SessionBootstrapDto: {
             user?: components["schemas"]["SessionUserDto"];
