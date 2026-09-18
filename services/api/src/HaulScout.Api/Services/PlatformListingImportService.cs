@@ -76,7 +76,7 @@ public sealed class PlatformListingImportService(HaulScoutDbContext db, ICurrent
             .Where(listing => listing.OrganizationId == currentUser.OrganizationId && keys.Contains(listing.ExternalListingId))
             .ToListAsync(cancellationToken);
 
-        int created = 0, updated = 0, skipped = 0;
+        int created = 0, updated = 0, skipped = 0, unchanged = 0;
         List<Guid> touched = [];
 
         foreach ((IngestPlatformListingInput input, string channel, string externalId) in normalized)
@@ -107,7 +107,7 @@ public sealed class PlatformListingImportService(HaulScoutDbContext db, ICurrent
                 ApplyImportedFields(listing, input, channelAccountId);
                 if (ImportedFingerprint(listing) == before)
                 {
-                    skipped++;
+                    unchanged++;
                 }
                 else
                 {
@@ -125,7 +125,7 @@ public sealed class PlatformListingImportService(HaulScoutDbContext db, ICurrent
             .ToListAsync(cancellationToken);
         Dictionary<Guid, (Guid Id, string Title, bool AlreadySold)> suggestions = await BuildSuggestions(refreshed, cancellationToken);
         List<PlatformListingDto> dtos = refreshed.Select(listing => listing.ToDto(Suggestion(suggestions, listing))).ToList();
-        return AppResult<IngestPlatformListingsResultDto>.Ok(new IngestPlatformListingsResultDto(created, updated, skipped, dtos));
+        return AppResult<IngestPlatformListingsResultDto>.Ok(new IngestPlatformListingsResultDto(created, updated, skipped, dtos, unchanged));
     }
 
     /// <summary>Import eBay's Listing Quality workbook (.xlsx). eBay stores item ids in title hyperlinks, so rows
@@ -324,7 +324,7 @@ public sealed class PlatformListingImportService(HaulScoutDbContext db, ICurrent
     }
 
     /// <summary>The imported facts of a listing, for telling a real refresh from an identical one.</summary>
-    private static string ImportedFingerprint(PlatformListing listing) => string.Join('\u001f',
+    private static string ImportedFingerprint(PlatformListing listing) => ImportFingerprint.Of(
         listing.ChannelAccountId, listing.Title, listing.Price, listing.Quantity, listing.QuantitySold, listing.Currency,
         listing.Status, listing.Format, listing.Sku, listing.CategoryName, listing.Condition, listing.Url,
         listing.PrimaryImageUrl, listing.ListedAt, listing.EndsAt);

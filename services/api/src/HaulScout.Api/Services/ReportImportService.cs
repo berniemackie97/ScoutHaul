@@ -188,8 +188,13 @@ public sealed class ReportImportService(
             return new ImportFileOutcomeDto(file.FileName, null, $"Your role cannot import {Describe(format.Area)}.");
         }
 
-        SyncArtifact artifact = await runs.FindArtifactAsync(organizationId, file.Sha256, cancellationToken)
-            ?? NewArtifact(organizationId, file);
+        // The same bytes are stored once, however many times they are imported.
+        SyncArtifact? artifact = await runs.FindArtifactAsync(organizationId, file.Sha256, cancellationToken);
+        if (artifact is null)
+        {
+            artifact = NewArtifact(organizationId, file);
+            runs.Add(artifact);
+        }
 
         SyncRun run = new()
         {
@@ -288,20 +293,25 @@ public sealed class ReportImportService(
                 return Outcome.Fail(error);
             }
 
-            string summary = Counted(result!.Created, result.Updated, result.Skipped, "order");
+            string summary = Counted(result!.Created, result.Updated, result.Unchanged, "order");
             if (result.AutoReconciled > 0)
             {
                 summary += $" {result.AutoReconciled} recorded as sales automatically.";
             }
 
-            return new Outcome(result.Created, result.Updated, result.Skipped,
+            if (result.Skipped > 0)
+            {
+                summary += $" {result.Skipped} you marked Not my inventory were left alone.";
+            }
+
+            return new Outcome(result.Created, result.Updated, result.Unchanged,
                 summary + await ApplyRefundsAsync(format.Platform, file, issues, cancellationToken));
         }
 
         if (format == ReportFormats.EbayListingSales)
         {
             IngestPlatformOrdersResultDto result = await feeEnrichment.EnrichEbayListingSalesAsync(report.ListingSales, cancellationToken);
-            return new Outcome(result.Created, result.Updated, result.Skipped,
+            return new Outcome(result.Created, result.Updated, result.Unchanged,
                 $"Fees and net sales refreshed on {result.Updated} order{Plural(result.Updated)}."
                 + await ApplyRefundsAsync(format.Platform, file, issues, cancellationToken));
         }
@@ -315,8 +325,8 @@ public sealed class ReportImportService(
                 return Outcome.Fail(result.Message ?? "The listings could not be imported.");
             }
 
-            return new Outcome(result.Value.Created, result.Value.Updated, result.Value.Skipped,
-                Counted(result.Value.Created, result.Value.Updated, result.Value.Skipped, "listing"));
+            return new Outcome(result.Value.Created, result.Value.Updated, result.Value.Unchanged,
+                Counted(result.Value.Created, result.Value.Updated, result.Value.Unchanged, "listing"));
         }
 
         if (format == ReportFormats.EbayListingQuality)
