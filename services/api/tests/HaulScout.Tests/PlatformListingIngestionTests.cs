@@ -42,7 +42,7 @@ public class PlatformListingIngestionTests
     {
         (HaulScoutDbContext db, Guid org, Guid user) = NewContext(nameof(Ingest_creates_then_reingest_updates_in_place));
         await using HaulScoutDbContext _ = db;
-        PlatformListingsController controller = new(db, new StubCurrentUser(org, user));
+        PlatformListingsController controller = new(db, new StubCurrentUser(org, user), new PlatformListingImportService(db, new StubCurrentUser(org, user)));
 
         ActionResult<IngestPlatformListingsResultDto> first = await controller.Ingest(new IngestPlatformListingsRequest("eBay", [Listing("EB-1", "Denim Jacket", 40m)]), CancellationToken.None);
         Assert.Equal(1, first.Value!.Created);
@@ -60,7 +60,7 @@ public class PlatformListingIngestionTests
     {
         (HaulScoutDbContext db, Guid org, Guid user) = NewContext(nameof(Reconcile_create_new_seeds_a_draft_item_and_a_channel_listing));
         await using HaulScoutDbContext _ = db;
-        PlatformListingsController controller = new(db, new StubCurrentUser(org, user));
+        PlatformListingsController controller = new(db, new StubCurrentUser(org, user), new PlatformListingImportService(db, new StubCurrentUser(org, user)));
         await controller.Ingest(new IngestPlatformListingsRequest("eBay", [Listing("EB-2", "Vintage Camera", 120m)]), CancellationToken.None);
         PlatformListing listing = await db.PlatformListings.SingleAsync();
 
@@ -98,7 +98,7 @@ public class PlatformListingIngestionTests
         db.InventoryItems.Add(item);
         await db.SaveChangesAsync();
 
-        PlatformListingsController controller = new(db, new StubCurrentUser(org, user));
+        PlatformListingsController controller = new(db, new StubCurrentUser(org, user), new PlatformListingImportService(db, new StubCurrentUser(org, user)));
 
         // First listing, linked.
         await controller.Ingest(new IngestPlatformListingsRequest("eBay", [Listing("EB-OLD", "Mesh Maxi Dress", 75m)]), CancellationToken.None);
@@ -127,7 +127,7 @@ public class PlatformListingIngestionTests
         InventoryItem item = new() { OrganizationId = org, Title = "My Camera", Status = InventoryStatus.ReadyToList };
         db.InventoryItems.Add(item);
         await db.SaveChangesAsync();
-        PlatformListingsController controller = new(db, new StubCurrentUser(org, user));
+        PlatformListingsController controller = new(db, new StubCurrentUser(org, user), new PlatformListingImportService(db, new StubCurrentUser(org, user)));
         await controller.Ingest(new IngestPlatformListingsRequest("eBay", [Listing("EB-3", "Vintage Camera", 120m)]), CancellationToken.None);
         PlatformListing listing = await db.PlatformListings.SingleAsync();
 
@@ -144,7 +144,7 @@ public class PlatformListingIngestionTests
     {
         (HaulScoutDbContext db, Guid org, Guid user) = NewContext(nameof(Unlink_reverts_to_pending_and_removes_channel_listing_created_by_reconcile));
         await using HaulScoutDbContext _ = db;
-        PlatformListingsController controller = new(db, new StubCurrentUser(org, user));
+        PlatformListingsController controller = new(db, new StubCurrentUser(org, user), new PlatformListingImportService(db, new StubCurrentUser(org, user)));
         await controller.Ingest(new IngestPlatformListingsRequest("eBay", [Listing("EB-UNLINK", "Vintage Camera", 120m)]), CancellationToken.None);
         PlatformListing listing = await db.PlatformListings.SingleAsync();
         await controller.Reconcile(listing.Id, new ReconcilePlatformListingRequest(CreateNewItem: true), CancellationToken.None);
@@ -180,7 +180,7 @@ public class PlatformListingIngestionTests
         });
         await db.SaveChangesAsync();
 
-        PlatformListingsController controller = new(db, new StubCurrentUser(org, user));
+        PlatformListingsController controller = new(db, new StubCurrentUser(org, user), new PlatformListingImportService(db, new StubCurrentUser(org, user)));
         await controller.Ingest(new IngestPlatformListingsRequest("eBay", [Listing("EB-PREEXISTING", "Vintage Camera", 120m)]), CancellationToken.None);
         PlatformListing listing = await db.PlatformListings.SingleAsync();
         await controller.Reconcile(listing.Id, new ReconcilePlatformListingRequest(InventoryItemId: second.Id), CancellationToken.None);
@@ -201,7 +201,7 @@ public class PlatformListingIngestionTests
         InventoryItem second = new() { OrganizationId = org, Title = "Second Camera", Status = InventoryStatus.ReadyToList };
         db.InventoryItems.AddRange(first, second);
         await db.SaveChangesAsync();
-        PlatformListingsController controller = new(db, new StubCurrentUser(org, user));
+        PlatformListingsController controller = new(db, new StubCurrentUser(org, user), new PlatformListingImportService(db, new StubCurrentUser(org, user)));
         await controller.Ingest(new IngestPlatformListingsRequest("eBay", [Listing("EB-RELINK", "Vintage Camera", 120m)]), CancellationToken.None);
         PlatformListing listing = await db.PlatformListings.SingleAsync();
         await controller.Reconcile(listing.Id, new ReconcilePlatformListingRequest(InventoryItemId: first.Id), CancellationToken.None);
@@ -220,7 +220,7 @@ public class PlatformListingIngestionTests
     {
         (HaulScoutDbContext db, Guid org, Guid user) = NewContext(nameof(Reconcile_requires_a_target));
         await using HaulScoutDbContext _ = db;
-        PlatformListingsController controller = new(db, new StubCurrentUser(org, user));
+        PlatformListingsController controller = new(db, new StubCurrentUser(org, user), new PlatformListingImportService(db, new StubCurrentUser(org, user)));
         await controller.Ingest(new IngestPlatformListingsRequest("eBay", [Listing("EB-4", "Thing", 10m)]), CancellationToken.None);
         PlatformListing listing = await db.PlatformListings.SingleAsync();
 
@@ -236,7 +236,7 @@ public class PlatformListingIngestionTests
         InventoryItem item = new() { OrganizationId = org, Title = "Levi's 501 Denim Jacket", Status = InventoryStatus.Sold };
         db.InventoryItems.Add(item);
         await db.SaveChangesAsync();
-        PlatformListingsController controller = new(db, new StubCurrentUser(org, user));
+        PlatformListingsController controller = new(db, new StubCurrentUser(org, user), new PlatformListingImportService(db, new StubCurrentUser(org, user)));
         await controller.Ingest(new IngestPlatformListingsRequest("eBay",
             [Listing("EB-5", "Vintage Levi's 501 Denim Jacket Men's Medium", 65m)]), CancellationToken.None);
 
@@ -251,7 +251,7 @@ public class PlatformListingIngestionTests
     {
         (HaulScoutDbContext db, Guid org, Guid user) = NewContext(nameof(Ignored_listings_refresh_on_reingest_but_stay_ignored_until_restored));
         await using HaulScoutDbContext _ = db;
-        PlatformListingsController controller = new(db, new StubCurrentUser(org, user));
+        PlatformListingsController controller = new(db, new StubCurrentUser(org, user), new PlatformListingImportService(db, new StubCurrentUser(org, user)));
         await controller.Ingest(new IngestPlatformListingsRequest("eBay", [Listing("EB-6", "Thing", 10m)]), CancellationToken.None);
         PlatformListing listing = await db.PlatformListings.SingleAsync();
         await controller.Ignore(listing.Id, CancellationToken.None);

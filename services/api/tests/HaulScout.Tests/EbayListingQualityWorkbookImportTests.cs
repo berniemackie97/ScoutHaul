@@ -71,7 +71,7 @@ public sealed class EbayListingQualityWorkbookImportTests
         });
         await db.SaveChangesAsync();
 
-        PlatformListingsController controller = new(db, new StubCurrentUser(org, user));
+        PlatformListingsController controller = new(db, new StubCurrentUser(org, user), new PlatformListingImportService(db, new StubCurrentUser(org, user)));
         string content = Convert.ToBase64String(BuildListingQualityWorkbook());
 
         ActionResult<ImportPlatformListingQualityResultDto> first = await controller.ImportEbayListingQualityWorkbook(
