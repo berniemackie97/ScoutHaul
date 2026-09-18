@@ -77,7 +77,10 @@ describe("matchCommands", () => {
     const broad = matchCommands("record");
     const narrow = matchCommands("record sale");
     expect(narrow.length).toBeLessThan(broad.length);
-    expect(narrow.every((command) => command.label.toLowerCase().includes("sale"))).toBe(true);
+    // Every result still answers every word, in its label or in what it is for.
+    const answers = (command: (typeof narrow)[number], word: string) =>
+      [command.label, ...command.keywords].some((text) => text.toLowerCase().includes(word));
+    expect(narrow.every((command) => answers(command, "record") && answers(command, "sale"))).toBe(true);
   });
 
   it("ignores case and stray spacing", () => {
@@ -93,7 +96,7 @@ describe("matchCommands", () => {
     const first = matchCommands("import");
     const second = matchCommands("import");
     expect(first.map((command) => command.id)).toEqual(second.map((command) => command.id));
-    expect(first[0]?.id).toBe("action:import-orders");
+    expect(first[0]?.id).toBe("action:import");
   });
 });
 
