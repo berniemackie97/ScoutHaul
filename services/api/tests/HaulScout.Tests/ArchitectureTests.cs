@@ -1,5 +1,9 @@
 using System.Reflection;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc.Routing;
+using HaulScout.Api.Authorization;
 using HaulScout.Api.Controllers;
+using HaulScout.Api.Services;
 using HaulScout.Application.Common;
 using HaulScout.Application.PlatformOrders;
 using HaulScout.Domain.Entities;
@@ -49,6 +53,61 @@ public class ArchitectureTests
         // so the backlog can never silently grow and always documents the real remaining work.
         Assert.Equal(ControllersPendingDePersistence, violating);
     }
+
+    /// <summary>
+    /// Controllers that declare no gate because they resolve the caller inside their own services — each
+    /// for a reason that makes an organization gate wrong. This list may only change deliberately.
+    /// </summary>
+    private static readonly Dictionary<string, string> ControllersGatedInsideTheirServices = new()
+    {
+        ["OrganizationsController"] = "creating or joining an organization is how a user without one gets one",
+        ["SessionController"] = "the session bootstrap has to answer before the user has an organization",
+    };
+
+    /// <summary>
+    /// Every endpoint says who may call it.
+    ///
+    /// The operator's user context is only resolved by the gate attributes. An endpoint without one
+    /// reads an unresolved context — no active organization — and answers every caller as if they
+    /// belonged to none. That is not a hypothetical: search shipped that way and returned no records
+    /// to anyone, while its unit tests passed against a stub that was always resolved.
+    /// </summary>
+    [Fact]
+    public void Every_controller_declares_who_may_call_it()
+    {
+        string[] ungated = ControllerTypes()
+            .Where(type => !IsGated(type))
+            .Select(type => type.Name)
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.Equal(ControllersGatedInsideTheirServices.Keys.OrderBy(name => name, StringComparer.Ordinal), ungated);
+    }
+
+    /// <summary>Gated at the class, or on every endpoint it exposes.</summary>
+    private static bool IsGated(Type controller)
+    {
+        if (DeclaresGate(controller.GetCustomAttributes(inherit: true)))
+        {
+            return true;
+        }
+
+        MethodInfo[] endpoints = controller
+            .GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
+            .Where(method => method.GetCustomAttributes<HttpMethodAttribute>(inherit: true).Any())
+            .ToArray();
+
+        return endpoints.Length > 0 && endpoints.All(method => DeclaresGate(method.GetCustomAttributes(inherit: true)));
+    }
+
+    /// <summary>
+    /// An organization gate, an explicit opt-out, or the shopper's own sign-in. A bare [Authorize] does
+    /// not count: it authenticates the operator without resolving their organization, which is the
+    /// exact state this test exists to rule out.
+    /// </summary>
+    private static bool DeclaresGate(object[] attributes) => attributes.Any(attribute =>
+        attribute is RequireOrganizationPermissionAttribute or RequireOrganizationMemberAttribute or AllowAnonymousAttribute
+        || attribute is AuthorizeAttribute { AuthenticationSchemes: StorefrontAuthDefaults.Scheme });
 
     /// <summary>A controller that has been de-persisted must stay that way.</summary>
     [Theory]
