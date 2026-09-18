@@ -1,152 +1,185 @@
 # Channel sync & reconciliation — design
 
-Status: **proposal, awaiting sign-off.** Supersedes the remaining scope of
-[IMPORT_RECONCILE_REDESIGN.md](IMPORT_RECONCILE_REDESIGN.md), whose matching work shipped in #178–#183.
+Status: **proposal, revision 2, awaiting sign-off.** Revision 1 (eBay API + sale-email capture) was
+rejected: eBay production API keys are not realistically obtainable for this business, and email
+parsing is brittle. This revision uses a **browser-extension sync agent**, the model the established
+reseller tools use. Supersedes the remaining scope of
+[IMPORT_RECONCILE_REDESIGN.md](IMPORT_RECONCILE_REDESIGN.md) (its matching work shipped, #178–#183).
 
 ---
 
 ## 1. What "done" looks like
 
-Every sale, listing, price, fee and payout on every channel the business sells on — eBay, Depop,
-Vinted, Poshmark — lands in HaulScout **without the operator re-typing or re-uploading it on a
-schedule**, is matched to inventory automatically, and is **re-checked on a timer** so the books and
-the stock stay true even on days nobody opens the portal.
+Every sale, listing, price, fee and payout on eBay, Depop, Vinted and Poshmark reaches HaulScout
+**without re-typing or re-uploading**, is matched to inventory automatically, and is re-checked on a
+timer. When an item sells on one channel it is **delisted on the others within minutes**, so it is
+never sold twice.
 
-The operator only ever sees two things:
-
-- **Needs your decision** — a match the computer genuinely cannot make (already built, #179–#180).
-- **Needs action** — something in the world must change: *delist on Depop, it sold on eBay an hour
-  ago*; *eBay has not synced in 26 hours*; *this sale has no cost recorded*.
-
-Principle carried over from #177: **the operator only answers questions the computer cannot.**
+The operator sees only two queues:
+- **Needs your decision** — a match the computer genuinely cannot make (built, #179–#180).
+- **Needs action** — something in the world must change that the system could not do itself.
 
 ---
 
-## 2. What each platform actually allows
+## 2. How existing tools do this
 
-Automation has to live inside each marketplace's rules. The browser extension's compliance model
-(human click only, never unattended — `apps/extension/README.md`) stays; it is **not** a sync source.
+| Tool | Where automation runs | Account connection | Sale detection / auto-delist |
+|---|---|---|---|
+| **Vendoo** | Chrome extension, in the seller's browser | Uses the browser's logged-in marketplace sessions | Scans every **10 min**; computer on + Chrome open required; no mobile. eBay, Poshmark, Depop, Mercari, Whatnot, Vinted, Etsy |
+| **List Perfectly** | Chrome extension | Browser sessions | Scan interval configurable, down to **every 1 min** |
+| **PrimeLister** | Extension, optional cloud | Extension connects automatically once you log in to the marketplace in Chrome; or credentials stored encrypted for cloud | — |
+| **Nifty** | Cloud (their servers) | Extension-assisted connect, or credentials used once to mint a session | Detects within **15 min**, device can be off |
+| **SellerAider** | Extension; "cloud auto-delist" on Pro | — | 11+ marketplaces incl. Vinted |
 
-| Channel | Official API for sellers | Export files | Sale emails | Automation ceiling |
-|---|---|---|---|---|
-| **eBay** | Yes — Fulfillment (orders), Finances (payouts, fees, refunds), Post-Order (returns), Feed / Trading (all active listings)¹ | All-Orders, Active Listings, Listings-Sales (parsers exist) | Yes | **Fully automatic**, scheduled |
-| **Depop** | No public seller API² | Sales history CSV — rich: fees, payout dates, refunds, tax, bundles (sample in `docs/`) | Yes | Sale captured within minutes by email; money reconciled from the CSV |
-| **Vinted** | No public API for standard sellers (Vinted Pro integrations are partner-gated)² | Needs a sample — **none on hand** | Yes | Same as Depop, once the export format is known |
-| **Poshmark** | No public API² | Inventory report (available listings only; sample in `docs/`); sales report to confirm | Yes | Same as Depop |
+What they share:
 
-¹ The Sell Inventory API only sees listings created *through* it, so listings made on ebay.com are
-read via the Feed API's active-inventory report or Trading `GetSellerList`. Finances calls may
-require eBay's digital-signature keys. **Both verified at build time, not assumed.**
-² Checked again at build time; if any platform offers an API to this account, it slots in as a
-connector (§4.1) with no redesign.
+- **Marketplace access is the seller's own logged-in session**, used by the extension. None ask the
+  seller for API keys (the tools that use eBay's official API do so with *their* partner keys).
+- **Two service levels.** Extension-only works while a computer is on. Cloud works 24/7 but holds
+  the seller's marketplace sessions or credentials on the tool's servers.
+- **Where accounts get banned:** engagement automation — auto-sharing, following, bumping, mass
+  offers — and scraping at volume. Crosslisting, sale detection and delisting your own sold items
+  are the accepted use. Vinted tightened duplicate/automation detection in early 2026.
 
-**Consequence:** three ways data arrives, in order of preference — **API pull**, **email capture**,
-**file drop** — and the design treats them as interchangeable sources of the same records.
+Sources: [Vendoo sale detection](https://www.vendoo.co/sale-detection-and-auto-delist) ·
+[Vendoo detection requirements](https://help.vendoo.co/en/articles/8833508-why-aren-t-my-sales-being-detected) ·
+[List Perfectly sales detection](https://listperfectly.com/selling/list-perfectlys-sales-and-order-detection-feature/) ·
+[Nifty auto-delisting](https://docs.nifty.ai/auto-delisting/auto-delisting) ·
+[Nifty connecting Poshmark](https://docs.nifty.ai/connections/connecting-poshmark) ·
+[PrimeLister connections](https://docs.primelister.com/getting-started/connect-marketplace-accounts) ·
+[SellerAider vs Vendoo](https://selleraider.com/crosslist-vs-vendoo/) ·
+[Vinted enforcement 2026](https://www.zipsale.co.uk/blog/how-to-avoid-getting-banned-on-vinted-in-2026)
+
+**Choice: extension agent now, not cloud sessions.** Cloud would mean holding live marketplace
+sessions on a server — a security liability — and logging in from datacenter IPs, which trips the
+marketplaces' fraud checks. The extension runs where the operator already logs in. The
+"computer must be on" limit is solved with an always-on machine (§4.8), not with session custody.
 
 ---
 
 ## 3. Shape
 
 ```
-SOURCES (per ChannelAccount)        LANDING (exists)          ENGINE                     BOOKS
- eBay API connector ──┐
- Email capture ───────┼─► SyncRun ─► PlatformOrder/Line  ─► Matcher (#179) ──────► Sale / Order
- File drop ───────────┘   provenance PlatformListing       Reconciler (new)          ChannelListing
-                          + raw file PlatformPayout (new)    │                       Inventory status
-                                                             └─► Exceptions ─► Console "Needs attention"
-SCHEDULER: per-account interval pulls + nightly reconciliation sweep (runs even with no new data)
+BROWSER (any paired Chrome)                         HAULSCOUT API
+┌─ Sync agent (extension) ──────────────┐           ┌──────────────────────────────────────────┐
+│ Adapters: eBay · Depop · Vinted · Posh │  ingest   │ SyncRun ─► PlatformOrder / PlatformListing│
+│  fast loop  : new sales      (~10 min) │ ────────► │            (landing records, exist)       │
+│  slow loop  : all listings   (~4 h)    │           │ Matcher (#179) ─► Sale / ChannelListing   │
+│  report loop: official exports (daily)│  leases   │ Reconciler ─► exceptions ─► console       │
+│  commands   : delist                   │ ◄──────── │ Command queue (delist) ◄── reconciler      │
+│ Safety governor · account binding      │ commands  │ Nightly sweep · agent health              │
+└────────────────────────────────────────┘           └──────────────────────────────────────────┘
+MANUAL: file drop (same parsers) for backfill and anything the agent cannot reach.
 ```
 
-What exists and is reused unchanged: `PlatformOrder`/`PlatformOrderLine`, `PlatformListing`,
-`ChannelAccount`, `ChannelListing`, the one matching chain (`PlatformLineMatching`, #179),
-auto-settle (#180), and "settled means settled" re-import (#178).
+The rule from the existing extension stays: **the brain is the API, the extension is the hands.**
+Adapters collect and act; matching, money and decisions live server-side where they are tested.
 
 ---
 
 ## 4. Components
 
-### 4.1 Sources
+### 4.1 Sync agent (the extension, rebuilt)
 
-- **Connector** (`IChannelConnector`, one per platform with an API) declares capabilities —
-  `PullOrders`, `PullListings`, `PullFinances` — and pages from a stored cursor ("everything since
-  the last successful pull", with a small overlap window so a late-arriving order is never missed).
-  Only eBay has one at first.
-- **Report format registry.** Every parser declares a **signature** (required header set), its
-  platform, report kind, and version. A dropped file is matched against signatures:
-  one match → parsed; none → "unrecognised export" said plainly (a platform renaming a column must
-  fail loudly, never import garbage); several → the operator picks. Replaces "which card do I use".
-- **Email capture.** One inbound address per organization. The operator adds a single forwarding
-  rule in their mailbox for the platforms' *"you made a sale"* emails. A signed webhook receives
-  them; per-platform parsers turn each into a `PlatformOrder` flagged **provisional** (price, item,
-  buyer — no fees yet). Senders are allow-listed and DKIM-checked; duplicates dropped by
-  `Message-ID`. When the platform's CSV later arrives, the same order is **enriched in place**
-  (fees, payout), not duplicated.
+Manifest V3, TypeScript, bundled and tested — replacing today's plain-JS scaffold. One **adapter per
+marketplace**, each implementing up to four capabilities:
 
-### 4.2 SyncRun — every arrival is accounted for
+| Capability | Default cadence | What it does |
+|---|---|---|
+| `scanSales` | every 10 min (5–60 configurable) | Recent sold orders since a cursor — the double-sell guard |
+| `snapshotListings` | every 4 h | Every live listing: id, title, price, quantity, status |
+| `pullReport` | daily | Download the marketplace's **official export** (eBay All-Orders / Active Listings, Depop sales CSV, Poshmark report) through the session and send it to the server's **existing parsers** — full fees, payouts and refunds without a human downloading it |
+| `delist` | on command | End a listing because it sold elsewhere |
 
-One row per pull, email or file: account, source, report kind, window covered, started/finished,
-status, and counts — **created / updated / unchanged / rejected** — plus per-row issues ("row 41:
-no sale date"). The raw file or payload is kept (compressed, in Postgres like photos) so a parser
-fix can **re-run history** instead of asking for the export again. This is the import history the
-operator has never had, and the audit trail an accountant would ask for.
+How an adapter reads a marketplace is decided per platform at build time by inspecting that
+marketplace's own web app in our logged-in browser: its **own JSON endpoints** where they exist
+(structured, stable enough, cheap), otherwise its **pages** in a background tab. Official exports are
+preferred wherever they exist — they are the formats the platform supports for sellers, and the
+parsers for eBay and Depop are already written and tested.
 
-### 4.3 Landing records
+### 4.2 Pairing — not a pasted token
 
-Upserted by `(account, external id)` with a content hash, so a re-delivered order is "unchanged",
-a changed one is an audited correction, and nothing is ever duplicated. Additions:
+Today the extension takes a pasted API token; a Supabase access token expires within the hour, so
+unattended sync is impossible as built. Instead: **Connect this browser** in the portal shows a
+one-time code → the extension exchanges it for a **device token** scoped to sync only (ingest,
+leases, commands, heartbeat), revocable per device from the portal, rotated automatically.
 
-- `PlatformOrder.IsProvisional` — captured from an email, awaiting financial detail.
-- `PlatformPayout` — a platform deposit and the orders it pays out, so payouts can be tied to the
-  bank later (§7 step 6).
+### 4.3 Account binding
 
-### 4.4 Reconciler — the part that keeps the books true
+Each adapter reads which marketplace account the browser is logged into and binds it to a
+`ChannelAccount`. Logged into a different Depop account than the one bound → the agent **refuses to
+sync it** and says so. A browser signed out of a marketplace → *"Log in to Depop in Chrome"* on
+the hub, instead of silently missing sales.
 
-A set of **rules**, each pure (facts in → exceptions out), run after every SyncRun and again by the
-nightly sweep. An exception **resolves itself** when its condition clears — no one has to close it.
+### 4.4 Leases — several browsers, one sync
 
-| Rule | Detects | Outcome | Tier |
-|---|---|---|---|
-| Unrecorded sale | Platform order not yet turned into a sale | Auto-settle when the match is certain (exists); else *Needs your decision* | attention |
-| **Double-sell risk** | Item sold on one channel, still live on another | *Delist on Depop* with a deep link; on eBay, end the listing via API **only** when the match is certain and the setting is on | attention — minutes matter |
-| Listing drift | Platform says ended/sold, HaulScout says live (or the reverse) | Unambiguous → correct `ChannelListing` + audit entry; conflicting → exception | work |
-| Price drift | Live price differs from HaulScout's price | Platform price is recorded as truth (it is what buyers see); change audited | hygiene |
-| Orphan listing | Live on a platform, matches no inventory | *Needs your decision* (exists as listing matching) | work |
-| Silent channel | Account has not synced within 2× its interval | *eBay has not synced since …* — so silence is never mistaken for no sales | attention |
-| Missing cost | Sale settled with no item cost | Link to the item (profit is wrong until fixed) | hygiene |
-| Payout mismatch *(step 6)* | Orders' net ≠ payout received | Exception with the difference | hygiene |
+The operator may have the extension on a laptop, a desktop and an always-on box. Before each loop
+the agent asks the server for a **lease** on (account, loop); one agent wins, so nothing is scanned
+twice and no listing is ever delisted twice. Leases expire, so a closed laptop hands over cleanly.
 
-Exceptions feed the home console's existing tiers, so "Double-sell risk" appears in **Needs
-attention** the moment it is true.
+### 4.5 Command queue (server → agent)
 
-### 4.5 Scheduler
+Writes are commands, never side effects of a scan:
 
-- **Per account:** interval (default every 4 hours for API connectors, configurable), enabled flag,
-  cursor, last success, consecutive failures.
-- **Nightly sweep** (03:00 in the organization's time zone): re-runs every reconciliation rule over
-  current state — this is what catches the listing that went stale while no data arrived.
-- A hosted background worker claims due work with `FOR UPDATE SKIP LOCKED`, so a second API
-  instance never double-runs a sync. Failures back off exponentially and surface as the *Silent
-  channel* exception rather than a log line nobody reads. **Sync now** on every account.
+- The reconciler creates `Delist(listing, account, because sale S)`.
+- An agent holding the account's lease claims it, executes, reports success or failure.
+- Idempotent by command id; expires if unclaimed; bounded retries; every step audited.
+- **Only certain matches auto-delist** — the listing is linked to the sold item by id through a
+  settled match. Anything less becomes *Needs action* for a human.
+- **Dry-run first:** each platform starts in a mode that records what it *would* delist, until the
+  operator switches it on.
 
-### 4.6 Credentials & security
+### 4.6 Safety governor (in the agent, configured from the server)
 
-- eBay OAuth (authorization-code grant): the operator clicks **Connect eBay**, approves on eBay,
-  and HaulScout stores the refresh token **encrypted** (ASP.NET Data Protection, key from the
-  environment). Never logged, never returned by any endpoint, revocable with **Disconnect**.
-- Inbound email and any platform webhook: signature-verified, sender allow-listed, size-capped.
-- Everything stays organization-scoped and permission-gated like the rest of the API.
+- Per-platform minimum intervals with random jitter, request-rate caps and daily caps.
+- Backs off on 429/403 or any challenge page, pauses that platform after repeated failures, and
+  raises it on the hub.
+- A server-side **kill switch** per platform and per adapter version — a marketplace changes its
+  site, we switch the adapter off remotely until it is fixed.
+- **Never** engagement automation (sharing, following, bumping, offers). Reads only your own
+  account's data. Listing *creation* stays human-reviewed prefill, as today.
 
-### 4.7 UI — one "Channels & sync" hub
+### 4.7 Server side (mostly from revision 1, unchanged)
 
-Replaces today's Imports page:
+- **SyncRun** — every scan, report pull and manual file drop recorded: account, source (agent /
+  file), window, counts (created / updated / unchanged / rejected), row issues, raw payload kept
+  for re-runs.
+- **Report format registry** — parsers declare header signatures; files (agent-pulled or dropped)
+  are detected, never card-picked; unknown formats refused loudly.
+- **Landing upserts** by (account, external id) + content hash — scans, reports and drops of the
+  same fact never duplicate; a scan-detected sale is **enriched in place** when the daily report
+  brings its fees.
+- **Reconciler** — pure rules, run after each ingest and in a nightly sweep, producing
+  self-resolving exceptions into the console:
 
-- **Accounts** — each channel with health (last sync, next sync, status), **Sync now**,
-  **Connect / Disconnect**, and the email-capture address with setup steps.
-- **Drop zone** — drop any exports, several at once; it shows what it detected before committing
-  (*"eBay All-Orders · 143 orders · Jul 1–31"*, *"Depop sales · 58 sales"*), then imports.
-- **History** — every SyncRun with its counts, drill-down to row issues, **re-run** after a fix.
-- **Needs your decision / Needs action** — the exception queues, one place, each showing what the
-  system tried.
+| Rule | Outcome | Tier |
+|---|---|---|
+| Unrecorded sale | Auto-settle when certain (exists), else *Needs your decision* | attention |
+| **Double-sell risk** | `Delist` command (certain match) or *Needs action* | attention |
+| Listing drift (platform ended/sold vs HaulScout live, or reverse) | Correct + audit when unambiguous, else exception | work |
+| Price drift | Platform price recorded as truth, audited | hygiene |
+| Orphan listing (live, no inventory) | *Needs your decision* | work |
+| **Silent channel** (no successful scan in 2× cadence) | *"No browser has synced Depop since 14:10"* | attention |
+| Agent signed out / wrong account | *"Log in to Depop in Chrome"* | attention |
+| Missing cost | Link to item | hygiene |
+| Payout mismatch (build step 5) | Difference shown | hygiene |
+
+### 4.8 Always-on, without cloud sessions
+
+The limit every extension tool has: nothing syncs while every paired computer is asleep. The answer
+here is **an always-on machine** — a small mini-PC or spare laptop running Chrome with the extension,
+logged into the marketplaces, set never to sleep. It is simply one more paired browser; leases make
+it the one that does the work, and the laptop takes over if it drops. The *Silent channel* rule
+makes any gap visible rather than silent.
+
+### 4.9 UI — one "Channels & sync" hub (replaces Imports)
+
+- **Accounts:** per channel — bound marketplace username, last scan per loop, next due, status,
+  dry-run / live toggle, **Sync now**.
+- **Browsers:** paired devices, last heartbeat, which accounts each is logged into; revoke.
+- **Drop zone:** manual files, detect-then-confirm.
+- **History:** every SyncRun, drill into row issues, re-run.
+- **Needs your decision / Needs action** queues, plus the command log (what was delisted, when, why).
 
 ---
 
@@ -154,69 +187,61 @@ Replaces today's Imports page:
 
 | Failure | What happens |
 |---|---|
-| Same data delivered twice (re-import, email + CSV, overlapping pulls) | Upsert by external id + content hash — counted as *unchanged*, never duplicated |
-| Platform changes its export columns | Signature mismatch — refused loudly, file kept for re-run once the parser is updated |
-| A pull fails half-way | Cursor advances only on success; next run resumes; rows already written are idempotent |
-| Platform unreachable for a day | *Silent channel* exception after 2× interval; backlog pulled on recovery |
-| Order arrives by email before the CSV | Provisional order → enriched in place when the CSV lands |
-| Time zones | Stored in UTC with the platform's zone recorded; days bucketed in the organization's zone |
-| Currencies | Stored in the platform's currency; conversion only if an account sells in a second currency (decision below) |
+| Same data from scan, report and drop | Upsert by external id + hash — *unchanged*, never duplicated |
+| Two browsers online | Lease: one scans, one delists |
+| Marketplace changes its site | Adapter fails its self-check → paused, kill switch, hub warning; other platforms unaffected |
+| Marketplace changes its export columns | Signature mismatch — refused loudly, raw file kept for re-run |
+| All computers off | Silent-channel warning; on wake, scans resume from the cursor with no gap |
+| Sale detected, fees unknown yet | Landed as sale; daily report enriches it in place |
+| Wrong marketplace account logged in | Binding check refuses to sync; hub tells the operator |
+| Delist fails (listing already gone, page changed) | Command reports failure → *Needs action*; never retried blindly |
+| False-positive delist | Prevented by design: only id-linked settled matches auto-delist; dry-run before live |
 
 ---
 
-## 6. Data model changes
+## 6. Data model
 
-- **New:** `SyncRun`, `SyncRunIssue`, `SyncArtifact` (raw file/payload), `SyncSchedule` (per
-  account), `ChannelCredential` (encrypted), `ReconciliationException`, `PlatformPayout`.
-- **Changed:** `PlatformOrder` gains `IsProvisional` and `SourceRunId`; `PlatformListing` gains
-  `SourceRunId`; `ChannelAccount` gains the inbound-email token.
-- **Unchanged:** the matching chain, sales, orders, inventory.
+- **New:** `SyncAgent` (paired device + token hash), `SyncLease`, `ChannelCommand`, `SyncRun`,
+  `SyncRunIssue`, `SyncArtifact`, `ReconciliationException`, `PlatformPayout`.
+- **Changed:** `ChannelAccount` gains bound marketplace username, per-loop cadence, dry-run flag,
+  cursors; `PlatformOrder` / `PlatformListing` gain `SourceRunId`.
+- **Unchanged:** matching chain, sales, orders, inventory.
 
 ---
 
 ## 7. Build order — one PR each
 
-1. **Foundation** — `SyncRun` + raw artifacts + format registry with detection; existing eBay
-   parsers move behind it; **Depop sales** and **Poshmark inventory** parsers (samples on hand);
-   the drop zone with detect-then-confirm, and import history.
-2. **Reconciler v1** — exception model, auto-resolve, rules *double-sell risk*, *listing drift*,
-   *silent channel* (plus the existing matching queues), wired into the console.
-3. **Scheduler + eBay connector** — OAuth connect, encrypted credentials, orders + listings pulls
-   on a schedule, **Sync now**, backoff, health on the hub.
-4. **Email capture** — inbound webhook, sale-email parsers for Depop / Vinted / Poshmark,
-   provisional orders, enrichment on CSV arrival.
-5. **Vinted export parser** — as soon as a sample export exists.
-6. **Finances** — eBay Finances API (fees, payouts, refunds), `PlatformPayout`, payout matching.
+1. **Server foundation** — `SyncRun` + raw artifacts + format registry and detection; existing eBay
+   parsers behind it; **Depop sales** and **Poshmark** parsers (samples on hand); drop zone with
+   detect-then-confirm; import history. Useful immediately for manual files, and it is the landing
+   the agent's report pulls use.
+2. **Agent core** — extension rebuilt in TypeScript with tests; pairing and device tokens; leases,
+   heartbeat, safety governor, ingest endpoint; account binding. First adapter: **eBay**
+   (`scanSales`, `snapshotListings`).
+3. **Reconciler + commands** — exception model, rules, console wiring; command queue; **delist on
+   eBay** in dry-run, then live.
+4. **Depop, Poshmark, Vinted adapters** — scan, snapshot, delist, each shipped in dry-run.
+5. **Report pulls + money** — agent downloads official exports daily; payouts and fee matching.
 
-Then the sales & reporting overhaul reads from all of it.
-
-Steps 1–2 remove the manual sorting and make the books self-checking; 3 makes eBay hands-off;
-4 makes the other three near-real-time for the one thing that cannot wait — a sale.
+Then the sales and reporting overhaul reads from all of it.
 
 ---
 
 ## 8. Decisions needed
 
-1. **eBay API.** Build the OAuth integration? It needs a free eBay Developer Program account and a
-   production keyset created by the account owner. *(Recommendation: yes — it is the only channel
-   that can be fully hands-off.)*
-2. **Sync cadence.** Default every 4 hours per API account plus the nightly sweep? *(User asked for
-   "daily or every few hours" — both are settings.)*
-3. **Auto-ending on eBay.** When an item sells elsewhere, end its eBay listing automatically when
-   the match is certain, or always leave it as an action? *(Recommendation: automatic for id/SKU
-   matches, behind a setting defaulting on; title-only matches always ask.)*
-4. **Price truth.** Platform price wins and is recorded, with the change audited?
-   *(Recommendation: yes — it is what buyers actually see.)*
-5. **Inbound email provider.** Resend (already used for outbound) if its receiving feature fits,
-   else Postmark inbound — decided at step 4 after checking both.
-6. **Poshmark** in scope? *(Assumed yes — there is a report on hand.)*
-7. **Raw file retention.** Keep raw exports 13 months (a full year of comparisons)?
-8. **Second currency.** Does any account sell in a currency other than USD (Vinted markets)?
+1. **Extension agent model**, with sync running while a paired computer is on — plus an always-on
+   machine for 24/7? *(Recommendation: yes; a cheap mini-PC is the whole answer to "computer must
+   be on".)*
+2. **Auto-delist.** Live for id-linked matches after each platform's dry-run week? *(Recommended.)*
+3. **Cadence defaults** — sales every 10 min, listings every 4 h, reports daily?
+4. **Distribution** — unlisted Chrome Web Store listing (auto-updates, recommended) or load
+   unpacked (manual updates)?
+5. **Poshmark** in scope? *(Assumed yes.)*
+6. **Vinted** market and currency?
+7. **Raw export retention** — 13 months?
 
 ## 9. Needed from you
 
-- A **Vinted** export (whatever Vinted lets you download for sales) — the parser is built against
-  the real file, never a guessed layout.
-- One **"you made a sale" email** from each of Depop, Vinted and Poshmark (forward as attachment) —
-  for step 4's parsers.
-- A **Poshmark sales report**, if Poshmark offers one beyond the inventory report.
+- A **Vinted** export (whatever Vinted lets you download) — parsers are built from real files.
+- At build time for each adapter: a session in Chrome logged into that marketplace, so the adapter
+  is written against the real site, not a guess.
