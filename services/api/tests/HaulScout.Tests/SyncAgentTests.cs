@@ -143,6 +143,7 @@ public sealed class SyncAgentTests
 
         FakeTimeProvider clock = new(new DateTimeOffset(2026, 9, 18, 20, 0, 0, TimeSpan.Zero));
         SyncAgentOptions syncOptions = new();
+        HashSet<string> grantedSet = granted.Length == 0 ? [HaulScoutPermissions.ManageFinance, HaulScoutPermissions.ManageListings] : [.. granted];
         return new Harness
         {
             Db = db,
@@ -150,10 +151,10 @@ public sealed class SyncAgentTests
             User = user,
             Clock = clock,
             Options = syncOptions,
-            Granted = granted.Length == 0 ? [HaulScoutPermissions.ManageFinance, HaulScoutPermissions.ManageListings] : [.. granted],
+            Granted = grantedSet,
             Ebay = ebay,
             Depop = depop,
-            Hub = new SyncHubService(new EfSyncAgentStore(db), new StubCurrentUser(org, user), clock, Microsoft.Extensions.Options.Options.Create(syncOptions)),
+            Hub = new SyncHubService(new EfSyncAgentStore(db), new StubCurrentUser(org, user), new StubAuthorizer(grantedSet), clock, Microsoft.Extensions.Options.Options.Create(syncOptions)),
         };
     }
 
@@ -521,6 +522,20 @@ public sealed class SyncAgentTests
 
         Assert.Equal(AppErrorCode.SyncNotPermitted, (await harness.StartAsync(agent, SyncLoopKind.Sales)).Code);
         Assert.Equal(AppResultStatus.Ok, (await harness.StartAsync(agent, SyncLoopKind.Listings)).Status);
+    }
+
+    [Fact]
+    public async Task Bringing_in_sales_takes_the_finance_permission()
+    {
+        Harness harness = NewHarness(HaulScoutPermissions.ManageListings);
+        await harness.ReadyAgentAsync();
+
+        RequestScanResultDto result = (await harness.Hub.RequestScanAsync(new RequestScanRequest(SyncScanScope.Everything, harness.Ebay.Id), CancellationToken.None)).Value!;
+        Assert.Equal(SyncLoopKind.Listings, Assert.Single(result.Requests).Loop);
+        Assert.Contains(result.Skipped, skipped => skipped.Reason.Contains("cannot bring in sales"));
+
+        Assert.Equal(AppResultStatus.Validation, (await harness.Hub.UpdateScheduleAsync(harness.Ebay.Id, new UpdateSyncScheduleRequest(10, null), CancellationToken.None)).Status);
+        Assert.Equal(AppResultStatus.Ok, (await harness.Hub.UpdateScheduleAsync(harness.Ebay.Id, new UpdateSyncScheduleRequest(null, 240), CancellationToken.None)).Status);
     }
 
     [Fact]

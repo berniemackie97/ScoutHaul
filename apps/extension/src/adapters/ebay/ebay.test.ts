@@ -32,20 +32,29 @@ const ledger = ledgerPage([
   { type: "PAYOUT", net: "-$2.83", description: ["Payout 123", "$2.83 to bank account ending in 0000"] },
 ]);
 
-function context(routes: Record<string, string | PageResponse>): MarketplaceContext & { requested: string[] } {
+function context(routes: Record<string, string | PageResponse>): MarketplaceContext & { requested: string[]; opened: string[] } {
   const requested: string[] = [];
+  const opened: string[] = [];
+  const serve = (url: string) => {
+    const route = routes[new URL(url).pathname];
+    if (route === undefined) {
+      throw new Error(`No fixture for ${url}`);
+    }
+
+    return Promise.resolve(typeof route === "string" ? { status: 200, url, contentType: "text/html", body: route } : route);
+  };
   return {
     requested,
+    opened,
     now: () => now,
-    async get(url: string) {
+    page(url: string) {
+      opened.push(url);
       requested.push(url);
-      const path = new URL(url).pathname;
-      const route = routes[path];
-      if (route === undefined) {
-        throw new Error(`No fixture for ${url}`);
-      }
-
-      return typeof route === "string" ? { status: 200, url, contentType: "text/html", body: route } : route;
+      return serve(url);
+    },
+    request(url: string) {
+      requested.push(url);
+      return serve(url);
     },
   };
 }
@@ -112,6 +121,8 @@ describe("the eBay adapter", () => {
     expect(scan.coversFrom).toBe("2026-09-04T20:00:00.000Z");
     expect(eBay.requested).toHaveLength(2);
     expect(eBay.requested[1]).toContain(encodeURIComponent("creationDate:(2026-09-03..2026-09-19)"));
+    // Seller pages are opened the way a person would open them, never fetched from script.
+    expect(eBay.opened).toEqual(eBay.requested);
   });
 
   it("reaches back to where the last scan stopped after days with every browser off", () => {
@@ -185,6 +196,7 @@ describe("the eBay adapter", () => {
 
     expect(await kind(challenge)).toBe("Challenge");
     expect(await kind(throttled)).toBe("RateLimited");
-    expect(await kind("<html>a redesigned page</html>")).toBe("SiteChanged");
+    expect(await kind(`<html>${"a redesigned seller page ".repeat(8000)}</html>`)).toBe("SiteChanged");
+    expect(await kind("<html><title>Something went wrong</title></html>")).toBe("Error");
   });
 });

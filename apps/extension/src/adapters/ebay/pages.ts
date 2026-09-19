@@ -40,3 +40,14 @@ export function assertReadable(response: PageResponse): void {
 export function siteChanged(page: string): AdapterError {
   return new AdapterError("SiteChanged", `eBay's ${page} page no longer carries its data where expected.`);
 }
+
+/**
+ * A page without its data. A real Seller Hub page runs to hundreds of kilobytes; a short one is an
+ * error page — a hiccup to try again later — not a redesign to pause the whole marketplace for.
+ * (A page the tab navigated to has no status code to go by in every browser.)
+ */
+export function unreadable(response: PageResponse, page: string): AdapterError {
+  return response.body.length < 100_000
+    ? new AdapterError("Error", `eBay showed an error page instead of the ${page} page.`)
+    : siteChanged(page);
+}

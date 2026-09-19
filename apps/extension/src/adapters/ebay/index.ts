@@ -4,7 +4,7 @@ import type { ListingsSnapshot, MarketplaceAdapter, MarketplaceContext, SalesSca
 import { readLedgerPage, type LedgerOrder } from "./ledger";
 import { readListingsPage } from "./listings";
 import { readOrdersPage, toIngestOrder, type EbayOrderRow } from "./orders";
-import { assertReadable, siteChanged } from "./pages";
+import { assertReadable, siteChanged, unreadable } from "./pages";
 import { isoDay, saleTime } from "./text";
 
 const origin = "https://www.ebay.com";
@@ -48,7 +48,7 @@ export const ebayAdapter: MarketplaceAdapter = {
   signInUrl: "https://signin.ebay.com/",
 
   async detectSession(context: MarketplaceContext): Promise<Session> {
-    const response = await context.get(`${origin}/gh/user_profile?modules=USER_PROFILE&behavior=GET_PROFILE&moduleType=USER_PROFILE&v=2`);
+    const response = await context.request(`${origin}/gh/user_profile?modules=USER_PROFILE&behavior=GET_PROFILE&moduleType=USER_PROFILE&v=2`);
     if (/signin\.ebay\./i.test(response.url) || response.status === 401) {
       return { signedIn: false, username: null, marketplaceUserId: null };
     }
@@ -72,12 +72,12 @@ export const ebayAdapter: MarketplaceAdapter = {
     // Newest first, until the list reaches sales older than the window.
     const rows: EbayOrderRow[] = [];
     for (let offset = 0; ; offset += pageSize) {
-      const response = await context.get(
+      const response = await context.page(
         `${origin}/sh/ord/?offset=${offset}&limit=${pageSize}&filter=status:ALL_ORDERS,timerange:LAST90D&sort=-creationdate`);
       assertReadable(response);
       const page = readOrdersPage(response.body);
       if (!page) {
-        throw siteChanged("orders");
+        throw unreadable(response, "orders");
       }
 
       rows.push(...page.rows);
@@ -93,11 +93,11 @@ export const ebayAdapter: MarketplaceAdapter = {
     const ledger = new Map<string, LedgerOrder>();
     const range = encodeURIComponent(`creationDate:(${isoDay(new Date(from.getTime() - day))}..${isoDay(new Date(now.getTime() + day))})`);
     for (let offset = 0; ; offset += pageSize) {
-      const response = await context.get(`${origin}/mes/transactionlist?sh=true&limit=${pageSize}&offset=${offset}&filter=${range}`);
+      const response = await context.page(`${origin}/mes/transactionlist?sh=true&limit=${pageSize}&offset=${offset}&filter=${range}`);
       assertReadable(response);
       const page = readLedgerPage(response.body);
       if (!page) {
-        throw siteChanged("transactions");
+        throw unreadable(response, "transactions");
       }
 
       for (const [id, entry] of page.byOrder) {
@@ -152,11 +152,11 @@ export const ebayAdapter: MarketplaceAdapter = {
     const issues: RunIssue[] = [];
     let total: number | null = null;
     for (let offset = 0; ; offset += pageSize) {
-      const response = await context.get(`${origin}/sh/lst/active?offset=${offset}&limit=${pageSize}`);
+      const response = await context.page(`${origin}/sh/lst/active?offset=${offset}&limit=${pageSize}`);
       assertReadable(response);
       const page = readListingsPage(response.body);
       if (!page) {
-        throw siteChanged("active listings");
+        throw unreadable(response, "active listings");
       }
 
       const before = listings.size;

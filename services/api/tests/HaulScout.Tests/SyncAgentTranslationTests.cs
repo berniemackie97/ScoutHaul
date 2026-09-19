@@ -25,6 +25,13 @@ public sealed class SyncAgentTranslationTests(PostgresFixture postgres)
         public Task ResolveAsync() => Task.CompletedTask;
     }
 
+    private sealed class EveryPermission : Application.Organizations.IOrganizationAuthorizer
+    {
+        public Task RequirePermission(Guid organizationId, string permission, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task<bool> HasPermission(Guid organizationId, string permission, CancellationToken cancellationToken) => Task.FromResult(true);
+        public Task RequireOwner(Guid organizationId, CancellationToken cancellationToken) => Task.CompletedTask;
+    }
+
     [Fact]
     public async Task Two_browsers_racing_for_a_lease_cannot_both_win()
     {
@@ -117,7 +124,7 @@ public sealed class SyncAgentTranslationTests(PostgresFixture postgres)
             });
             await db.SaveChangesAsync();
 
-            SyncHubService hub = new(new EfSyncAgentStore(db), new StubCurrentUser(org, user), TimeProvider.System, Options.Create(new SyncAgentOptions()));
+            SyncHubService hub = new(new EfSyncAgentStore(db), new StubCurrentUser(org, user), new EveryPermission(), TimeProvider.System, Options.Create(new SyncAgentOptions()));
             RequestScanResultDto requested = (await hub.RequestScanAsync(new RequestScanRequest(SyncScanScope.Sales), CancellationToken.None)).Value!;
             SyncOverviewDto overview = await hub.OverviewAsync(CancellationToken.None);
 

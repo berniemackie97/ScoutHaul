@@ -1,5 +1,6 @@
 using HaulScout.Application.Common;
 using HaulScout.Application.Contracts;
+using HaulScout.Application.Organizations;
 using HaulScout.Application.Security;
 using HaulScout.Domain.Entities;
 using Microsoft.Extensions.Options;
@@ -17,9 +18,16 @@ namespace HaulScout.Application.Sync.Agents;
 public sealed class SyncHubService(
     ISyncAgentStore store,
     ICurrentUserContext currentUser,
+    IOrganizationAuthorizer access,
     TimeProvider clock,
     IOptions<SyncAgentOptions> optionsAccessor)
 {
+    /// <summary>
+    /// Sales bring in money — prices, fees, payouts — so asking for them, or scheduling them, takes
+    /// the finance permission as well as the listings one every sync action needs.
+    /// </summary>
+    private const string SalesNeedFinance = "Your role cannot bring in sales. Ask someone who manages finance.";
+
     /// <summary>Longest schedule the hub accepts: a week.</summary>
     public const int MaxEveryMinutes = 7 * 24 * 60;
 
@@ -79,6 +87,12 @@ public sealed class SyncHubService(
                 return AppResult<SyncOverviewDto>.Validation(
                     $"{platform.Platform} {what} can be scanned every {platform.MinMinutes(loop)} minutes at most often, and at least once a week.");
             }
+        }
+
+        if (request.SalesEveryMinutes != account.SalesScanEveryMinutes
+            && !await access.HasPermission(currentUser.OrganizationId, HaulScoutPermissions.ManageFinance, cancellationToken))
+        {
+            return AppResult<SyncOverviewDto>.Validation(SalesNeedFinance);
         }
 
         account.SalesScanEveryMinutes = request.SalesEveryMinutes;
@@ -212,6 +226,7 @@ public sealed class SyncHubService(
         }
 
         IReadOnlyList<SyncScanRequest> open = await store.ListOpenScanRequestsAsync(organizationId, cancellationToken);
+        bool mayBringInSales = await access.HasPermission(organizationId, HaulScoutPermissions.ManageFinance, cancellationToken);
         List<SyncScanRequest> queued = [];
         List<SkippedScanDto> skipped = [];
         foreach (ChannelAccount account in targets)
@@ -237,6 +252,12 @@ public sealed class SyncHubService(
                 if (SyncRules.Refusal(account, loop, options, extensionVersion: null) is AppResult refusal)
                 {
                     skipped.Add(new SkippedScanDto(account.Id, account.DisplayName, refusal.Message!));
+                    continue;
+                }
+
+                if (loop == SyncLoopKind.Sales && !mayBringInSales)
+                {
+                    skipped.Add(new SkippedScanDto(account.Id, account.DisplayName, SalesNeedFinance));
                     continue;
                 }
 

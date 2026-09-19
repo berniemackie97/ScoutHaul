@@ -28,23 +28,26 @@ export async function hasAccess(adapter: MarketplaceAdapter): Promise<boolean> {
  * counts toward the caps, and refuses outright while the marketplace is paused.
  */
 export function governedContext(tab: MarketplaceTab, platform: string, policy: GovernorPolicy, deps: RunnerDeps): MarketplaceContext {
+  const paced = async <T>(go: () => Promise<T>): Promise<T> => {
+    const states = await governorItem.getValue();
+    const slot = nextSlot(states[platform] ?? initialGovernorState(), policy, deps.now().getTime());
+    if (!slot.allowed) {
+      throw new AdapterError("RateLimited", slot.reason);
+    }
+
+    if (slot.waitMs > 0) {
+      await deps.sleep(slot.waitMs);
+    }
+
+    const latest = await governorItem.getValue();
+    await governorItem.setValue({ ...latest, [platform]: recordRequest(latest[platform] ?? initialGovernorState(), deps.now().getTime()) });
+    return go();
+  };
+
   return {
     now: () => deps.now(),
-    async get(url: string) {
-      const states = await governorItem.getValue();
-      const slot = nextSlot(states[platform] ?? initialGovernorState(), policy, deps.now().getTime());
-      if (!slot.allowed) {
-        throw new AdapterError("RateLimited", slot.reason);
-      }
-
-      if (slot.waitMs > 0) {
-        await deps.sleep(slot.waitMs);
-      }
-
-      const latest = await governorItem.getValue();
-      await governorItem.setValue({ ...latest, [platform]: recordRequest(latest[platform] ?? initialGovernorState(), deps.now().getTime()) });
-      return tab.get(url);
-    },
+    page: (url: string) => paced(() => tab.page(url)),
+    request: (url: string) => paced(() => tab.request(url)),
   };
 }
 

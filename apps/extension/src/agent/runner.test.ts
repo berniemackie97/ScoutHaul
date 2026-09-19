@@ -46,14 +46,12 @@ function harness(routes: Record<string, Route>) {
     sleep: async () => undefined,
     async openTab(workerUrl: string) {
       opened.push(workerUrl);
-      return {
-        get: async (url: string) => {
-          const parsed = new URL(url);
-          const route = routes[parsed.pathname];
-          return route === undefined ? page("", url, 404) : page(typeof route === "string" ? route : route(parsed), url);
-        },
-        close: closed,
+      const serve = async (url: string) => {
+        const parsed = new URL(url);
+        const route = routes[parsed.pathname];
+        return route === undefined ? page("", url, 404) : page(typeof route === "string" ? route : route(parsed), url);
       };
+      return { page: serve, request: serve, close: closed };
     },
   };
   return { api, deps, opened, closed };
@@ -99,7 +97,7 @@ describe("running one piece of work", () => {
   });
 
   it("fails the run with the reason when eBay's page changed, and pauses eBay", async () => {
-    const { api, deps } = harness({ ...signedIn, "/sh/ord/": "<html>redesigned</html>" });
+    const { api, deps } = harness({ ...signedIn, "/sh/ord/": `<html>${"a redesigned seller page ".repeat(8000)}</html>` });
 
     await runWork(sales, heartbeat, deps);
 

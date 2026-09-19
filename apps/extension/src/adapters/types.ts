@@ -9,11 +9,17 @@ export interface PageResponse {
 }
 
 /**
- * How an adapter reaches its marketplace. Each call is one request, made inside a marketplace tab
- * with the site's own cookies, and paced by the safety governor before it goes out.
+ * How an adapter reaches its marketplace, from inside a marketplace tab, with every call paced by the
+ * safety governor.
+ *
+ * A seller page is *opened* — the tab navigates to it the way a person's click would, and the loaded
+ * page is read — because a page fetched from script looks nothing like a person viewing it, and
+ * marketplaces' bot protection notices. Only the small JSON endpoints the site's own pages call are
+ * *requested* from the page.
  */
 export interface MarketplaceContext {
-  get(url: string): Promise<PageResponse>;
+  page(url: string): Promise<PageResponse>;
+  request(url: string): Promise<PageResponse>;
   now(): Date;
 }
 

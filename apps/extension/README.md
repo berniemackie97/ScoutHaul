@@ -31,11 +31,17 @@ Firefox is the first target. The same code builds for Chrome and Edge, and Safar
 | Popup: connect, marketplace access, scan now, activity | `src/popup/` |
 | Portal bridge: tells the HaulScout portal the extension is here and can be woken | `src/entrypoints/portal.content.ts` |
 
-**Why requests run in a marketplace tab.** They run inside a background tab on the marketplace's
+**Why it reads through a marketplace tab.** It reads inside a background tab on the marketplace's
 own site, not from the extension's background. Firefox keeps each site's cookies separate, so a
-background request would not reliably carry your session. A request from the site's own page is the
-site's own request, and that works the same in every browser. The tab opens without taking focus and
-closes when the run ends.
+background request would not reliably carry your session.
+
+**Why pages are opened rather than fetched.** Seller pages are opened in that tab the way a click
+opens them, then read once loaded. A page fetched from script sends different request headers from a
+person viewing it, and marketplaces' bot protection notices. eBay showed its security check to
+exactly that during development. Only the small JSON endpoints the site's own pages call are
+requested from the page.
+
+The tab opens without taking focus and closes when the run ends.
 
 **Pairing** uses a one-time code:
 1. HaulScout shows the code under **Sync → Browsers → Connect a browser**.
