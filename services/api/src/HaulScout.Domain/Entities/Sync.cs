@@ -52,6 +52,19 @@ public sealed class SyncRun : EntityBase, IOrganizationScoped
     /// <summary>Set when this run re-processed an earlier run's file.</summary>
     public Guid? RerunOfId { get; set; }
 
+    /// <summary>The paired browser that ran it, for agent runs.</summary>
+    public Guid? SyncAgentId { get; set; }
+    public SyncAgent? SyncAgent { get; set; }
+
+    /// <summary>Which loop an agent run was — sales or listings. Null for files.</summary>
+    public SyncLoopKind? Loop { get; set; }
+
+    /// <summary>Why an agent run happened. Null for files.</summary>
+    public SyncTrigger? Trigger { get; set; }
+
+    /// <summary>The scan request an agent run answered, when a person asked for it.</summary>
+    public Guid? ScanRequestId { get; set; }
+
     public ICollection<SyncRunIssue> Issues { get; set; } = [];
 }
 

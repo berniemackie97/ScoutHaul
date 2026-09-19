@@ -2,12 +2,14 @@ using HaulScout.Infrastructure.Orders;
 using HaulScout.Infrastructure.Storefront;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens;
 using HaulScout.Api;
+using HaulScout.Api.Authentication;
 using HaulScout.Api.Configuration;
 using HaulScout.Api.Middleware;
 using HaulScout.Api.Services;
@@ -59,7 +61,9 @@ builder.Services
     .AddJwtBearer(
         StorefrontAuthDefaults.Scheme,
         options => SupabaseBearerConfiguration.Configure(
-            options, storefrontSupabaseAuth, storefrontSigningKeyResolver));
+            options, storefrontSupabaseAuth, storefrontSigningKeyResolver))
+    // Paired browsers (the sync extension) authenticate with a device token, never a person's session.
+    .AddScheme<AuthenticationSchemeOptions, SyncAgentAuthenticationHandler>(SyncAgentAuthDefaults.Scheme, configureOptions: null);
 
 builder.Services.AddApiAdapters(builder.Configuration);
 builder.Services.AddAuthorization(options =>
@@ -73,6 +77,17 @@ builder.Services.AddAuthorization(options =>
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    // Pairing is the one anonymous sync endpoint, and a pairing code is short enough to type, so
+    // guesses are held to a handful a minute per address.
+    options.AddPolicy(SyncAgentAuthDefaults.PairingRateLimitPolicy, context => RateLimitPartition.GetFixedWindowLimiter(
+        partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "anonymous",
+        factory: _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 10,
+            Window = TimeSpan.FromMinutes(1),
+            QueueLimit = 0,
+        }));
 
     options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
     {
@@ -207,3 +222,6 @@ app.UseMiddleware<IdempotencyMiddleware>();
 app.MapHealthChecks("/health").AllowAnonymous();
 app.MapControllers();
 app.Run();
+
+/// <summary>Visible to the HTTP tests, which host the real pipeline in memory.</summary>
+public partial class Program;

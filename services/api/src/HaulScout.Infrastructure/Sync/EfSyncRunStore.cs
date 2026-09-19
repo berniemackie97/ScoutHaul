@@ -27,7 +27,9 @@ public sealed class EfSyncRunStore(HaulScoutDbContext db) : ISyncRunStore
         db.SyncArtifacts.SingleOrDefaultAsync(artifact => artifact.OrganizationId == organizationId && artifact.Id == artifactId, cancellationToken);
 
     public Task<SyncRun?> FindRunAsync(Guid organizationId, Guid runId, CancellationToken cancellationToken) =>
-        db.SyncRuns.SingleOrDefaultAsync(run => run.OrganizationId == organizationId && run.Id == runId, cancellationToken);
+        db.SyncRuns
+            .Include(run => run.SyncAgent)
+            .SingleOrDefaultAsync(run => run.OrganizationId == organizationId && run.Id == runId, cancellationToken);
 
     public async Task<IReadOnlyList<SyncRunIssue>> ListIssuesAsync(Guid organizationId, Guid runId, CancellationToken cancellationToken) =>
         await db.SyncRunIssues
@@ -36,10 +38,23 @@ public sealed class EfSyncRunStore(HaulScoutDbContext db) : ISyncRunStore
             .ThenBy(issue => issue.CreatedAt)
             .ToListAsync(cancellationToken);
 
-    public async Task<(IReadOnlyList<SyncRunRow> Rows, int Total)> ListRunsAsync(
-        Guid organizationId, int skip, int take, CancellationToken cancellationToken)
+    public async Task<(IReadOnlyList<SyncRunRow> Rows, int Total, int QuietHidden)> ListRunsAsync(
+        Guid organizationId, int skip, int take, bool includeQuiet, CancellationToken cancellationToken)
     {
         IQueryable<SyncRun> runs = db.SyncRuns.Where(run => run.OrganizationId == organizationId);
+        // Quiet: a scan that succeeded without creating, changing or rejecting anything.
+        IQueryable<SyncRun> quiet = runs.Where(run => run.Source == SyncSource.Agent
+            && run.Status == SyncRunStatus.Succeeded
+            && run.Created == 0 && run.Updated == 0 && run.Rejected == 0);
+        int quietHidden = 0;
+        if (!includeQuiet)
+        {
+            quietHidden = await quiet.CountAsync(cancellationToken);
+            runs = runs.Where(run => !(run.Source == SyncSource.Agent
+                && run.Status == SyncRunStatus.Succeeded
+                && run.Created == 0 && run.Updated == 0 && run.Rejected == 0));
+        }
+
         int total = await runs.CountAsync(cancellationToken);
         var rows = await runs
             .OrderByDescending(run => run.StartedAt)
@@ -50,10 +65,11 @@ public sealed class EfSyncRunStore(HaulScoutDbContext db) : ISyncRunStore
                 Run = run,
                 FileName = run.Artifact == null ? null : run.Artifact.FileName,
                 IssueCount = run.Issues.Count,
+                AgentName = run.SyncAgent == null ? null : run.SyncAgent.Name,
             })
             .ToListAsync(cancellationToken);
 
-        return (rows.Select(row => new SyncRunRow(row.Run, row.FileName, row.IssueCount)).ToList(), total);
+        return (rows.Select(row => new SyncRunRow(row.Run, row.FileName, row.IssueCount, row.AgentName)).ToList(), total, quietHidden);
     }
 
     public async Task<Guid?> SoleAccountAsync(Guid organizationId, string platform, CancellationToken cancellationToken)

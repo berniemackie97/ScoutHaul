@@ -9,6 +9,7 @@ using HaulScout.Application.Sales;
 using HaulScout.Application.Sessions;
 using HaulScout.Application.Services;
 using HaulScout.Application.Storefront;
+using HaulScout.Application.Sync.Agents;
 
 namespace HaulScout.Application;
 
@@ -53,6 +54,8 @@ public static class DependencyInjection
         services.AddScoped<SalesChannelWorkflowService>();
         services.AddScoped<SessionBootstrapService>();
         services.AddScoped<StoreSettingsWorkflowService>();
+        services.AddScoped<SyncAgentService>();
+        services.AddScoped<SyncHubService>();
         services.AddSingleton<IMarketplaceSearchLinkGenerator, MarketplaceSearchLinkGenerator>();
 
         return services;

@@ -44,11 +44,15 @@ public sealed record SyncRunDto(
     string? FileName,
     int IssueCount,
     Guid? RerunOfId,
-    bool CanRerun);
+    bool CanRerun,
+    string? Loop = null,
+    string? Trigger = null,
+    string? AgentName = null);
 
 public sealed record SyncRunDetailDto(SyncRunDto Run, IReadOnlyList<SyncRunIssueDto> Issues);
 
-public sealed record SyncRunListDto(IReadOnlyList<SyncRunDto> Items, int Total, int Page, int PageSize, int PageCount);
+/// <param name="QuietHidden">Scans that changed nothing, left out of this list; zero when they were asked for.</param>
+public sealed record SyncRunListDto(IReadOnlyList<SyncRunDto> Items, int Total, int Page, int PageSize, int PageCount, int QuietHidden = 0);
 
 /// <summary>One file's outcome: the run it produced, or why none was.</summary>
 public sealed record ImportFileOutcomeDto(string FileName, SyncRunDto? Run, string? Problem);

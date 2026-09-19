@@ -1154,6 +1154,7 @@ export interface paths {
                 query?: {
                     page?: number;
                     pageSize?: number;
+                    quiet?: boolean;
                 };
                 header?: never;
                 path?: never;
@@ -7859,6 +7860,638 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/sync/overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SyncOverviewDto"];
+                        "application/json": components["schemas"]["SyncOverviewDto"];
+                        "text/json": components["schemas"]["SyncOverviewDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sync/accounts/{accountId}/schedule": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    accountId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["UpdateSyncScheduleRequest"];
+                    "text/json": components["schemas"]["UpdateSyncScheduleRequest"];
+                    "application/*+json": components["schemas"]["UpdateSyncScheduleRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SyncOverviewDto"];
+                        "application/json": components["schemas"]["SyncOverviewDto"];
+                        "text/json": components["schemas"]["SyncOverviewDto"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sync/accounts/{accountId}/binding": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    accountId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["BindSyncAccountRequest"];
+                    "text/json": components["schemas"]["BindSyncAccountRequest"];
+                    "application/*+json": components["schemas"]["BindSyncAccountRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SyncOverviewDto"];
+                        "application/json": components["schemas"]["SyncOverviewDto"];
+                        "text/json": components["schemas"]["SyncOverviewDto"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    accountId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SyncOverviewDto"];
+                        "application/json": components["schemas"]["SyncOverviewDto"];
+                        "text/json": components["schemas"]["SyncOverviewDto"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sync/scans": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["RequestScanRequest"];
+                    "text/json": components["schemas"]["RequestScanRequest"];
+                    "application/*+json": components["schemas"]["RequestScanRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["RequestScanResultDto"];
+                        "application/json": components["schemas"]["RequestScanResultDto"];
+                        "text/json": components["schemas"]["RequestScanResultDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sync/scans/{requestId}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    requestId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sync/agents/{agentId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    agentId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    agentId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["RenameSyncAgentRequest"];
+                    "text/json": components["schemas"]["RenameSyncAgentRequest"];
+                    "application/*+json": components["schemas"]["RenameSyncAgentRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SyncAgentDto"];
+                        "application/json": components["schemas"]["SyncAgentDto"];
+                        "text/json": components["schemas"]["SyncAgentDto"];
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/api/sync/pairings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["CreateSyncPairingResultDto"];
+                        "application/json": components["schemas"]["CreateSyncPairingResultDto"];
+                        "text/json": components["schemas"]["CreateSyncPairingResultDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sync/pairings/{pairingId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    pairingId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SyncPairingDto"];
+                        "application/json": components["schemas"]["SyncPairingDto"];
+                        "text/json": components["schemas"]["SyncPairingDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sync/agent/pair": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["PairAgentRequest"];
+                    "text/json": components["schemas"]["PairAgentRequest"];
+                    "application/*+json": components["schemas"]["PairAgentRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["PairAgentResultDto"];
+                        "application/json": components["schemas"]["PairAgentResultDto"];
+                        "text/json": components["schemas"]["PairAgentResultDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sync/agent/heartbeat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["AgentHeartbeatRequest"];
+                    "text/json": components["schemas"]["AgentHeartbeatRequest"];
+                    "application/*+json": components["schemas"]["AgentHeartbeatRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["AgentHeartbeatDto"];
+                        "application/json": components["schemas"]["AgentHeartbeatDto"];
+                        "text/json": components["schemas"]["AgentHeartbeatDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sync/agent/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["StartAgentRunRequest"];
+                    "text/json": components["schemas"]["StartAgentRunRequest"];
+                    "application/*+json": components["schemas"]["StartAgentRunRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["AgentRunDto"];
+                        "application/json": components["schemas"]["AgentRunDto"];
+                        "text/json": components["schemas"]["AgentRunDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sync/agent/runs/{runId}/batches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    runId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["AgentRunBatchRequest"];
+                    "text/json": components["schemas"]["AgentRunBatchRequest"];
+                    "application/*+json": components["schemas"]["AgentRunBatchRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["AgentRunBatchResultDto"];
+                        "application/json": components["schemas"]["AgentRunBatchResultDto"];
+                        "text/json": components["schemas"]["AgentRunBatchResultDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sync/agent/runs/{runId}/complete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    runId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["CompleteAgentRunRequest"];
+                    "text/json": components["schemas"]["CompleteAgentRunRequest"];
+                    "application/*+json": components["schemas"]["CompleteAgentRunRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SyncRunDto"];
+                        "application/json": components["schemas"]["SyncRunDto"];
+                        "text/json": components["schemas"]["SyncRunDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sync/agent/runs/{runId}/fail": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    runId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["FailAgentRunRequest"];
+                    "text/json": components["schemas"]["FailAgentRunRequest"];
+                    "application/*+json": components["schemas"]["FailAgentRunRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SyncRunDto"];
+                        "application/json": components["schemas"]["SyncRunDto"];
+                        "text/json": components["schemas"]["SyncRunDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/tasks": {
         parameters: {
             query?: never;
@@ -8217,6 +8850,101 @@ export interface components {
             /** Format: uuid */
             roleId?: string | null;
         };
+        AgentAccountDto: {
+            /** Format: uuid */
+            channelAccountId?: string;
+            platform?: string | null;
+            displayName?: string | null;
+            boundUsername?: string | null;
+            /** Format: int32 */
+            salesEveryMinutes?: number | null;
+            /** Format: int32 */
+            listingsEveryMinutes?: number | null;
+        };
+        AgentHeartbeatDto: {
+            /** Format: uuid */
+            agentId?: string;
+            agentName?: string | null;
+            organizationName?: string | null;
+            /** Format: int32 */
+            heartbeatSeconds?: number;
+            platforms?: components["schemas"]["AgentPlatformPolicyDto"][] | null;
+            accounts?: components["schemas"]["AgentAccountDto"][] | null;
+            work?: components["schemas"]["AgentWorkDto"][] | null;
+            /** Format: date-time */
+            serverTime?: string;
+            newToken?: string | null;
+        };
+        AgentHeartbeatRequest: {
+            extensionVersion?: string | null;
+            browser?: string | null;
+            marketplaces?: components["schemas"]["AgentMarketplaceReport"][] | null;
+            operatingSystem?: string | null;
+        };
+        AgentMarketplaceReport: {
+            platform?: string | null;
+            accessGranted?: boolean;
+            signedIn?: boolean | null;
+            username?: string | null;
+            marketplaceUserId?: string | null;
+            /** Format: date-time */
+            pausedUntil?: string | null;
+            pauseReason?: string | null;
+        };
+        AgentPlatformPolicyDto: {
+            platform?: string | null;
+            enabled?: boolean;
+            disabledReason?: string | null;
+            loops?: components["schemas"]["SyncLoopKind"][] | null;
+            /** Format: int32 */
+            minSecondsBetweenRequests?: number;
+            /** Format: int32 */
+            maxRequestsPerMinute?: number;
+            /** Format: int32 */
+            maxRequestsPerDay?: number;
+            /** Format: int32 */
+            historyDays?: number;
+        };
+        AgentRunBatchRequest: {
+            orders?: components["schemas"]["IngestPlatformOrderInput"][] | null;
+            listings?: components["schemas"]["IngestPlatformListingInput"][] | null;
+            issues?: components["schemas"]["AgentRunIssueInput"][] | null;
+        };
+        AgentRunBatchResultDto: {
+            /** Format: int32 */
+            created?: number;
+            /** Format: int32 */
+            updated?: number;
+            /** Format: int32 */
+            unchanged?: number;
+            /** Format: date-time */
+            leaseExpiresAt?: string;
+        };
+        AgentRunDto: {
+            /** Format: uuid */
+            runId?: string;
+            /** Format: date-time */
+            leaseExpiresAt?: string;
+            cursor?: string | null;
+            /** Format: date-time */
+            from?: string | null;
+        };
+        AgentRunIssueInput: {
+            message?: string | null;
+            externalReference?: string | null;
+            rejected?: boolean;
+        };
+        AgentWorkDto: {
+            /** Format: uuid */
+            channelAccountId?: string;
+            platform?: string | null;
+            loop?: components["schemas"]["SyncLoopKind"];
+            trigger?: components["schemas"]["SyncTrigger"];
+            /** Format: uuid */
+            scanRequestId?: string | null;
+            /** Format: date-time */
+            from?: string | null;
+        };
         AssignTaskRequest: {
             /** Format: uuid */
             assignedToUserId?: string | null;
@@ -8239,6 +8967,10 @@ export interface components {
             platform?: string | null;
             /** Format: int32 */
             lineCount?: number;
+        };
+        BindSyncAccountRequest: {
+            username?: string | null;
+            marketplaceUserId?: string | null;
         };
         BudgetDto: {
             /** Format: uuid */
@@ -8387,6 +9119,14 @@ export interface components {
         };
         /** @enum {string} */
         ChannelListingStatus: "NotListed" | "Draft" | "Active" | "Sold" | "PendingDelist" | "Delisted" | "Error";
+        CompleteAgentRunRequest: {
+            cursor?: string | null;
+            /** Format: date-time */
+            coversFrom?: string | null;
+            /** Format: date-time */
+            coversTo?: string | null;
+            completeSnapshot?: boolean;
+        };
         CompleteSourcingStopRequest: {
             force?: boolean;
         };
@@ -8486,6 +9226,13 @@ export interface components {
             /** Format: uuid */
             assignedToUserId?: string | null;
             notes?: string | null;
+        };
+        CreateSyncPairingResultDto: {
+            /** Format: uuid */
+            pairingId?: string;
+            code?: string | null;
+            /** Format: date-time */
+            expiresAt?: string;
         };
         CreateTaskRequest: {
             /** Format: uuid */
@@ -8623,6 +9370,10 @@ export interface components {
             /** Format: date-time */
             occurredAt?: string;
         };
+        FailAgentRunRequest: {
+            kind?: components["schemas"]["SyncFailureKind"];
+            message?: string | null;
+        };
         /** @enum {string} */
         FulfillmentStatus: "Unfulfilled" | "Partial" | "Fulfilled";
         GenerateListingRequest: {
@@ -8759,7 +9510,7 @@ export interface components {
             /** Format: double */
             taxCollected?: number;
             /** Format: double */
-            feeTotal?: number;
+            feeTotal?: number | null;
             lines?: components["schemas"]["IngestPlatformOrderLineInput"][] | null;
             platform?: string | null;
             /** Format: double */
@@ -8788,6 +9539,7 @@ export interface components {
             shippedAt?: string | null;
             feeBreakdownJson?: string | null;
             rawJson?: string | null;
+            feesPending?: boolean;
         };
         IngestPlatformOrderLineInput: {
             title?: string | null;
@@ -9483,6 +10235,20 @@ export interface components {
             /** Format: date-time */
             joinedAt?: string;
         };
+        PairAgentRequest: {
+            code?: string | null;
+            browser?: string | null;
+            extensionVersion?: string | null;
+            operatingSystem?: string | null;
+            name?: string | null;
+        };
+        PairAgentResultDto: {
+            /** Format: uuid */
+            agentId?: string;
+            agentName?: string | null;
+            token?: string | null;
+            organizationName?: string | null;
+        };
         /** @enum {string} */
         PaymentStatus: "Pending" | "Paid" | "PartiallyRefunded" | "Refunded" | "Failed";
         PermissionCatalogDto: {
@@ -9637,6 +10403,7 @@ export interface components {
             /** Format: date-time */
             scrapedAt?: string;
             lines?: components["schemas"]["PlatformOrderLineDto"][] | null;
+            feesPending?: boolean;
         };
         PlatformOrderLineDto: {
             /** Format: uuid */
@@ -9898,6 +10665,9 @@ export interface components {
         RejectReturnRequest: {
             reason?: string | null;
         };
+        RenameSyncAgentRequest: {
+            name?: string | null;
+        };
         ReorderSourcingTripStopsRequest: {
             stopIds?: string[] | null;
         };
@@ -10034,6 +10804,18 @@ export interface components {
             inventorySpend?: number;
             /** Format: int32 */
             salesCount?: number;
+        };
+        RequestScanRequest: {
+            scope?: components["schemas"]["SyncScanScope"];
+            /** Format: uuid */
+            channelAccountId?: string | null;
+            platform?: string | null;
+            /** Format: date-time */
+            from?: string | null;
+        };
+        RequestScanResultDto: {
+            requests?: components["schemas"]["SyncScanRequestDto"][] | null;
+            skipped?: components["schemas"]["SkippedScanDto"][] | null;
         };
         ResaleComp: {
             /** Format: double */
@@ -10319,6 +11101,12 @@ export interface components {
         SkipSourcingStopRequest: {
             reason?: string | null;
         };
+        SkippedScanDto: {
+            /** Format: uuid */
+            channelAccountId?: string;
+            accountName?: string | null;
+            reason?: string | null;
+        };
         SourcingRouteDetailDto: {
             trip?: components["schemas"]["SourcingTripDto"];
             summary?: components["schemas"]["SourcingTripSummaryDto"];
@@ -10443,6 +11231,16 @@ export interface components {
             /** Format: int32 */
             scheduleVarianceMinutes?: number;
             status?: components["schemas"]["SourcingRouteStatus"];
+        };
+        StartAgentRunRequest: {
+            /** Format: uuid */
+            channelAccountId?: string;
+            loop?: components["schemas"]["SyncLoopKind"];
+            trigger?: components["schemas"]["SyncTrigger"];
+            signedInAs?: string | null;
+            /** Format: uuid */
+            scanRequestId?: string | null;
+            marketplaceUserId?: string | null;
         };
         StoreCategoryDto: {
             /** Format: uuid */
@@ -10746,6 +11544,104 @@ export interface components {
             /** Format: int32 */
             attributedSuppliers?: number;
         };
+        SyncAccountDto: {
+            /** Format: uuid */
+            channelAccountId?: string;
+            platform?: string | null;
+            displayName?: string | null;
+            supported?: boolean;
+            supportedLoops?: components["schemas"]["SyncLoopKind"][] | null;
+            supportsHistory?: boolean;
+            boundUsername?: string | null;
+            /** Format: date-time */
+            boundAt?: string | null;
+            health?: components["schemas"]["SyncAccountHealth"];
+            healthMessage?: string | null;
+            loops?: components["schemas"]["SyncLoopDto"][] | null;
+            sessions?: components["schemas"]["SyncSessionSeenDto"][] | null;
+        };
+        /** @enum {string} */
+        SyncAccountHealth: "Ready" | "NotBound" | "NoBrowser" | "Paused" | "Disabled" | "Unsupported";
+        SyncAgentDto: {
+            /** Format: uuid */
+            id?: string;
+            name?: string | null;
+            browser?: string | null;
+            operatingSystem?: string | null;
+            extensionVersion?: string | null;
+            /** Format: date-time */
+            pairedAt?: string;
+            pairedBy?: string | null;
+            /** Format: date-time */
+            lastSeenAt?: string | null;
+            online?: boolean;
+            revoked?: boolean;
+            marketplaces?: components["schemas"]["SyncAgentMarketplaceDto"][] | null;
+        };
+        SyncAgentMarketplaceDto: {
+            platform?: string | null;
+            accessGranted?: boolean;
+            signedIn?: boolean | null;
+            username?: string | null;
+            /** Format: date-time */
+            pausedUntil?: string | null;
+            pauseReason?: string | null;
+            /** Format: date-time */
+            observedAt?: string;
+        };
+        /** @enum {string} */
+        SyncFailureKind: "SignedOut" | "WrongAccount" | "RateLimited" | "Challenge" | "SiteChanged" | "Network" | "Error";
+        SyncLoopDto: {
+            loop?: components["schemas"]["SyncLoopKind"];
+            /** Format: int32 */
+            everyMinutes?: number | null;
+            /** Format: date-time */
+            lastStartedAt?: string | null;
+            /** Format: date-time */
+            lastSucceededAt?: string | null;
+            /** Format: uuid */
+            lastRunId?: string | null;
+            lastError?: string | null;
+            /** Format: int32 */
+            consecutiveFailures?: number;
+            runningOn?: string | null;
+            /** Format: date-time */
+            nextDueAt?: string | null;
+        };
+        /** @enum {string} */
+        SyncLoopKind: "Sales" | "Listings";
+        SyncOverviewDto: {
+            accounts?: components["schemas"]["SyncAccountDto"][] | null;
+            agents?: components["schemas"]["SyncAgentDto"][] | null;
+            requests?: components["schemas"]["SyncScanRequestDto"][] | null;
+            platforms?: components["schemas"]["SyncPlatformSettingsDto"][] | null;
+        };
+        SyncPairingDto: {
+            /** Format: uuid */
+            pairingId?: string;
+            status?: components["schemas"]["SyncPairingStatus"];
+            /** Format: date-time */
+            expiresAt?: string;
+            agent?: components["schemas"]["SyncAgentDto"];
+        };
+        /** @enum {string} */
+        SyncPairingStatus: "Waiting" | "Paired" | "Expired";
+        SyncPlatformSettingsDto: {
+            platform?: string | null;
+            loops?: components["schemas"]["SyncLoopKind"][] | null;
+            /** Format: int32 */
+            suggestedSalesMinutes?: number;
+            /** Format: int32 */
+            minSalesMinutes?: number;
+            /** Format: int32 */
+            suggestedListingsMinutes?: number;
+            /** Format: int32 */
+            minListingsMinutes?: number;
+            /** Format: int32 */
+            historyDays?: number;
+            enabled?: boolean;
+            disabledReason?: string | null;
+        };
         SyncRunDetailDto: {
             run?: components["schemas"]["SyncRunDto"];
             issues?: components["schemas"]["SyncRunIssueDto"][] | null;
@@ -10782,6 +11678,9 @@ export interface components {
             /** Format: uuid */
             rerunOfId?: string | null;
             canRerun?: boolean;
+            loop?: string | null;
+            trigger?: string | null;
+            agentName?: string | null;
         };
         SyncRunIssueDto: {
             severity?: string | null;
@@ -10800,7 +11699,50 @@ export interface components {
             pageSize?: number;
             /** Format: int32 */
             pageCount?: number;
+            /** Format: int32 */
+            quietHidden?: number;
         };
+        SyncScanRequestDto: {
+            /** Format: uuid */
+            id?: string;
+            /** Format: uuid */
+            channelAccountId?: string;
+            accountName?: string | null;
+            platform?: string | null;
+            loop?: components["schemas"]["SyncLoopKind"];
+            /** Format: date-time */
+            from?: string | null;
+            status?: components["schemas"]["SyncScanStatus"];
+            /** Format: date-time */
+            requestedAt?: string;
+            /** Format: date-time */
+            startedAt?: string | null;
+            /** Format: date-time */
+            finishedAt?: string | null;
+            runningOn?: string | null;
+            /** Format: uuid */
+            runId?: string | null;
+            message?: string | null;
+        };
+        /** @enum {string} */
+        SyncScanScope: "Sales" | "Listings" | "History" | "Everything";
+        /** @enum {string} */
+        SyncScanStatus: "Queued" | "Running" | "Succeeded" | "Failed" | "Cancelled" | "Expired";
+        SyncSessionSeenDto: {
+            /** Format: uuid */
+            agentId?: string;
+            agentName?: string | null;
+            online?: boolean;
+            accessGranted?: boolean;
+            signedIn?: boolean | null;
+            username?: string | null;
+            marketplaceUserId?: string | null;
+            /** Format: date-time */
+            pausedUntil?: string | null;
+            pauseReason?: string | null;
+        };
+        /** @enum {string} */
+        SyncTrigger: "Scheduled" | "Requested" | "Extension";
         UngroupSalesRequest: {
             saleIds?: string[] | null;
         };
@@ -10918,6 +11860,12 @@ export interface components {
         UpdateStoreSettingsRequest: {
             name?: string | null;
             storeDomain?: string | null;
+        };
+        UpdateSyncScheduleRequest: {
+            /** Format: int32 */
+            salesEveryMinutes?: number | null;
+            /** Format: int32 */
+            listingsEveryMinutes?: number | null;
         };
         UpdateTaskStatusRequest: {
             status?: components["schemas"]["WorkTaskStatus"];

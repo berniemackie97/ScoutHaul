@@ -47,6 +47,14 @@ public sealed class PlatformOrder : EntityBase, IOrganizationScoped
     public decimal TaxCollected { get; set; }
     public decimal FeeTotal { get; set; }
 
+    /// <summary>
+    /// True while the marketplace has not yet posted this order's fees — a scan saw the sale minutes
+    /// after it happened, before the fees reached the seller's ledger. <see cref="FeeTotal"/> means
+    /// nothing until it clears. The order is still a sale for stock purposes, but it is not settled
+    /// into money until a later scan or report brings the fees.
+    /// </summary>
+    public bool FeesPending { get; set; }
+
     /// <summary>The seller's own shipping-label cost, when the platform reports it (e.g. eBay labels bought on
     /// eBay). Null when unknown — reconciliation then preserves whatever cost the operator already recorded.</summary>
     public decimal? SellerShippingCost { get; set; }

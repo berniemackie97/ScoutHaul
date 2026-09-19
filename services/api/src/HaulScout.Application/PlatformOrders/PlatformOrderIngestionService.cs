@@ -47,7 +47,7 @@ public sealed class PlatformOrderIngestionService(
                 return (null, $"Order {externalOrderId} has no line items.");
             }
 
-            if (new[] { input.ItemsSubtotal, input.ShippingCharged, input.TaxCollected, input.FeeTotal }.Any(value => value < 0)
+            if (new[] { input.ItemsSubtotal, input.ShippingCharged, input.TaxCollected, input.FeeTotal ?? 0 }.Any(value => value < 0)
                 || (input.ShippingCost.HasValue && input.ShippingCost.Value < 0)
                 || (input.PayoutAmount.HasValue && input.PayoutAmount.Value < 0)
                 || input.Lines.Any(line => line.UnitPrice < 0 || line.Quantity <= 0))
@@ -86,8 +86,8 @@ public sealed class PlatformOrderIngestionService(
                 };
                 store.AddPlatformOrder(order);
                 existing.Add(order);
-                ApplyImportedFields(order, input, channelAccountId);
-                ReplaceLines(order, input, preserveExistingMappings: false);
+                ApplyImportedFields(order, input, channelAccountId, isNew: true);
+                ReplaceLines(order, MergeLines(input.Lines, []), preserveExistingMappings: false);
                 created++;
             }
             else if (order.Status != PlatformOrderStatus.Ignored)
@@ -96,17 +96,11 @@ public sealed class PlatformOrderIngestionService(
                 // counted as unchanged. It used to count as updated and rewrite every line, so an
                 // import history could not say what an export actually changed.
                 string factsBefore = OrderFingerprint(order);
-                string linesBefore = LinesFingerprint(order.Lines.Select(line => new LineFacts(
-                    line.Title, line.UnitPrice, line.Quantity, line.ExternalItemId, line.Sku, line.ShippingCharged, line.TaxCollected,
-                    line.PlatformFees, line.SellerShippingCost, line.NetSales, line.TotalSales, line.FeeBreakdownJson)));
-                ApplyImportedFields(order, input, channelAccountId);
-                string linesAfter = LinesFingerprint(input.Lines.Select(line => new LineFacts(
-                    string.IsNullOrWhiteSpace(line.Title) ? "Untitled item" : line.Title.Trim(), line.UnitPrice,
-                    line.Quantity <= 0 ? 1 : line.Quantity, Text.TrimToNull(line.ExternalItemId), Text.TrimToNull(line.Sku),
-                    line.ShippingCharged, line.TaxCollected, line.PlatformFees, line.SellerShippingCost, line.NetSales,
-                    line.TotalSales, Text.TrimToNull(line.FeeBreakdownJson))));
+                string linesBefore = LinesFingerprint(order.Lines.Select(Facts));
+                List<LineFacts> merged = MergeLines(input.Lines, order.Lines);
+                ApplyImportedFields(order, input, channelAccountId, isNew: false);
 
-                if (OrderFingerprint(order) == factsBefore && linesAfter == linesBefore)
+                if (OrderFingerprint(order) == factsBefore && LinesFingerprint(merged) == linesBefore)
                 {
                     unchanged++;
                     touched.Add(order.Id);
@@ -114,7 +108,7 @@ public sealed class PlatformOrderIngestionService(
                 }
 
                 bool wasReconciled = order.Status == PlatformOrderStatus.Reconciled;
-                ReplaceLines(order, input, preserveExistingMappings: wasReconciled);
+                ReplaceLines(order, merged, preserveExistingMappings: wasReconciled);
 
                 // Re-importing used to demote every reconciled order back into the queue, so a weekly
                 // export meant redoing matching already done. Demotion conflated two different needs:
@@ -175,6 +169,7 @@ public sealed class PlatformOrderIngestionService(
         return (new IngestPlatformOrdersResultDto(created, updated, skipped, autoReconciled, dtos, unchanged), null);
     }
 
+    /// <summary>A line as it will be written. <see cref="RawJson"/> is evidence, so it never counts as a change.</summary>
     private sealed record LineFacts(
         string Title,
         decimal UnitPrice,
@@ -187,15 +182,54 @@ public sealed class PlatformOrderIngestionService(
         decimal? SellerShippingCost,
         decimal? NetSales,
         decimal? TotalSales,
-        string? FeeBreakdownJson);
+        string? FeeBreakdownJson,
+        string? RawJson);
+
+    private static LineFacts Facts(PlatformOrderLine line) => new(
+        line.Title, line.UnitPrice, line.Quantity, line.ExternalItemId, line.Sku, line.ShippingCharged, line.TaxCollected,
+        line.PlatformFees, line.SellerShippingCost, line.NetSales, line.TotalSales, line.FeeBreakdownJson, line.RawJson);
+
+    /// <summary>
+    /// The incoming lines, with every figure the source left out taken from the line already recorded
+    /// for the same listing. The All Orders export has no fees; the fee report and a scan do. Without
+    /// this, re-importing the export after either wiped the fees — and re-synced the wiped figures onto
+    /// the settled sales.
+    /// </summary>
+    private static List<LineFacts> MergeLines(IEnumerable<IngestPlatformOrderLineInput> incoming, IEnumerable<PlatformOrderLine> recorded)
+    {
+        Dictionary<string, PlatformOrderLine> recordedByItem = recorded
+            .Where(line => !string.IsNullOrWhiteSpace(line.ExternalItemId))
+            .GroupBy(line => line.ExternalItemId!, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+
+        return incoming.Select(line =>
+        {
+            string? externalItemId = Text.TrimToNull(line.ExternalItemId);
+            PlatformOrderLine? was = externalItemId is not null ? recordedByItem.GetValueOrDefault(externalItemId) : null;
+            return new LineFacts(
+                string.IsNullOrWhiteSpace(line.Title) ? "Untitled item" : line.Title.Trim(),
+                line.UnitPrice,
+                line.Quantity <= 0 ? 1 : line.Quantity,
+                externalItemId,
+                Text.TrimToNull(line.Sku) ?? was?.Sku,
+                line.ShippingCharged ?? was?.ShippingCharged,
+                line.TaxCollected ?? was?.TaxCollected,
+                line.PlatformFees ?? was?.PlatformFees,
+                line.SellerShippingCost ?? was?.SellerShippingCost,
+                line.NetSales ?? was?.NetSales,
+                line.TotalSales ?? was?.TotalSales,
+                Text.TrimToNull(line.FeeBreakdownJson) ?? was?.FeeBreakdownJson,
+                Text.TrimToNull(line.RawJson) ?? was?.RawJson);
+        }).ToList();
+    }
 
     /// <summary>The order-level facts an import sets: everything ApplyImportedFields writes except evidence and timestamps.</summary>
     private static string OrderFingerprint(PlatformOrder order) => ImportFingerprint.Of(
         order.ChannelAccountId, order.BuyerName, order.BuyerReference, order.BuyerEmail, order.BuyerNote,
         order.ShipToName, order.ShipToPhone, order.ShipToLine1, order.ShipToLine2, order.ShipToCity, order.ShipToRegion,
         order.ShipToPostalCode, order.ShipToCountry, order.OrderedAt, order.PaidAt, order.ShippedAt, order.ItemsSubtotal,
-        order.ShippingCharged, order.TaxCollected, order.FeeTotal, order.SellerShippingCost, order.PayoutAmount, order.Currency,
-        order.TaxRemittedByPlatform, ImportFingerprint.Json(order.FeeBreakdownJson), order.Carrier, order.TrackingNumber);
+        order.ShippingCharged, order.TaxCollected, order.FeeTotal, order.FeesPending, order.SellerShippingCost, order.PayoutAmount,
+        order.Currency, order.TaxRemittedByPlatform, ImportFingerprint.Json(order.FeeBreakdownJson), order.Carrier, order.TrackingNumber);
 
     /// <summary>Line facts in a stable order, so the same lines compare equal however they were listed.</summary>
     private static string LinesFingerprint(IEnumerable<LineFacts> lines) =>
@@ -205,43 +239,58 @@ public sealed class PlatformOrderIngestionService(
                 ImportFingerprint.Json(line.FeeBreakdownJson)))
             .Order(StringComparer.Ordinal));
 
-    private static void ApplyImportedFields(PlatformOrder order, IngestPlatformOrderInput input, Guid? channelAccountId)
+    /// <summary>
+    /// Writes what this source says about the order. The figures every source carries — when, items,
+    /// shipping, tax — are replaced; anything the source leaves out keeps what another source recorded.
+    /// </summary>
+    private static void ApplyImportedFields(PlatformOrder order, IngestPlatformOrderInput input, Guid? channelAccountId, bool isNew)
     {
         if (channelAccountId.HasValue)
         {
             order.ChannelAccountId = channelAccountId;
         }
-        order.BuyerName = Text.TrimToNull(input.BuyerName);
-        order.BuyerReference = Text.TrimToNull(input.BuyerReference);
-        order.BuyerEmail = Text.TrimToNull(input.BuyerEmail);
-        order.BuyerNote = Text.TrimToNull(input.BuyerNote);
-        order.ShipToName = Text.TrimToNull(input.ShipToName);
-        order.ShipToPhone = Text.TrimToNull(input.ShipToPhone);
-        order.ShipToLine1 = Text.TrimToNull(input.ShipToLine1);
-        order.ShipToLine2 = Text.TrimToNull(input.ShipToLine2);
-        order.ShipToCity = Text.TrimToNull(input.ShipToCity);
-        order.ShipToRegion = Text.TrimToNull(input.ShipToRegion);
-        order.ShipToPostalCode = Text.TrimToNull(input.ShipToPostalCode);
-        order.ShipToCountry = Text.TrimToNull(input.ShipToCountry);
+        order.BuyerName = Text.TrimToNull(input.BuyerName) ?? order.BuyerName;
+        order.BuyerReference = Text.TrimToNull(input.BuyerReference) ?? order.BuyerReference;
+        order.BuyerEmail = Text.TrimToNull(input.BuyerEmail) ?? order.BuyerEmail;
+        order.BuyerNote = Text.TrimToNull(input.BuyerNote) ?? order.BuyerNote;
+        order.ShipToName = Text.TrimToNull(input.ShipToName) ?? order.ShipToName;
+        order.ShipToPhone = Text.TrimToNull(input.ShipToPhone) ?? order.ShipToPhone;
+        order.ShipToLine1 = Text.TrimToNull(input.ShipToLine1) ?? order.ShipToLine1;
+        order.ShipToLine2 = Text.TrimToNull(input.ShipToLine2) ?? order.ShipToLine2;
+        order.ShipToCity = Text.TrimToNull(input.ShipToCity) ?? order.ShipToCity;
+        order.ShipToRegion = Text.TrimToNull(input.ShipToRegion) ?? order.ShipToRegion;
+        order.ShipToPostalCode = Text.TrimToNull(input.ShipToPostalCode) ?? order.ShipToPostalCode;
+        order.ShipToCountry = Text.TrimToNull(input.ShipToCountry) ?? order.ShipToCountry;
         order.OrderedAt = input.OrderedAt;
-        order.PaidAt = input.PaidAt;
-        order.ShippedAt = input.ShippedAt;
+        order.PaidAt = input.PaidAt ?? order.PaidAt;
+        order.ShippedAt = input.ShippedAt ?? order.ShippedAt;
         order.ItemsSubtotal = input.ItemsSubtotal;
         order.ShippingCharged = input.ShippingCharged;
         order.TaxCollected = input.TaxCollected;
-        order.FeeTotal = input.FeeTotal;
-        order.SellerShippingCost = input.ShippingCost;
-        order.PayoutAmount = input.PayoutAmount;
+
+        if (input.FeeTotal is decimal fees)
+        {
+            order.FeeTotal = fees;
+            order.FeesPending = false;
+        }
+        else if (isNew)
+        {
+            order.FeeTotal = 0;
+            order.FeesPending = input.FeesPending;
+        }
+
+        order.SellerShippingCost = input.ShippingCost ?? order.SellerShippingCost;
+        order.PayoutAmount = input.PayoutAmount ?? order.PayoutAmount;
         order.Currency = string.IsNullOrWhiteSpace(input.Currency) ? "USD" : input.Currency.Trim().ToUpperInvariant();
         order.TaxRemittedByPlatform = input.TaxRemittedByPlatform;
-        order.FeeBreakdownJson = Text.TrimToNull(input.FeeBreakdownJson);
-        order.Carrier = Text.TrimToNull(input.Carrier);
-        order.TrackingNumber = Text.TrimToNull(input.TrackingNumber);
-        order.RawJson = Text.TrimToNull(input.RawJson);
+        order.FeeBreakdownJson = Text.TrimToNull(input.FeeBreakdownJson) ?? order.FeeBreakdownJson;
+        order.Carrier = Text.TrimToNull(input.Carrier) ?? order.Carrier;
+        order.TrackingNumber = Text.TrimToNull(input.TrackingNumber) ?? order.TrackingNumber;
+        order.RawJson = Text.TrimToNull(input.RawJson) ?? order.RawJson;
         order.ScrapedAt = DateTimeOffset.UtcNow;
     }
 
-    private void ReplaceLines(PlatformOrder order, IngestPlatformOrderInput input, bool preserveExistingMappings)
+    private void ReplaceLines(PlatformOrder order, IReadOnlyList<LineFacts> lines, bool preserveExistingMappings)
     {
         Dictionary<string, Guid?> mappingsByExternalId = preserveExistingMappings
             ? order.Lines
@@ -251,27 +300,26 @@ public sealed class PlatformOrderIngestionService(
             : [];
         List<PlatformOrderLine> replacementLines = [];
 
-        foreach (IngestPlatformOrderLineInput line in input.Lines)
+        foreach (LineFacts line in lines)
         {
-            string? externalItemId = Text.TrimToNull(line.ExternalItemId);
             replacementLines.Add(new PlatformOrderLine
             {
                 OrganizationId = currentUser.OrganizationId,
                 PlatformOrderId = order.Id,
-                Title = string.IsNullOrWhiteSpace(line.Title) ? "Untitled item" : line.Title.Trim(),
+                Title = line.Title,
                 UnitPrice = line.UnitPrice,
-                Quantity = line.Quantity <= 0 ? 1 : line.Quantity,
-                ExternalItemId = externalItemId,
-                Sku = Text.TrimToNull(line.Sku),
+                Quantity = line.Quantity,
+                ExternalItemId = line.ExternalItemId,
+                Sku = line.Sku,
                 ShippingCharged = line.ShippingCharged,
                 TaxCollected = line.TaxCollected,
                 PlatformFees = line.PlatformFees,
                 SellerShippingCost = line.SellerShippingCost,
                 NetSales = line.NetSales,
                 TotalSales = line.TotalSales,
-                FeeBreakdownJson = Text.TrimToNull(line.FeeBreakdownJson),
-                RawJson = Text.TrimToNull(line.RawJson),
-                InventoryItemId = externalItemId is not null && mappingsByExternalId.TryGetValue(externalItemId, out Guid? mapped) ? mapped : null,
+                FeeBreakdownJson = line.FeeBreakdownJson,
+                RawJson = line.RawJson,
+                InventoryItemId = line.ExternalItemId is not null && mappingsByExternalId.TryGetValue(line.ExternalItemId, out Guid? mapped) ? mapped : null,
             });
         }
 

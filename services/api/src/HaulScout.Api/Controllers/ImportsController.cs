@@ -61,13 +61,14 @@ public sealed class ImportsController(ReportImportService imports) : HaulScoutCo
     public async Task<ActionResult<ImportQueuesDto>> Queues(CancellationToken cancellationToken) =>
         await imports.QueuesAsync(cancellationToken);
 
-    /// <summary>Every import, newest first.</summary>
+    /// <summary>Every import and scan, newest first; scans that changed nothing only when <paramref name="quiet"/> is set.</summary>
     [HttpGet("runs")]
     public async Task<ActionResult<SyncRunListDto>> Runs(
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 25,
+        [FromQuery] bool quiet = false,
         CancellationToken cancellationToken = default) =>
-        await imports.ListAsync(page, pageSize, cancellationToken);
+        await imports.ListAsync(page, pageSize, quiet, cancellationToken);
 
     [HttpGet("runs/{id:guid}")]
     public async Task<ActionResult<SyncRunDetailDto>> Run(Guid id, CancellationToken cancellationToken) =>

@@ -94,6 +94,15 @@ public sealed class PlatformOrderWorkflowService(
             return AppResult<PlatformOrderReconcileResultDto>.NotFound();
         }
 
+        // Settling writes the sale's money. Until the marketplace posts the fees, the order's fee
+        // figure is a placeholder, and a sale recorded from it would show a profit that is not true —
+        // with nothing left to say so once it is settled.
+        if (order.FeesPending)
+        {
+            return AppResult<PlatformOrderReconcileResultDto>.Validation(
+                $"{order.Platform} has not posted this order's fees yet. The next sales scan after they appear brings them in; settle it then.");
+        }
+
         Dictionary<Guid, Guid> mapByLine = (request.Lines ?? [])
             .GroupBy(line => line.PlatformOrderLineId)
             .ToDictionary(group => group.Key, group => group.First().InventoryItemId);
