@@ -24,7 +24,7 @@ export async function requestScan(scope: ScanScope, channelAccountId: string | n
   refresh();
   const queued = result.data.requests?.length ?? 0;
   const skipped = result.data.skipped ?? [];
-  const lead = queued === 0 ? "Nothing was queued." : `${queued} scan${queued === 1 ? "" : "s"} queued.`;
+  const lead = queued === 0 ? "Nothing was queued." : queued === 1 ? "Scan queued — follow it below." : `${queued} scans queued — follow them below.`;
   const why = skipped.map((item) => `${item.accountName}: ${item.reason}`).join(" ");
   return { ok: queued > 0, message: why ? `${lead} ${why}` : lead };
 }

@@ -6,7 +6,8 @@ import reactHooks from "eslint-plugin-react-hooks";
  * same line on TypeScript and hooks, and the same zero-warning bar.
  */
 export default tseslint.config(
-  { ignores: [".output/**", ".wxt/**", "node_modules/**", "coverage/**"] },
+  // Built extensions (`firefox-mv3/` and the like, wherever they are unpacked) are output, not source.
+  { ignores: [".output/**", ".wxt/**", "node_modules/**", "coverage/**", "*-mv2/**", "*-mv3/**"] },
   ...tseslint.configs.recommended,
   {
     plugins: { "react-hooks": reactHooks },

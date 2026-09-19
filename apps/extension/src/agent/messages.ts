@@ -1,10 +1,13 @@
 import type { LoopKind } from "./types";
 
-/** What the popup may ask the background agent to do. */
+/**
+ * What the popup may ask the background agent to do. Anything that reaches a marketplace is started
+ * and answered at once; the popup follows its progress from storage, so closing it stops nothing.
+ */
 export type PopupRequest =
   | { type: "pair"; code: string; name: string | null }
-  | { type: "check-in" }
-  | { type: "check-sessions" }
+  | { type: "popup-opened" }
+  | { type: "refresh" }
   | { type: "scan"; channelAccountId: string; loop: LoopKind }
   | { type: "resume"; platform: string }
   | { type: "disconnect" };

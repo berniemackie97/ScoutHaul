@@ -10144,6 +10144,37 @@
         }
       }
     },
+    "/api/sync/agent/work-failures": {
+      "post": {
+        "tags": [
+          "SyncAgent"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentWorkFailureRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentWorkFailureRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentWorkFailureRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
     "/api/sync/agent/runs": {
       "post": {
         "tags": [
@@ -10996,6 +11027,13 @@
             "type": "integer",
             "format": "int32",
             "nullable": true
+          },
+          "loops": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AgentLoopDto"
+            },
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -11072,6 +11110,37 @@
           "operatingSystem": {
             "type": "string",
             "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "AgentLoopDto": {
+        "type": "object",
+        "properties": {
+          "loop": {
+            "$ref": "#/components/schemas/SyncLoopKind"
+          },
+          "everyMinutes": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "lastSucceededAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "lastError": {
+            "type": "string",
+            "nullable": true
+          },
+          "nextDueAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "running": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false
@@ -11264,6 +11333,31 @@
           "from": {
             "type": "string",
             "format": "date-time",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "AgentWorkFailureRequest": {
+        "type": "object",
+        "properties": {
+          "channelAccountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "loop": {
+            "$ref": "#/components/schemas/SyncLoopKind"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/SyncFailureKind"
+          },
+          "message": {
+            "type": "string",
+            "nullable": true
+          },
+          "scanRequestId": {
+            "type": "string",
+            "format": "uuid",
             "nullable": true
           }
         },
@@ -19094,6 +19188,8 @@
           "Challenge",
           "SiteChanged",
           "Network",
+          "NoAccess",
+          "Interrupted",
           "Error"
         ],
         "type": "string"

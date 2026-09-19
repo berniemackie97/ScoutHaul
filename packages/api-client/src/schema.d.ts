@@ -8347,6 +8347,45 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/sync/agent/work-failures": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["AgentWorkFailureRequest"];
+                    "text/json": components["schemas"]["AgentWorkFailureRequest"];
+                    "application/*+json": components["schemas"]["AgentWorkFailureRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/sync/agent/runs": {
         parameters: {
             query?: never;
@@ -8893,6 +8932,7 @@ export interface components {
             salesEveryMinutes?: number | null;
             /** Format: int32 */
             listingsEveryMinutes?: number | null;
+            loops?: components["schemas"]["AgentLoopDto"][] | null;
         };
         AgentHeartbeatDto: {
             /** Format: uuid */
@@ -8913,6 +8953,17 @@ export interface components {
             browser?: string | null;
             marketplaces?: components["schemas"]["AgentMarketplaceReport"][] | null;
             operatingSystem?: string | null;
+        };
+        AgentLoopDto: {
+            loop?: components["schemas"]["SyncLoopKind"];
+            /** Format: int32 */
+            everyMinutes?: number | null;
+            /** Format: date-time */
+            lastSucceededAt?: string | null;
+            lastError?: string | null;
+            /** Format: date-time */
+            nextDueAt?: string | null;
+            running?: boolean;
         };
         AgentMarketplaceReport: {
             platform?: string | null;
@@ -8977,6 +9028,15 @@ export interface components {
             scanRequestId?: string | null;
             /** Format: date-time */
             from?: string | null;
+        };
+        AgentWorkFailureRequest: {
+            /** Format: uuid */
+            channelAccountId?: string;
+            loop?: components["schemas"]["SyncLoopKind"];
+            kind?: components["schemas"]["SyncFailureKind"];
+            message?: string | null;
+            /** Format: uuid */
+            scanRequestId?: string | null;
         };
         AssignTaskRequest: {
             /** Format: uuid */
@@ -11627,7 +11687,7 @@ export interface components {
             observedAt?: string;
         };
         /** @enum {string} */
-        SyncFailureKind: "SignedOut" | "WrongAccount" | "RateLimited" | "Challenge" | "SiteChanged" | "Network" | "Error";
+        SyncFailureKind: "SignedOut" | "WrongAccount" | "RateLimited" | "Challenge" | "SiteChanged" | "Network" | "NoAccess" | "Interrupted" | "Error";
         SyncLoopDto: {
             loop?: components["schemas"]["SyncLoopKind"];
             /** Format: int32 */

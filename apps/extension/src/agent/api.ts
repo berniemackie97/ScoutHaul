@@ -81,8 +81,12 @@ export function createAgentApi(getToken: () => Promise<string | null>) {
     complete: (runId: string, body: { cursor?: string | null; coversFrom?: string | null; coversTo?: string | null; completeSnapshot?: boolean }) =>
       unwrap<SyncRun>(client.POST("/api/sync/agent/runs/{runId}/complete", { params: { path: { runId } }, body })),
 
-    fail: (runId: string, kind: FailureKind, message: string) =>
+    fail: (runId: string, kind: FailureKind, message: string | null) =>
       unwrap<SyncRun>(client.POST("/api/sync/agent/runs/{runId}/fail", { params: { path: { runId } }, body: { kind, message } })),
+
+    /** Work that could not start — nothing read, no run opened — so a scan someone asked for says why. */
+    reportWorkFailure: (body: { channelAccountId: string; loop: LoopKind; kind: FailureKind; message?: string | null; scanRequestId?: string | null }) =>
+      unwrap(client.POST("/api/sync/agent/work-failures", { body })),
 
     disconnect: () => unwrap(client.POST("/api/sync/agent/disconnect", {})),
   };

@@ -4,12 +4,12 @@ import type { BridgeRequest } from "../agent/messages";
 
 /**
  * The bridge between the HaulScout portal and this extension. It runs only on the portal (the
- * build fixes which one), and passes on just two questions: is this browser connected, and would it
- * check in now — so a scan asked for in the portal starts at once instead of at the next heartbeat.
+ * build fixes its addresses), and passes on just two questions: is this browser connected, and would
+ * it check in now — so a scan asked for in the portal starts at once instead of at the next heartbeat.
  */
 export default defineContentScript({
-  // Replaced at build time with this build's portal; see wxt.config.ts.
-  matches: ["https://admin.overhaultrading.com/*"],
+  // Replaced at build time with every address of this build's portal; see wxt.config.ts.
+  matches: ["https://scout-haul-admin-ten.vercel.app/*"],
   runAt: "document_idle",
   main() {
     const post = (message: Record<string, unknown>) =>

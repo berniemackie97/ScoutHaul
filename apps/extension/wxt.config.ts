@@ -2,14 +2,24 @@ import { defineConfig } from "wxt";
 
 /**
  * Where this build talks to. A development build (`pnpm dev`) points at the API and portal running
- * locally; every other build at production. Either can be overridden when building, for a staging
- * API: `WXT_API_ORIGIN=https://… pnpm build`.
+ * locally; every other build at production. Either can be overridden when building — the API for a
+ * staging server, the portal with every address it is reached at, comma-separated:
+ * `WXT_API_ORIGIN=https://… WXT_PORTAL_ORIGINS=https://a…,https://b… pnpm build`.
+ *
+ * The bridge runs only on the portal addresses listed, and a portal opened at any other would never
+ * wake the extension — its scans would sit queued until the next heartbeat. The portal is served
+ * from its Vercel address; when it gets a custom domain, that is added here beside it.
  */
 function origins(mode: string) {
   const development = mode === "development";
+  const portals = process.env.WXT_PORTAL_ORIGINS ?? process.env.WXT_PORTAL_ORIGIN;
   return {
     api: process.env.WXT_API_ORIGIN ?? (development ? "http://localhost:5080" : "https://scouthaul-production.up.railway.app"),
-    portal: process.env.WXT_PORTAL_ORIGIN ?? (development ? "http://localhost:3001" : "https://admin.overhaultrading.com"),
+    portals: portals
+      ? portals.split(",").map((origin) => origin.trim().replace(/\/+$/, "")).filter(Boolean)
+      : development
+        ? ["http://localhost:3001"]
+        : ["https://scout-haul-admin-ten.vercel.app"],
   };
 }
 
@@ -24,7 +34,7 @@ export default defineConfig({
   vite: ({ mode }) => ({
     define: {
       __API_ORIGIN__: JSON.stringify(origins(mode).api),
-      __PORTAL_ORIGIN__: JSON.stringify(origins(mode).portal),
+      __PORTAL_ORIGINS__: JSON.stringify(origins(mode).portals),
     },
   }),
   manifest: ({ mode, browser }) => ({
@@ -56,7 +66,7 @@ export default defineConfig({
     "entrypoints:resolved": (wxt, entrypoints) => {
       for (const entrypoint of entrypoints) {
         if (entrypoint.type === "content-script" && entrypoint.name === "portal") {
-          entrypoint.options.matches = [`${origins(wxt.config.mode).portal}/*`];
+          entrypoint.options.matches = origins(wxt.config.mode).portals.map((origin) => `${origin}/*`);
         }
       }
     },

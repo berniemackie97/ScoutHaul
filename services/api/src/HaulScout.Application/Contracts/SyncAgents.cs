@@ -51,7 +51,20 @@ public sealed record AgentAccountDto(
     string DisplayName,
     string? BoundUsername,
     int? SalesEveryMinutes,
-    int? ListingsEveryMinutes);
+    int? ListingsEveryMinutes,
+    IReadOnlyList<AgentLoopDto> Loops);
+
+/// <summary>
+/// Where one loop on one account stands, whichever browser ran it last — so the popup shows the same
+/// "last synced" and "next" as the portal rather than only what this browser remembers.
+/// </summary>
+public sealed record AgentLoopDto(
+    SyncLoopKind Loop,
+    int? EveryMinutes,
+    DateTimeOffset? LastSucceededAt,
+    string? LastError,
+    DateTimeOffset? NextDueAt,
+    bool Running);
 
 /// <summary>One thing the agent should run now.</summary>
 public sealed record AgentWorkDto(
@@ -109,7 +122,20 @@ public sealed record CompleteAgentRunRequest(
     DateTimeOffset? CoversTo = null,
     bool CompleteSnapshot = false);
 
-public sealed record FailAgentRunRequest(SyncFailureKind Kind, string Message);
+/// <param name="Message">Detail beside the reason the kind already gives — an adapter's account of a page it could not read. Optional.</param>
+public sealed record FailAgentRunRequest(SyncFailureKind Kind, string? Message = null);
+
+/// <summary>
+/// Work the agent was offered but could not start — the browser turned out to be signed out, or
+/// signed in as someone else, before any run was opened. Reported so a scan someone asked for says
+/// why it did not happen, and so the schedule backs off instead of offering it again every minute.
+/// </summary>
+public sealed record AgentWorkFailureRequest(
+    Guid ChannelAccountId,
+    SyncLoopKind Loop,
+    SyncFailureKind Kind,
+    string? Message = null,
+    Guid? ScanRequestId = null);
 
 // ── Portal ─────────────────────────────────────────────────────────────────────────────────────
 

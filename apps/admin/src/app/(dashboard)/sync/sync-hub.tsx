@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CircleAlert, Loader2, ScanLine } from "lucide-react";
+import { CircleAlert, Loader2, ScanLine, X } from "lucide-react";
 import { Badge, Button, Card, Input } from "@overhaul/ui";
 import type { Tone } from "@/features/imports/import-model";
 import {
@@ -15,6 +15,7 @@ import {
   isOpen,
   loopName,
   loopSummary,
+  openRequestFor,
   requestStatus,
   type LoopKind,
   type ScanScope,
@@ -60,12 +61,32 @@ export function SyncHub({ overview }: { overview: SyncOverview }) {
   const anyOnline = agents.some((agent) => agent.online);
   const busy = requests.some(isOpen) || accounts.some((account) => (account.loops ?? []).some((loop) => loop.runningOn));
 
-  // While anything is queued or running, keep the page current without anyone reloading it.
+  // The page keeps itself current while someone is looking at it — every few seconds while a scan is
+  // queued or running, every half minute otherwise, and on coming back to the tab — so a browser's
+  // sign-in, a Bind button or a finished scan shows up without anyone reloading.
+  const lastRefresh = useRef(0);
   useEffect(() => {
-    if (!busy) return;
-    const timer = setInterval(() => router.refresh(), 5000);
-    return () => clearInterval(timer);
+    const refresh = () => {
+      if (document.visibilityState !== "visible" || Date.now() - lastRefresh.current < 2000) return;
+      lastRefresh.current = Date.now();
+      router.refresh();
+    };
+    const timer = setInterval(refresh, busy ? 5000 : 30_000);
+    document.addEventListener("visibilitychange", refresh);
+    window.addEventListener("focus", refresh);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", refresh);
+      window.removeEventListener("focus", refresh);
+    };
   }, [busy, router]);
+
+  // A confirmation clears itself; a problem stays until it is read and dismissed.
+  useEffect(() => {
+    if (!message?.ok) return;
+    const timer = setTimeout(() => setMessage(null), 6000);
+    return () => clearTimeout(timer);
+  }, [message]);
 
   const run = (action: () => Promise<SyncActionResult>, wakeAfter = false) =>
     startTransition(async () => {
@@ -90,9 +111,12 @@ export function SyncHub({ overview }: { overview: SyncOverview }) {
 
       <div aria-live="polite">
         {message ? (
-          <p className={`rounded-lg border px-4 py-3 text-sm ${message.ok ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-amber-200 bg-amber-50 text-amber-900"}`}>
-            {message.message}
-          </p>
+          <div className={`flex items-start justify-between gap-3 rounded-lg border px-4 py-3 text-sm ${message.ok ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-amber-200 bg-amber-50 text-amber-900"}`}>
+            <p>{message.message}</p>
+            <button type="button" className="shrink-0 opacity-70 hover:opacity-100" aria-label="Dismiss" onClick={() => setMessage(null)}>
+              <X className="h-4 w-4" aria-hidden />
+            </button>
+          </div>
         ) : null}
       </div>
 
@@ -117,6 +141,7 @@ export function SyncHub({ overview }: { overview: SyncOverview }) {
                 key={account.channelAccountId}
                 account={account}
                 settings={overview.platforms?.find((platform) => platform.platform === account.platform)}
+                requests={requests}
                 now={now}
                 pending={pending}
                 onScan={scan}
@@ -127,7 +152,7 @@ export function SyncHub({ overview }: { overview: SyncOverview }) {
         )}
       </section>
 
-      {requests.length > 0 ? <Requests requests={requests} anyOnline={anyOnline} now={now} pending={pending} onRun={run} /> : null}
+      {requests.length > 0 ? <Requests requests={requests} accounts={accounts} anyOnline={anyOnline} now={now} pending={pending} onRun={run} /> : null}
     </div>
   );
 }
@@ -135,12 +160,13 @@ export function SyncHub({ overview }: { overview: SyncOverview }) {
 function AccountCard(props: {
   account: SyncAccount;
   settings: SyncPlatformSettings | undefined;
+  requests: SyncScanRequest[];
   now: Date;
   pending: boolean;
   onScan: (scope: ScanScope, accountId: string | null, from?: string | null) => void;
   onRun: (action: () => Promise<SyncActionResult>, wakeAfter?: boolean) => void;
 }) {
-  const { account, settings, now, pending, onScan, onRun } = props;
+  const { account, settings, requests, now, pending, onScan, onRun } = props;
   const id = account.channelAccountId!;
   const badge = healthBadge(account.health);
   const loops = account.loops ?? [];
@@ -250,10 +276,8 @@ function AccountCard(props: {
 
           {account.boundUsername ? (
             <div className="flex flex-wrap items-end gap-2">
-              <Button size="sm" disabled={pending} onClick={() => onScan("Sales", id)}>
-                <ScanLine className="mr-2 h-4 w-4" aria-hidden /> Scan sales
-              </Button>
-              <Button variant="outline" size="sm" disabled={pending} onClick={() => onScan("Listings", id)}>Scan listings</Button>
+              <ScanButton loop="Sales" open={openRequestFor(requests, id, "Sales")} pending={pending} primary onScan={() => onScan("Sales", id)} />
+              <ScanButton loop="Listings" open={openRequestFor(requests, id, "Listings")} pending={pending} onScan={() => onScan("Listings", id)} />
               {account.supportsHistory ? (
                 <form
                   className="flex items-end gap-2"
@@ -284,14 +308,36 @@ function AccountCard(props: {
   );
 }
 
+/** A scan button that shows its scan under way — queued, or running — instead of offering it twice. */
+function ScanButton(props: { loop: LoopKind; open: SyncScanRequest | undefined; pending: boolean; primary?: boolean; onScan: () => void }) {
+  const { loop, open, pending, primary, onScan } = props;
+  const noun = loop === "Sales" ? "sales" : "listings";
+  return (
+    <Button size="sm" variant={primary ? "default" : "outline"} disabled={pending || open !== undefined} onClick={onScan}>
+      {open?.status === "Running" ? (
+        <>
+          <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden /> Scanning {noun}…
+        </>
+      ) : open ? (
+        <>{loopName(loop)} scan queued</>
+      ) : (
+        <>
+          {primary ? <ScanLine className="mr-2 h-4 w-4" aria-hidden /> : null} Scan {noun}
+        </>
+      )}
+    </Button>
+  );
+}
+
 function Requests(props: {
   requests: SyncScanRequest[];
+  accounts: SyncAccount[];
   anyOnline: boolean;
   now: Date;
   pending: boolean;
   onRun: (action: () => Promise<SyncActionResult>) => void;
 }) {
-  const { requests, anyOnline, now, pending, onRun } = props;
+  const { requests, accounts, anyOnline, now, pending, onRun } = props;
   return (
     <section aria-labelledby="scans-heading" className="space-y-3">
       <h2 id="scans-heading" className="text-sm font-semibold">Scans you asked for</h2>
@@ -308,7 +354,8 @@ function Requests(props: {
           </thead>
           <tbody className="divide-y">
             {requests.map((request) => {
-              const status = requestStatus(request, anyOnline);
+              const status = requestStatus(request, accounts.find((account) => account.channelAccountId === request.channelAccountId), anyOnline);
+              const note = status.note ?? request.message;
               return (
                 <tr key={request.id}>
                   <td className="px-4 py-3 font-medium">{request.accountName}</td>
@@ -321,7 +368,7 @@ function Requests(props: {
                       {status.tone === "warning" ? <CircleAlert className="h-3.5 w-3.5 text-amber-600" aria-hidden /> : null}
                       <Badge variant={BADGE[status.tone]}>{status.label}</Badge>
                     </span>
-                    {request.message ? <p className="text-muted-foreground mt-1 text-xs">{request.message}</p> : null}
+                    {note ? <p className="text-muted-foreground mt-1 text-xs">{note}</p> : null}
                   </td>
                   <td className="text-muted-foreground whitespace-nowrap px-4 py-3 text-xs">{ago(request.requestedAt, now)}</td>
                   <td className="px-4 py-3 text-right">
