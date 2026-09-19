@@ -1,3 +1,5 @@
+import { cents } from "../amounts";
+
 /**
  * eBay's printed values: money like "$20.00" or "+$6.99 | shipping", and sale times like
  * "Sep 18 | 12:48am PDT" — no year, in the seller's time zone. Strict: anything unexpected is null,
@@ -13,11 +15,6 @@ const zones: Record<string, number> = {
   PST: -8, PDT: -7, MST: -7, MDT: -6, CST: -6, CDT: -5, EST: -5, EDT: -4,
   AKST: -9, AKDT: -8, HST: -10, GMT: 0, UTC: 0,
 };
-
-/** Rounds to the cent, so sums of printed amounts compare exactly. */
-export function cents(value: number): number {
-  return Math.round(value * 100) / 100;
-}
 
 /** "$1,234.50", "+$6.99 | shipping", "-$0.52" → a number; "Free shipping" → 0; anything else → null. */
 export function money(text: string | null | undefined): number | null {

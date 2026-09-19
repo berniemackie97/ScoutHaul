@@ -5,6 +5,7 @@ import { logActivity } from "./activity";
 import { ApiError, type AgentApi } from "./api";
 import { describeFailure, waitsForAPerson } from "./failures";
 import { initialGovernorState, nextSlot, pauseOf, recordOutcome, recordRequest, type GovernorPolicy, type Outcome } from "./governor";
+import { adapterMemory } from "./memory";
 import { governorItem, sessionsItem, type StoredSession } from "./storage";
 import type { MarketplaceTab } from "./transport";
 import type { AgentAccount, FailureKind, Heartbeat, Work } from "./types";
@@ -82,6 +83,7 @@ export function governedContext(tab: MarketplaceTab, platform: string, policy: G
     now: () => deps.now(),
     page: (url: string) => paced(() => tab.page(url)),
     request: (url: string) => paced(() => tab.request(url)),
+    memory: adapterMemory(platform),
   };
 }
 
@@ -287,16 +289,16 @@ export async function runWork(work: Work, heartbeat: Heartbeat, tab: Marketplace
   try {
     let done;
     if (work.loop === "Sales") {
-      const run = await adapter.scanSales(context, { from: from ? new Date(from) : null, cursor });
-      let first = true;
-      for (const orders of chunks(run.orders, ordersPerBatch)) {
-        await deps.api.addBatch(runId, { orders, issues: first ? run.issues : [] });
-        first = false;
+      const run = await adapter.scanSales(context, { from: from ? new Date(from) : null, cursor }, session);
+      const orders = chunks(run.orders, ordersPerBatch);
+      const cancelled = chunks(run.cancelledOrderIds, ordersPerBatch);
+      for (let index = 0; index < Math.max(orders.length, cancelled.length); index++) {
+        await deps.api.addBatch(runId, { orders: orders[index] ?? [], cancelledOrderIds: cancelled[index] ?? [], issues: index === 0 ? run.issues : [] });
       }
 
       done = await deps.api.complete(runId, { cursor: run.cursor, coversFrom: run.coversFrom, coversTo: run.coversTo });
     } else {
-      const snapshot = await adapter.snapshotListings(context);
+      const snapshot = await adapter.snapshotListings(context, session);
       let first = true;
       for (const listings of chunks(snapshot.listings, listingsPerBatch)) {
         await deps.api.addBatch(runId, { listings, issues: first ? snapshot.issues : [] });

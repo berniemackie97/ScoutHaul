@@ -345,8 +345,9 @@ public sealed class SyncAgentTests
 
         AgentHeartbeatDto beat = await harness.HeartbeatAsync(agent);
         Assert.Empty(beat.Work);
-        AgentPlatformPolicyDto policy = Assert.Single(beat.Platforms);
+        AgentPlatformPolicyDto policy = beat.Platforms.Single(platform => platform.Platform == "eBay");
         Assert.False(policy.Enabled);
+        Assert.True(beat.Platforms.Single(platform => platform.Platform == "Vinted").Enabled);
         Assert.Equal("eBay changed its orders page; a fix is on the way.", policy.DisabledReason);
         Assert.Equal(AppErrorCode.SyncUnavailable, (await harness.StartAsync(agent, SyncLoopKind.Sales)).Code);
         Assert.Equal(SyncAccountHealth.Disabled, (await harness.Hub.OverviewAsync(CancellationToken.None)).Accounts.Single(account => account.ChannelAccountId == harness.Ebay.Id).Health);
@@ -386,7 +387,7 @@ public sealed class SyncAgentTests
         AppResult<RequestScanResultDto> tooOld = await harness.Hub.RequestScanAsync(
             new RequestScanRequest(SyncScanScope.History, harness.Ebay.Id, From: now.AddDays(-120)), CancellationToken.None);
         Assert.Equal(AppResultStatus.Validation, tooOld.Status);
-        Assert.Contains("90 days", tooOld.Message);
+        Assert.Contains("90 days. For older sales, import the order report.", tooOld.Message);
 
         Assert.Equal(AppResultStatus.Validation, (await harness.Hub.RequestScanAsync(
             new RequestScanRequest(SyncScanScope.History, harness.Ebay.Id), CancellationToken.None)).Status);
@@ -449,6 +450,59 @@ public sealed class SyncAgentTests
         Assert.Null(loop.LeaseAgentId);
         SyncScanRequest answered = await harness.Db.SyncScanRequests.SingleAsync();
         Assert.Equal((SyncScanStatus.Succeeded, done.Summary), (answered.Status, answered.Message));
+    }
+
+    [Fact]
+    public async Task A_cancelled_order_is_set_aside_unless_it_already_has_sales()
+    {
+        Harness harness = NewHarness();
+        Guid agent = await harness.ReadyAgentAsync();
+        AgentRunDto first = (await harness.StartAsync(agent, SyncLoopKind.Sales)).Value!;
+        await harness.As(agent).AddBatchAsync(first.RunId,
+            new AgentRunBatchRequest(Orders: [EbayOrder("26-15152-72360", "377273002938"), EbayOrder("07-15174-93677", "377251512872")]),
+            CancellationToken.None);
+        await harness.As(agent).CompleteRunAsync(first.RunId, new CompleteAgentRunRequest(), CancellationToken.None);
+
+        // One of the two has since been turned into sales.
+        PlatformOrder settled = await harness.Db.PlatformOrders.SingleAsync(order => order.ExternalOrderId == "07-15174-93677");
+        settled.Status = PlatformOrderStatus.Reconciled;
+        await harness.Db.SaveChangesAsync();
+
+        // The marketplace now shows both cancelled, and one this organization never imported.
+        AgentRunDto next = (await harness.StartAsync(agent, SyncLoopKind.Sales)).Value!;
+        AgentRunBatchResultDto batch = (await harness.As(agent).AddBatchAsync(next.RunId,
+            new AgentRunBatchRequest(CancelledOrderIds: ["26-15152-72360", "07-15174-93677", "11-11111-11111"]), CancellationToken.None)).Value!;
+        SyncRunDto done = (await harness.As(agent).CompleteRunAsync(next.RunId, new CompleteAgentRunRequest(), CancellationToken.None)).Value!;
+
+        Assert.Equal(1, batch.Updated);
+        Assert.Equal(PlatformOrderStatus.Ignored, (await harness.Db.PlatformOrders.SingleAsync(order => order.ExternalOrderId == "26-15152-72360")).Status);
+        Assert.Equal(PlatformOrderStatus.Reconciled, (await harness.Db.PlatformOrders.SingleAsync(order => order.ExternalOrderId == "07-15174-93677")).Status);
+        SyncRunIssue issue = Assert.Single(await harness.Db.SyncRunIssues.Where(candidate => candidate.SyncRunId == next.RunId).ToListAsync());
+        Assert.Equal("07-15174-93677", issue.ExternalReference);
+        Assert.StartsWith("eBay cancelled this order after it was recorded as a sale.", issue.Message);
+        Assert.Equal("CompletedWithIssues", done.Status);
+
+        // Cancellations are a sales run's to deliver.
+        AgentRunDto listings = (await harness.StartAsync(agent, SyncLoopKind.Listings)).Value!;
+        Assert.Equal(AppResultStatus.Validation, (await harness.As(agent).AddBatchAsync(listings.RunId,
+            new AgentRunBatchRequest(CancelledOrderIds: ["26-15152-72360"]), CancellationToken.None)).Status);
+    }
+
+    [Fact]
+    public async Task Vinted_syncs_both_loops_and_reaches_back_through_its_whole_history()
+    {
+        Harness harness = NewHarness();
+        ChannelAccount vinted = new() { OrganizationId = harness.Org, Channel = "Vinted", DisplayName = "Overhaul Vinted" };
+        harness.Db.ChannelAccounts.Add(vinted);
+        await harness.Db.SaveChangesAsync();
+
+        SyncOverviewDto overview = await harness.Hub.OverviewAsync(CancellationToken.None);
+        SyncAccountDto account = overview.Accounts.Single(candidate => candidate.ChannelAccountId == vinted.Id);
+        Assert.True(account.Supported);
+        Assert.True(account.SupportsHistory);
+        Assert.Equal([SyncLoopKind.Sales, SyncLoopKind.Listings], account.SupportedLoops);
+        Assert.Equal(SyncAccountHealth.NotBound, account.Health);
+        Assert.Equal(3650, overview.Platforms.Single(platform => platform.Platform == "Vinted").HistoryDays);
     }
 
     [Fact]

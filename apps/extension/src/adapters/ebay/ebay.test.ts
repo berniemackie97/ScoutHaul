@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { ledgerPage, listingsPage, ordersPage, profileJson, type FixtureOrder } from "../../test/ebay-fixtures";
-import { AdapterError, type MarketplaceContext, type PageResponse } from "../types";
+import { memoryInMap } from "../../test/memory";
+import { AdapterError, type MarketplaceContext, type PageResponse, type Session } from "../types";
 import { ebayAdapter, salesFrom } from ".";
 import { readLedgerPage } from "./ledger";
 import { readOrdersPage, toIngestOrder } from "./orders";
 
 const now = new Date("2026-09-18T20:00:00Z");
+const seller: Session = { signedIn: true, username: "overhaultradingcompany", marketplaceUserId: null };
 
 const sold: FixtureOrder = {
   orderId: "26-15152-72360",
@@ -47,6 +49,7 @@ function context(routes: Record<string, string | PageResponse>): MarketplaceCont
     requested,
     opened,
     now: () => now,
+    memory: memoryInMap(),
     page(url: string) {
       opened.push(url);
       requested.push(url);
@@ -113,7 +116,7 @@ describe("the eBay adapter", () => {
   it("scans the routine window of sales with their fees", async () => {
     const eBay = context({ "/sh/ord/": ordersPage([sold, earlier]), "/mes/transactionlist": ledger });
 
-    const scan = await ebayAdapter.scanSales(eBay, { from: null, cursor: null });
+    const scan = await ebayAdapter.scanSales(eBay, { from: null, cursor: null }, seller);
 
     expect(scan.orders.map((order) => order.externalOrderId)).toEqual(["26-15152-72360", "07-15174-93677"]);
     expect(scan.orders[1]).toMatchObject({ feesPending: true });
@@ -132,7 +135,7 @@ describe("the eBay adapter", () => {
 
   it("leaves out sales older than the window", async () => {
     const eBay = context({ "/sh/ord/": ordersPage([sold, earlier]), "/mes/transactionlist": ledger });
-    const scan = await ebayAdapter.scanSales(eBay, { from: new Date("2026-09-17T00:00:00Z"), cursor: null });
+    const scan = await ebayAdapter.scanSales(eBay, { from: new Date("2026-09-17T00:00:00Z"), cursor: null }, seller);
     expect(scan.orders.map((order) => order.externalOrderId)).toEqual(["26-15152-72360"]);
   });
 
@@ -144,7 +147,7 @@ describe("the eBay adapter", () => {
       ]),
     });
 
-    const snapshot = await ebayAdapter.snapshotListings(eBay);
+    const snapshot = await ebayAdapter.snapshotListings(eBay, seller);
 
     expect(snapshot.complete).toBe(true);
     expect(snapshot.listings[0]).toMatchObject({
@@ -165,7 +168,7 @@ describe("the eBay adapter", () => {
     const full = Array.from({ length: 200 }, (_, index) => ({ id: String(377100000000 + index), title: `Item ${index}`, price: 5 }));
     const eBay = context({ "/sh/lst/active": listingsPage(full, 400) });
 
-    const snapshot = await ebayAdapter.snapshotListings(eBay);
+    const snapshot = await ebayAdapter.snapshotListings(eBay, seller);
 
     expect(snapshot.listings).toHaveLength(200);
     expect(snapshot.complete).toBe(false);
@@ -174,7 +177,7 @@ describe("the eBay adapter", () => {
 
   it("does not call a partial snapshot complete", async () => {
     const eBay = context({ "/sh/lst/active": listingsPage([{ id: "1", title: "One", price: 5 }], 130) });
-    expect((await ebayAdapter.snapshotListings(eBay)).complete).toBe(false);
+    expect((await ebayAdapter.snapshotListings(eBay, seller)).complete).toBe(false);
   });
 
   it("knows who the browser is signed in as, and when it is not", async () => {
@@ -189,7 +192,7 @@ describe("the eBay adapter", () => {
     const challenge = { status: 200, url: "https://www.ebay.com/splashui/challenge?ap=1", contentType: "text/html", body: "" };
     const throttled = { status: 429, url: "https://www.ebay.com/sh/ord/", contentType: "text/html", body: "" };
     const kind = async (route: string | PageResponse) =>
-      ebayAdapter.scanSales(context({ "/sh/ord/": route }), { from: null, cursor: null }).then(
+      ebayAdapter.scanSales(context({ "/sh/ord/": route }), { from: null, cursor: null }, seller).then(
         () => "none",
         (error: unknown) => (error instanceof AdapterError ? error.kind : "unexpected"),
       );

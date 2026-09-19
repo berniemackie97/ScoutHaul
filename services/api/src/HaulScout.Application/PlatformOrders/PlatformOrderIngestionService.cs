@@ -326,6 +326,52 @@ public sealed class PlatformOrderIngestionService(
         store.ReplacePlatformOrderLines(order, replacementLines);
     }
 
+    /// <summary>
+    /// Orders a marketplace shows as cancelled. One not yet turned into sales is set aside, as a
+    /// person pressing Ignore would; one already turned into sales cannot be — sales are money, and
+    /// are never undone automatically — so its id comes back for a person to correct. An id never
+    /// imported is nothing to do.
+    /// </summary>
+    public async Task<PlatformOrderCancellations> ApplyCancellationsAsync(
+        string platform,
+        IReadOnlyCollection<string> externalOrderIds,
+        CancellationToken cancellationToken)
+    {
+        string? channel = SalesChannelCatalog.CanonicalValue(platform, await ExistingChannels(cancellationToken));
+        HashSet<string> keys = externalOrderIds.Select(id => id.Trim()).Where(id => id.Length > 0).ToHashSet(StringComparer.Ordinal);
+        if (channel is null || keys.Count == 0)
+        {
+            return new PlatformOrderCancellations(0, []);
+        }
+
+        int setAside = 0;
+        List<string> stillRecorded = [];
+        foreach (PlatformOrder order in await store.ListImportedOrdersByExternalIdsAsync(currentUser.OrganizationId, keys, cancellationToken))
+        {
+            if (order.Platform != channel)
+            {
+                continue;
+            }
+
+            if (order.Status == PlatformOrderStatus.Imported)
+            {
+                order.Status = PlatformOrderStatus.Ignored;
+                setAside++;
+            }
+            else if (order.Status == PlatformOrderStatus.Reconciled)
+            {
+                stillRecorded.Add(order.ExternalOrderId);
+            }
+        }
+
+        if (setAside > 0)
+        {
+            await store.SaveChangesAsync(cancellationToken);
+        }
+
+        return new PlatformOrderCancellations(setAside, stillRecorded);
+    }
+
     private async Task<List<string>> ExistingChannels(CancellationToken cancellationToken)
     {
         IReadOnlyList<string> saleChannels = await store.ListKnownSalesChannelsAsync(currentUser.OrganizationId, cancellationToken);
@@ -333,3 +379,7 @@ public sealed class PlatformOrderIngestionService(
         return saleChannels.Concat(listingChannels).Distinct(StringComparer.OrdinalIgnoreCase).Order().ToList();
     }
 }
+
+/// <param name="SetAside">Orders not yet turned into sales, now ignored.</param>
+/// <param name="StillRecorded">External ids of orders already turned into sales, for a person to correct.</param>
+public sealed record PlatformOrderCancellations(int SetAside, IReadOnlyList<string> StillRecorded);

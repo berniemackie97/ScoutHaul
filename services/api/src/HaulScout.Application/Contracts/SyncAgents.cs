@@ -108,10 +108,15 @@ public sealed record AgentRunDto(Guid RunId, DateTimeOffset LeaseExpiresAt, stri
 public sealed record AgentRunIssueInput(string Message, string? ExternalReference = null, bool Rejected = false);
 
 /// <summary>One slice of what a run read. Sales runs carry orders; listing runs carry listings.</summary>
+/// <param name="CancelledOrderIds">
+/// Orders the marketplace shows as cancelled, by their external order id — a sales run's news that a
+/// sale it may have brought in before did not happen after all.
+/// </param>
 public sealed record AgentRunBatchRequest(
     IReadOnlyList<IngestPlatformOrderInput>? Orders = null,
     IReadOnlyList<IngestPlatformListingInput>? Listings = null,
-    IReadOnlyList<AgentRunIssueInput>? Issues = null);
+    IReadOnlyList<AgentRunIssueInput>? Issues = null,
+    IReadOnlyList<string>? CancelledOrderIds = null);
 
 public sealed record AgentRunBatchResultDto(int Created, int Updated, int Unchanged, DateTimeOffset LeaseExpiresAt);
 

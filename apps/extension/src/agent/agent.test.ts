@@ -66,6 +66,12 @@ function agentWith(calls: ReturnType<typeof api>, tabs = fakeTabs(servedTab(ebay
 
 const signedInSession = { signedIn: true, username: "seller", marketplaceUserId: null, checkedAt: now.toISOString() };
 
+/** Access to eBay alone, as a seller who has only allowed eBay would have. */
+function allowEbayOnly() {
+  fakeBrowser.permissions.contains = vi.fn(async (permissions: { origins?: string[] }) =>
+    (permissions.origins ?? []).every((origin) => origin.includes("ebay.com"))) as typeof fakeBrowser.permissions.contains;
+}
+
 describe("checking in", () => {
   beforeEach(() => {
     fakeBrowser.reset();
@@ -86,7 +92,10 @@ describe("checking in", () => {
     await agentWith(calls).agent.checkIn();
 
     expect(calls.heartbeat).toHaveBeenCalledWith(expect.objectContaining({
-      marketplaces: [expect.objectContaining({ platform: "eBay", accessGranted: false })],
+      marketplaces: [
+        expect.objectContaining({ platform: "eBay", accessGranted: false }),
+        expect.objectContaining({ platform: "Vinted", accessGranted: false }),
+      ],
     }));
     expect(await pairingItem.getValue()).toMatchObject({ token: "hsa_new", agentName: "Office mini-PC" });
     expect((await heartbeatItem.getValue())?.newToken).toBeNull();
@@ -123,7 +132,7 @@ describe("checking in", () => {
 describe("running the work a check-in hands out", () => {
   beforeEach(async () => {
     fakeBrowser.reset();
-    fakeBrowser.permissions.contains = vi.fn(async () => true) as typeof fakeBrowser.permissions.contains;
+    allowEbayOnly();
     fakeBrowser.runtime.getManifest = vi.fn(() => ({ manifest_version: 3 as const, name: "HaulScout Sync", version: "0.3.0" }));
     await pairingItem.setValue(pairing);
     await sessionsItem.setValue({ eBay: signedInSession });
@@ -159,7 +168,7 @@ describe("running the work a check-in hands out", () => {
     await agent.checkIn();
 
     expect(calls.heartbeat).toHaveBeenCalledTimes(2);
-    expect(calls.heartbeat.mock.calls[1]![0]).toMatchObject({ marketplaces: [expect.objectContaining({ signedIn: false })] });
+    expect(calls.heartbeat.mock.calls[1]![0]).toMatchObject({ marketplaces: expect.arrayContaining([expect.objectContaining({ platform: "eBay", signedIn: false })]) });
     expect(calls.reportWorkFailure).not.toHaveBeenCalled();
     expect((await lastRunsItem.getValue())[`${account}:Sales`]).toMatchObject({ tone: "warning", text: expect.stringContaining("Signed out of eBay") });
   });
@@ -178,7 +187,7 @@ describe("running the work a check-in hands out", () => {
 describe("a scan asked for in the popup", () => {
   beforeEach(async () => {
     fakeBrowser.reset();
-    fakeBrowser.permissions.contains = vi.fn(async () => true) as typeof fakeBrowser.permissions.contains;
+    allowEbayOnly();
     fakeBrowser.runtime.getManifest = vi.fn(() => ({ manifest_version: 3 as const, name: "HaulScout Sync", version: "0.3.0" }));
     await pairingItem.setValue(pairing);
     await sessionsItem.setValue({ eBay: signedInSession });
@@ -213,7 +222,7 @@ describe("noticing the operator sign in, or clear a security check", () => {
   beforeEach(async () => {
     vi.useFakeTimers();
     fakeBrowser.reset();
-    fakeBrowser.permissions.contains = vi.fn(async () => true) as typeof fakeBrowser.permissions.contains;
+    allowEbayOnly();
     fakeBrowser.runtime.getManifest = vi.fn(() => ({ manifest_version: 3 as const, name: "HaulScout Sync", version: "0.3.0" }));
     await pairingItem.setValue(pairing);
   });

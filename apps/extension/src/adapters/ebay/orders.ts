@@ -1,7 +1,8 @@
 import type { IngestOrder, IngestOrderLine, RunIssue } from "../../agent/types";
 import { dig, jsonAfter, spans } from "../embedded-json";
 import type { LedgerOrder } from "./ledger";
-import { cents, money, saleTime } from "./text";
+import { cents } from "../amounts";
+import { money, saleTime } from "./text";
 
 /** One order as Seller Hub's order list carries it. */
 export interface EbayOrderRow {

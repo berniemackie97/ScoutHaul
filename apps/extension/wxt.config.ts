@@ -24,7 +24,7 @@ function origins(mode: string) {
 }
 
 /** The marketplaces an adapter exists for. Access to each is asked for only when it is connected. */
-const marketplaceOrigins = ["https://*.ebay.com/*"];
+const marketplaceOrigins = ["https://*.ebay.com/*", "https://*.vinted.com/*"];
 
 export default defineConfig({
   srcDir: "src",

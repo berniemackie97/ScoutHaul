@@ -75,7 +75,7 @@ export function createAgentApi(getToken: () => Promise<string | null>) {
       marketplaceUserId?: string | null;
     }) => unwrap<AgentRun>(client.POST("/api/sync/agent/runs", { body })),
 
-    addBatch: (runId: string, body: { orders?: IngestOrder[]; listings?: IngestListing[]; issues?: RunIssue[] }) =>
+    addBatch: (runId: string, body: { orders?: IngestOrder[]; cancelledOrderIds?: string[]; listings?: IngestListing[]; issues?: RunIssue[] }) =>
       unwrap(client.POST("/api/sync/agent/runs/{runId}/batches", { params: { path: { runId } }, body })),
 
     complete: (runId: string, body: { cursor?: string | null; coversFrom?: string | null; coversTo?: string | null; completeSnapshot?: boolean }) =>

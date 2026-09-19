@@ -7,6 +7,7 @@ import { recheckMs, signedInFreshMs } from "./config";
 import { describeBrowser } from "./environment";
 import { describeFailure, waitsForAPerson } from "./failures";
 import { initialGovernorState, pauseOf, resume } from "./governor";
+import { forgetAdapterMemory } from "./memory";
 import {
   checkSession,
   describeWork,
@@ -451,6 +452,7 @@ export class Agent {
       lastRunsItem.setValue({}),
       connectionItem.setValue(null),
       activityItem.setValue([]),
+      forgetAdapterMemory(),
     ]);
   }
 
