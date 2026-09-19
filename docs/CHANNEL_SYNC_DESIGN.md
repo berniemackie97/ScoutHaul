@@ -1,6 +1,6 @@
 # Channel sync & reconciliation — design
 
-Status: **approved (revision 2), in build.** Decisions in §8 taken as recommended. Revision 1 (eBay API + sale-email capture) was
+Status: **approved (revision 2), in build — steps 1 and 2 built.** Decisions in §8 taken as recommended. Revision 1 (eBay API + sale-email capture) was
 rejected: eBay production API keys are not realistically obtainable for this business, and email
 parsing is brittle. This revision uses a **browser-extension sync agent**, the model the established
 reseller tools use. Supersedes the remaining scope of
@@ -87,10 +87,15 @@ are handled in the build, not in the adapters:
 
 - **Portal ↔ extension** talk through a small content script on the portal's own pages
   (`window.postMessage` bridge). Firefox does not support `externally_connectable`, and the bridge
-  works identically in every browser.
-- **Marketplace requests run inside a marketplace tab** (same-origin, the site's own first-party
-  cookies and CSRF tokens), not from the background script — Firefox's cookie partitioning makes
-  background requests unreliable, and the in-tab route behaves the same in every browser.
+  works identically in every browser. *As built:* the bridge answers only "is this browser
+  connected" and "check in now" — it never carries a pairing code (see §4.2).
+- **Marketplace reads run inside a marketplace tab** (same-origin, the site's own first-party
+  cookies), not from the background script — Firefox's cookie partitioning makes background
+  requests unreliable, and the in-tab route behaves the same in every browser. *As built:* seller
+  pages are **opened** in that background tab — a navigation, as a click makes — and read once
+  loaded; only the small JSON endpoints the site's own pages call are requested from the page. A page
+  fetched from script sends different request headers from one a person opens, and eBay's bot
+  protection answered exactly that with its security check during development.
 - **Host permissions are optional and per marketplace** — the extension asks for Depop access when
   Depop is connected, not for every site at install.
 - **Distribution:** Firefox — a signed, unlisted add-on through addons.mozilla.org with automatic
@@ -126,6 +131,12 @@ Today the extension takes a pasted API token; a Supabase access token expires wi
 unattended sync is impossible as built. Instead: **Connect this browser** in the portal shows a
 one-time code → the extension exchanges it for a **device token** scoped to sync only (ingest,
 leases, commands, heartbeat), revocable per device from the portal, rotated automatically.
+
+*As built:* the code is **pasted into the extension's popup** — never handed to the extension by a
+portal page. A script running on a page could otherwise pair the browser to someone else's
+organization and send it the seller's orders. The code works once, for ten minutes, through a
+rate-limited endpoint; only hashes of codes and tokens are stored; the token rotates weekly and the
+previous one keeps working until the browser is seen using the new one.
 
 ### 4.3 Account binding
 
@@ -259,9 +270,11 @@ Every loop can also be run **now**, at any scope the operator needs:
    parsers behind it; **Depop sales** and **Poshmark** parsers (samples on hand); drop zone with
    detect-then-confirm; import history. Useful immediately for manual files, and it is the landing
    the agent's report pulls use.
-2. **Agent core** — extension rebuilt in TypeScript with tests; pairing and device tokens; leases,
-   heartbeat, safety governor, ingest endpoint; account binding. First adapter: **eBay**
-   (`scanSales`, `snapshotListings`).
+2. **Agent core** *(built)* — extension rebuilt in TypeScript with tests; pairing and device tokens;
+   leases, heartbeat, safety governor, ingest endpoint; account binding; scans on demand by scope
+   (sales, listings, history from a date, everything). First adapter: **eBay** (`scanSales` with
+   fees from the seller's transaction ledger, `snapshotListings`). A sale seen before its fees are
+   posted lands as *fees pending* and is not settled into money until they arrive.
 3. **Reconciler + commands** — exception model, rules, console wiring; command queue; **delist on
    eBay** in dry-run, then live.
 4. **Depop, Poshmark, Vinted adapters** — scan, snapshot, backfill, delist, each shipped in dry-run.

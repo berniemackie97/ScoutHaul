@@ -78,7 +78,8 @@ public static class PlatformOrderDtoFactory
                         suggestion?.Title,
                         suggestion?.AlreadySold ?? false);
                 })
-                .ToList());
+                .ToList(),
+            order.FeesPending);
     }
 
     public static SaleDto ToSaleDto(Sale sale) => new(

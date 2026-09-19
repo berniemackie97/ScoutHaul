@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Microsoft.EntityFrameworkCore;
+using HaulScout.Api.Authentication;
 using HaulScout.Application.Common;
 using HaulScout.Application.Security;
 using HaulScout.Domain;
@@ -39,6 +40,17 @@ public sealed class JwtCurrentUserContext(IHttpContextAccessor httpContextAccess
         if (!HasAuthenticatedPrincipal(claims))
         {
             throw new UnauthorizedAccessException("Authenticated user context is unavailable.");
+        }
+
+        // A paired browser acts as the member who paired it. Its token was matched, and that
+        // membership checked, by the device-token handler on this same request.
+        if (claims.Identity?.AuthenticationType == SyncAgentAuthDefaults.Scheme)
+        {
+            Guid agentOrganization = Guid.Parse(ReadRequiredClaim(claims, SyncAgentAuthDefaults.OrganizationIdClaim));
+            Guid agentUser = Guid.Parse(ReadRequiredClaim(claims, SyncAgentAuthDefaults.UserIdClaim));
+            tenant.SetOrganization(agentOrganization);
+            resolved = new ResolvedUserContext(agentOrganization, agentUser);
+            return;
         }
 
         string externalSubject = ReadRequiredClaim(claims, ClaimTypes.NameIdentifier, "sub");

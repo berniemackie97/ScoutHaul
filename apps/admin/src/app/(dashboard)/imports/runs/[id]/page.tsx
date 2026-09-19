@@ -68,7 +68,11 @@ export default async function ImportRunPage({ params }: { params: Promise<{ id: 
 
       <Card className="p-5">
         <dl className="grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
-          <Fact label="File" value={run.fileName ?? "—"} />
+          {run.source === "Agent" ? (
+            <Fact label="Read by" value={[run.agentName ?? "A paired browser", runTrigger(run.trigger)].filter(Boolean).join(", ")} />
+          ) : (
+            <Fact label="File" value={run.fileName ?? "—"} />
+          )}
           <Fact label="Covers" value={period ?? "—"} />
           <Fact label="Started" value={run.startedAt ? STAMP.format(new Date(run.startedAt)) : "—"} />
           <Fact label="Finished" value={run.finishedAt ? STAMP.format(new Date(run.finishedAt)) : "Still running"} />
@@ -130,4 +134,17 @@ function Fact({ label, value }: { label: string; value: string }) {
       <dd className="mt-1 truncate font-medium">{value}</dd>
     </div>
   );
+}
+
+function runTrigger(trigger: string | null | undefined): string | null {
+  switch (trigger) {
+    case "Scheduled":
+      return "on schedule";
+    case "Requested":
+      return "when asked in HaulScout";
+    case "Extension":
+      return "when asked in the extension";
+    default:
+      return null;
+  }
 }

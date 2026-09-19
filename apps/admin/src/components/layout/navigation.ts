@@ -7,6 +7,7 @@ import {
   Package,
   Radio,
   ReceiptText,
+  RefreshCw,
   Settings,
   ShoppingCart,
   Truck,
@@ -54,7 +55,10 @@ export const navGroups: NavGroup[] = [
   },
   {
     label: "Data",
-    items: [{ name: "Imports", href: "/imports", icon: FileSpreadsheet, keywords: ["csv", "upload", "ebay report"] }],
+    items: [
+      { name: "Sync", href: "/sync", icon: RefreshCw, keywords: ["extension", "browser", "scan", "ebay sales", "automatic", "schedule"] },
+      { name: "Imports", href: "/imports", icon: FileSpreadsheet, keywords: ["csv", "upload", "ebay report", "history"] },
+    ],
   },
   {
     label: "Intelligence",

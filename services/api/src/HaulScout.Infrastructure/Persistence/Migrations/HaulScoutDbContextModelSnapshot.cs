@@ -434,6 +434,20 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<DateTimeOffset?>("BoundAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("BoundByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("BoundMarketplaceUserId")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<string>("BoundUsername")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
                     b.Property<string>("Channel")
                         .IsRequired()
                         .HasMaxLength(60)
@@ -464,12 +478,18 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                     b.Property<bool>("IsNativelySynced")
                         .HasColumnType("boolean");
 
+                    b.Property<int?>("ListingsScanEveryMinutes")
+                        .HasColumnType("integer");
+
                     b.Property<string>("Notes")
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)");
 
                     b.Property<Guid>("OrganizationId")
                         .HasColumnType("uuid");
+
+                    b.Property<int?>("SalesScanEveryMinutes")
+                        .HasColumnType("integer");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -2357,6 +2377,11 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                         .HasPrecision(12, 2)
                         .HasColumnType("numeric(12,2)");
 
+                    b.Property<bool>("FeesPending")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
                     b.Property<decimal>("ItemsSubtotal")
                         .HasPrecision(12, 2)
                         .HasColumnType("numeric(12,2)");
@@ -3579,6 +3604,136 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                     b.ToTable("StorefrontOffers", (string)null);
                 });
 
+            modelBuilder.Entity("HaulScout.Domain.Entities.SyncAgent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Browser")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ExtensionVersion")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)");
+
+                    b.Property<DateTimeOffset?>("LastSeenAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<string>("OperatingSystem")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("PairedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("PairedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("PreviousTokenHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTimeOffset?>("RevokedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("RevokedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTimeOffset>("TokenIssuedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrganizationId");
+
+                    b.HasIndex("PairedByUserId");
+
+                    b.HasIndex("PreviousTokenHash");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique();
+
+                    b.ToTable("SyncAgents", (string)null);
+                });
+
+            modelBuilder.Entity("HaulScout.Domain.Entities.SyncAgentMarketplace", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("AccessGranted")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("MarketplaceUserId")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<DateTimeOffset>("ObservedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("PauseReason")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<DateTimeOffset?>("PausedUntil")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Platform")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
+                    b.Property<bool?>("SignedIn")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid>("SyncAgentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Username")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SyncAgentId", "Platform")
+                        .IsUnique();
+
+                    b.ToTable("SyncAgentMarketplaces", (string)null);
+                });
+
             modelBuilder.Entity("HaulScout.Domain.Entities.SyncArtifact", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3623,6 +3778,117 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                     b.ToTable("SyncArtifacts", (string)null);
                 });
 
+            modelBuilder.Entity("HaulScout.Domain.Entities.SyncLoop", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ChannelAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("ConsecutiveFailures")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Cursor")
+                        .HasMaxLength(400)
+                        .HasColumnType("character varying(400)");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTimeOffset?>("LastFinishedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("LastRunId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("LastStartedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("LastSucceededAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("LeaseAgentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("LeaseExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("LeaseRunId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrganizationId");
+
+                    b.HasIndex("ChannelAccountId", "Kind")
+                        .IsUnique();
+
+                    b.ToTable("SyncLoops", (string)null);
+                });
+
+            modelBuilder.Entity("HaulScout.Domain.Entities.SyncPairing", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CodeHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTimeOffset?>("ConsumedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("SyncAgentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CodeHash")
+                        .IsUnique();
+
+                    b.HasIndex("OrganizationId");
+
+                    b.ToTable("SyncPairings", (string)null);
+                });
+
             modelBuilder.Entity("HaulScout.Domain.Entities.SyncRun", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3658,6 +3924,10 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                     b.Property<bool>("IsCompleteSnapshot")
                         .HasColumnType("boolean");
 
+                    b.Property<string>("Loop")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
                     b.Property<Guid>("OrganizationId")
                         .HasColumnType("uuid");
 
@@ -3670,6 +3940,9 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer");
 
                     b.Property<Guid?>("RerunOfId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ScanRequestId")
                         .HasColumnType("uuid");
 
                     b.Property<string>("Source")
@@ -3689,6 +3962,13 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
+                    b.Property<Guid?>("SyncAgentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Trigger")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
                     b.Property<Guid?>("TriggeredByUserId")
                         .HasColumnType("uuid");
 
@@ -3706,6 +3986,8 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                     b.HasIndex("ArtifactId");
 
                     b.HasIndex("ChannelAccountId");
+
+                    b.HasIndex("SyncAgentId");
 
                     b.HasIndex("OrganizationId", "StartedAt");
 
@@ -3752,6 +4034,68 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                     b.HasIndex("SyncRunId");
 
                     b.ToTable("SyncRunIssues", (string)null);
+                });
+
+            modelBuilder.Entity("HaulScout.Domain.Entities.SyncScanRequest", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ChannelAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("FinishedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("From")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Loop")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<string>("Message")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("RequestedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("RequestedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("StartedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<Guid?>("SyncAgentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("SyncRunId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrganizationId", "Status");
+
+                    b.HasIndex("ChannelAccountId", "Loop", "Status");
+
+                    b.ToTable("SyncScanRequests", (string)null);
                 });
 
             modelBuilder.Entity("HaulScout.Domain.Entities.WishlistItem", b =>
@@ -4655,6 +4999,39 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                     b.Navigation("StoreListing");
                 });
 
+            modelBuilder.Entity("HaulScout.Domain.Entities.SyncAgent", b =>
+                {
+                    b.HasOne("HaulScout.Domain.Entities.AppUser", "PairedByUser")
+                        .WithMany()
+                        .HasForeignKey("PairedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("PairedByUser");
+                });
+
+            modelBuilder.Entity("HaulScout.Domain.Entities.SyncAgentMarketplace", b =>
+                {
+                    b.HasOne("HaulScout.Domain.Entities.SyncAgent", "SyncAgent")
+                        .WithMany("Marketplaces")
+                        .HasForeignKey("SyncAgentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("SyncAgent");
+                });
+
+            modelBuilder.Entity("HaulScout.Domain.Entities.SyncLoop", b =>
+                {
+                    b.HasOne("HaulScout.Domain.Entities.ChannelAccount", "ChannelAccount")
+                        .WithMany()
+                        .HasForeignKey("ChannelAccountId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ChannelAccount");
+                });
+
             modelBuilder.Entity("HaulScout.Domain.Entities.SyncRun", b =>
                 {
                     b.HasOne("HaulScout.Domain.Entities.SyncArtifact", "Artifact")
@@ -4667,9 +5044,16 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                         .HasForeignKey("ChannelAccountId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("HaulScout.Domain.Entities.SyncAgent", "SyncAgent")
+                        .WithMany()
+                        .HasForeignKey("SyncAgentId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.Navigation("Artifact");
 
                     b.Navigation("ChannelAccount");
+
+                    b.Navigation("SyncAgent");
                 });
 
             modelBuilder.Entity("HaulScout.Domain.Entities.SyncRunIssue", b =>
@@ -4681,6 +5065,17 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                         .IsRequired();
 
                     b.Navigation("SyncRun");
+                });
+
+            modelBuilder.Entity("HaulScout.Domain.Entities.SyncScanRequest", b =>
+                {
+                    b.HasOne("HaulScout.Domain.Entities.ChannelAccount", "ChannelAccount")
+                        .WithMany()
+                        .HasForeignKey("ChannelAccountId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ChannelAccount");
                 });
 
             modelBuilder.Entity("HaulScout.Domain.Entities.WishlistItem", b =>
@@ -4831,6 +5226,11 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("HaulScout.Domain.Entities.StoreListing", b =>
                 {
                     b.Navigation("Reviews");
+                });
+
+            modelBuilder.Entity("HaulScout.Domain.Entities.SyncAgent", b =>
+                {
+                    b.Navigation("Marketplaces");
                 });
 
             modelBuilder.Entity("HaulScout.Domain.Entities.SyncRun", b =>

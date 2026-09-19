@@ -19,15 +19,27 @@ public sealed record IngestPlatformOrderLineInput(
     string? FeeBreakdownJson = null,
     string? RawJson = null);
 
-/// <summary>One imported marketplace order with the platform's own money figures. <see cref="ExternalOrderId"/>
-/// is the idempotency key: re-ingesting the same order updates it in place (until it is reconciled).</summary>
+/// <summary>
+/// One imported marketplace order with the platform's own money figures. <see cref="ExternalOrderId"/>
+/// is the idempotency key: re-ingesting the same order updates it in place.
+///
+/// Several sources describe the same order — a scan, the All Orders export, the fee report — and each
+/// knows different things. A figure a source does not carry is null, and null never erases what
+/// another source already recorded: the All Orders export has no fees, so importing it after the fee
+/// report must leave the fees alone.
+/// </summary>
+/// <param name="FeeTotal">The marketplace's fees, or null when this source does not carry them.</param>
+/// <param name="FeesPending">
+/// The marketplace has not posted the fees yet — a scan saw the sale before they reached the ledger.
+/// Only meaningful with a null <paramref name="FeeTotal"/>, and never turns known fees back into unknown.
+/// </param>
 public sealed record IngestPlatformOrderInput(
     string ExternalOrderId,
     DateTimeOffset OrderedAt,
     decimal ItemsSubtotal,
     decimal ShippingCharged,
     decimal TaxCollected,
-    decimal FeeTotal,
+    decimal? FeeTotal,
     IReadOnlyList<IngestPlatformOrderLineInput> Lines,
     string? Platform = null,
     decimal? ShippingCost = null,
@@ -51,7 +63,8 @@ public sealed record IngestPlatformOrderInput(
     DateTimeOffset? PaidAt = null,
     DateTimeOffset? ShippedAt = null,
     string? FeeBreakdownJson = null,
-    string? RawJson = null);
+    string? RawJson = null,
+    bool FeesPending = false);
 
 /// <summary>A batch of imported orders. <see cref="Platform"/> is the default channel for
 /// orders that do not carry their own.</summary>
@@ -117,7 +130,8 @@ public sealed record PlatformOrderDto(
     DateTimeOffset? ReconciledAt,
     DateTimeOffset OrderedAtUtc,
     DateTimeOffset ScrapedAt,
-    IReadOnlyList<PlatformOrderLineDto> Lines);
+    IReadOnlyList<PlatformOrderLineDto> Lines,
+    bool FeesPending = false);
 
 public sealed record PlatformOrderDeletedDto(Guid PlatformOrderId);
 

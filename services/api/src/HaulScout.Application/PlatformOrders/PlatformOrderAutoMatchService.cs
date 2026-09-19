@@ -61,8 +61,11 @@ public sealed class PlatformOrderAutoMatchService(
         IReadOnlyList<PlatformOrder> orders,
         CancellationToken cancellationToken)
     {
+        // An order whose fees the marketplace has not posted yet waits: settling writes money, and a
+        // sale recorded before its fees are known would carry a profit that is not true. The scan
+        // that brings the fees settles it.
         List<PlatformOrder> unsettled = orders
-            .Where(order => order.Status == PlatformOrderStatus.Imported && order.Lines.Count > 0)
+            .Where(order => order.Status == PlatformOrderStatus.Imported && order.Lines.Count > 0 && !order.FeesPending)
             .ToList();
         if (unsettled.Count == 0)
         {

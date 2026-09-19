@@ -134,19 +134,20 @@ public sealed class ReportImportService(
             : AppResult<SyncRunDto>.Ok(outcome.Run);
     }
 
-    public async Task<SyncRunListDto> ListAsync(int page, int pageSize, CancellationToken cancellationToken)
+    public async Task<SyncRunListDto> ListAsync(int page, int pageSize, bool includeQuiet, CancellationToken cancellationToken)
     {
         page = Math.Max(1, page);
         pageSize = Math.Clamp(pageSize, 1, 100);
-        (IReadOnlyList<SyncRunRow> rows, int total) = await runs.ListRunsAsync(
-            currentUser.OrganizationId, (page - 1) * pageSize, pageSize, cancellationToken);
+        (IReadOnlyList<SyncRunRow> rows, int total, int quietHidden) = await runs.ListRunsAsync(
+            currentUser.OrganizationId, (page - 1) * pageSize, pageSize, includeQuiet, cancellationToken);
 
         return new SyncRunListDto(
-            rows.Select(row => ToDto(row.Run, row.FileName, row.IssueCount)).ToList(),
+            rows.Select(row => SyncRunDtos.From(row.Run, row.FileName, row.IssueCount, row.AgentName)).ToList(),
             total,
             page,
             pageSize,
-            Math.Max(1, (int)Math.Ceiling(total / (double)pageSize)));
+            Math.Max(1, (int)Math.Ceiling(total / (double)pageSize)),
+            quietHidden);
     }
 
     public async Task<AppResult<SyncRunDetailDto>> GetAsync(Guid runId, CancellationToken cancellationToken)
@@ -267,8 +268,8 @@ public sealed class ReportImportService(
                 SyncRunId = run.Id,
                 Severity = issue.Rejected ? SyncIssueSeverity.Error : SyncIssueSeverity.Warning,
                 RowNumber = issue.RowNumber > 0 ? issue.RowNumber : null,
-                ExternalReference = Clip(issue.Reference, 200),
-                Message = Clip(issue.Message, 1000)!,
+                ExternalReference = SyncText.Clip(issue.Reference, 200),
+                Message = SyncText.Clip(issue.Message, 1000)!,
             }));
             await runs.SaveChangesAsync(cancellationToken);
             return new ImportFileOutcomeDto(file.FileName, ToDto(run, artifact.FileName, issues.Count), outcome.Failed ? outcome.Summary : null);
@@ -307,7 +308,7 @@ public sealed class ReportImportService(
                 return Outcome.Fail(error);
             }
 
-            string summary = Counted(result!.Created, result.Updated, result.Unchanged, "order");
+            string summary = SyncText.Counted(result!.Created, result.Updated, result.Unchanged, "order");
             if (result.AutoReconciled > 0)
             {
                 summary += $" {result.AutoReconciled} recorded as sales automatically.";
@@ -326,7 +327,7 @@ public sealed class ReportImportService(
         {
             IngestPlatformOrdersResultDto result = await feeEnrichment.EnrichEbayListingSalesAsync(report.ListingSales, cancellationToken);
             return new Outcome(result.Created, result.Updated, result.Unchanged,
-                $"Fees and net sales refreshed on {result.Updated} order{Plural(result.Updated)}."
+                $"Fees and net sales refreshed on {result.Updated} order{SyncText.Plural(result.Updated)}."
                 + await ApplyRefundsAsync(format.Platform, file, issues, cancellationToken));
         }
 
@@ -340,7 +341,7 @@ public sealed class ReportImportService(
             }
 
             return new Outcome(result.Value.Created, result.Value.Updated, result.Value.Unchanged,
-                Counted(result.Value.Created, result.Value.Updated, result.Value.Unchanged, "listing"));
+                SyncText.Counted(result.Value.Created, result.Value.Updated, result.Value.Unchanged, "listing"));
         }
 
         if (format == ReportFormats.EbayListingQuality)
@@ -354,7 +355,7 @@ public sealed class ReportImportService(
 
             issues.AddRange(result.Value.Warnings.Select(warning => new ReportRowIssue(0, null, warning, false)));
             return new Outcome(result.Value.Imported, result.Value.Updated, 0,
-                $"{result.Value.Imported + result.Value.Updated} quality snapshot{Plural(result.Value.Imported + result.Value.Updated)}; " +
+                $"{result.Value.Imported + result.Value.Updated} quality snapshot{SyncText.Plural(result.Value.Imported + result.Value.Updated)}; " +
                 $"{result.Value.MatchedListings} matched to known listings.");
         }
 
@@ -382,7 +383,7 @@ public sealed class ReportImportService(
         }
 
         issues.AddRange(result!.Warnings.Select(warning => new ReportRowIssue(0, null, warning, false)));
-        return result.Imported > 0 ? $" {result.Imported} refund{Plural(result.Imported)} applied." : string.Empty;
+        return result.Imported > 0 ? $" {result.Imported} refund{SyncText.Plural(result.Imported)} applied." : string.Empty;
     }
 
     private async Task<TimeZoneInfo> ZoneAsync(Guid organizationId, CancellationToken cancellationToken)
@@ -403,7 +404,7 @@ public sealed class ReportImportService(
         SyncArtifact artifact = new()
         {
             OrganizationId = organizationId,
-            FileName = Clip(Path.GetFileName(file.FileName), 260) ?? "export",
+            FileName = SyncText.Clip(Path.GetFileName(file.FileName), 260) ?? "export",
             ContentType = file.LooksLikeWorkbook
                 ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 : "text/csv",
@@ -426,25 +427,8 @@ public sealed class ReportImportService(
     };
 
     /// <summary>"36 new orders." · "3 new, 40 unchanged listings." — only the parts that happened.</summary>
-    private static string Counted(int created, int updated, int unchanged, string noun)
-    {
-        int total = created + updated + unchanged;
-        if (total == 0)
-        {
-            return $"No {noun}s were imported.";
-        }
 
-        string[] parts = new[] { (created, "new"), (updated, "updated"), (unchanged, "unchanged") }
-            .Where(part => part.Item1 > 0)
-            .Select(part => $"{part.Item1} {part.Item2}")
-            .ToArray();
-        return $"{string.Join(", ", parts)} {noun}{Plural(total)}.";
-    }
 
-    private static string Plural(int count) => count == 1 ? string.Empty : "s";
-
-    private static string? Clip(string? value, int max) =>
-        value is null ? null : value.Length <= max ? value : value[..(max - 1)] + "…";
 
     private static SyncRunIssueDto ToDto(ReportRowIssue issue) =>
         new(issue.Rejected ? "Error" : "Warning", issue.RowNumber > 0 ? issue.RowNumber : null, issue.Reference, issue.Message);
@@ -452,25 +436,5 @@ public sealed class ReportImportService(
     private static SyncRunIssueDto ToDto(SyncRunIssue issue) =>
         new(issue.Severity.ToString(), issue.RowNumber, issue.ExternalReference, issue.Message);
 
-    private static SyncRunDto ToDto(SyncRun run, string? fileName, int issueCount) => new(
-        run.Id,
-        run.FormatKey,
-        run.Platform,
-        ReportFormats.Find(run.FormatKey)?.Label,
-        run.Source.ToString(),
-        run.Status.ToString(),
-        run.StartedAt,
-        run.FinishedAt,
-        run.Created,
-        run.Updated,
-        run.Unchanged,
-        run.Rejected,
-        run.CoversFrom,
-        run.CoversTo,
-        run.IsCompleteSnapshot,
-        run.Summary,
-        fileName,
-        issueCount,
-        run.RerunOfId,
-        CanRerun: run.ArtifactId is not null && run.Status != SyncRunStatus.Running);
+    private static SyncRunDto ToDto(SyncRun run, string? fileName, int issueCount) => SyncRunDtos.From(run, fileName, issueCount);
 }

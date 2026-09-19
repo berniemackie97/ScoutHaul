@@ -1339,6 +1339,14 @@
               "format": "int32",
               "default": 25
             }
+          },
+          {
+            "name": "quiet",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
           }
         ],
         "responses": {
@@ -9623,6 +9631,744 @@
         }
       }
     },
+    "/api/sync/overview": {
+      "get": {
+        "tags": [
+          "Sync"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncOverviewDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncOverviewDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncOverviewDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sync/accounts/{accountId}/schedule": {
+      "put": {
+        "tags": [
+          "Sync"
+        ],
+        "parameters": [
+          {
+            "name": "accountId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSyncScheduleRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSyncScheduleRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSyncScheduleRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncOverviewDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncOverviewDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncOverviewDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sync/accounts/{accountId}/binding": {
+      "put": {
+        "tags": [
+          "Sync"
+        ],
+        "parameters": [
+          {
+            "name": "accountId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BindSyncAccountRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BindSyncAccountRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/BindSyncAccountRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncOverviewDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncOverviewDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncOverviewDto"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Sync"
+        ],
+        "parameters": [
+          {
+            "name": "accountId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncOverviewDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncOverviewDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncOverviewDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sync/scans": {
+      "post": {
+        "tags": [
+          "Sync"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestScanRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestScanRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestScanRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestScanResultDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestScanResultDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestScanResultDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sync/scans/{requestId}/cancel": {
+      "post": {
+        "tags": [
+          "Sync"
+        ],
+        "parameters": [
+          {
+            "name": "requestId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/sync/agents/{agentId}": {
+      "patch": {
+        "tags": [
+          "Sync"
+        ],
+        "parameters": [
+          {
+            "name": "agentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RenameSyncAgentRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RenameSyncAgentRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/RenameSyncAgentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncAgentDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncAgentDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncAgentDto"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Sync"
+        ],
+        "parameters": [
+          {
+            "name": "agentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/sync/pairings": {
+      "post": {
+        "tags": [
+          "Sync"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateSyncPairingResultDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateSyncPairingResultDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateSyncPairingResultDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sync/pairings/{pairingId}": {
+      "get": {
+        "tags": [
+          "Sync"
+        ],
+        "parameters": [
+          {
+            "name": "pairingId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncPairingDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncPairingDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncPairingDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sync/agent/pair": {
+      "post": {
+        "tags": [
+          "SyncAgent"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PairAgentRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PairAgentRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/PairAgentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/PairAgentResultDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PairAgentResultDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PairAgentResultDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sync/agent/heartbeat": {
+      "post": {
+        "tags": [
+          "SyncAgent"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentHeartbeatRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentHeartbeatRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentHeartbeatRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentHeartbeatDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentHeartbeatDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentHeartbeatDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sync/agent/disconnect": {
+      "post": {
+        "tags": [
+          "SyncAgent"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/sync/agent/runs": {
+      "post": {
+        "tags": [
+          "SyncAgent"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartAgentRunRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartAgentRunRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartAgentRunRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentRunDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentRunDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentRunDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sync/agent/runs/{runId}/batches": {
+      "post": {
+        "tags": [
+          "SyncAgent"
+        ],
+        "parameters": [
+          {
+            "name": "runId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentRunBatchRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentRunBatchRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentRunBatchRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentRunBatchResultDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentRunBatchResultDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentRunBatchResultDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sync/agent/runs/{runId}/complete": {
+      "post": {
+        "tags": [
+          "SyncAgent"
+        ],
+        "parameters": [
+          {
+            "name": "runId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompleteAgentRunRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompleteAgentRunRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompleteAgentRunRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncRunDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncRunDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncRunDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sync/agent/runs/{runId}/fail": {
+      "post": {
+        "tags": [
+          "SyncAgent"
+        ],
+        "parameters": [
+          {
+            "name": "runId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FailAgentRunRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FailAgentRunRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/FailAgentRunRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncRunDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncRunDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncRunDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/tasks": {
       "post": {
         "tags": [
@@ -10222,6 +10968,307 @@
         },
         "additionalProperties": false
       },
+      "AgentAccountDto": {
+        "type": "object",
+        "properties": {
+          "channelAccountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "platform": {
+            "type": "string",
+            "nullable": true
+          },
+          "displayName": {
+            "type": "string",
+            "nullable": true
+          },
+          "boundUsername": {
+            "type": "string",
+            "nullable": true
+          },
+          "salesEveryMinutes": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "listingsEveryMinutes": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "AgentHeartbeatDto": {
+        "type": "object",
+        "properties": {
+          "agentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "agentName": {
+            "type": "string",
+            "nullable": true
+          },
+          "organizationName": {
+            "type": "string",
+            "nullable": true
+          },
+          "heartbeatSeconds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "platforms": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AgentPlatformPolicyDto"
+            },
+            "nullable": true
+          },
+          "accounts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AgentAccountDto"
+            },
+            "nullable": true
+          },
+          "work": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AgentWorkDto"
+            },
+            "nullable": true
+          },
+          "serverTime": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "newToken": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "AgentHeartbeatRequest": {
+        "type": "object",
+        "properties": {
+          "extensionVersion": {
+            "type": "string",
+            "nullable": true
+          },
+          "browser": {
+            "type": "string",
+            "nullable": true
+          },
+          "marketplaces": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AgentMarketplaceReport"
+            },
+            "nullable": true
+          },
+          "operatingSystem": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "AgentMarketplaceReport": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string",
+            "nullable": true
+          },
+          "accessGranted": {
+            "type": "boolean"
+          },
+          "signedIn": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "username": {
+            "type": "string",
+            "nullable": true
+          },
+          "marketplaceUserId": {
+            "type": "string",
+            "nullable": true
+          },
+          "pausedUntil": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "pauseReason": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "AgentPlatformPolicyDto": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string",
+            "nullable": true
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "disabledReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "loops": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SyncLoopKind"
+            },
+            "nullable": true
+          },
+          "minSecondsBetweenRequests": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxRequestsPerMinute": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxRequestsPerDay": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "historyDays": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "AgentRunBatchRequest": {
+        "type": "object",
+        "properties": {
+          "orders": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IngestPlatformOrderInput"
+            },
+            "nullable": true
+          },
+          "listings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IngestPlatformListingInput"
+            },
+            "nullable": true
+          },
+          "issues": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AgentRunIssueInput"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "AgentRunBatchResultDto": {
+        "type": "object",
+        "properties": {
+          "created": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "updated": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "unchanged": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "leaseExpiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "AgentRunDto": {
+        "type": "object",
+        "properties": {
+          "runId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "leaseExpiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "cursor": {
+            "type": "string",
+            "nullable": true
+          },
+          "from": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "AgentRunIssueInput": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "nullable": true
+          },
+          "externalReference": {
+            "type": "string",
+            "nullable": true
+          },
+          "rejected": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "AgentWorkDto": {
+        "type": "object",
+        "properties": {
+          "channelAccountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "platform": {
+            "type": "string",
+            "nullable": true
+          },
+          "loop": {
+            "$ref": "#/components/schemas/SyncLoopKind"
+          },
+          "trigger": {
+            "$ref": "#/components/schemas/SyncTrigger"
+          },
+          "scanRequestId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "from": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "AssignTaskRequest": {
         "type": "object",
         "properties": {
@@ -10282,6 +11329,20 @@
           "lineCount": {
             "type": "integer",
             "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "BindSyncAccountRequest": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "nullable": true
+          },
+          "marketplaceUserId": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -10730,6 +11791,29 @@
         ],
         "type": "string"
       },
+      "CompleteAgentRunRequest": {
+        "type": "object",
+        "properties": {
+          "cursor": {
+            "type": "string",
+            "nullable": true
+          },
+          "coversFrom": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "coversTo": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "completeSnapshot": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
       "CompleteSourcingStopRequest": {
         "type": "object",
         "properties": {
@@ -11020,6 +12104,24 @@
           "notes": {
             "type": "string",
             "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "CreateSyncPairingResultDto": {
+        "type": "object",
+        "properties": {
+          "pairingId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string",
+            "nullable": true
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
           }
         },
         "additionalProperties": false
@@ -11414,6 +12516,19 @@
           "occurredAt": {
             "type": "string",
             "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "FailAgentRunRequest": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/SyncFailureKind"
+          },
+          "message": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -11858,7 +12973,8 @@
           },
           "feeTotal": {
             "type": "number",
-            "format": "double"
+            "format": "double",
+            "nullable": true
           },
           "lines": {
             "type": "array",
@@ -11961,6 +13077,9 @@
           "rawJson": {
             "type": "string",
             "nullable": true
+          },
+          "feesPending": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false
@@ -14093,6 +15212,54 @@
         },
         "additionalProperties": false
       },
+      "PairAgentRequest": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "nullable": true
+          },
+          "browser": {
+            "type": "string",
+            "nullable": true
+          },
+          "extensionVersion": {
+            "type": "string",
+            "nullable": true
+          },
+          "operatingSystem": {
+            "type": "string",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "PairAgentResultDto": {
+        "type": "object",
+        "properties": {
+          "agentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "agentName": {
+            "type": "string",
+            "nullable": true
+          },
+          "token": {
+            "type": "string",
+            "nullable": true
+          },
+          "organizationName": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "PaymentStatus": {
         "enum": [
           "Pending",
@@ -14558,6 +15725,9 @@
               "$ref": "#/components/schemas/PlatformOrderLineDto"
             },
             "nullable": true
+          },
+          "feesPending": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false
@@ -15302,6 +16472,16 @@
         },
         "additionalProperties": false
       },
+      "RenameSyncAgentRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "ReorderSourcingTripStopsRequest": {
         "type": "object",
         "properties": {
@@ -15634,6 +16814,49 @@
           "salesCount": {
             "type": "integer",
             "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RequestScanRequest": {
+        "type": "object",
+        "properties": {
+          "scope": {
+            "$ref": "#/components/schemas/SyncScanScope"
+          },
+          "channelAccountId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "platform": {
+            "type": "string",
+            "nullable": true
+          },
+          "from": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "RequestScanResultDto": {
+        "type": "object",
+        "properties": {
+          "requests": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SyncScanRequestDto"
+            },
+            "nullable": true
+          },
+          "skipped": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SkippedScanDto"
+            },
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -16425,6 +17648,24 @@
         },
         "additionalProperties": false
       },
+      "SkippedScanDto": {
+        "type": "object",
+        "properties": {
+          "channelAccountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "accountName": {
+            "type": "string",
+            "nullable": true
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "SourcingRouteDetailDto": {
         "type": "object",
         "properties": {
@@ -16774,6 +18015,35 @@
           },
           "status": {
             "$ref": "#/components/schemas/SourcingRouteStatus"
+          }
+        },
+        "additionalProperties": false
+      },
+      "StartAgentRunRequest": {
+        "type": "object",
+        "properties": {
+          "channelAccountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "loop": {
+            "$ref": "#/components/schemas/SyncLoopKind"
+          },
+          "trigger": {
+            "$ref": "#/components/schemas/SyncTrigger"
+          },
+          "signedInAs": {
+            "type": "string",
+            "nullable": true
+          },
+          "scanRequestId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "marketplaceUserId": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -17647,6 +18917,335 @@
         },
         "additionalProperties": false
       },
+      "SyncAccountDto": {
+        "type": "object",
+        "properties": {
+          "channelAccountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "platform": {
+            "type": "string",
+            "nullable": true
+          },
+          "displayName": {
+            "type": "string",
+            "nullable": true
+          },
+          "supported": {
+            "type": "boolean"
+          },
+          "supportedLoops": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SyncLoopKind"
+            },
+            "nullable": true
+          },
+          "supportsHistory": {
+            "type": "boolean"
+          },
+          "boundUsername": {
+            "type": "string",
+            "nullable": true
+          },
+          "boundAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "health": {
+            "$ref": "#/components/schemas/SyncAccountHealth"
+          },
+          "healthMessage": {
+            "type": "string",
+            "nullable": true
+          },
+          "loops": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SyncLoopDto"
+            },
+            "nullable": true
+          },
+          "sessions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SyncSessionSeenDto"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "SyncAccountHealth": {
+        "enum": [
+          "Ready",
+          "NotBound",
+          "NoBrowser",
+          "Paused",
+          "Disabled",
+          "Unsupported"
+        ],
+        "type": "string"
+      },
+      "SyncAgentDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "browser": {
+            "type": "string",
+            "nullable": true
+          },
+          "operatingSystem": {
+            "type": "string",
+            "nullable": true
+          },
+          "extensionVersion": {
+            "type": "string",
+            "nullable": true
+          },
+          "pairedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "pairedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastSeenAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "online": {
+            "type": "boolean"
+          },
+          "revoked": {
+            "type": "boolean"
+          },
+          "marketplaces": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SyncAgentMarketplaceDto"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "SyncAgentMarketplaceDto": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string",
+            "nullable": true
+          },
+          "accessGranted": {
+            "type": "boolean"
+          },
+          "signedIn": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "username": {
+            "type": "string",
+            "nullable": true
+          },
+          "pausedUntil": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "pauseReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "observedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "SyncFailureKind": {
+        "enum": [
+          "SignedOut",
+          "WrongAccount",
+          "RateLimited",
+          "Challenge",
+          "SiteChanged",
+          "Network",
+          "Error"
+        ],
+        "type": "string"
+      },
+      "SyncLoopDto": {
+        "type": "object",
+        "properties": {
+          "loop": {
+            "$ref": "#/components/schemas/SyncLoopKind"
+          },
+          "everyMinutes": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "lastStartedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "lastSucceededAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "lastRunId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "lastError": {
+            "type": "string",
+            "nullable": true
+          },
+          "consecutiveFailures": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "runningOn": {
+            "type": "string",
+            "nullable": true
+          },
+          "nextDueAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "SyncLoopKind": {
+        "enum": [
+          "Sales",
+          "Listings"
+        ],
+        "type": "string"
+      },
+      "SyncOverviewDto": {
+        "type": "object",
+        "properties": {
+          "accounts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SyncAccountDto"
+            },
+            "nullable": true
+          },
+          "agents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SyncAgentDto"
+            },
+            "nullable": true
+          },
+          "requests": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SyncScanRequestDto"
+            },
+            "nullable": true
+          },
+          "platforms": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SyncPlatformSettingsDto"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "SyncPairingDto": {
+        "type": "object",
+        "properties": {
+          "pairingId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "$ref": "#/components/schemas/SyncPairingStatus"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "agent": {
+            "$ref": "#/components/schemas/SyncAgentDto"
+          }
+        },
+        "additionalProperties": false
+      },
+      "SyncPairingStatus": {
+        "enum": [
+          "Waiting",
+          "Paired",
+          "Expired"
+        ],
+        "type": "string"
+      },
+      "SyncPlatformSettingsDto": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string",
+            "nullable": true
+          },
+          "loops": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SyncLoopKind"
+            },
+            "nullable": true
+          },
+          "suggestedSalesMinutes": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "minSalesMinutes": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "suggestedListingsMinutes": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "minListingsMinutes": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "historyDays": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "disabledReason": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "SyncRunDetailDto": {
         "type": "object",
         "properties": {
@@ -17747,6 +19346,18 @@
           },
           "canRerun": {
             "type": "boolean"
+          },
+          "loop": {
+            "type": "string",
+            "nullable": true
+          },
+          "trigger": {
+            "type": "string",
+            "nullable": true
+          },
+          "agentName": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -17799,9 +19410,142 @@
           "pageCount": {
             "type": "integer",
             "format": "int32"
+          },
+          "quietHidden": {
+            "type": "integer",
+            "format": "int32"
           }
         },
         "additionalProperties": false
+      },
+      "SyncScanRequestDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "channelAccountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "accountName": {
+            "type": "string",
+            "nullable": true
+          },
+          "platform": {
+            "type": "string",
+            "nullable": true
+          },
+          "loop": {
+            "$ref": "#/components/schemas/SyncLoopKind"
+          },
+          "from": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "status": {
+            "$ref": "#/components/schemas/SyncScanStatus"
+          },
+          "requestedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "finishedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "runningOn": {
+            "type": "string",
+            "nullable": true
+          },
+          "runId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "message": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "SyncScanScope": {
+        "enum": [
+          "Sales",
+          "Listings",
+          "History",
+          "Everything"
+        ],
+        "type": "string"
+      },
+      "SyncScanStatus": {
+        "enum": [
+          "Queued",
+          "Running",
+          "Succeeded",
+          "Failed",
+          "Cancelled",
+          "Expired"
+        ],
+        "type": "string"
+      },
+      "SyncSessionSeenDto": {
+        "type": "object",
+        "properties": {
+          "agentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "agentName": {
+            "type": "string",
+            "nullable": true
+          },
+          "online": {
+            "type": "boolean"
+          },
+          "accessGranted": {
+            "type": "boolean"
+          },
+          "signedIn": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "username": {
+            "type": "string",
+            "nullable": true
+          },
+          "marketplaceUserId": {
+            "type": "string",
+            "nullable": true
+          },
+          "pausedUntil": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "pauseReason": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "SyncTrigger": {
+        "enum": [
+          "Scheduled",
+          "Requested",
+          "Extension"
+        ],
+        "type": "string"
       },
       "UngroupSalesRequest": {
         "type": "object",
@@ -18143,6 +19887,22 @@
           },
           "storeDomain": {
             "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "UpdateSyncScheduleRequest": {
+        "type": "object",
+        "properties": {
+          "salesEveryMinutes": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "listingsEveryMinutes": {
+            "type": "integer",
+            "format": "int32",
             "nullable": true
           }
         },
@@ -18932,6 +20692,12 @@
     },
     {
       "name": "StoreSettings"
+    },
+    {
+      "name": "Sync"
+    },
+    {
+      "name": "SyncAgent"
     },
     {
       "name": "Tasks"

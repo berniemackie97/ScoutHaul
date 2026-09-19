@@ -82,6 +82,7 @@ public sealed class PlatformOrderFeeEnrichmentService(
             }
 
             order.FeeTotal = order.Lines.Sum(line => line.PlatformFees ?? 0);
+            order.FeesPending = false;
             decimal labelTotal = order.Lines.Sum(line => line.SellerShippingCost ?? 0);
             if (order.Lines.Any(line => line.SellerShippingCost.HasValue))
             {

@@ -104,7 +104,7 @@ public class ArchitectureTests
     /// exact state this test exists to rule out.
     /// </summary>
     private static bool DeclaresGate(object[] attributes) => attributes.Any(attribute =>
-        attribute is RequireOrganizationPermissionAttribute or RequireOrganizationMemberAttribute or AllowAnonymousAttribute
+        attribute is RequireOrganizationPermissionAttribute or RequireOrganizationMemberAttribute or RequireSyncAgentAttribute or AllowAnonymousAttribute
         || attribute is AuthorizeAttribute { AuthenticationSchemes: StorefrontAuthDefaults.Scheme });
 
     /// <summary>A controller that has been de-persisted must stay that way.</summary>

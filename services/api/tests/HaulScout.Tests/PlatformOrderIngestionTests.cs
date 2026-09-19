@@ -529,10 +529,18 @@ Repeat Listing Item,REPEAT-ITEM,-,-,2,$110.00,$100.00,$0.00,$0.00,$10.00,$20.00,
         Assert.Equal(5.97m, order.SellerShippingCost);
         Assert.Equal(62.92m, order.PayoutAmount);
 
+        // The All Orders report carries no fees. Re-importing it after the fee report used to wipe them —
+        // and count that as an update; now what it does not know leaves the fees as they were.
         ActionResult<IngestPlatformOrdersResultDto> second = await controller.ImportEbayCsv(new ImportPlatformOrdersCsvRequest("eBay", EbayAllOrdersCsv), CancellationToken.None);
         Assert.Equal(0, second.Value!.Created);
-        Assert.Equal(1, second.Value.Updated);
+        Assert.Equal(0, second.Value.Updated);
+        Assert.Equal(1, second.Value.Unchanged);
         Assert.Single(await db.PlatformOrders.ToListAsync());
+        order = await db.PlatformOrders.Include(o => o.Lines).SingleAsync();
+        Assert.Equal(12.08m, order.FeeTotal);
+        Assert.Equal(5.97m, order.SellerShippingCost);
+        Assert.Equal(62.92m, order.PayoutAmount);
+        Assert.Equal(12.08m, order.Lines.Sum(line => line.PlatformFees));
     }
 
     [Fact]
@@ -1134,5 +1142,68 @@ Brass Lamp,377251318593,1,$0.00,$0.00,$0.00,$0.00,$0.00,$12.34,$0.00,$0.00,$16.9
         ActionResult<PlatformOrderDto> detail = await controller.Get(order.Id, CancellationToken.None);
         Assert.Equal(92m, detail.Value!.ExpectedPayout);
         Assert.Equal(-2m, detail.Value.PayoutVariance);
+    }
+
+    [Fact]
+    public async Task An_order_seen_before_its_fees_are_posted_waits_and_settles_when_they_arrive()
+    {
+        var (db, org, user) = NewContext(nameof(An_order_seen_before_its_fees_are_posted_waits_and_settles_when_they_arrive));
+        await using var _ = db;
+        var controller = NewController(db, org, user);
+
+        InventoryItem item = SeedItem(db, org, "Leather Boots", 30m);
+        item.Barcode = "SKU-BOOT-9";
+        db.SaveChanges();
+        IngestPlatformOrderLineInput[] lines = [new("Leather Boots", 90m, Sku: "SKU-BOOT-9")];
+
+        // A scan minutes after the sale: the match is certain, but the marketplace has not posted the
+        // fees, so settling now would write a sale with a profit that is not true.
+        IngestPlatformOrderInput early = Order("ORD-EARLY", lines) with { FeeTotal = null, FeesPending = true };
+        ActionResult<IngestPlatformOrdersResultDto> seen = await controller.Ingest(new IngestPlatformOrdersRequest("eBay", [early]), CancellationToken.None);
+        Assert.Equal(0, seen.Value!.AutoReconciled);
+        PlatformOrder order = await db.PlatformOrders.Include(o => o.Lines).SingleAsync();
+        Assert.True(order.FeesPending);
+        Assert.Equal(PlatformOrderStatus.Imported, order.Status);
+        Assert.True(seen.Value.Orders.Single().FeesPending);
+
+        // Nor can a person settle it by hand while the fee figure is a placeholder.
+        ActionResult<PlatformOrderReconcileResultDto> byHand = await controller.Reconcile(
+            order.Id, new ReconcilePlatformOrderRequest([new ReconcilePlatformOrderLineMap(order.Lines.Single().Id, item.Id)]), CancellationToken.None);
+        Assert.Equal(400, Assert.IsType<ObjectResult>(byHand.Result).StatusCode);
+
+        // The next scan brings the fees; the order settles itself.
+        ActionResult<IngestPlatformOrdersResultDto> posted = await controller.Ingest(
+            new IngestPlatformOrdersRequest("eBay", [Order("ORD-EARLY", lines, fee: 11.43m)]), CancellationToken.None);
+        Assert.Equal(1, posted.Value!.AutoReconciled);
+        order = await db.PlatformOrders.Include(o => o.Lines).SingleAsync();
+        Assert.False(order.FeesPending);
+        Assert.Equal(11.43m, order.FeeTotal);
+        Assert.Equal(PlatformOrderStatus.Reconciled, order.Status);
+    }
+
+    [Fact]
+    public async Task A_source_that_does_not_carry_a_figure_never_erases_it()
+    {
+        var (db, org, user) = NewContext(nameof(A_source_that_does_not_carry_a_figure_never_erases_it));
+        await using var _ = db;
+        var controller = NewController(db, org, user);
+
+        IngestPlatformOrderLineInput[] withFees = [new("Lamp", 40m, ExternalItemId: "377001", PlatformFees: 5.20m, SellerShippingCost: 7.10m)];
+        await controller.Ingest(new IngestPlatformOrdersRequest("eBay",
+            [Order("ORD-MIX", withFees, fee: 5.20m, payout: 27.70m) with { BuyerEmail = "buyer@x.com", ShippingCost = 7.10m }]), CancellationToken.None);
+
+        // A second source knows the order and its lines but none of the money after the sale.
+        IngestPlatformOrderLineInput[] bare = [new("Lamp", 40m, ExternalItemId: "377001")];
+        ActionResult<IngestPlatformOrdersResultDto> again = await controller.Ingest(new IngestPlatformOrdersRequest("eBay",
+            [Order("ORD-MIX", bare) with { FeeTotal = null }]), CancellationToken.None);
+
+        Assert.Equal(1, again.Value!.Unchanged);
+        PlatformOrder order = await db.PlatformOrders.Include(o => o.Lines).SingleAsync();
+        Assert.Equal(5.20m, order.FeeTotal);
+        Assert.Equal(7.10m, order.SellerShippingCost);
+        Assert.Equal(27.70m, order.PayoutAmount);
+        Assert.Equal("buyer@x.com", order.BuyerEmail);
+        Assert.Equal(5.20m, order.Lines.Single().PlatformFees);
+        Assert.Equal(7.10m, order.Lines.Single().SellerShippingCost);
     }
 }

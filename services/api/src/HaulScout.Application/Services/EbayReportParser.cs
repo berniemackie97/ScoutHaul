@@ -180,7 +180,9 @@ public static class EbayReportParser
                 ItemsSubtotal: itemSubtotal,
                 ShippingCharged: shipping,
                 TaxCollected: sellerTax + ebayTax,
-                FeeTotal: 0,
+                // The All Orders report carries no fees. Saying so, rather than 0, keeps a re-import
+                // from wiping fees the Listings Sales report or a sales scan already recorded.
+                FeeTotal: null,
                 Lines: lines,
                 Platform: "eBay",
                 ShippingCost: null,

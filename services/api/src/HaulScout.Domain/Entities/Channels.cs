@@ -32,7 +32,36 @@ public sealed class ChannelAccount : EntityBase, IOrganizationScoped
     public DateTimeOffset? ConnectedAt { get; set; }
     public string? Notes { get; set; }
 
+    /// <summary>
+    /// The marketplace account this channel account syncs, as a paired browser saw it signed in and
+    /// the operator confirmed. A browser signed in as anyone else is refused, so a personal account
+    /// open in the same browser can never be synced into the business by mistake.
+    /// </summary>
+    public string? BoundUsername { get; set; }
+
+    /// <summary>The marketplace's own stable id for the bound user, where it exposes one.</summary>
+    public string? BoundMarketplaceUserId { get; set; }
+
+    public DateTimeOffset? BoundAt { get; set; }
+    public Guid? BoundByUserId { get; set; }
+
+    /// <summary>How often a paired browser scans this account's new sales. Null — the default — is off.</summary>
+    public int? SalesScanEveryMinutes { get; set; }
+
+    /// <summary>How often a paired browser snapshots this account's live listings. Null — the default — is off.</summary>
+    public int? ListingsScanEveryMinutes { get; set; }
+
     public ICollection<ChannelListing> Listings { get; set; } = [];
+
+    public bool IsBound => !string.IsNullOrWhiteSpace(BoundUsername);
+
+    /// <summary>The schedule for one loop; null when it is off.</summary>
+    public int? EveryMinutes(SyncLoopKind loop) => loop switch
+    {
+        SyncLoopKind.Sales => SalesScanEveryMinutes,
+        SyncLoopKind.Listings => ListingsScanEveryMinutes,
+        _ => null,
+    };
 }
 
 /// <summary>

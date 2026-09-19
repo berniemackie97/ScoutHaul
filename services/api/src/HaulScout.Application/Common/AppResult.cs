@@ -37,6 +37,30 @@ public static class AppErrorCode
     /// </summary>
     public const string RequestInFlight = "request_in_flight";
 
+    /// <summary>Another paired browser holds this account's lease; this one should leave it be.</summary>
+    public const string SyncLeaseHeld = "sync_lease_held";
+
+    /// <summary>The run's lease expired or was taken over; the agent should stop and let the next one run.</summary>
+    public const string SyncLeaseLost = "sync_lease_lost";
+
+    /// <summary>The browser is signed in to the marketplace as someone other than the bound account.</summary>
+    public const string SyncWrongAccount = "sync_wrong_account";
+
+    /// <summary>The account is not bound to a marketplace account yet.</summary>
+    public const string SyncNotBound = "sync_not_bound";
+
+    /// <summary>The marketplace has no adapter, or sync for it is switched off.</summary>
+    public const string SyncUnavailable = "sync_unavailable";
+
+    /// <summary>The person who paired the browser no longer has the permission this sync writes under.</summary>
+    public const string SyncNotPermitted = "sync_not_permitted";
+
+    /// <summary>The run already finished; the agent is holding a stale reference.</summary>
+    public const string SyncRunFinished = "sync_run_finished";
+
+    /// <summary>The pairing code is wrong, used, or expired.</summary>
+    public const string SyncPairingInvalid = "sync_pairing_invalid";
+
     /// <summary>The default reason for a status, for callers that have nothing more specific to say.</summary>
     public static string ForStatus(AppResultStatus status) => status switch
     {
@@ -64,6 +88,9 @@ public sealed record AppResult<T>(AppResultStatus Status, T? Value = default, st
     public static AppResult<T> NotFound(string? message = null, string? code = null) => new(AppResultStatus.NotFound, default, message, code);
     public static AppResult<T> Validation(string message, string? code = null) => new(AppResultStatus.Validation, default, message, code);
     public static AppResult<T> Conflict(string message, string? code = null) => new(AppResultStatus.Conflict, default, message, code);
+
+    /// <summary>A refusal decided without a value in mind, carried over as it is — status, words and code.</summary>
+    public static AppResult<T> Refused(AppResult refusal) => new(refusal.Status, default, refusal.Message, refusal.Code);
 
     /// <summary>The reason to send the caller: what this result said, or the default for its status.</summary>
     public string ResolvedCode => Code ?? AppErrorCode.ForStatus(Status);

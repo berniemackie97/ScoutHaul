@@ -285,7 +285,7 @@ public sealed class ReportImportTests
         await harness.Imports.ImportAsync([PoshmarkFile("Blouse")], CancellationToken.None);
         await harness.Imports.ImportAsync([DepopFile(DepopRow("Coat", bundle: "Yes"))], CancellationToken.None);
 
-        SyncRunListDto history = await harness.Imports.ListAsync(1, 25, CancellationToken.None);
+        SyncRunListDto history = await harness.Imports.ListAsync(1, 25, includeQuiet: false, CancellationToken.None);
 
         Assert.Equal(2, history.Total);
         Assert.Equal("depop.sales", history.Items[0].FormatKey);

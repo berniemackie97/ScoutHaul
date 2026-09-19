@@ -74,6 +74,11 @@ public sealed class HaulScoutDbContext(
     public DbSet<SyncRun> SyncRuns => Set<SyncRun>();
     public DbSet<SyncRunIssue> SyncRunIssues => Set<SyncRunIssue>();
     public DbSet<SyncArtifact> SyncArtifacts => Set<SyncArtifact>();
+    public DbSet<SyncAgent> SyncAgents => Set<SyncAgent>();
+    public DbSet<SyncAgentMarketplace> SyncAgentMarketplaces => Set<SyncAgentMarketplace>();
+    public DbSet<SyncPairing> SyncPairings => Set<SyncPairing>();
+    public DbSet<SyncLoop> SyncLoops => Set<SyncLoop>();
+    public DbSet<SyncScanRequest> SyncScanRequests => Set<SyncScanRequest>();
     public DbSet<PlatformListingQualitySnapshot> PlatformListingQualitySnapshots => Set<PlatformListingQualitySnapshot>();
     public DbSet<PlatformOrderLine> PlatformOrderLines => Set<PlatformOrderLine>();
 
@@ -790,6 +795,8 @@ public sealed class HaulScoutDbContext(
             entity.Property(item => item.ExternalAccountId).HasMaxLength(200);
             entity.Property(item => item.DefaultFeeProfileId).HasMaxLength(80);
             entity.Property(item => item.Notes).HasMaxLength(2000);
+            entity.Property(item => item.BoundUsername).HasMaxLength(120);
+            entity.Property(item => item.BoundMarketplaceUserId).HasMaxLength(120);
             entity.HasIndex(item => new { item.OrganizationId, item.Channel });
             entity.HasIndex(item => new { item.OrganizationId, item.DisplayName }).IsUnique();
         });
@@ -824,6 +831,7 @@ public sealed class HaulScoutDbContext(
         modelBuilder.Entity<PlatformOrder>(entity =>
         {
             entity.ToTable("PlatformOrders");
+            entity.Property(item => item.FeesPending).HasDefaultValue(false);
             entity.Property(item => item.Platform).HasMaxLength(60).IsRequired();
             entity.Property(item => item.ExternalOrderId).HasMaxLength(120).IsRequired();
             entity.Property(item => item.BuyerName).HasMaxLength(200);
@@ -884,9 +892,70 @@ public sealed class HaulScoutDbContext(
             entity.Property(item => item.Summary).HasMaxLength(500);
             // History is read newest first, per organization; that is the only list query.
             entity.HasIndex(item => new { item.OrganizationId, item.StartedAt });
+            entity.Property(item => item.Loop).HasConversion<string>().HasMaxLength(16);
+            entity.Property(item => item.Trigger).HasConversion<string>().HasMaxLength(16);
             entity.HasOne(item => item.ChannelAccount).WithMany().HasForeignKey(item => item.ChannelAccountId).OnDelete(DeleteBehavior.SetNull);
             entity.HasOne(item => item.Artifact).WithMany().HasForeignKey(item => item.ArtifactId).OnDelete(DeleteBehavior.SetNull);
+            entity.HasOne(item => item.SyncAgent).WithMany().HasForeignKey(item => item.SyncAgentId).OnDelete(DeleteBehavior.SetNull);
             entity.HasMany(item => item.Issues).WithOne(item => item.SyncRun).HasForeignKey(item => item.SyncRunId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<SyncAgent>(entity =>
+        {
+            entity.ToTable("SyncAgents");
+            entity.Property(item => item.Name).HasMaxLength(80).IsRequired();
+            entity.Property(item => item.Browser).HasMaxLength(40).IsRequired();
+            entity.Property(item => item.OperatingSystem).HasMaxLength(40);
+            entity.Property(item => item.ExtensionVersion).HasMaxLength(24).IsRequired();
+            entity.Property(item => item.TokenHash).HasMaxLength(64).IsRequired();
+            entity.Property(item => item.PreviousTokenHash).HasMaxLength(64);
+            // A token is looked up before anyone knows its organization, so its hash is unique everywhere.
+            entity.HasIndex(item => item.TokenHash).IsUnique();
+            entity.HasIndex(item => item.PreviousTokenHash);
+            entity.HasIndex(item => item.OrganizationId);
+            entity.HasOne(item => item.PairedByUser).WithMany().HasForeignKey(item => item.PairedByUserId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasMany(item => item.Marketplaces).WithOne(item => item.SyncAgent).HasForeignKey(item => item.SyncAgentId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<SyncAgentMarketplace>(entity =>
+        {
+            entity.ToTable("SyncAgentMarketplaces");
+            entity.Property(item => item.Platform).HasMaxLength(60).IsRequired();
+            entity.Property(item => item.Username).HasMaxLength(120);
+            entity.Property(item => item.MarketplaceUserId).HasMaxLength(120);
+            entity.Property(item => item.PauseReason).HasMaxLength(300);
+            entity.HasIndex(item => new { item.SyncAgentId, item.Platform }).IsUnique();
+        });
+
+        modelBuilder.Entity<SyncPairing>(entity =>
+        {
+            entity.ToTable("SyncPairings");
+            entity.Property(item => item.CodeHash).HasMaxLength(64).IsRequired();
+            entity.HasIndex(item => item.CodeHash).IsUnique();
+            entity.HasIndex(item => item.OrganizationId);
+        });
+
+        modelBuilder.Entity<SyncLoop>(entity =>
+        {
+            entity.ToTable("SyncLoops");
+            entity.Property(item => item.Kind).HasConversion<string>().HasMaxLength(16);
+            entity.Property(item => item.Cursor).HasMaxLength(400);
+            entity.Property(item => item.LastError).HasMaxLength(500);
+            entity.Property(item => item.Version).IsConcurrencyToken();
+            entity.HasIndex(item => new { item.ChannelAccountId, item.Kind }).IsUnique();
+            entity.HasIndex(item => item.OrganizationId);
+            entity.HasOne(item => item.ChannelAccount).WithMany().HasForeignKey(item => item.ChannelAccountId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<SyncScanRequest>(entity =>
+        {
+            entity.ToTable("SyncScanRequests");
+            entity.Property(item => item.Loop).HasConversion<string>().HasMaxLength(16);
+            entity.Property(item => item.Status).HasConversion<string>().HasMaxLength(16);
+            entity.Property(item => item.Message).HasMaxLength(500);
+            entity.HasIndex(item => new { item.OrganizationId, item.Status });
+            entity.HasIndex(item => new { item.ChannelAccountId, item.Loop, item.Status });
+            entity.HasOne(item => item.ChannelAccount).WithMany().HasForeignKey(item => item.ChannelAccountId).OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<SyncRunIssue>(entity =>

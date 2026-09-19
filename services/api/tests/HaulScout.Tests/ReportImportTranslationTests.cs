@@ -129,7 +129,7 @@ public sealed class ReportImportTranslationTests(PostgresFixture postgres)
         SyncRunDto run = Assert.Single((await imports.ImportAsync([file], CancellationToken.None)).Files).Run!;
         db.ChangeTracker.Clear();
 
-        SyncRunListDto history = await imports.ListAsync(1, 25, CancellationToken.None);
+        SyncRunListDto history = await imports.ListAsync(1, 25, includeQuiet: false, CancellationToken.None);
         Assert.Equal("Depop Sales.csv", Assert.Single(history.Items).FileName);
 
         ReportDetectionDto detected = Assert.Single(await imports.DetectAsync([file], CancellationToken.None));
@@ -137,4 +137,54 @@ public sealed class ReportImportTranslationTests(PostgresFixture postgres)
 
         Assert.Equal(file.Content, (await imports.DownloadAsync(run.Id, CancellationToken.None)).Value!.Content);
     }
+
+    [Fact]
+    public async Task Scans_that_changed_nothing_stay_out_of_the_history_until_asked_for()
+    {
+        (HaulScoutDbContext db, Guid org, Guid user) = await postgres.NewOrganizationAsync();
+        await using HaulScoutDbContext _ = db;
+        Domain.Entities.SyncAgent agent = new()
+        {
+            OrganizationId = org,
+            Name = "Office mini-PC",
+            Browser = "Firefox",
+            ExtensionVersion = "1.0.0",
+            PairedByUserId = user,
+            PairedAt = DateTimeOffset.UtcNow,
+            TokenHash = Application.Sync.Agents.SyncSecrets.HashToken(Application.Sync.Agents.SyncSecrets.NewToken()),
+            TokenIssuedAt = DateTimeOffset.UtcNow,
+        };
+        db.SyncAgents.Add(agent);
+        db.SyncRuns.AddRange(
+            Scan(org, agent.Id, created: 0, minutesAgo: 30),
+            Scan(org, agent.Id, created: 0, minutesAgo: 20),
+            Scan(org, agent.Id, created: 2, minutesAgo: 10));
+        await db.SaveChangesAsync();
+        db.ChangeTracker.Clear();
+        ReportImportService imports = Imports(db, org, user);
+
+        SyncRunListDto usual = await imports.ListAsync(1, 25, includeQuiet: false, CancellationToken.None);
+        SyncRunDto scan = Assert.Single(usual.Items);
+        Assert.Equal((2, "Office mini-PC", "eBay sales scan"), (scan.Created, scan.AgentName, scan.FormatLabel));
+        Assert.Equal(2, usual.QuietHidden);
+
+        SyncRunListDto everything = await imports.ListAsync(1, 25, includeQuiet: true, CancellationToken.None);
+        Assert.Equal((3, 0), (everything.Items.Count, everything.QuietHidden));
+    }
+
+    private static Domain.Entities.SyncRun Scan(Guid org, Guid agentId, int created, int minutesAgo) => new()
+    {
+        OrganizationId = org,
+        Source = Domain.Entities.SyncSource.Agent,
+        FormatKey = "agent.ebay.sales",
+        Platform = "eBay",
+        Status = Domain.Entities.SyncRunStatus.Succeeded,
+        StartedAt = DateTimeOffset.UtcNow.AddMinutes(-minutesAgo),
+        FinishedAt = DateTimeOffset.UtcNow.AddMinutes(-minutesAgo),
+        Created = created,
+        Unchanged = 5,
+        SyncAgentId = agentId,
+        Loop = Domain.Entities.SyncLoopKind.Sales,
+        Trigger = Domain.Entities.SyncTrigger.Scheduled,
+    };
 }

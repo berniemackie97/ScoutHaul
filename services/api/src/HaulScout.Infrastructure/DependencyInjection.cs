@@ -5,6 +5,7 @@ using HaulScout.Application.Common;
 using HaulScout.Application.Inventory;
 using HaulScout.Application.Search;
 using HaulScout.Application.Sync;
+using HaulScout.Application.Sync.Agents;
 using HaulScout.Application.Organizations;
 using HaulScout.Application.PlatformOrders;
 using HaulScout.Application.ReferenceData;
@@ -50,6 +51,7 @@ public static class DependencyInjection
         services.AddScoped<IInventoryStore, EfInventoryStore>();
         services.AddScoped<ISearchStore, EfSearchStore>();
         services.AddScoped<ISyncRunStore, EfSyncRunStore>();
+        services.AddScoped<ISyncAgentStore, EfSyncAgentStore>();
         services.AddScoped<IStorefrontCartStore, EfStorefrontCartStore>();
         services.AddScoped<IStorefrontCheckoutStore, EfStorefrontCheckoutStore>();
         services.AddScoped<IStorefrontCustomerStore, EfStorefrontCustomerStore>();

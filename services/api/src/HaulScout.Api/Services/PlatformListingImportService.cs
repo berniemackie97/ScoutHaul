@@ -10,6 +10,7 @@ using HaulScout.Application.Services;
 using HaulScout.Domain;
 using HaulScout.Domain.Entities;
 using HaulScout.Infrastructure.Persistence;
+using HaulScout.Application.Sync.Agents;
 
 namespace HaulScout.Api.Services;
 
@@ -21,7 +22,7 @@ namespace HaulScout.Api.Services;
 /// too, so they moved here unchanged apart from one fix: an identical re-import now counts as
 /// unchanged instead of updated.
 /// </summary>
-public sealed class PlatformListingImportService(HaulScoutDbContext db, ICurrentUserContext currentUser)
+public sealed class PlatformListingImportService(HaulScoutDbContext db, ICurrentUserContext currentUser) : IPlatformListingIngestion
 {
     /// <summary>Idempotent batch upsert of imported/captured listings. Re-ingesting a listing that is not yet linked
     /// refreshes it; a listing already linked to inventory keeps its link but still refreshes its imported fields.</summary>
