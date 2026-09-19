@@ -28,6 +28,7 @@ Firefox is the first target. The same code builds for Chrome and Edge, and Safar
 | Safety governor, as pure functions | `src/agent/governor.ts` |
 | The sync tab, and waiting for a page to really load | `src/agent/transport.ts` |
 | eBay adapter: reads the JSON each Seller Hub page embeds | `src/adapters/ebay/` |
+| Vinted adapter: reads Vinted's own JSON API, from a Vinted page | `src/adapters/vinted/` |
 | Popup: connect, marketplace access, what is happening, scan now, activity | `src/popup/` (states worked out in `model.ts`) |
 | Portal bridge: tells the HaulScout portal the extension is here and can be woken | `src/entrypoints/portal.content.ts` |
 
@@ -61,6 +62,20 @@ asked for waits and runs as soon as it can, instead of failing.
 The extension notices when that happens without anyone pressing a button. When an eBay page
 finishes loading in one of your tabs, it looks again: you signed in, or you finished the check in
 Seller Hub.
+
+**Vinted.** Vinted has no seller report, so each sale is read in full from the sale itself: the
+price agreed, its items, and the buyer's username. Vinted's fee (Buyer Protection) and the shipping
+label are paid by the buyer, so an individual seller's sale records no fees. It is paid out once the
+sale completes. The first scan reads the seller's whole order history. After that, Vinted lists the
+sales with the latest activity first, and the adapter remembers each sale it has read. A routine
+scan reads again only what changed, and stops at the first page with nothing new. A cancelled sale
+is reported as cancelled: HaulScout sets it aside if it has not become a sale yet, and otherwise
+asks a person to correct it.
+
+Vinted's sync tab sits on a real Vinted page (the sold orders) rather than a bare file, for two
+reasons. Vinted's own pages renew an expired sign-in as they load, and its bot protection
+(DataDome) runs in them. A request DataDome blocks answers with a pointer to
+`captcha-delivery.com`; that is how a security check is recognised.
 
 **Pairing** uses a one-time code:
 1. HaulScout shows the code under **Sync → Browsers → Connect a browser**.
@@ -99,7 +114,8 @@ removed when Firefox restarts.
 
 1. Write an adapter against the real site, in a browser signed in to that marketplace. Its
    `readable` and `pageKind` tell the sync tab which pages are the marketplace's own, and which are
-   its sign-in form and security check.
+   its sign-in form and security check. An adapter that would otherwise read the same thing on
+   every scan keeps it in `context.memory`, as Vinted does with each sale.
 2. List it in `src/adapters/registry.ts` and add its origin to `marketplaceOrigins` in
    `wxt.config.ts`.
 3. List it in `SyncPlatforms` on the server, in the same change.

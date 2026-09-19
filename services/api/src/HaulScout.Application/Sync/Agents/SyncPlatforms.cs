@@ -7,6 +7,7 @@ namespace HaulScout.Application.Sync.Agents;
 /// reaches, the cadences the hub suggests and the least it allows, and how gently the agent must
 /// treat the site.
 /// </summary>
+/// <param name="OlderSalesHint">Where sales older than <paramref name="HistoryDays"/> can come from instead, when anywhere.</param>
 public sealed record SyncPlatform(
     string Platform,
     IReadOnlyList<SyncLoopKind> Loops,
@@ -17,7 +18,8 @@ public sealed record SyncPlatform(
     int MinListingsMinutes,
     int MinSecondsBetweenRequests,
     int MaxRequestsPerMinute,
-    int MaxRequestsPerDay)
+    int MaxRequestsPerDay,
+    string? OlderSalesHint = null)
 {
     public bool Supports(SyncLoopKind loop) => Loops.Contains(loop);
 
@@ -45,9 +47,27 @@ public static class SyncPlatforms
         MinListingsMinutes: 60,
         MinSecondsBetweenRequests: 3,
         MaxRequestsPerMinute: 12,
-        MaxRequestsPerDay: 1500);
+        MaxRequestsPerDay: 1500,
+        OlderSalesHint: "For older sales, import the order report.");
 
-    public static readonly IReadOnlyList<SyncPlatform> All = [Ebay];
+    /// <summary>
+    /// Vinted (vinted.com, USD). It has no seller report, so a sales scan carries each sale's money in
+    /// full and reaches back through the seller's whole order history — the first scan reads all of
+    /// it. The site guards itself against automation closely, so it is read more gently than eBay.
+    /// </summary>
+    public static readonly SyncPlatform Vinted = new(
+        "Vinted",
+        [SyncLoopKind.Sales, SyncLoopKind.Listings],
+        HistoryDays: 3650,
+        SuggestedSalesMinutes: 30,
+        MinSalesMinutes: 15,
+        SuggestedListingsMinutes: 240,
+        MinListingsMinutes: 120,
+        MinSecondsBetweenRequests: 4,
+        MaxRequestsPerMinute: 10,
+        MaxRequestsPerDay: 800);
+
+    public static readonly IReadOnlyList<SyncPlatform> All = [Ebay, Vinted];
 
     public static SyncPlatform? Find(string? platform) =>
         All.FirstOrDefault(candidate => string.Equals(candidate.Platform, platform?.Trim(), StringComparison.OrdinalIgnoreCase));

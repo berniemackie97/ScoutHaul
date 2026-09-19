@@ -154,6 +154,8 @@ export const ebayAdapter: MarketplaceAdapter = {
 
     return {
       orders,
+      // Not read from eBay's scan yet; its refunds reach the books through the order report import.
+      cancelledOrderIds: [],
       issues,
       cursor: Number.isFinite(newest) ? new Date(newest).toISOString() : window.cursor,
       coversFrom: from.toISOString(),

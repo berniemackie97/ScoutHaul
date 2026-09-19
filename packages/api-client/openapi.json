@@ -11242,6 +11242,13 @@
               "$ref": "#/components/schemas/AgentRunIssueInput"
             },
             "nullable": true
+          },
+          "cancelledOrderIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
           }
         },
         "additionalProperties": false

@@ -21,6 +21,17 @@ export interface MarketplaceContext {
   page(url: string): Promise<PageResponse>;
   request(url: string): Promise<PageResponse>;
   now(): Date;
+  /** What the adapter keeps between scans in this browser, so work already done is not asked for again. */
+  memory: AdapterMemory;
+}
+
+/**
+ * A small store an adapter keeps between scans, in this browser only. Bounded: the oldest entries go
+ * first, so it never grows without limit, and anything forgotten is simply read again.
+ */
+export interface AdapterMemory {
+  get<T>(key: string): Promise<T | undefined>;
+  set<T>(key: string, value: T): Promise<void>;
 }
 
 export interface Session {
@@ -31,6 +42,8 @@ export interface Session {
 
 export interface SalesScan {
   orders: IngestOrder[];
+  /** Orders the marketplace shows as cancelled, by external order id — sales that did not happen after all. */
+  cancelledOrderIds: string[];
   issues: RunIssue[];
   /** Where the next scan can resume from — the newest sale seen. */
   cursor: string | null;
@@ -77,8 +90,9 @@ export interface MarketplaceAdapter {
   readable(url: string): boolean;
   pageKind(url: string): PageKind;
   detectSession(context: MarketplaceContext): Promise<Session>;
-  scanSales(context: MarketplaceContext, window: SalesWindow): Promise<SalesScan>;
-  snapshotListings(context: MarketplaceContext): Promise<ListingsSnapshot>;
+  /** `session` is who the scan runs as, as just detected. */
+  scanSales(context: MarketplaceContext, window: SalesWindow, session: Session): Promise<SalesScan>;
+  snapshotListings(context: MarketplaceContext, session: Session): Promise<ListingsSnapshot>;
 }
 
 /** A failure an adapter understands, classified so the server and the governor react correctly. */

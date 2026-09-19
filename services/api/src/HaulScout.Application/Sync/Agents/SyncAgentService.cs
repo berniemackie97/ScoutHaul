@@ -335,13 +335,14 @@ public sealed class SyncAgentService(
         IReadOnlyList<IngestPlatformOrderInput> orders = batch.Orders ?? [];
         IReadOnlyList<IngestPlatformListingInput> listings = batch.Listings ?? [];
         IReadOnlyList<AgentRunIssueInput> issues = batch.Issues ?? [];
-        if (orders.Count > MaxOrdersPerBatch || listings.Count > MaxListingsPerBatch || issues.Count > MaxIssuesPerBatch)
+        IReadOnlyList<string> cancelled = batch.CancelledOrderIds ?? [];
+        if (orders.Count > MaxOrdersPerBatch || cancelled.Count > MaxOrdersPerBatch || listings.Count > MaxListingsPerBatch || issues.Count > MaxIssuesPerBatch)
         {
             return AppResult<AgentRunBatchResultDto>.Validation(
-                $"A batch carries at most {MaxOrdersPerBatch} orders, {MaxListingsPerBatch} listings and {MaxIssuesPerBatch} issues.");
+                $"A batch carries at most {MaxOrdersPerBatch} orders, {MaxOrdersPerBatch} cancellations, {MaxListingsPerBatch} listings and {MaxIssuesPerBatch} issues.");
         }
 
-        if ((run!.Loop == SyncLoopKind.Sales && listings.Count > 0) || (run.Loop == SyncLoopKind.Listings && orders.Count > 0))
+        if ((run!.Loop == SyncLoopKind.Sales && listings.Count > 0) || (run.Loop == SyncLoopKind.Listings && (orders.Count > 0 || cancelled.Count > 0)))
         {
             return AppResult<AgentRunBatchResultDto>.Validation("A sales run delivers orders and a listings run delivers listings.");
         }
@@ -385,11 +386,21 @@ public sealed class SyncAgentService(
             (created, updated, unchanged) = (result.Value.Created, result.Value.Updated, result.Value.Unchanged);
         }
 
+        List<AgentRunIssueInput> raised = [.. issues];
+        if (cancelled.Count > 0)
+        {
+            PlatformOrderCancellations applied = await orderIngestion.ApplyCancellationsAsync(run.Platform, cancelled, cancellationToken);
+            updated += applied.SetAside;
+            raised.AddRange(applied.StillRecorded.Select(externalOrderId => new AgentRunIssueInput(
+                $"{run.Platform} cancelled this order after it was recorded as a sale. Correct its sale in HaulScout; sales are never undone automatically.",
+                externalOrderId)));
+        }
+
         run.Created += created;
         run.Updated += updated;
         run.Unchanged += unchanged;
         run.Rejected += issues.Count(issue => issue.Rejected);
-        runs.AddIssues(issues.Select(issue => new SyncRunIssue
+        runs.AddIssues(raised.Select(issue => new SyncRunIssue
         {
             OrganizationId = organizationId,
             SyncRunId = run.Id,

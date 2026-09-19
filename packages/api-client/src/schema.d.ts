@@ -8993,6 +8993,7 @@ export interface components {
             orders?: components["schemas"]["IngestPlatformOrderInput"][] | null;
             listings?: components["schemas"]["IngestPlatformListingInput"][] | null;
             issues?: components["schemas"]["AgentRunIssueInput"][] | null;
+            cancelledOrderIds?: string[] | null;
         };
         AgentRunBatchResultDto: {
             /** Format: int32 */

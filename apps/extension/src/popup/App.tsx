@@ -141,7 +141,9 @@ function Connected({ pairing, home }: { pairing: StoredPairing; home: string | n
     }
   };
 
-  const marketplaces = adapters.map((adapter) => ({
+  const accounts = heartbeat?.accounts ?? [];
+  // Only the marketplaces this organization sells on: no nagging about one it has no account for.
+  const marketplaces = adapters.filter((adapter) => accounts.some((account) => adapterFor(account.platform) === adapter)).map((adapter) => ({
     adapter,
     status: marketplaceStatus(adapter, {
       policy: heartbeat?.platforms?.find((item) => item.platform === adapter.platform),
@@ -151,7 +153,6 @@ function Connected({ pairing, home }: { pairing: StoredPairing; home: string | n
       now: now.getTime(),
     }),
   }));
-  const accounts = heartbeat?.accounts ?? [];
   const top = headline({ connection, running, marketplaces, accounts, now });
 
   return (
@@ -176,12 +177,14 @@ function Connected({ pairing, home }: { pairing: StoredPairing; home: string | n
       <HeadlineBar headline={top} />
       {error ? <p className="section error">{error}</p> : null}
 
-      <section className="section">
-        <h2>Marketplaces</h2>
-        {marketplaces.map(({ adapter, status }) => (
-          <Marketplace key={adapter.platform} adapter={adapter} status={status} now={now} send={send} />
-        ))}
-      </section>
+      {marketplaces.length > 0 ? (
+        <section className="section">
+          <h2>Marketplaces</h2>
+          {marketplaces.map(({ adapter, status }) => (
+            <Marketplace key={adapter.platform} adapter={adapter} status={status} now={now} send={send} />
+          ))}
+        </section>
+      ) : null}
 
       <section className="section">
         <h2>Accounts</h2>

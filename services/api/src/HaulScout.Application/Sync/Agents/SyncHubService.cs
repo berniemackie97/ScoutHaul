@@ -243,7 +243,7 @@ public sealed class SyncHubService(
             if (from is not null && platform is not null && from < now.AddDays(-platform.HistoryDays))
             {
                 skipped.Add(new SkippedScanDto(account.Id, account.DisplayName,
-                    $"{platform.Platform}'s sales ledger reaches back {platform.HistoryDays} days. For older sales, import the order report."));
+                    $"{platform.Platform}'s sales history reaches back {platform.HistoryDays} days. {platform.OlderSalesHint}".Trim()));
                 continue;
             }
 

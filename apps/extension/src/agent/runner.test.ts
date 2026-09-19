@@ -8,6 +8,7 @@ import { preflight, runWork, type RunnerDeps } from "./runner";
 import { activityItem, governorItem, sessionsItem } from "./storage";
 import type { MarketplaceTab } from "./transport";
 import { servedTab, type Route } from "../test/tabs";
+import { orderList, orderRow, transaction } from "../test/vinted-fixtures";
 import type { Heartbeat, Work } from "./types";
 
 const account = "3f2b8c1e-0000-4000-8000-000000000001";
@@ -136,6 +137,29 @@ describe("running one piece of work", () => {
     await runWork({ ...sales, trigger: "Extension" }, heartbeat, closed, deps);
 
     expect(api.reportWorkFailure).not.toHaveBeenCalled();
+  });
+
+  it("delivers the sales a marketplace cancelled beside the sales it recorded", async () => {
+    const vinted: Heartbeat = {
+      ...heartbeat,
+      platforms: [{ platform: "Vinted", enabled: true, loops: ["Sales", "Listings"], minSecondsBetweenRequests: 4, maxRequestsPerMinute: 10, maxRequestsPerDay: 800, historyDays: 3650 }],
+      accounts: [{ channelAccountId: account, platform: "Vinted", displayName: "Overhaul Vinted", boundUsername: "test_seller" }],
+    };
+    const rows = [orderRow(1000, "2026-09-18T10:00:00-06:00", "8.5"), orderRow(1001, "2026-09-17T10:00:00-06:00", "6.0", "cancelled"), orderRow(1002, "2026-09-16T10:00:00-06:00", "4.0", "open")];
+    const { api, deps, tab } = harness({
+      "/api/v2/users/current": JSON.stringify({ user: { id: 5550001, login: "test_seller" } }),
+      "/api/v2/my_orders": JSON.stringify(orderList(rows, 1, 1)),
+      "/api/v2/transactions/1000": JSON.stringify(transaction(1000, { price: "8.5" })),
+      "/api/v2/transactions/1002": JSON.stringify(transaction(1002, { price: "4.0" })),
+    });
+
+    await runWork({ ...sales, platform: "Vinted" }, vinted, tab, deps);
+
+    expect(api.addBatch).toHaveBeenCalledTimes(1);
+    expect(api.addBatch.mock.calls[0]![1]).toMatchObject({
+      orders: [expect.objectContaining({ externalOrderId: "1000", payoutAmount: 8.5 }), expect.objectContaining({ externalOrderId: "1002", payoutAmount: null })],
+      cancelledOrderIds: ["1001"],
+    });
   });
 
   it("delivers a large snapshot in batches, and marks it complete only when everything was read", async () => {
