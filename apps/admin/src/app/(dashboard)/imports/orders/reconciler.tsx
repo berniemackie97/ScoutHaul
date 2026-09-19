@@ -83,7 +83,9 @@ function OrderCard({ order, targets }: { order: PlatformOrder; targets: MatchTar
   const chosen = Object.values(map).filter(Boolean);
   const allMatched = lines.length > 0 && lines.every((line) => map[line.id ?? ""]);
   const allDistinct = new Set(chosen).size === chosen.length;
-  const canReconcile = allMatched && allDistinct;
+  // Fees not posted yet: settling now would write a sale with a profit that is not true.
+  const feesPending = order.feesPending === true;
+  const canReconcile = allMatched && allDistinct && !feesPending;
   const willCorrect = chosen.filter((id) => soldById.get(id)).length;
   const willCreate = chosen.length - willCorrect;
 
@@ -132,9 +134,13 @@ function OrderCard({ order, targets }: { order: PlatformOrder; targets: MatchTar
           <span className="text-muted-foreground">
             Tax <span className="text-foreground">{currency(order.taxCollected)}</span>
           </span>
-          <span className="text-muted-foreground">
-            Fees <span className="text-foreground">-{currency(order.feeTotal)}</span>
-          </span>
+          {feesPending ? (
+            <Badge variant="warning">Fees pending</Badge>
+          ) : (
+            <span className="text-muted-foreground">
+              Fees <span className="text-foreground">-{currency(order.feeTotal)}</span>
+            </span>
+          )}
           <span className="text-muted-foreground">
             Expected payout{" "}
             <span className="text-foreground">{currency(order.expectedPayout)}</span>
@@ -241,8 +247,9 @@ function OrderCard({ order, targets }: { order: PlatformOrder; targets: MatchTar
 
           <div className="flex items-center justify-between gap-3">
             <p className="text-muted-foreground text-xs">
-              Writes {order.platform}&apos;s exact price, shipping, tax, and fees. Items you already
-              recorded are corrected in place (audited); the rest become new sales.
+              {feesPending
+                ? `${order.platform} has not posted this order's fees yet. The next sales scan after they appear brings them in; it can be settled then.`
+                : `Writes ${order.platform}'s exact price, shipping, tax, and fees. Items you already recorded are corrected in place (audited); the rest become new sales.`}
             </p>
             <ReconcileButton
               disabled={!canReconcile}

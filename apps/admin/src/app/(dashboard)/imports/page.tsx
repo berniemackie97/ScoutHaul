@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, History } from "lucide-react";
+import { ArrowRight, History, RefreshCw } from "lucide-react";
 import { Badge, Card } from "@overhaul/ui";
 import { ListEmpty, PageHeader } from "@/components/list/list-search";
 import { Pager } from "@/components/list/pager";
@@ -33,11 +33,12 @@ export default async function ImportsPage({
 }) {
   const query = await searchParams;
   const page = Math.max(1, Number(query.page) || 1);
+  const quiet = query.quiet === "1";
 
   const api = await getApiClient();
   const [{ data: queues }, { data: history }] = await Promise.all([
     api.GET("/api/imports/queues", {}),
-    api.GET("/api/imports/runs", { params: { query: { page, pageSize: 20 } } }),
+    api.GET("/api/imports/runs", { params: { query: { page, pageSize: 20, quiet } } }),
   ]);
 
   const runs = history?.items ?? [];
@@ -48,6 +49,11 @@ export default async function ImportsPage({
         eyebrow="Data"
         title="Imports"
         description="Bring in the marketplaces' own exports. Anything that matches exactly is recorded for you; only genuine questions reach the queues below. Re-importing a file never duplicates anything."
+        action={
+          <Link href="/sync" className="text-brand-600 inline-flex items-center gap-1.5 text-sm font-medium hover:underline">
+            <RefreshCw className="h-4 w-4" aria-hidden /> Sync from a browser instead
+          </Link>
+        }
       />
 
       <ImportDropZone />
@@ -79,12 +85,23 @@ export default async function ImportsPage({
       ) : null}
 
       <section aria-labelledby="history-heading" className="space-y-3">
-        <h2 id="history-heading" className="flex items-center gap-2 text-sm font-semibold">
-          <History className="text-muted-foreground h-4 w-4" aria-hidden /> Import history
-        </h2>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 id="history-heading" className="flex items-center gap-2 text-sm font-semibold">
+            <History className="text-muted-foreground h-4 w-4" aria-hidden /> History
+          </h2>
+          {quiet ? (
+            <Link href="/imports" className="text-muted-foreground text-xs hover:underline">
+              Hide scans that changed nothing
+            </Link>
+          ) : (history?.quietHidden ?? 0) > 0 ? (
+            <Link href="/imports?quiet=1" className="text-muted-foreground text-xs hover:underline">
+              Show {history!.quietHidden} scan{history!.quietHidden === 1 ? "" : "s"} that changed nothing
+            </Link>
+          ) : null}
+        </div>
 
         {runs.length === 0 ? (
-          <ListEmpty>No imports yet. Files you import appear here with what each one changed.</ListEmpty>
+          <ListEmpty>Nothing yet. Files you import, and scans from a paired browser, appear here with what each one changed.</ListEmpty>
         ) : (
           <>
             <Card className="overflow-x-auto p-0">
@@ -110,7 +127,7 @@ export default async function ImportsPage({
                           <Link href={`/imports/runs/${run.id}`} className="block px-4 py-3">
                             <span className="font-medium">{run.formatLabel ?? "Unrecognised file"}</span>
                             <span className="text-muted-foreground block truncate text-xs">
-                              {[run.fileName, period].filter(Boolean).join(" · ")}
+                              {[run.fileName, run.agentName ? `by ${run.agentName}` : null, triggerLabel(run.trigger), period].filter(Boolean).join(" · ")}
                             </span>
                           </Link>
                         </td>
@@ -148,4 +165,18 @@ function QueueCard({ href, title, count, hint }: { href: string; title: string; 
       <p className="text-muted-foreground mt-1 text-xs">{hint}</p>
     </Link>
   );
+}
+
+/** Why a scan ran, when it was not a file someone dropped. */
+function triggerLabel(trigger: string | null | undefined): string | null {
+  switch (trigger) {
+    case "Scheduled":
+      return "on schedule";
+    case "Requested":
+      return "asked for in HaulScout";
+    case "Extension":
+      return "asked for in the extension";
+    default:
+      return null;
+  }
 }

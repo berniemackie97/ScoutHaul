@@ -33,6 +33,8 @@ export const ACTIONS: PaletteCommand[] = [
   { id: "action:import", label: "Import marketplace exports", section: "Actions", href: "/imports", keywords: ["upload", "csv", "ebay report", "depop", "poshmark", "drop file"] },
   { id: "action:match-orders", label: "Match imported orders", section: "Actions", href: "/imports/orders", keywords: ["reconcile", "record sales", "unmatched"] },
   { id: "action:match-listings", label: "Match imported listings", section: "Actions", href: "/imports/listings", keywords: ["reconcile", "link listings", "unmatched"] },
+  { id: "action:sync", label: "Scan marketplace sales and listings", section: "Actions", href: "/sync", keywords: ["sync", "scan ebay", "refresh sales", "update listings", "extension"] },
+  { id: "action:connect-browser", label: "Connect a browser for syncing", section: "Actions", href: "/sync/browsers?connect=1", keywords: ["pair", "extension", "install", "firefox", "add-on"] },
 ];
 
 export const NAVIGATION: PaletteCommand[] = navGroups.flatMap((group) =>
