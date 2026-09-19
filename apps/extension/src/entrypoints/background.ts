@@ -1,14 +1,20 @@
 import { browser, type Browser } from "wxt/browser";
 import { defineBackground } from "wxt/utils/define-background";
 import { Agent } from "../agent/agent";
-import { portalOrigin } from "../agent/config";
+import { portalOrigins } from "../agent/config";
 import type { AgentResponse, BridgeRequest, BridgeStatus, PopupRequest } from "../agent/messages";
-import { pairingItem } from "../agent/storage";
+import { pairingItem, portalItem, queuedItem, runningItem } from "../agent/storage";
+import { SyncTabs } from "../agent/transport";
 
 const heartbeatAlarm = "haulscout-heartbeat";
 
 export default defineBackground(() => {
-  const agent = new Agent();
+  const tabs = new SyncTabs();
+  const agent = new Agent({ tabs });
+
+  // Whatever a stopped background was in the middle of is over: start clean, and close any sync tab
+  // it left open.
+  void Promise.all([runningItem.setValue(null), queuedItem.setValue([]), tabs.sweep()]);
 
   // The heartbeat is an alarm, not a timer: it survives the background being stopped between checks.
   const ensureAlarm = () => browser.alarms.create(heartbeatAlarm, { periodInMinutes: 1, delayInMinutes: 0.1 });
@@ -20,15 +26,28 @@ export default defineBackground(() => {
     }
   });
 
-  // Access to a marketplace was just granted: find out who this browser is signed in as there.
-  browser.permissions.onAdded.addListener(() => void agent.checkSessions());
+  // Access to a marketplace was just granted: find out who this browser is signed in as there. Taken
+  // away: tell HaulScout, so it stops handing this browser that marketplace's work.
+  browser.permissions.onAdded.addListener(() => void agent.checkSessions({ force: true }));
+  browser.permissions.onRemoved.addListener(() => void agent.checkIn());
+
+  // A marketplace page finishing in one of the operator's tabs may mean they just signed in, or got
+  // through a security check; the agent looks again. The browser gives the extension the address
+  // only of pages it may read, so no other browsing is seen.
+  browser.tabs.onUpdated.addListener((tabId, change, tab) => {
+    if (change.status === "complete" && tab.url) {
+      void agent.noticePage(tabId, tab.url);
+    }
+  });
 
   browser.runtime.onMessage.addListener((message: unknown, sender: Browser.runtime.MessageSender) => {
     if (fromPopup(sender)) {
       return handlePopup(agent, message as PopupRequest);
     }
 
-    if (fromPortal(sender)) {
+    const portal = portalOf(sender);
+    if (portal) {
+      void portalItem.setValue(portal);
       return handleBridge(agent, message as BridgeRequest);
     }
 
@@ -42,8 +61,13 @@ function fromPopup(sender: Browser.runtime.MessageSender): boolean {
   return sender.id === browser.runtime.id && (sender.url?.startsWith(browser.runtime.getURL("/")) ?? false) && sender.tab === undefined;
 }
 
-function fromPortal(sender: Browser.runtime.MessageSender): boolean {
-  return sender.id === browser.runtime.id && sender.tab !== undefined && (sender.url?.startsWith(`${portalOrigin}/`) ?? false);
+/** The portal address a message came from, when it came from the bridge on one. */
+function portalOf(sender: Browser.runtime.MessageSender): string | null {
+  if (sender.id !== browser.runtime.id || sender.tab === undefined) {
+    return null;
+  }
+
+  return portalOrigins.find((origin) => sender.url?.startsWith(`${origin}/`)) ?? null;
 }
 
 async function handlePopup(agent: Agent, request: PopupRequest): Promise<AgentResponse> {
@@ -51,20 +75,22 @@ async function handlePopup(agent: Agent, request: PopupRequest): Promise<AgentRe
     switch (request.type) {
       case "pair": {
         const pairing = await agent.pair(request.code, request.name);
-        void agent.checkSessions();
+        void agent.checkSessions({ force: true });
         return { ok: true, message: `Connected to ${pairing.organizationName}.` };
       }
-      case "check-in":
-        await agent.checkIn();
+      // Anything that reaches a marketplace is started, not awaited: it can take a minute, and the
+      // popup follows it from storage — closing the popup must not look like stopping it.
+      case "popup-opened":
+        void agent.popupOpened();
         return { ok: true };
-      case "check-sessions":
-        await agent.checkSessions();
+      case "refresh":
+        void agent.checkSessions({ force: true });
         return { ok: true };
       case "scan":
-        await agent.scanNow(request.channelAccountId, request.loop);
+        void agent.scanNow(request.channelAccountId, request.loop);
         return { ok: true };
       case "resume":
-        await agent.resume(request.platform);
+        void agent.resume(request.platform);
         return { ok: true };
       case "disconnect":
         await agent.disconnect();

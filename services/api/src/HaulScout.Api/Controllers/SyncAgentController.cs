@@ -35,6 +35,11 @@ public sealed class SyncAgentController(SyncAgentService sync) : HaulScoutContro
     public async Task<IActionResult> Disconnect(CancellationToken cancellationToken) =>
         ToActionResult(await sync.DisconnectAsync(cancellationToken));
 
+    /// <summary>Work the browser was offered but could not start; see <see cref="AgentWorkFailureRequest"/>.</summary>
+    [HttpPost("work-failures")]
+    public async Task<IActionResult> RecordWorkFailure(AgentWorkFailureRequest request, CancellationToken cancellationToken) =>
+        ToActionResult(await sync.RecordWorkFailureAsync(request, cancellationToken));
+
     [HttpPost("runs")]
     public async Task<ActionResult<AgentRunDto>> StartRun(StartAgentRunRequest request, CancellationToken cancellationToken) =>
         ToActionResult(await sync.StartRunAsync(request, cancellationToken));

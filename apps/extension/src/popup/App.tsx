@@ -1,26 +1,45 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { browser } from "wxt/browser";
-import { adapters } from "../adapters/registry";
+import { adapterFor, adapters } from "../adapters/registry";
 import type { MarketplaceAdapter } from "../adapters/types";
-import { sessionFreshMs } from "../agent/config";
+import { portalOrigins } from "../agent/config";
 import { describeBrowser } from "../agent/environment";
+import type { PopupRequest } from "../agent/messages";
 import {
   activityItem,
   authProblemItem,
+  connectionItem,
   governorItem,
   heartbeatItem,
+  lastRunsItem,
   pairingItem,
+  portalItem,
+  queuedItem,
   runningItem,
   sessionsItem,
+  workKey,
+  type LastRun,
+  type RunningWork,
   type StoredPairing,
 } from "../agent/storage";
-import type { AgentAccount, LoopKind, PlatformPolicy } from "../agent/types";
-import { ago, ask, cadence, useNow, useStored } from "./hooks";
+import type { AgentAccount, LoopKind } from "../agent/types";
+import { ask, useAccess, useNow, useStored } from "./hooks";
+import { ago, clock, headline, loopRow, marketplaceStatus, scanBlocker, type Headline, type MarketplaceStatus } from "./model";
+
+type Send = (request: PopupRequest) => Promise<void>;
+
+/** Opens a page in a new tab, in front — the popup closes as it goes. */
+function openTab(url: string) {
+  void browser.tabs.create({ url, active: true });
+  window.close();
+}
 
 export function App() {
   const pairing = useStored(pairingItem);
   const problem = useStored(authProblemItem);
+  const portal = useStored(portalItem);
   const version = browser.runtime.getManifest().version;
+  const home = portal ?? portalOrigins[0] ?? null;
 
   return (
     <main className="popup">
@@ -29,12 +48,12 @@ export function App() {
         <h1>HaulScout Sync</h1>
         <span className="version">v{version}</span>
       </header>
-      {pairing === undefined ? null : pairing ? <Connected pairing={pairing} /> : <Connect problem={problem?.message ?? null} />}
+      {pairing === undefined ? null : pairing ? <Connected pairing={pairing} home={home} /> : <Connect problem={problem?.message ?? null} home={home} />}
     </main>
   );
 }
 
-function Connect({ problem }: { problem: string | null }) {
+function Connect({ problem, home }: { problem: string | null; home: string | null }) {
   const [code, setCode] = useState("");
   const [name, setName] = useState(() => {
     const { browser: browserName, operatingSystem } = describeBrowser();
@@ -59,8 +78,15 @@ function Connect({ problem }: { problem: string | null }) {
       {problem ? <p className="notice notice-warning">{problem}</p> : null}
       <h2>Connect this browser</h2>
       <p className="muted">
-        In HaulScout, open <strong>Sync</strong>, choose <strong>Connect a browser</strong>, and paste the code it shows here.
+        In HaulScout, open <strong>Sync → Browsers</strong>, choose <strong>Connect a browser</strong>, and paste the code it shows here.
       </p>
+      {home ? (
+        <p className="muted">
+          <button className="link" type="button" onClick={() => openTab(`${home}/sync/browsers?connect=1`)}>
+            Get a code in HaulScout
+          </button>
+        </p>
+      ) : null}
       <form className="stack" onSubmit={submit}>
         <label className="field">
           <span>Code</span>
@@ -88,72 +114,72 @@ function Connect({ problem }: { problem: string | null }) {
   );
 }
 
-function Connected({ pairing }: { pairing: StoredPairing }) {
+function Connected({ pairing, home }: { pairing: StoredPairing; home: string | null }) {
   const heartbeat = useStored(heartbeatItem);
   const sessions = useStored(sessionsItem);
+  const governors = useStored(governorItem);
   const running = useStored(runningItem);
+  const queued = useStored(queuedItem);
+  const lastRuns = useStored(lastRunsItem);
+  const connection = useStored(connectionItem);
   const activity = useStored(activityItem);
+  const access = useAccess();
   const now = useNow();
-  const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Opening the popup is a good moment to confirm who this browser is signed in as, if that answer
-  // has gone stale; the check is cheap, and it is what the portal offers for binding.
+  // Opening the popup is a good moment to look again at a sign-in that has aged or shows a problem;
+  // the agent decides whether it needs to.
   useEffect(() => {
-    if (sessions === undefined) {
-      return;
-    }
+    void ask({ type: "popup-opened" });
+  }, []);
 
-    const stale = adapters.some((adapter) => {
-      const checked = sessions[adapter.platform]?.checkedAt;
-      return !checked || Date.now() - Date.parse(checked) > sessionFreshMs;
-    });
-    if (stale) {
-      void ask({ type: "check-sessions" });
-    }
-    // Once per popup opening: rechecking on every storage change would loop.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessions === undefined]);
-
-  const run = async (key: string, request: Parameters<typeof ask>[0]) => {
-    setBusy(key);
+  const send: Send = async (request) => {
     setError(null);
     const answer = await ask(request);
-    setBusy(null);
     if (!answer.ok) {
       setError(answer.error);
     }
   };
 
+  const marketplaces = adapters.map((adapter) => ({
+    adapter,
+    status: marketplaceStatus(adapter, {
+      policy: heartbeat?.platforms?.find((item) => item.platform === adapter.platform),
+      access: access?.[adapter.platform],
+      session: sessions?.[adapter.platform],
+      governor: governors?.[adapter.platform],
+      now: now.getTime(),
+    }),
+  }));
   const accounts = heartbeat?.accounts ?? [];
+  const top = headline({ connection, running, marketplaces, accounts, now });
+
   return (
     <>
-      <section className="section">
-        <p className="org">{pairing.organizationName}</p>
-        <p className="muted">
-          This browser is <strong>{pairing.agentName}</strong> · checked in {ago(heartbeat?.receivedAt, now)}
-        </p>
-        <div className="row">
-          <button className="button" onClick={() => run("check-in", { type: "check-in" })} disabled={busy !== null}>
-            {busy === "check-in" ? "Checking in…" : "Check in now"}
-          </button>
-          {running ? <span className="running">{running.label}…</span> : null}
+      <section className="section identity">
+        <div>
+          <p className="org">{pairing.organizationName}</p>
+          <p className="muted">
+            This browser is <strong>{pairing.agentName}</strong> · checked in {ago(heartbeat?.receivedAt, now)}
+          </p>
         </div>
-        {error ? <p className="error">{error}</p> : null}
+        <button
+          className="button button-small"
+          onClick={() => void send({ type: "refresh" })}
+          disabled={Boolean(running)}
+          title="Look at the sign-in again and check in with HaulScout now"
+        >
+          Refresh
+        </button>
       </section>
+
+      <HeadlineBar headline={top} />
+      {error ? <p className="section error">{error}</p> : null}
 
       <section className="section">
         <h2>Marketplaces</h2>
-        {adapters.map((adapter) => (
-          <Marketplace
-            key={adapter.platform}
-            adapter={adapter}
-            policy={heartbeat?.platforms?.find((item) => item.platform === adapter.platform)}
-            session={sessions?.[adapter.platform]}
-            now={now}
-            busy={busy}
-            onRun={run}
-          />
+        {marketplaces.map(({ adapter, status }) => (
+          <Marketplace key={adapter.platform} adapter={adapter} status={status} now={now} send={send} />
         ))}
       </section>
 
@@ -162,20 +188,36 @@ function Connected({ pairing }: { pairing: StoredPairing }) {
         {accounts.length === 0 ? (
           <p className="muted">No marketplace accounts to sync yet. Add them in HaulScout under Channels.</p>
         ) : (
-          accounts.map((account) => <Account key={account.channelAccountId} account={account} busy={busy} onRun={run} />)
+          accounts.map((account) => (
+            <Account
+              key={account.channelAccountId}
+              account={account}
+              status={marketplaces.find((item) => item.adapter.platform === adapterFor(account.platform)?.platform)?.status}
+              lastRuns={lastRuns ?? {}}
+              offline={connection?.ok === false}
+              running={running}
+              queued={queued ?? []}
+              now={now}
+              home={home}
+              send={send}
+            />
+          ))
         )}
       </section>
 
       <section className="section">
         <h2>Activity</h2>
         {!activity || activity.length === 0 ? (
-          <p className="muted">Nothing yet. Scans that find something new, and anything that goes wrong, show up here.</p>
+          <p className="muted">Nothing yet. Every scan you ask for shows up here, with anything that needs you.</p>
         ) : (
           <ul className="activity">
             {activity.slice(0, 8).map((entry) => (
               <li key={`${entry.at}-${entry.message}`} className={`activity-${entry.tone}`}>
                 <span className="when">{ago(entry.at, now)}</span>
-                <span>{entry.message}</span>
+                <span>
+                  {entry.message}
+                  {entry.count && entry.count > 1 ? <span className="count"> ×{entry.count}</span> : null}
+                </span>
               </li>
             ))}
           </ul>
@@ -183,14 +225,20 @@ function Connected({ pairing }: { pairing: StoredPairing }) {
       </section>
 
       <footer className="footer">
+        {home ? (
+          <button className="link" onClick={() => openTab(`${home}/sync`)}>
+            Open HaulScout
+          </button>
+        ) : (
+          <span />
+        )}
         <button
           className="link-danger"
           onClick={() => {
             if (window.confirm(`Disconnect this browser from ${pairing.organizationName}? It stops syncing until you connect it again.`)) {
-              void run("disconnect", { type: "disconnect" });
+              void send({ type: "disconnect" });
             }
           }}
-          disabled={busy !== null}
         >
           Disconnect this browser
         </button>
@@ -199,111 +247,185 @@ function Connected({ pairing }: { pairing: StoredPairing }) {
   );
 }
 
-function Marketplace(props: {
-  adapter: MarketplaceAdapter;
-  policy: PlatformPolicy | undefined;
-  session: { signedIn: boolean; username: string | null; checkedAt: string } | undefined;
-  now: Date;
-  busy: string | null;
-  onRun: (key: string, request: Parameters<typeof ask>[0]) => Promise<void>;
-}) {
-  const { adapter, policy, session, now, busy, onRun } = props;
-  const governors = useStored(governorItem);
-  const [access, setAccess] = useState<boolean>();
-  useEffect(() => {
-    void browser.permissions.contains({ origins: adapter.origins }).then(setAccess);
-  }, [adapter]);
+function HeadlineBar({ headline: line }: { headline: Headline }) {
+  return (
+    <section className={`headline headline-${line.tone}`} role="status" aria-live="polite">
+      <span className={line.tone === "busy" ? "spinner" : "headline-mark"} aria-hidden />
+      <div>
+        <p className="headline-title">{line.title}</p>
+        {line.text ? <p className="headline-text">{line.text}</p> : null}
+      </div>
+    </section>
+  );
+}
 
-  const governor = governors?.[adapter.platform];
-  const paused = governor?.pausedUntil && governor.pausedUntil > now.getTime() ? governor : null;
+function Marketplace(props: { adapter: MarketplaceAdapter; status: MarketplaceStatus; now: Date; send: Send }) {
+  const { adapter, status, now, send } = props;
 
-  let status: ReactNode;
-  if (policy && policy.enabled === false) {
-    status = <p className="notice notice-warning">{policy.disabledReason ?? `Sync for ${adapter.platform} is switched off for now.`}</p>;
-  } else if (access === false) {
-    status = (
-      <>
-        <p className="muted">HaulScout Sync needs your permission to read your {adapter.platform} seller pages in this browser.</p>
-        <button
-          className="button button-primary"
-          onClick={() => {
-            // Must be asked from the click itself: browsers only show the prompt for a user gesture.
-            void browser.permissions.request({ origins: adapter.origins }).then(setAccess);
-          }}
-        >
-          Allow access to {adapter.platform}
-        </button>
-      </>
-    );
-  } else if (paused) {
-    status = (
-      <>
-        <p className="notice notice-warning">{paused.pauseReason}</p>
-        <button className="button" onClick={() => onRun(`resume-${adapter.platform}`, { type: "resume", platform: adapter.platform })} disabled={busy !== null}>
-          Resume now
-        </button>
-      </>
-    );
-  } else if (!session) {
-    status = <p className="muted">Checking who this browser is signed in as…</p>;
-  } else if (!session.signedIn) {
-    status = (
-      <>
-        <p className="notice notice-warning">Not signed in to {adapter.platform} in this browser.</p>
-        <div className="row">
-          <button className="button" onClick={() => void browser.tabs.create({ url: adapter.signInUrl })}>
+  let body: ReactNode;
+  switch (status.kind) {
+    case "disabled":
+      body = <p className="notice notice-warning">{status.text}</p>;
+      break;
+    case "no-access":
+      body = (
+        <>
+          <p className="muted">
+            HaulScout Sync needs your permission to read your {adapter.platform} seller pages in this browser. It only reads — it never changes
+            anything on {adapter.platform}.
+          </p>
+          <button
+            className="button button-primary"
+            // Asked from the click itself: browsers only show the prompt for a person's gesture.
+            onClick={() => void browser.permissions.request({ origins: adapter.origins })}
+          >
+            Allow access to {adapter.platform}
+          </button>
+        </>
+      );
+      break;
+    case "checking":
+      body = (
+        <p className="muted">
+          <span className="spinner spinner-inline" aria-hidden /> Checking who this browser is signed in as…
+        </p>
+      );
+      break;
+    case "paused":
+      body = (
+        <>
+          <p className="notice notice-warning">{status.reason}</p>
+          <div className="row">
+            {status.challenge ? (
+              <button className="button button-primary" onClick={() => openTab(adapter.checkUrl)}>
+                Open {adapter.platform}
+              </button>
+            ) : null}
+            <button className="button" onClick={() => void send({ type: "resume", platform: adapter.platform })}>
+              Resume now
+            </button>
+          </div>
+          <p className="hint">
+            {status.challenge ? "Syncing picks up by itself once the check is done." : `Resumes by itself at ${clock(status.until, now)}.`}
+          </p>
+        </>
+      );
+      break;
+    case "signed-out":
+      body = (
+        <>
+          <p className="notice notice-warning">Not signed in to {adapter.platform} in this browser.</p>
+          <button className="button button-primary" onClick={() => openTab(adapter.signInUrl)}>
             Sign in to {adapter.platform}
           </button>
-          <button className="button" onClick={() => onRun(`check-${adapter.platform}`, { type: "check-sessions" })} disabled={busy !== null}>
-            Check again
-          </button>
-        </div>
-      </>
-    );
-  } else {
-    status = (
-      <p className="muted">
-        Signed in as <strong>{session.username}</strong> · checked {ago(session.checkedAt, now)}
-      </p>
-    );
+          <p className="hint">Syncing picks up by itself once you have signed in.</p>
+        </>
+      );
+      break;
+    case "signed-in":
+      body = (
+        <p className="muted">
+          Signed in as <strong>{status.username}</strong> · checked {ago(status.checkedAt, now)}
+        </p>
+      );
+      break;
   }
 
   return (
     <div className="card">
       <p className="card-title">{adapter.platform}</p>
-      {status}
+      {body}
     </div>
   );
 }
 
 function Account(props: {
   account: AgentAccount;
-  busy: string | null;
-  onRun: (key: string, request: Parameters<typeof ask>[0]) => Promise<void>;
+  status: MarketplaceStatus | undefined;
+  lastRuns: Record<string, LastRun>;
+  offline: boolean;
+  running: RunningWork | null | undefined;
+  queued: string[];
+  now: Date;
+  home: string | null;
+  send: Send;
 }) {
-  const { account, busy, onRun } = props;
-  const scan = (loop: LoopKind) => onRun(`${account.channelAccountId}-${loop}`, { type: "scan", channelAccountId: account.channelAccountId!, loop });
+  const { account, status, lastRuns, offline, running, queued, now, home, send } = props;
+  const adapter = adapterFor(account.platform);
+  // A scan with HaulScout out of reach would read the marketplace and have nowhere to put it.
+  const blocker = offline ? "HaulScout can't be reached right now." : scanBlocker(adapter, account, status);
+  const loops: LoopKind[] = account.loops?.length ? account.loops.map((loop) => loop.loop!) : ["Sales", "Listings"];
+
+  // A click shows at once, before the agent has queued the scan and said so — until it has.
+  const [asked, setAsked] = useState<string[]>([]);
+  useEffect(() => {
+    setAsked((current) => {
+      const waiting = current.filter((key) => running?.key !== key && !queued.includes(key));
+      return waiting.length === current.length ? current : waiting;
+    });
+  }, [running, queued]);
+  useEffect(() => {
+    if (asked.length === 0) {
+      return;
+    }
+
+    const timer = setTimeout(() => setAsked([]), 4000);
+    return () => clearTimeout(timer);
+  }, [asked]);
 
   return (
     <div className="card">
       <p className="card-title">{account.displayName}</p>
       {account.boundUsername ? (
+        <p className="card-sub">
+          Syncs <strong>{account.boundUsername}</strong> on {account.platform}
+        </p>
+      ) : null}
+      {!account.boundUsername ? (
         <>
-          <p className="muted">
-            Syncs <strong>{account.boundUsername}</strong> · sales {cadence(account.salesEveryMinutes)} · listings {cadence(account.listingsEveryMinutes)}
-          </p>
-          <div className="row">
-            <button className="button" onClick={() => scan("Sales")} disabled={busy !== null}>
-              {busy === `${account.channelAccountId}-Sales` ? "Scanning…" : "Scan sales"}
+          <p className="muted">Not bound to its {account.platform} seller account yet. In HaulScout, open Sync and choose Bind.</p>
+          {home ? (
+            <button className="button" onClick={() => openTab(`${home}/sync`)}>
+              Open HaulScout
             </button>
-            <button className="button" onClick={() => scan("Listings")} disabled={busy !== null}>
-              {busy === `${account.channelAccountId}-Listings` ? "Scanning…" : "Scan listings"}
-            </button>
-          </div>
+          ) : null}
         </>
       ) : (
-        <p className="muted">Not bound to its {account.platform} seller account yet. Bind it in HaulScout under Sync.</p>
+        <ul className="loops">
+          {loops.map((loop) => {
+            const key = workKey(account.channelAccountId!, loop);
+            const row = loopRow(account, loop, lastRuns[key], running, queued, now);
+            const state = row.state === "idle" && asked.includes(key) ? "queued" : row.state;
+            return (
+              <li key={loop} className="loop">
+                <div className="loop-main">
+                  <p className="loop-name">
+                    {loop === "Listings" ? "Listings" : "Sales"}
+                    <span className="small muted-inline">
+                      {" "}
+                      · {row.cadence}
+                      {row.next ? ` · ${row.next}` : ""}
+                    </span>
+                  </p>
+                  {row.last ? <p className={`loop-last loop-last-${row.last.tone}`}>{row.last.text}</p> : null}
+                </div>
+                <button
+                  className="button button-small"
+                  disabled={state !== "idle" || blocker !== null}
+                  title={blocker ?? `Scan ${account.displayName} ${loop === "Listings" ? "listings" : "sales"} now`}
+                  onClick={() => {
+                    setAsked((current) => [...current, key]);
+                    void send({ type: "scan", channelAccountId: account.channelAccountId!, loop });
+                  }}
+                >
+                  {state === "running" ? "Scanning…" : state === "queued" ? "Queued" : "Scan"}
+                </button>
+              </li>
+            );
+          })}
+        </ul>
       )}
+      {account.boundUsername && blocker ? <p className="hint">{blocker}</p> : null}
     </div>
   );
 }

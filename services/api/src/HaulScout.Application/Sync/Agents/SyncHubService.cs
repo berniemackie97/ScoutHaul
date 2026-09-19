@@ -478,7 +478,7 @@ public sealed class SyncHubService(
                 .ToArray();
             return (SyncAccountHealth.NotBound, signedIn.Length > 0
                 ? $"Bind it to the {platform.Platform} account it should sync — a browser is signed in as {string.Join(" and ", signedIn)}."
-                : $"Sign in to {platform.Platform} in a paired browser, then bind it to that account.");
+                : WhatTheBrowsersNeed(platform.Platform, online) ?? $"Open the browser with HaulScout Sync, sign in to {platform.Platform} there, then bind this account.");
         }
 
         List<(SyncAgent Agent, SyncAgentMarketplace Marketplace)> able = online
@@ -494,11 +494,10 @@ public sealed class SyncHubService(
                 .Where(username => !SyncWorkPlanner.SameMarketplaceUser(username, account.BoundUsername))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToArray();
-            bool noAccess = online.Any(session => !session.Marketplace.AccessGranted);
             return (SyncAccountHealth.NoBrowser,
                 others.Length > 0 ? $"The browsers online are signed in to {platform.Platform} as {string.Join(" and ", others)}, not {account.BoundUsername}."
-                : noAccess ? $"Allow the HaulScout extension to reach {platform.Platform} in its popup."
-                : $"No browser signed in to {platform.Platform} as {account.BoundUsername} is online.");
+                : WhatTheBrowsersNeed(platform.Platform, online)
+                    ?? $"No browser signed in to {platform.Platform} as {account.BoundUsername} is online. Open the browser with HaulScout Sync.");
         }
 
         List<(SyncAgent Agent, SyncAgentMarketplace Marketplace)> running = able.Where(session => !(session.Marketplace.PausedUntil > now)).ToList();
@@ -510,6 +509,30 @@ public sealed class SyncHubService(
         }
 
         return (SyncAccountHealth.Ready, $"Ready on {string.Join(", ", running.Select(session => session.Agent.Name).Distinct())}.");
+    }
+
+    /// <summary>
+    /// What stands between the online browsers and syncing, most actionable first: a browser still
+    /// being checked, one signed out, one without access. Null when no browser is online.
+    /// </summary>
+    private static string? WhatTheBrowsersNeed(string platform, IReadOnlyList<(SyncAgent Agent, SyncAgentMarketplace Marketplace)> online)
+    {
+        if (online.FirstOrDefault(session => session.Marketplace.AccessGranted && session.Marketplace.SignedIn is null) is { Agent: not null } checking)
+        {
+            return $"Checking which {platform} account {checking.Agent.Name} is signed in to…";
+        }
+
+        if (online.FirstOrDefault(session => session.Marketplace.AccessGranted && session.Marketplace.SignedIn == false) is { Agent: not null } signedOut)
+        {
+            return $"{signedOut.Agent.Name} is signed out of {platform}. Sign in to {platform} there.";
+        }
+
+        if (online.FirstOrDefault(session => !session.Marketplace.AccessGranted) is { Agent: not null } noAccess)
+        {
+            return $"Allow HaulScout Sync to reach {platform} in {noAccess.Agent.Name} — open the extension and choose Allow access.";
+        }
+
+        return null;
     }
 
     private SyncAgentDto Agent(SyncAgent agent, IReadOnlyDictionary<Guid, string> people, DateTimeOffset now) => new(

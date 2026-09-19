@@ -31,9 +31,15 @@ describe("sync model", () => {
   });
 
   it("never lets a queued scan look imminent when no browser can run it", () => {
-    expect(requestStatus({ status: "Queued" }, true).label).toBe("Queued");
-    expect(requestStatus({ status: "Queued" }, false)).toEqual({ label: "Waiting for a browser", tone: "warning" });
-    expect(requestStatus({ status: "Running", runningOn: "Laptop" }, true).label).toBe("Running on Laptop");
+    expect(requestStatus({ status: "Queued" }, { health: "Ready", healthMessage: "Ready on Laptop." }, true))
+      .toEqual({ label: "Queued", tone: "info", note: "Starting in a moment." });
+    expect(requestStatus({ status: "Queued" }, undefined, false).label).toBe("Waiting for a browser");
+    expect(requestStatus({ status: "Running", runningOn: "Laptop" }, undefined, true).label).toBe("Running on Laptop");
+  });
+
+  it("says what a queued scan is waiting for, and that it runs by itself after", () => {
+    expect(requestStatus({ status: "Queued" }, { health: "NoBrowser", healthMessage: "Laptop is signed out of eBay. Sign in to eBay there." }, true))
+      .toEqual({ label: "Waiting", tone: "warning", note: "Laptop is signed out of eBay. Sign in to eBay there. It starts by itself after." });
   });
 
   it("offers each signed-in username once for binding", () => {

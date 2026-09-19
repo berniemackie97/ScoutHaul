@@ -505,7 +505,7 @@ public sealed class SyncAgentTests
         SyncRunDto failed = (await harness.As(agent).FailRunAsync(run.RunId,
             new FailAgentRunRequest(SyncFailureKind.Challenge, "Captcha on /sh/ord."), CancellationToken.None)).Value!;
         Assert.Equal("Failed", failed.Status);
-        Assert.StartsWith("eBay showed a security check.", failed.Summary);
+        Assert.StartsWith("eBay wants to confirm a person is there.", failed.Summary);
 
         SyncLoop loop = await harness.Db.SyncLoops.SingleAsync();
         Assert.Equal(1, loop.ConsecutiveFailures);
@@ -543,18 +543,31 @@ public sealed class SyncAgentTests
     {
         Harness harness = NewHarness();
         Guid agent = await harness.ReadyAgentAsync();
-        AgentRunDto run = (await harness.StartAsync(agent, SyncLoopKind.Listings)).Value!;
-        await harness.As(agent).AddBatchAsync(run.RunId, new AgentRunBatchRequest(Listings:
+        IngestPlatformListingInput[] live =
         [
-            new IngestPlatformListingInput("377296454991", "Gucci Oxford Shirt", 249.99m, PlatformListingStatus.Active),
-            new IngestPlatformListingInput("377296454992", "Levi's 501", 45m, PlatformListingStatus.Active),
-        ]), CancellationToken.None);
+            new("377296454991", "Gucci Oxford Shirt", 249.99m, PlatformListingStatus.Active),
+            new("377296454992", "Levi's 501", 45m, PlatformListingStatus.Active),
+        ];
+        AgentRunDto run = (await harness.StartAsync(agent, SyncLoopKind.Listings)).Value!;
+        await harness.As(agent).AddBatchAsync(run.RunId, new AgentRunBatchRequest(Listings: live), CancellationToken.None);
 
         SyncRunDto done = (await harness.As(agent).CompleteRunAsync(run.RunId, new CompleteAgentRunRequest(CompleteSnapshot: true), CancellationToken.None)).Value!;
 
         Assert.True(done.IsCompleteSnapshot);
         Assert.Equal("2 new listings.", done.Summary);
         Assert.All(await harness.Db.PlatformListings.ToListAsync(), listing => Assert.Equal(harness.Ebay.Id, listing.ChannelAccountId));
+
+        // The same listings again: nothing changed, and the summary says that in so many words.
+        AgentRunDto again = (await harness.StartAsync(agent, SyncLoopKind.Listings)).Value!;
+        await harness.As(agent).AddBatchAsync(again.RunId, new AgentRunBatchRequest(Listings: live), CancellationToken.None);
+        SyncRunDto quiet = (await harness.As(agent).CompleteRunAsync(again.RunId, new CompleteAgentRunRequest(CompleteSnapshot: true), CancellationToken.None)).Value!;
+        Assert.Equal("No changes — 2 listings checked.", quiet.Summary);
+
+        // The browser learns where the loop stands from its heartbeat, whichever browser ran it.
+        AgentLoopDto listings = (await harness.HeartbeatAsync(agent)).Accounts
+            .Single(account => account.ChannelAccountId == harness.Ebay.Id).Loops
+            .Single(loop => loop.Loop == SyncLoopKind.Listings);
+        Assert.Equal((harness.Clock.GetUtcNow(), (string?)null, false), (listings.LastSucceededAt, listings.LastError, listings.Running));
     }
 
     // ── Browsers ────────────────────────────────────────────────────────────────
@@ -585,6 +598,52 @@ public sealed class SyncAgentTests
         await harness.HeartbeatAsync(agentId);
         Assert.Null(await store.FindAgentByTokenAsync(SyncSecrets.HashToken(original), CancellationToken.None));
         Assert.NotNull(await store.FindAgentByTokenAsync(SyncSecrets.HashToken(reissued!), CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task Work_a_browser_cannot_start_says_why_and_is_not_offered_again()
+    {
+        Harness harness = NewHarness();
+        Guid agent = await harness.ReadyAgentAsync();
+        await harness.Hub.UpdateScheduleAsync(harness.Ebay.Id, new UpdateSyncScheduleRequest(10, null), CancellationToken.None);
+        SyncScanRequestDto asked = Assert.Single((await harness.Hub.RequestScanAsync(new RequestScanRequest(SyncScanScope.Sales, harness.Ebay.Id), CancellationToken.None)).Value!.Requests);
+
+        // The browser's sync tab was closed before it could start: nothing was read, no run opened.
+        AppResult reported = await harness.As(agent).RecordWorkFailureAsync(
+            new AgentWorkFailureRequest(harness.Ebay.Id, SyncLoopKind.Sales, SyncFailureKind.Interrupted, ScanRequestId: asked.Id), CancellationToken.None);
+
+        Assert.Equal(AppResultStatus.Ok, reported.Status);
+        SyncScanRequest request = await harness.Db.SyncScanRequests.SingleAsync();
+        Assert.Equal(SyncScanStatus.Failed, request.Status);
+        Assert.StartsWith("The sync tab was closed", request.Message);
+        Assert.Empty(await harness.Db.SyncRuns.ToListAsync());
+
+        SyncLoop loop = await harness.Db.SyncLoops.SingleAsync(candidate => candidate.Kind == SyncLoopKind.Sales);
+        Assert.Equal(1, loop.ConsecutiveFailures);
+        Assert.StartsWith("The sync tab was closed", loop.LastError);
+
+        // Neither the request nor the schedule comes straight back on the next heartbeat.
+        Assert.DoesNotContain((await harness.HeartbeatAsync(agent)).Work, work => work.Loop == SyncLoopKind.Sales);
+    }
+
+    [Fact]
+    public async Task A_scan_that_needs_a_sign_in_waits_for_it_rather_than_failing()
+    {
+        Harness harness = NewHarness();
+        Guid agent = await harness.ReadyAgentAsync();
+        SyncScanRequestDto asked = Assert.Single((await harness.Hub.RequestScanAsync(new RequestScanRequest(SyncScanScope.Sales, harness.Ebay.Id), CancellationToken.None)).Value!.Requests);
+
+        // The browser went to scan and found itself signed out of eBay. It says so on its heartbeat…
+        AppResult reported = await harness.As(agent).RecordWorkFailureAsync(
+            new AgentWorkFailureRequest(harness.Ebay.Id, SyncLoopKind.Sales, SyncFailureKind.SignedOut, ScanRequestId: asked.Id), CancellationToken.None);
+        Assert.Equal(AppResultStatus.Ok, reported.Status);
+        Assert.Empty((await harness.HeartbeatAsync(agent, signedInAs: null)).Work);
+
+        // …the scan waits, with the schedule untouched, and runs as soon as the browser is signed in again.
+        Assert.Equal(SyncScanStatus.Queued, (await harness.Db.SyncScanRequests.SingleAsync()).Status);
+        Assert.All(await harness.Db.SyncLoops.ToListAsync(), loop => Assert.Equal(0, loop.ConsecutiveFailures));
+        AgentWorkDto work = Assert.Single((await harness.HeartbeatAsync(agent)).Work);
+        Assert.Equal((SyncTrigger.Requested, asked.Id), (work.Trigger, work.ScanRequestId));
     }
 
     [Fact]

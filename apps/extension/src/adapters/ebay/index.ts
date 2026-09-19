@@ -1,6 +1,6 @@
 import type { IngestListing, IngestOrder, RunIssue } from "../../agent/types";
 import { dig, spans } from "../embedded-json";
-import type { ListingsSnapshot, MarketplaceAdapter, MarketplaceContext, SalesScan, SalesWindow, Session } from "../types";
+import type { ListingsSnapshot, MarketplaceAdapter, MarketplaceContext, PageKind, SalesScan, SalesWindow, Session } from "../types";
 import { readLedgerPage, type LedgerOrder } from "./ledger";
 import { readListingsPage } from "./listings";
 import { readOrdersPage, toIngestOrder, type EbayOrderRow } from "./orders";
@@ -44,8 +44,24 @@ export function salesFrom(window: SalesWindow, now: Date): Date {
 export const ebayAdapter: MarketplaceAdapter = {
   platform: "eBay",
   origins: ["https://*.ebay.com/*"],
+  home: origin,
   workerUrl: `${origin}/robots.txt`,
   signInUrl: "https://signin.ebay.com/",
+  checkUrl: `${origin}/sh/ord/`,
+
+  readable: (url: string) => /^https:\/\/([a-z0-9-]+\.)*ebay\.com(\/|$)/i.test(url),
+
+  pageKind(url: string): PageKind {
+    if (/^https:\/\/signin\.ebay\.com(\/|$)/i.test(url)) {
+      return "sign-in";
+    }
+
+    if (/^https:\/\/[^/]+\/splashui\/(challenge|captcha)/i.test(url)) {
+      return "challenge";
+    }
+
+    return /^https:\/\/www\.ebay\.com\/(sh|mes)\//i.test(url) ? "seller" : "other";
+  },
 
   async detectSession(context: MarketplaceContext): Promise<Session> {
     const response = await context.request(`${origin}/gh/user_profile?modules=USER_PROFILE&behavior=GET_PROFILE&moduleType=USER_PROFILE&v=2`);

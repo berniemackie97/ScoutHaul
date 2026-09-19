@@ -27,6 +27,8 @@ export interface ActivityEntry {
   at: string;
   tone: "info" | "success" | "warning" | "error";
   message: string;
+  /** How many times this same line happened in a row, when more than once. */
+  count?: number;
 }
 
 /** Why the device token stopped working, so the popup can say so instead of silently doing nothing. */
@@ -34,6 +36,32 @@ export interface AuthProblem {
   code: string;
   message: string;
   at: string;
+}
+
+/** What the agent is doing right now, for the popup. */
+export interface RunningWork {
+  /** "Reading Overhaul eBay sales", "Checking the eBay sign-in". */
+  label: string;
+  /** `accountId:loop` for a scan; null for anything else. */
+  key: string | null;
+  startedAt: string;
+  /** Marketplace pages read so far. */
+  pages: number;
+}
+
+/** How the last scan of one loop run in this browser ended. */
+export interface LastRun {
+  at: string;
+  tone: "success" | "warning" | "error";
+  text: string;
+}
+
+/** Whether HaulScout answered the last check-in — an outage is shown in the popup, not hidden. */
+export interface Connection {
+  ok: boolean;
+  /** When it last changed between reachable and not. */
+  since: string;
+  message: string | null;
 }
 
 export const pairingItem = storage.defineItem<StoredPairing | null>("local:pairing", { fallback: null });
@@ -48,5 +76,26 @@ export const activityItem = storage.defineItem<ActivityEntry[]>("local:activity"
 
 export const authProblemItem = storage.defineItem<AuthProblem | null>("local:authProblem", { fallback: null });
 
-/** What is running right now, so a restarted background worker never starts a second run beside it. */
-export const runningItem = storage.defineItem<{ label: string; startedAt: string } | null>("local:running", { fallback: null });
+export const connectionItem = storage.defineItem<Connection | null>("local:connection", { fallback: null });
+
+export const runningItem = storage.defineItem<RunningWork | null>("local:running", { fallback: null });
+
+/** Scans asked for in this browser that are waiting their turn, as `accountId:loop`. */
+export const queuedItem = storage.defineItem<string[]>("local:queued", { fallback: [] });
+
+/** How the last scan of each loop run here ended, by `accountId:loop`. */
+export const lastRunsItem = storage.defineItem<Record<string, LastRun>>("local:lastRuns", { fallback: {} });
+
+/** The portal address the bridge last ran on — where "Open HaulScout" goes. */
+export const portalItem = storage.defineItem<string | null>("local:portal", { fallback: null });
+
+/**
+ * The sync tabs open now, by marketplace. Session storage, so it is gone with the browser session
+ * that owned those tabs — a background restarted mid-session uses it to close what it left open.
+ */
+export const syncTabsItem = storage.defineItem<Record<string, number>>("session:syncTabs", { fallback: {} });
+
+/** The key a scan of one loop on one account is known by. */
+export function workKey(channelAccountId: string, loop: string): string {
+  return `${channelAccountId}:${loop}`;
+}

@@ -52,6 +52,12 @@ export interface SalesWindow {
 }
 
 /**
+ * What a marketplace page is, from its address alone — so a sign-in form or a security check the
+ * operator is working through is never mistaken for a page to read, or interrupted.
+ */
+export type PageKind = "sign-in" | "challenge" | "seller" | "other";
+
+/**
  * One marketplace. An adapter only reads the seller's own account — orders, fees, listings — and
  * never engages with anything on the site: no sharing, following, offers or listing changes.
  */
@@ -59,10 +65,17 @@ export interface MarketplaceAdapter {
   readonly platform: string;
   /** Host permissions to ask for when the marketplace is connected. */
   readonly origins: string[];
+  /** The origin requests are made from; a tab must be on it for them to be the site's own. */
+  readonly home: string;
   /** The page a marketplace tab is opened at when one is needed: a light one, on the site's own origin. */
   readonly workerUrl: string;
   /** Where to send the operator to sign in. */
   readonly signInUrl: string;
+  /** Where to send the operator to clear a security check: the seller page that raised it. */
+  readonly checkUrl: string;
+  /** Whether an address is one of the marketplace's own pages — the only pages the extension reads. */
+  readable(url: string): boolean;
+  pageKind(url: string): PageKind;
   detectSession(context: MarketplaceContext): Promise<Session>;
   scanSales(context: MarketplaceContext, window: SalesWindow): Promise<SalesScan>;
   snapshotListings(context: MarketplaceContext): Promise<ListingsSnapshot>;

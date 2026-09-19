@@ -118,12 +118,89 @@ public sealed class SyncAgentService(
                 .OrderBy(account => account.DisplayName, StringComparer.OrdinalIgnoreCase)
                 .Select(account => new AgentAccountDto(
                     account.Id, SyncPlatforms.Find(account.Channel)!.Platform, account.DisplayName, account.BoundUsername,
-                    account.SalesScanEveryMinutes, account.ListingsScanEveryMinutes))
+                    account.SalesScanEveryMinutes, account.ListingsScanEveryMinutes, Loops(account, loops, now)))
                 .ToList(),
             work,
             now,
             newToken));
     }
+
+    private static List<AgentLoopDto> Loops(ChannelAccount account, IReadOnlyList<SyncLoop> loops, DateTimeOffset now) =>
+        SyncPlatforms.Find(account.Channel)!.Loops.Select(kind =>
+        {
+            SyncLoop? loop = loops.FirstOrDefault(candidate => candidate.ChannelAccountId == account.Id && candidate.Kind == kind);
+            DateTimeOffset? due = SyncWorkPlanner.DueAt(account.EveryMinutes(kind), loop);
+            return new AgentLoopDto(
+                kind,
+                account.EveryMinutes(kind),
+                loop?.LastSucceededAt,
+                loop?.LastError,
+                due is null ? null : due < now ? now : due,
+                loop?.LeaseAgentId is not null && loop.LeaseExpiresAt > now);
+        }).ToList();
+
+    /// <summary>
+    /// Records work the agent could not start: nothing was read, so there is no run. The loop counts
+    /// the failure, which backs its schedule off, and a scan someone asked for is closed with the
+    /// reason rather than being offered again on every heartbeat.
+    ///
+    /// Trouble a person clears — signed out, signed in as someone else, access not allowed, a security
+    /// check, a request to slow down — is not recorded here. The browser reports it on its heartbeat,
+    /// which keeps work away from it until it clears; a scan someone asked for then waits, and runs
+    /// the moment it can instead of failing for want of a sign-in.
+    /// </summary>
+    public async Task<AppResult> RecordWorkFailureAsync(AgentWorkFailureRequest request, CancellationToken cancellationToken)
+    {
+        Guid organizationId = currentUser.OrganizationId;
+        DateTimeOffset now = clock.GetUtcNow();
+        ChannelAccount? account = await store.FindAccountAsync(organizationId, request.ChannelAccountId, cancellationToken);
+        if (account is null)
+        {
+            return AppResult.NotFound("That account was not found.");
+        }
+
+        if (WaitsForAPerson(request.Kind))
+        {
+            return AppResult.Ok();
+        }
+
+        string summary = SyncText.Clip(FailureSummary(account.Channel, request.Kind, request.Message), 500)!;
+        SyncLoop? loop = await store.FindLoopAsync(organizationId, account.Id, request.Loop, cancellationToken);
+        if (loop is null)
+        {
+            loop = new SyncLoop { OrganizationId = organizationId, ChannelAccountId = account.Id, Kind = request.Loop };
+            store.Add(loop);
+        }
+        else if (loop.IsLeasedByAnother(agent.AgentId, now))
+        {
+            // Another browser is running it right now; this one's trouble is not the loop's.
+            return AppResult.Ok();
+        }
+
+        loop.LastStartedAt = now;
+        loop.LastFinishedAt = now;
+        loop.LastError = summary;
+        loop.ConsecutiveFailures++;
+        loop.Version = Guid.NewGuid();
+
+        if (request.ScanRequestId is Guid requestId
+            && await store.FindScanRequestAsync(organizationId, requestId, cancellationToken) is SyncScanRequest scan
+            && scan.ChannelAccountId == account.Id
+            && scan.Status == SyncScanStatus.Queued)
+        {
+            scan.SyncAgentId = agent.AgentId;
+            SyncSweep.Finish(scan, SyncScanStatus.Failed, summary, now);
+        }
+
+        // A lost race means another browser has the loop; nothing to record.
+        await store.TrySaveChangesAsync(cancellationToken);
+        return AppResult.Ok();
+    }
+
+    /// <summary>Trouble the browser reports on its heartbeat, and that holds its work back until a person or time clears it.</summary>
+    private static bool WaitsForAPerson(SyncFailureKind kind) =>
+        kind is SyncFailureKind.SignedOut or SyncFailureKind.WrongAccount or SyncFailureKind.NoAccess
+            or SyncFailureKind.Challenge or SyncFailureKind.RateLimited;
 
     /// <summary>The browser leaving on its own — "Disconnect this browser" in the extension.</summary>
     public async Task<AppResult> DisconnectAsync(CancellationToken cancellationToken)
@@ -518,7 +595,11 @@ public sealed class SyncAgentService(
             return run.Loop == SyncLoopKind.Sales ? "No sales in the period scanned." : "No live listings found.";
         }
 
-        string counted = SyncText.Counted(run.Created, run.Updated, run.Unchanged, noun);
+        // A scan that found nothing new says so plainly, rather than as a count of what did not change.
+        int read = run.Created + run.Updated + run.Unchanged;
+        string counted = run.Created + run.Updated == 0
+            ? $"No changes — {read} {noun}{SyncText.Plural(read)} checked."
+            : SyncText.Counted(run.Created, run.Updated, run.Unchanged, noun);
         return run.Rejected > 0 ? $"{counted} {run.Rejected} could not be read." : counted;
     }
 
@@ -526,13 +607,15 @@ public sealed class SyncAgentService(
     {
         string reason = kind switch
         {
-            SyncFailureKind.SignedOut => $"The browser is not signed in to {platform}.",
-            SyncFailureKind.WrongAccount => $"The browser is signed in to a different {platform} account.",
-            SyncFailureKind.RateLimited => $"{platform} asked for a pause; the browser backed off.",
-            SyncFailureKind.Challenge => $"{platform} showed a security check. Open {platform} in that browser and complete it.",
-            SyncFailureKind.SiteChanged => $"{platform}'s pages no longer look the way the extension expects. It has paused {platform} until an update.",
-            SyncFailureKind.Network => $"{platform} could not be reached.",
-            _ => "The scan stopped.",
+            SyncFailureKind.SignedOut => $"The browser is signed out of {platform}. Sign in to {platform} there, then scan again.",
+            SyncFailureKind.WrongAccount => $"The browser is signed in to a different {platform} account than this one syncs.",
+            SyncFailureKind.RateLimited => $"{platform} asked for a slower pace, so the browser is holding off for a while.",
+            SyncFailureKind.Challenge => $"{platform} wants to confirm a person is there. Open {platform} in that browser and complete the check; syncing picks up by itself after.",
+            SyncFailureKind.SiteChanged => $"{platform}'s pages changed and could not be read. Sync for {platform} is paused in that browser until the extension is updated.",
+            SyncFailureKind.Network => $"{platform} or HaulScout could not be reached. Scan again in a moment.",
+            SyncFailureKind.NoAccess => $"HaulScout Sync is not allowed to reach {platform} in that browser. Allow it from the extension.",
+            SyncFailureKind.Interrupted => $"The sync tab was closed, or left {platform}, before the scan finished. Scan again.",
+            _ => "The scan stopped unexpectedly.",
         };
         string? clean = Text.TrimToNull(detail);
         return clean is null ? reason : $"{reason} {clean}";

@@ -1,11 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fakeBrowser } from "wxt/testing/fake-browser";
 import { ledgerPage, listingsPage, ordersPage, profileJson, type FixtureListing } from "../test/ebay-fixtures";
-import type { PageResponse } from "../adapters/types";
+import { AdapterError, type PageResponse } from "../adapters/types";
 import { ApiError, type AgentApi } from "./api";
 import { initialGovernorState } from "./governor";
-import { runWork, type RunnerDeps } from "./runner";
+import { preflight, runWork, type RunnerDeps } from "./runner";
 import { activityItem, governorItem, sessionsItem } from "./storage";
+import type { MarketplaceTab } from "./transport";
+import { servedTab, type Route } from "../test/tabs";
 import type { Heartbeat, Work } from "./types";
 
 const account = "3f2b8c1e-0000-4000-8000-000000000001";
@@ -29,32 +31,16 @@ function page(body: string, url: string, status = 200): PageResponse {
   return { status, url, contentType: "text/html", body };
 }
 
-type Route = string | ((url: URL) => string);
-
 function harness(routes: Record<string, Route>) {
-  const opened: string[] = [];
-  const closed = vi.fn();
   const api = {
     startRun: vi.fn(async () => ({ runId: "run-1", leaseExpiresAt: now.toISOString(), cursor: null, from: null })),
     addBatch: vi.fn(async (_runId: string, _batch: { orders?: unknown[]; listings?: unknown[] }) => ({ created: 1, updated: 0, unchanged: 0 })),
     complete: vi.fn(async () => ({ status: "Succeeded", summary: "1 new order.", created: 1, updated: 0, rejected: 0 })),
     fail: vi.fn(async () => ({ status: "Failed" })),
+    reportWorkFailure: vi.fn(async () => undefined),
   };
-  const deps: RunnerDeps = {
-    api: api as unknown as AgentApi,
-    now: () => now,
-    sleep: async () => undefined,
-    async openTab(workerUrl: string) {
-      opened.push(workerUrl);
-      const serve = async (url: string) => {
-        const parsed = new URL(url);
-        const route = routes[parsed.pathname];
-        return route === undefined ? page("", url, 404) : page(typeof route === "string" ? route : route(parsed), url);
-      };
-      return { page: serve, request: serve, close: closed };
-    },
-  };
-  return { api, deps, opened, closed };
+  const deps: RunnerDeps = { api: api as unknown as AgentApi, now: () => now, sleep: async () => undefined };
+  return { api, deps, tab: servedTab(routes) };
 }
 
 const signedIn = { "/gh/user_profile": profileJson("seller") };
@@ -65,59 +51,96 @@ describe("running one piece of work", () => {
     fakeBrowser.permissions.contains = vi.fn(async () => true) as typeof fakeBrowser.permissions.contains;
   });
 
-  it("checks who is signed in, takes the run, delivers the sales and closes the tab", async () => {
-    const { api, deps, opened, closed } = harness({
+  it("checks who is signed in, takes the run, delivers the sales and says what came of it", async () => {
+    const { api, deps, tab } = harness({
       ...signedIn,
       "/sh/ord/": ordersPage([{ orderId: "26-15152-72360", created: ["Sep 18", "12:48am PDT"], soldFor: "$20.00", total: "$20.00", lines: [{ listingId: "1", title: "Lamp", price: "$20.00" }] }]),
       "/mes/transactionlist": ledgerPage([]),
     });
 
-    await runWork(sales, heartbeat, deps);
+    const result = await runWork(sales, heartbeat, tab, deps);
 
-    expect(opened).toEqual(["https://www.ebay.com/robots.txt"]);
+    expect(result).toEqual({ status: "done", text: "1 new order.", changed: true, issues: false });
     expect(api.startRun).toHaveBeenCalledWith(expect.objectContaining({ channelAccountId: account, loop: "Sales", signedInAs: "seller" }));
-    expect(api.addBatch).toHaveBeenCalledTimes(1);
     expect(api.addBatch.mock.calls[0]![1]).toMatchObject({ orders: [expect.objectContaining({ externalOrderId: "26-15152-72360", feesPending: true })] });
     expect(api.complete).toHaveBeenCalledWith("run-1", expect.objectContaining({ cursor: "2026-09-18T07:48:00.000Z" }));
-    expect(closed).toHaveBeenCalled();
     expect((await governorItem.getValue()).eBay?.dayCount).toBe(3);
     expect((await sessionsItem.getValue()).eBay).toMatchObject({ signedIn: true, username: "seller" });
-    expect((await activityItem.getValue())[0]).toMatchObject({ tone: "success", message: "Overhaul eBay sales: 1 new order." });
+    expect((await activityItem.getValue())[0]?.message).toBe("Signed in to eBay as seller.");
   });
 
   it("leaves a loop another browser holds, without calling it a problem", async () => {
-    const { api, deps, closed } = harness(signedIn);
+    const { api, deps, tab } = harness(signedIn);
     api.startRun.mockRejectedValueOnce(new ApiError(409, "sync_lease_held", "Another browser is already running it."));
 
-    await runWork(sales, heartbeat, deps);
-
+    expect(await runWork(sales, heartbeat, tab, deps)).toEqual({ status: "skipped" });
     expect(api.fail).not.toHaveBeenCalled();
-    expect(closed).toHaveBeenCalled();
-    expect(await activityItem.getValue()).toEqual([]);
   });
 
   it("fails the run with the reason when eBay's page changed, and pauses eBay", async () => {
-    const { api, deps } = harness({ ...signedIn, "/sh/ord/": `<html>${"a redesigned seller page ".repeat(8000)}</html>` });
+    const { api, deps, tab } = harness({ ...signedIn, "/sh/ord/": `<html>${"a redesigned seller page ".repeat(8000)}</html>` });
 
-    await runWork(sales, heartbeat, deps);
+    const result = await runWork(sales, heartbeat, tab, deps);
 
     expect(api.fail).toHaveBeenCalledWith("run-1", "SiteChanged", expect.stringContaining("orders"));
-    const governor = (await governorItem.getValue()).eBay!;
-    expect(governor.pausedUntil).toBe(now.getTime() + 6 * 60 * 60 * 1000);
+    expect(result).toMatchObject({ status: "failed", kind: "SiteChanged", text: expect.stringContaining("eBay's pages changed") });
+    expect((await governorItem.getValue()).eBay!.pausedUntil).toBe(now.getTime() + 6 * 60 * 60 * 1000);
   });
 
-  it("does not start a run when the browser is signed out", async () => {
-    const { api, deps } = harness({ "/gh/user_profile": profileJson(null) });
+  it("starts nothing when the browser is signed out, and leaves the telling to the heartbeat", async () => {
+    const { api, deps, tab } = harness({ "/gh/user_profile": profileJson(null) });
 
-    await runWork(sales, heartbeat, deps);
+    const result = await runWork({ ...sales, trigger: "Requested", scanRequestId: "request-1" }, heartbeat, tab, deps);
 
+    expect(result).toMatchObject({ status: "failed", kind: "SignedOut" });
     expect(api.startRun).not.toHaveBeenCalled();
-    expect((await activityItem.getValue())[0]?.message).toBe("Sign in to eBay in this browser to sync Overhaul eBay.");
+    expect(api.reportWorkFailure).not.toHaveBeenCalled();
+    expect((await sessionsItem.getValue()).eBay).toMatchObject({ signedIn: false });
+    expect((await governorItem.getValue()).eBay?.strikes ?? 0).toBe(0);
+  });
+
+  it("starts nothing when the browser is signed in as someone else, and names both", async () => {
+    const { api, deps, tab } = harness({ "/gh/user_profile": profileJson("someone_else") });
+
+    const result = await runWork(sales, heartbeat, tab, deps);
+
+    expect(result).toMatchObject({ status: "failed", kind: "WrongAccount" });
+    expect(result.status === "failed" && result.text).toContain("signed in to eBay as someone_else, but Overhaul eBay syncs seller");
+    expect(api.startRun).not.toHaveBeenCalled();
+  });
+
+  it("reports work it could not start for its own reasons, so a scan someone asked for says why", async () => {
+    const { api, deps } = harness({});
+    const closed: MarketplaceTab = {
+      page: async () => page("", ""),
+      request: async () => {
+        throw new AdapterError("Interrupted", "The sync tab was closed.");
+      },
+    };
+
+    const result = await runWork({ ...sales, trigger: "Requested", scanRequestId: "request-1" }, heartbeat, closed, deps);
+
+    expect(result).toMatchObject({ status: "failed", kind: "Interrupted" });
+    expect(api.reportWorkFailure).toHaveBeenCalledWith({ channelAccountId: account, loop: "Sales", kind: "Interrupted", message: null, scanRequestId: "request-1" });
+  });
+
+  it("does not hold a scan asked for in the popup against the account's schedule", async () => {
+    const { api, deps } = harness({});
+    const closed: MarketplaceTab = {
+      page: async () => page("", ""),
+      request: async () => {
+        throw new AdapterError("Interrupted", "The sync tab was closed.");
+      },
+    };
+
+    await runWork({ ...sales, trigger: "Extension" }, heartbeat, closed, deps);
+
+    expect(api.reportWorkFailure).not.toHaveBeenCalled();
   });
 
   it("delivers a large snapshot in batches, and marks it complete only when everything was read", async () => {
     const listings: FixtureListing[] = Array.from({ length: 1200 }, (_, index) => ({ id: String(377000000000 + index), title: `Item ${index}`, price: 10 }));
-    const { api, deps } = harness({
+    const { api, deps, tab } = harness({
       ...signedIn,
       "/sh/lst/active": (url) => {
         const offset = Number(url.searchParams.get("offset"));
@@ -125,20 +148,35 @@ describe("running one piece of work", () => {
       },
     });
 
-    await runWork(listingsWork, heartbeat, deps);
+    await runWork(listingsWork, heartbeat, tab, deps);
 
     expect(api.addBatch.mock.calls.map((call) => call[1].listings?.length)).toEqual([500, 500, 200]);
     expect(api.complete).toHaveBeenCalledWith("run-1", { completeSnapshot: true });
   });
+});
 
-  it("opens nothing while the marketplace is paused, or when sync for it is switched off", async () => {
-    const { deps, opened } = harness(signedIn);
-    await governorItem.setValue({ eBay: { ...initialGovernorState(), pausedUntil: now.getTime() + 60_000, pauseReason: "Paused." } });
-    await runWork(sales, heartbeat, deps);
+describe("what stops work before a tab is opened", () => {
+  beforeEach(() => {
+    fakeBrowser.reset();
+    fakeBrowser.permissions.contains = vi.fn(async () => true) as typeof fakeBrowser.permissions.contains;
+  });
 
-    await governorItem.setValue({});
-    await runWork(sales, { ...heartbeat, platforms: [{ ...heartbeat.platforms![0]!, enabled: false }] }, deps);
+  it("lets ready work through", async () => {
+    expect(await preflight(sales, heartbeat, now)).toBeNull();
+  });
 
-    expect(opened).toEqual([]);
+  it("holds work back while the marketplace is paused, and says why", async () => {
+    await governorItem.setValue({ eBay: { ...initialGovernorState(), pausedUntil: now.getTime() + 60_000, pauseReason: "eBay showed a security check.", pausedFor: "challenge" } });
+    expect(await preflight(sales, heartbeat, now)).toEqual({ status: "failed", kind: "Challenge", text: "eBay showed a security check." });
+  });
+
+  it("holds work back when sync is switched off, access is missing, or the account is not bound", async () => {
+    expect(await preflight(sales, { ...heartbeat, platforms: [{ ...heartbeat.platforms![0]!, enabled: false, disabledReason: "Paused by HaulScout." }] }, now))
+      .toMatchObject({ status: "failed", text: "Paused by HaulScout." });
+    expect(await preflight(sales, { ...heartbeat, accounts: [{ ...heartbeat.accounts![0]!, boundUsername: null }] }, now))
+      .toMatchObject({ status: "failed", text: "Bind Overhaul eBay to its eBay seller account in HaulScout first." });
+
+    fakeBrowser.permissions.contains = vi.fn(async () => false) as typeof fakeBrowser.permissions.contains;
+    expect(await preflight(sales, heartbeat, now)).toMatchObject({ status: "failed", kind: "NoAccess" });
   });
 });

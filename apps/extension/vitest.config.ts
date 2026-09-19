@@ -5,7 +5,7 @@ export default defineConfig({
   plugins: [WxtVitest()],
   define: {
     __API_ORIGIN__: JSON.stringify("http://api.test"),
-    __PORTAL_ORIGIN__: JSON.stringify("http://portal.test"),
+    __PORTAL_ORIGINS__: JSON.stringify(["https://portal.test", "https://portal-app.test"]),
   },
   test: {
     environment: "node",

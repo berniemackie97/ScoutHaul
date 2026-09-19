@@ -219,6 +219,12 @@ public enum SyncFailureKind
     /// <summary>The marketplace or the network could not be reached.</summary>
     Network,
 
+    /// <summary>The browser has not allowed the extension to reach the marketplace.</summary>
+    NoAccess,
+
+    /// <summary>The sync tab was closed, or left the marketplace, before the work finished.</summary>
+    Interrupted,
+
     /// <summary>Anything else; the message says what.</summary>
     Error,
 }

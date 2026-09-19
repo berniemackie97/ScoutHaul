@@ -114,26 +114,43 @@ export function loopSummary(loop: SyncLoop, now: Date): { text: string; tone: To
 }
 
 /**
- * A scan request's state in the operator's words. A queued scan with no browser online says so —
- * a click must never look as if it is about to happen when nothing can run it.
+ * A scan request's state in the operator's words, with what a queued one is waiting for. A click must
+ * never look as if it is about to happen when nothing can run it: a queued scan says whether a
+ * browser will pick it up in a moment, or what it is waiting on — a sign-in, a security check, a
+ * browser being opened — which it then runs after, by itself.
  */
-export function requestStatus(request: SyncScanRequest, anyBrowserOnline: boolean): { label: string; tone: Tone } {
+export function requestStatus(
+  request: SyncScanRequest,
+  account: Pick<SyncAccount, "health" | "healthMessage"> | undefined,
+  anyBrowserOnline: boolean,
+): { label: string; tone: Tone; note: string | null } {
   switch (request.status) {
     case "Queued":
-      return anyBrowserOnline ? { label: "Queued", tone: "info" } : { label: "Waiting for a browser", tone: "warning" };
+      if (!anyBrowserOnline) {
+        return { label: "Waiting for a browser", tone: "warning", note: "No browser with HaulScout Sync is online. It starts when one is." };
+      }
+
+      return !account || account.health === "Ready"
+        ? { label: "Queued", tone: "info", note: "Starting in a moment." }
+        : { label: "Waiting", tone: "warning", note: `${account.healthMessage ?? ""} It starts by itself after.`.trim() };
     case "Running":
-      return { label: request.runningOn ? `Running on ${request.runningOn}` : "Running", tone: "info" };
+      return { label: request.runningOn ? `Running on ${request.runningOn}` : "Running", tone: "info", note: null };
     case "Succeeded":
-      return { label: "Done", tone: "success" };
+      return { label: "Done", tone: "success", note: null };
     case "Failed":
-      return { label: "Failed", tone: "danger" };
+      return { label: "Failed", tone: "danger", note: null };
     case "Cancelled":
-      return { label: "Cancelled", tone: "neutral" };
+      return { label: "Cancelled", tone: "neutral", note: null };
     case "Expired":
-      return { label: "Expired", tone: "neutral" };
+      return { label: "Expired", tone: "neutral", note: null };
     default:
-      return { label: request.status ?? "Unknown", tone: "neutral" };
+      return { label: request.status ?? "Unknown", tone: "neutral", note: null };
   }
+}
+
+/** The scan of one loop on one account that is queued or running, if there is one. */
+export function openRequestFor(requests: SyncScanRequest[], channelAccountId: string, loop: LoopKind): SyncScanRequest | undefined {
+  return requests.find((request) => request.channelAccountId === channelAccountId && request.loop === loop && !request.from && isOpen(request));
 }
 
 export function isOpen(request: SyncScanRequest): boolean {

@@ -24,11 +24,11 @@ Firefox is the first target. The same code builds for Chrome and Edge, and Safar
 
 | Piece | Where |
 |---|---|
-| Background agent: checks in every minute, runs due work one item at a time | `src/entrypoints/background.ts`, `src/agent/agent.ts`, `src/agent/runner.ts` |
+| Background agent: checks in every minute, runs due work one item at a time, notices a sign-in | `src/entrypoints/background.ts`, `src/agent/agent.ts`, `src/agent/runner.ts` |
 | Safety governor, as pure functions | `src/agent/governor.ts` |
-| Marketplace requests, run inside a background marketplace tab | `src/agent/transport.ts` |
+| The sync tab, and waiting for a page to really load | `src/agent/transport.ts` |
 | eBay adapter: reads the JSON each Seller Hub page embeds | `src/adapters/ebay/` |
-| Popup: connect, marketplace access, scan now, activity | `src/popup/` |
+| Popup: connect, marketplace access, what is happening, scan now, activity | `src/popup/` (states worked out in `model.ts`) |
 | Portal bridge: tells the HaulScout portal the extension is here and can be woken | `src/entrypoints/portal.content.ts` |
 
 **Why it reads through a marketplace tab.** It reads inside a background tab on the marketplace's
@@ -41,7 +41,26 @@ person viewing it, and marketplaces' bot protection notices. eBay showed its sec
 exactly that during development. Only the small JSON endpoints the site's own pages call are
 requested from the page.
 
-The tab opens without taking focus and closes when the run ends.
+**The sync tab.** Nobody has to open or keep a marketplace page open. When there is work, the
+extension opens its own tab: pinned, in the background, and in an ordinary window, never a private
+one. Work that follows reuses it, and it closes itself a few seconds after the last piece. Closing
+it by hand mid-scan only fails that scan, with a reason; the next scan opens another. A quick
+sign-in check uses an eBay tab you already have open when there is one, and never navigates it.
+
+**Waiting for a page.** A page is read only once it has finished loading at a marketplace address,
+and, after a navigation, only once that navigation has begun. Firefox reports a brand-new tab as
+"complete" while it still shows about:blank, before the real page even starts, and reading it then
+fails with "Missing host permission for the tab". `judgeTab` in `transport.ts` holds this rule, and
+its tests replay Firefox's sequence.
+
+**Needing a person.** Some trouble only a person can clear: signed out, signed in as another
+account, access not allowed, or a security check. The extension says so in the popup and on its
+heartbeat. HaulScout then holds the work back, and the portal shows what is needed. A scan someone
+asked for waits and runs as soon as it can, instead of failing.
+
+The extension notices when that happens without anyone pressing a button. When an eBay page
+finishes loading in one of your tabs, it looks again: you signed in, or you finished the check in
+Seller Hub.
 
 **Pairing** uses a one-time code:
 1. HaulScout shows the code under **Sync → Browsers → Connect a browser**.
@@ -61,7 +80,10 @@ pnpm --filter @overhaul/extension build        # Firefox, production → .output
 pnpm --filter @overhaul/extension build:chrome # Chrome/Edge, production → .output/chrome-mv3
 ```
 
-To point a build at another API, set `WXT_API_ORIGIN`, and set `WXT_PORTAL_ORIGIN` for the portal.
+To point a build at another API, set `WXT_API_ORIGIN`. For the portal, set `WXT_PORTAL_ORIGINS`
+to every address it is reached at, comma-separated. The bridge runs only there, so a portal opened
+anywhere else cannot wake the extension, and its scans wait for the next heartbeat. Production
+defaults to the portal's Vercel address.
 
 **Load a build in Firefox for testing:** open `about:debugging#/runtime/this-firefox`, choose
 **Load Temporary Add-on…**, and pick `.output/firefox-mv3/manifest.json`. A temporary add-on is
@@ -75,7 +97,9 @@ removed when Firefox restarts.
 
 ## Adding a marketplace
 
-1. Write an adapter against the real site, in a browser signed in to that marketplace.
+1. Write an adapter against the real site, in a browser signed in to that marketplace. Its
+   `readable` and `pageKind` tell the sync tab which pages are the marketplace's own, and which are
+   its sign-in form and security check.
 2. List it in `src/adapters/registry.ts` and add its origin to `marketplaceOrigins` in
    `wxt.config.ts`.
 3. List it in `SyncPlatforms` on the server, in the same change.

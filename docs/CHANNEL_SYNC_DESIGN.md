@@ -95,7 +95,17 @@ are handled in the build, not in the adapters:
   pages are **opened** in that background tab — a navigation, as a click makes — and read once
   loaded; only the small JSON endpoints the site's own pages call are requested from the page. A page
   fetched from script sends different request headers from one a person opens, and eBay's bot
-  protection answered exactly that with its security check during development.
+  protection answered exactly that with its security check during development. The tab is the
+  extension's own **sync tab**. It opens pinned and in the background when there is work, is reused
+  by whatever follows, and closes itself when idle, so the operator never opens or keeps one. A page
+  counts as loaded only at a marketplace address: Firefox reports a new tab "complete" while it is
+  still on about:blank.
+- **Trouble a person clears waits for them, not against them.** Signed out, the wrong account, no
+  access, or a security check is reported on the heartbeat, and the server holds that account's work
+  back; a requested scan stays queued, showing why, and runs once the cause clears. The extension
+  notices a sign-in, or a finished check, from the operator's own marketplace tab loading. Anything
+  else that stops work before it starts is reported (`work-failures`), which fails the request with
+  the reason and backs the schedule off.
 - **Host permissions are optional and per marketplace** — the extension asks for Depop access when
   Depop is connected, not for every site at install.
 - **Distribution:** Firefox — a signed, unlisted add-on through addons.mozilla.org with automatic
