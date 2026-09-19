@@ -125,6 +125,20 @@ public sealed class SyncAgentService(
             newToken));
     }
 
+    /// <summary>The browser leaving on its own — "Disconnect this browser" in the extension.</summary>
+    public async Task<AppResult> DisconnectAsync(CancellationToken cancellationToken)
+    {
+        SyncAgent? self = await store.FindAgentAsync(currentUser.OrganizationId, agent.AgentId, cancellationToken);
+        if (self is null)
+        {
+            return AppResult.NotFound("This browser is no longer paired.");
+        }
+
+        await SyncSweep.DisconnectAsync(store, self, currentUser.UserId, clock.GetUtcNow(), cancellationToken);
+        await store.SaveChangesAsync(cancellationToken);
+        return AppResult.Ok();
+    }
+
     /// <summary>
     /// Takes the lease on one loop of one account and opens its run — or says why not. Nothing is read
     /// from the marketplace until this succeeds.

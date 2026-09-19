@@ -10132,6 +10132,18 @@
         }
       }
     },
+    "/api/sync/agent/disconnect": {
+      "post": {
+        "tags": [
+          "SyncAgent"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
     "/api/sync/agent/runs": {
       "post": {
         "tags": [

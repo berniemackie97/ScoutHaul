@@ -63,6 +63,47 @@ public static class SyncSweep
         }
     }
 
+    /// <summary>
+    /// Disconnects a browser: its token stops working at once, and whatever it was running is closed
+    /// out so another browser can take over. The same whether the portal revokes it or it leaves.
+    /// </summary>
+    public static async Task DisconnectAsync(
+        ISyncAgentStore store, SyncAgent agent, Guid byUserId, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        if (agent.RevokedAt is not null)
+        {
+            return;
+        }
+
+        agent.RevokedAt = now;
+        agent.RevokedByUserId = byUserId;
+
+        const string disconnected = "The browser running this was disconnected from HaulScout.";
+        List<SyncLoop> held = (await store.ListLoopsAsync(agent.OrganizationId, cancellationToken))
+            .Where(loop => loop.LeaseAgentId == agent.Id)
+            .ToList();
+        IReadOnlyList<SyncRun> runs = await store.ListRunsAsync(
+            agent.OrganizationId, held.Where(loop => loop.LeaseRunId is not null).Select(loop => loop.LeaseRunId!.Value), cancellationToken);
+        IReadOnlyList<SyncScanRequest> open = await store.ListOpenScanRequestsAsync(agent.OrganizationId, cancellationToken);
+        foreach (SyncLoop loop in held)
+        {
+            if (runs.FirstOrDefault(run => run.Id == loop.LeaseRunId) is SyncRun run && run.Status == SyncRunStatus.Running)
+            {
+                run.Status = SyncRunStatus.Failed;
+                run.Summary = disconnected;
+                run.FinishedAt = now;
+                foreach (SyncScanRequest request in open.Where(request => request.SyncRunId == run.Id && request.Status == SyncScanStatus.Running))
+                {
+                    Finish(request, SyncScanStatus.Failed, disconnected, now);
+                }
+            }
+
+            loop.LastFinishedAt = now;
+            loop.LastError = disconnected;
+            ReleaseLease(loop);
+        }
+    }
+
     public static void ReleaseLease(SyncLoop loop)
     {
         loop.LeaseAgentId = null;

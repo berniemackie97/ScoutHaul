@@ -331,39 +331,7 @@ public sealed class SyncHubService(
             return AppResult.NotFound("That browser was not found.");
         }
 
-        if (agent.RevokedAt is not null)
-        {
-            return AppResult.Ok();
-        }
-
-        DateTimeOffset now = clock.GetUtcNow();
-        agent.RevokedAt = now;
-        agent.RevokedByUserId = currentUser.UserId;
-
-        const string disconnected = "The browser running this was disconnected from HaulScout.";
-        List<SyncLoop> held = (await store.ListLoopsAsync(organizationId, cancellationToken))
-            .Where(loop => loop.LeaseAgentId == agent.Id)
-            .ToList();
-        IReadOnlyList<SyncRun> runs = await store.ListRunsAsync(organizationId, held.Where(loop => loop.LeaseRunId is not null).Select(loop => loop.LeaseRunId!.Value), cancellationToken);
-        IReadOnlyList<SyncScanRequest> open = await store.ListOpenScanRequestsAsync(organizationId, cancellationToken);
-        foreach (SyncLoop loop in held)
-        {
-            if (runs.FirstOrDefault(run => run.Id == loop.LeaseRunId) is SyncRun run && run.Status == SyncRunStatus.Running)
-            {
-                run.Status = SyncRunStatus.Failed;
-                run.Summary = disconnected;
-                run.FinishedAt = now;
-                foreach (SyncScanRequest request in open.Where(request => request.SyncRunId == run.Id && request.Status == SyncScanStatus.Running))
-                {
-                    SyncSweep.Finish(request, SyncScanStatus.Failed, disconnected, now);
-                }
-            }
-
-            loop.LastFinishedAt = now;
-            loop.LastError = disconnected;
-            SyncSweep.ReleaseLease(loop);
-        }
-
+        await SyncSweep.DisconnectAsync(store, agent, currentUser.UserId, clock.GetUtcNow(), cancellationToken);
         await store.SaveChangesAsync(cancellationToken);
         return AppResult.Ok();
     }

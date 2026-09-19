@@ -573,6 +573,20 @@ public sealed class SyncAgentTests
     }
 
     [Fact]
+    public async Task A_browser_can_disconnect_itself()
+    {
+        Harness harness = NewHarness();
+        (Guid agent, string token) = await harness.PairAsync();
+
+        Assert.Equal(AppResultStatus.Ok, (await harness.As(agent).DisconnectAsync(CancellationToken.None)).Status);
+
+        SyncAgent gone = await harness.Db.SyncAgents.SingleAsync();
+        Assert.NotNull(gone.RevokedAt);
+        Assert.Equal(harness.User, gone.RevokedByUserId);
+        Assert.NotNull(await new EfSyncAgentStore(harness.Db).FindAgentByTokenAsync(SyncSecrets.HashToken(token), CancellationToken.None));
+    }
+
+    [Fact]
     public async Task Disconnecting_a_browser_closes_what_it_was_running()
     {
         Harness harness = NewHarness();

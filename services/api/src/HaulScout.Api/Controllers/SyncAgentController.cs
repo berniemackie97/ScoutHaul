@@ -30,6 +30,11 @@ public sealed class SyncAgentController(SyncAgentService sync) : HaulScoutContro
     public async Task<ActionResult<AgentHeartbeatDto>> Heartbeat(AgentHeartbeatRequest request, CancellationToken cancellationToken) =>
         ToActionResult(await sync.HeartbeatAsync(request, cancellationToken));
 
+    /// <summary>The browser disconnecting itself; its token stops working at once.</summary>
+    [HttpPost("disconnect")]
+    public async Task<IActionResult> Disconnect(CancellationToken cancellationToken) =>
+        ToActionResult(await sync.DisconnectAsync(cancellationToken));
+
     [HttpPost("runs")]
     public async Task<ActionResult<AgentRunDto>> StartRun(StartAgentRunRequest request, CancellationToken cancellationToken) =>
         ToActionResult(await sync.StartRunAsync(request, cancellationToken));
