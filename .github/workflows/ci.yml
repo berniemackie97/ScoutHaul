@@ -139,21 +139,26 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Type-check (shared packages + apps)
-        run: pnpm --filter @overhaul/api-client --filter @overhaul/ui --filter @overhaul/storefront --filter @overhaul/admin type-check
+        run: pnpm --filter @overhaul/api-client --filter @overhaul/ui --filter @overhaul/storefront --filter @overhaul/admin --filter @overhaul/extension type-check
 
       # Neither app had an ESLint config and eslint was not installed, so `next lint` had never been
       # runnable. Starting at --max-warnings 0: the first run found ten findings and all ten are fixed
       # here, so there is no debt to ratchet down from.
       - name: Lint
-        run: pnpm --filter @overhaul/storefront --filter @overhaul/admin lint
+        run: pnpm --filter @overhaul/storefront --filter @overhaul/admin --filter @overhaul/extension lint
 
       # These suites existed and passed, and nothing ran them — so nothing was protecting the
       # behaviour they describe. A test that never runs in CI is a comment.
       - name: Test
-        run: pnpm --filter @overhaul/ui --filter @overhaul/storefront --filter @overhaul/admin test
+        run: pnpm --filter @overhaul/ui --filter @overhaul/storefront --filter @overhaul/admin --filter @overhaul/extension test
 
       - name: Build storefront + admin
         run: pnpm --filter @overhaul/storefront --filter @overhaul/admin build
+
+      # The sync extension ships to Firefox first and Chrome/Edge after; build both, so a change that
+      # only breaks one browser's bundle is caught here rather than when someone installs it.
+      - name: Build extension (Firefox, Chrome)
+        run: pnpm --filter @overhaul/extension build && pnpm --filter @overhaul/extension build:chrome
 
   docker:
     name: Docker
