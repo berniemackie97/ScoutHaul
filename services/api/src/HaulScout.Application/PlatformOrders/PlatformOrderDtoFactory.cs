@@ -9,7 +9,7 @@ public static class PlatformOrderDtoFactory
 {
     public static PlatformOrderDto ToPlatformOrderDto(
         PlatformOrder order,
-        IReadOnlyDictionary<Guid, (Guid Id, string Title, bool AlreadySold)>? lineSuggestions = null)
+        IReadOnlyDictionary<Guid, PlatformLineSuggestion>? lineSuggestions = null)
     {
         decimal expectedPayout = ExpectedPayout(order);
         return new PlatformOrderDto(
@@ -53,9 +53,8 @@ public static class PlatformOrderDtoFactory
                 .OrderBy(line => line.CreatedAt)
                 .Select(line =>
                 {
-                    (Guid Id, string Title, bool AlreadySold)? suggestion =
-                        lineSuggestions is not null
-                        && lineSuggestions.TryGetValue(line.Id, out (Guid Id, string Title, bool AlreadySold) match)
+                    PlatformLineSuggestion? suggestion =
+                        lineSuggestions is not null && lineSuggestions.TryGetValue(line.Id, out PlatformLineSuggestion? match)
                             ? match
                             : null;
                     return new PlatformOrderLineDto(
@@ -76,7 +75,8 @@ public static class PlatformOrderDtoFactory
                         line.InventoryItem?.Title,
                         suggestion?.Id,
                         suggestion?.Title,
-                        suggestion?.AlreadySold ?? false);
+                        suggestion?.AlreadySold ?? false,
+                        suggestion?.Exact ?? false);
                 })
                 .ToList(),
             order.FeesPending);

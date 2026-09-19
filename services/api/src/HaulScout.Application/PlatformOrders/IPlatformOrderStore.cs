@@ -58,6 +58,11 @@ public interface IPlatformOrderStore
 
     void AddSale(Sale sale);
 
+    /// <summary>An inventory item created from a sale, for a line whose item was never recorded.</summary>
+    void AddInventoryItem(InventoryItem item);
+
+    void AddChannelListing(ChannelListing listing);
+
     /// <summary>Removes an imported order and its source lines. Only valid while it is unreconciled.</summary>
     void RemoveImportedOrder(PlatformOrder order);
 

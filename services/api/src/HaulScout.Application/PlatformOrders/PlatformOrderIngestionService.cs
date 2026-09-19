@@ -163,7 +163,7 @@ public sealed class PlatformOrderIngestionService(
             ? imported
             : await store.ListImportedOrdersForDisplayAsync(currentUser.OrganizationId, touched, cancellationToken);
 
-        Dictionary<Guid, (Guid Id, string Title, bool AlreadySold)> suggestions =
+        Dictionary<Guid, PlatformLineSuggestion> suggestions =
             await suggestionService.BuildSuggestionsAsync(refreshed, cancellationToken);
         List<PlatformOrderDto> dtos = refreshed.Select(order => PlatformOrderDtoFactory.ToPlatformOrderDto(order, suggestions)).ToList();
         return (new IngestPlatformOrdersResultDto(created, updated, skipped, autoReconciled, dtos, unchanged), null);
