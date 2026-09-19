@@ -10,25 +10,15 @@ export const dynamic = "force-dynamic";
 
 export default async function PlatformOrdersPage() {
   const api = await getApiClient();
-  const [openResult, reconciledResult, inventoryResult, autoMatchResult] = await Promise.all([
+  const [openResult, reconciledResult, autoMatchResult] = await Promise.all([
     api.GET("/api/platform-orders", { params: { query: { status: "Imported" } } }),
     api.GET("/api/platform-orders", { params: { query: { status: "Reconciled" } } }),
-    api.GET("/api/inventory", { params: { query: { includeArchived: false } } }),
     // A preview only — it reports what could be settled and writes nothing.
     api.GET("/api/platform-orders/auto-match/preview", {}),
   ]);
 
   const openOrders = openResult.data ?? [];
   const reconciled = reconciledResult.data ?? [];
-  // Match against ALL inventory (sold + unsold): unsold → new sale, already-recorded → correct that sale.
-  const targets = (inventoryResult.data ?? [])
-    .filter((item) => item.id && (!item.isBundle || item.bundleComponentCount === 0))
-    .map((item) => ({
-      id: item.id as string,
-      title: item.title ?? "Untitled item",
-      isSold: item.isSold ?? false,
-    }));
-
   const flagged = openOrders.filter(
     (order) => typeof order.payoutAmount === "number" && Math.abs(order.payoutVariance ?? 0) >= 0.01
   ).length;
@@ -102,7 +92,7 @@ export default async function PlatformOrdersPage() {
 
       <section className="space-y-3">
         <h2 className="text-sm font-semibold">Needs your decision</h2>
-        <PlatformOrderReconciler orders={openOrders} targets={targets} />
+        <PlatformOrderReconciler orders={openOrders} />
       </section>
 
       {reconciled.length > 0 && (

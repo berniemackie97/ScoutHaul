@@ -10468,6 +10468,7 @@ export interface components {
             suggestedInventoryItemId?: string | null;
             suggestedInventoryItemTitle?: string | null;
             suggestedInventoryItemAlreadySold?: boolean;
+            suggestionExact?: boolean;
         };
         PlatformOrderReconcileResultDto: {
             /** Format: uuid */
@@ -10479,6 +10480,8 @@ export interface components {
             /** Format: int32 */
             correctedSaleCount?: number;
             sales?: components["schemas"]["SaleDto"][] | null;
+            /** Format: int32 */
+            createdItemCount?: number;
         };
         /** @enum {string} */
         PlatformOrderStatus: "Imported" | "Reconciled" | "Ignored";
@@ -10578,7 +10581,8 @@ export interface components {
             /** Format: uuid */
             platformOrderLineId?: string;
             /** Format: uuid */
-            inventoryItemId?: string;
+            inventoryItemId?: string | null;
+            createItem?: boolean;
         };
         ReconcilePlatformOrderRequest: {
             lines?: components["schemas"]["ReconcilePlatformOrderLineMap"][] | null;

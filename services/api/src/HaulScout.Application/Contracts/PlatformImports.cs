@@ -91,7 +91,8 @@ public sealed record PlatformOrderLineDto(
     string? InventoryItemTitle,
     Guid? SuggestedInventoryItemId,
     string? SuggestedInventoryItemTitle,
-    bool SuggestedInventoryItemAlreadySold);
+    bool SuggestedInventoryItemAlreadySold,
+    bool SuggestionExact = false);
 
 public sealed record PlatformOrderDto(
     Guid Id,
@@ -172,15 +173,20 @@ public sealed record ImportMarketplaceRefundsCsvRequest(string Platform, string 
 
 public sealed record ImportMarketplaceRefundsResultDto(int Imported, int Skipped, IReadOnlyList<string> Warnings);
 
-/// <summary>Maps one imported order line to the ScoutHaul inventory item it represents, for reconciliation.</summary>
-public sealed record ReconcilePlatformOrderLineMap(Guid PlatformOrderLineId, Guid InventoryItemId);
+/// <summary>
+/// Maps one imported order line to the ScoutHaul inventory item it represents, for reconciliation —
+/// or, with <paramref name="CreateItem"/>, says the item was never recorded and should be created from
+/// the sale itself: a listing sold before it was ever inventory has nothing to match.
+/// </summary>
+public sealed record ReconcilePlatformOrderLineMap(Guid PlatformOrderLineId, Guid? InventoryItemId = null, bool CreateItem = false);
 
 /// <summary>Turns an imported order into ScoutHaul <see cref="SaleDto"/>(s) using the platform's exact money figures.</summary>
 public sealed record ReconcilePlatformOrderRequest(
     IReadOnlyList<ReconcilePlatformOrderLineMap> Lines,
     string? Notes = null);
 
-public sealed record PlatformOrderReconcileResultDto(Guid PlatformOrderId, Guid SaleGroupId, int CreatedSaleCount, int CorrectedSaleCount, IReadOnlyList<SaleDto> Sales);
+/// <param name="CreatedItemCount">Inventory items created from the sale, for lines that had none.</param>
+public sealed record PlatformOrderReconcileResultDto(Guid PlatformOrderId, Guid SaleGroupId, int CreatedSaleCount, int CorrectedSaleCount, IReadOnlyList<SaleDto> Sales, int CreatedItemCount = 0);
 
 // --- Platform listing ingestion (captured/imported marketplace listings → seed/link inventory) ---
 

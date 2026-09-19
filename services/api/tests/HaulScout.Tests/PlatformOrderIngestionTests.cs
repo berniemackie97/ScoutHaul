@@ -1206,4 +1206,60 @@ Brass Lamp,377251318593,1,$0.00,$0.00,$0.00,$0.00,$0.00,$12.34,$0.00,$0.00,$16.9
         Assert.Equal(5.20m, order.Lines.Single().PlatformFees);
         Assert.Equal(7.10m, order.Lines.Single().SellerShippingCost);
     }
+
+    [Fact]
+    public async Task A_sale_whose_item_was_never_recorded_creates_the_item_from_the_sale()
+    {
+        var (db, org, user) = NewContext(nameof(A_sale_whose_item_was_never_recorded_creates_the_item_from_the_sale));
+        await using var _ = db;
+        var controller = NewController(db, org, user);
+        ChannelAccount ebay = new() { OrganizationId = org, Channel = "eBay", DisplayName = "Overhaul eBay" };
+        db.ChannelAccounts.Add(ebay);
+        db.SaveChanges();
+
+        // Something that sold before it was ever inventory: nothing matches it by id, only by a guess.
+        SeedItem(db, org, "Wii Sports Disc Only (Nintendo Wii, 2006)", 2m);
+        IngestPlatformOrderLineInput[] lines = [new("Sports Game Lot of 4 For Nintendo Wii", 20m, ExternalItemId: "377273002938")];
+        ActionResult<IngestPlatformOrdersResultDto> landed = await controller.Ingest(
+            new IngestPlatformOrdersRequest("eBay", [Order("26-15152-72360", lines, shipping: 6.99m, tax: 1.96m, fee: 4.08m)], ebay.Id), CancellationToken.None);
+        PlatformOrderLineDto line = landed.Value!.Orders.Single().Lines.Single();
+        Assert.False(line.SuggestionExact);
+
+        ActionResult<PlatformOrderReconcileResultDto> settled = await controller.Reconcile(
+            landed.Value.Orders.Single().Id, new ReconcilePlatformOrderRequest([new ReconcilePlatformOrderLineMap(line.Id, CreateItem: true)]), CancellationToken.None);
+
+        Assert.Equal((1, 1), (settled.Value!.CreatedItemCount, settled.Value.CreatedSaleCount));
+        InventoryItem created = await db.InventoryItems.SingleAsync(item => item.Title == "Sports Game Lot of 4 For Nintendo Wii");
+        Assert.Equal(InventoryStatus.Sold, created.Status);
+        Assert.Null(created.PurchasePrice);
+        Assert.Equal(20m, created.EstimatedSalePrice);
+        ChannelListing listing = await db.ChannelListings.SingleAsync();
+        Assert.Equal((created.Id, "377273002938", ChannelListingStatus.Sold, ebay.Id), (listing.InventoryItemId, listing.ExternalListingId, listing.Status, listing.ChannelAccountId));
+        Sale sale = await db.Sales.SingleAsync();
+        Assert.Equal((created.Id, 20m, 4.08m), (sale.InventoryItemId, sale.SoldPrice, sale.PlatformFees));
+
+        // The listing that sold is now linked by its id, so another order for it is an exact match.
+        ActionResult<IngestPlatformOrdersResultDto> again = await controller.Ingest(
+            new IngestPlatformOrdersRequest("eBay", [Order("27-00000-00001", lines, fee: 4m)], ebay.Id), CancellationToken.None);
+        PlatformOrderLineDto repeat = again.Value!.Orders.Single().Lines.Single();
+        Assert.Equal((created.Id, true, true), (repeat.SuggestedInventoryItemId, repeat.SuggestionExact, repeat.SuggestedInventoryItemAlreadySold));
+    }
+
+    [Fact]
+    public async Task A_line_left_without_an_item_or_a_new_one_blocks_the_order()
+    {
+        var (db, org, user) = NewContext(nameof(A_line_left_without_an_item_or_a_new_one_blocks_the_order));
+        await using var _ = db;
+        var controller = NewController(db, org, user);
+        IngestPlatformOrderLineInput[] lines = [new("Lamp", 40m), new("Shade", 10m)];
+        ActionResult<IngestPlatformOrdersResultDto> landed = await controller.Ingest(
+            new IngestPlatformOrdersRequest("eBay", [Order("ORD-2L", lines, fee: 5m)]), CancellationToken.None);
+        PlatformOrderDto order = landed.Value!.Orders.Single();
+
+        ActionResult<PlatformOrderReconcileResultDto> partial = await controller.Reconcile(
+            order.Id, new ReconcilePlatformOrderRequest([new ReconcilePlatformOrderLineMap(order.Lines[0].Id, CreateItem: true)]), CancellationToken.None);
+
+        Assert.Equal(400, Assert.IsType<ObjectResult>(partial.Result).StatusCode);
+        Assert.Empty(await db.InventoryItems.ToListAsync());
+    }
 }

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { getApiClient } from "@/lib/api";
 import { errorMessage } from "@/lib/api-error";
+import type { MappingRow } from "@/features/imports/reconcile-model";
 
 export type ActionResult = { ok: boolean; message: string };
 
@@ -14,31 +15,26 @@ export async function reconcilePlatformOrder(
   const orderId = formData.get("orderId");
   if (typeof orderId !== "string" || !orderId) return { ok: false, message: "Missing order." };
 
-  let lines: { platformOrderLineId: string; inventoryItemId: string }[] = [];
+  let lines: MappingRow[] = [];
   try {
     const parsed = JSON.parse((formData.get("mappingJson") as string) ?? "[]");
     if (Array.isArray(parsed)) {
-      lines = parsed
-        .filter(
-          (row) =>
-            row &&
-            typeof row.platformOrderLineId === "string" &&
-            typeof row.inventoryItemId === "string" &&
-            row.inventoryItemId
-        )
-        .map((row) => ({
-          platformOrderLineId: row.platformOrderLineId as string,
-          inventoryItemId: row.inventoryItemId as string,
-        }));
+      lines = parsed.flatMap<MappingRow>((row) => {
+        if (!row || typeof row.platformOrderLineId !== "string") return [];
+        if (row.createItem === true) return [{ platformOrderLineId: row.platformOrderLineId as string, createItem: true }];
+        return typeof row.inventoryItemId === "string" && row.inventoryItemId
+          ? [{ platformOrderLineId: row.platformOrderLineId as string, inventoryItemId: row.inventoryItemId as string }]
+          : [];
+      });
     }
   } catch {
     return { ok: false, message: "Line mapping could not be read. Reload and try again." };
   }
   if (lines.length === 0)
-    return { ok: false, message: "Match every line to an inventory item first." };
+    return { ok: false, message: "Match every line to an inventory item, or create one from the sale, first." };
 
-  const uniqueItems = new Set(lines.map((line) => line.inventoryItemId));
-  if (uniqueItems.size !== lines.length)
+  const itemIds = lines.flatMap((line) => (line.inventoryItemId ? [line.inventoryItemId] : []));
+  if (new Set(itemIds).size !== itemIds.length)
     return { ok: false, message: "Each inventory item can be matched to only one line." };
 
   const api = await getApiClient();
@@ -54,9 +50,11 @@ export async function reconcilePlatformOrder(
   revalidatePath("/inventory");
   const created = result.data.createdSaleCount ?? 0;
   const corrected = result.data.correctedSaleCount ?? 0;
+  const items = result.data.createdItemCount ?? 0;
   const parts = [
     created > 0 ? `${created} new sale${created === 1 ? "" : "s"}` : null,
     corrected > 0 ? `${corrected} corrected` : null,
+    items > 0 ? `${items} item${items === 1 ? "" : "s"} created from the sale — add ${items === 1 ? "its" : "their"} cost in Inventory` : null,
   ].filter(Boolean);
   return { ok: true, message: `Reconciled: ${parts.join(", ") || "done"}.` };
 }

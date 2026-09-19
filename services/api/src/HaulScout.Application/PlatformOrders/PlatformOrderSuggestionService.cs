@@ -5,6 +5,13 @@ using HaulScout.Domain.Entities;
 namespace HaulScout.Application.PlatformOrders;
 
 /// <summary>
+/// The item a line most likely is, and how sure that is. <see cref="Exact"/> means an identifier
+/// matched — the platform's item number or the SKU; otherwise it is a title resemblance, a guess a
+/// person must confirm, never one to pre-select.
+/// </summary>
+public sealed record PlatformLineSuggestion(Guid Id, string Title, bool AlreadySold, bool Exact);
+
+/// <summary>
 /// Builds operator-facing inventory suggestions for unreconciled platform order lines.
 /// Suggestions are advisory only; reconciliation still requires explicit operator confirmation.
 /// </summary>
@@ -14,7 +21,7 @@ public sealed class PlatformOrderSuggestionService(IPlatformOrderSuggestionStore
     /// The operator-facing suggestion per open line. Advisory: reconciliation still needs a person,
     /// except where <see cref="BuildMatchesAsync"/> reports a match safe to settle on its own.
     /// </summary>
-    public async Task<Dictionary<Guid, (Guid Id, string Title, bool AlreadySold)>> BuildSuggestionsAsync(
+    public async Task<Dictionary<Guid, PlatformLineSuggestion>> BuildSuggestionsAsync(
         IReadOnlyList<PlatformOrder> orders,
         CancellationToken cancellationToken)
     {
@@ -25,7 +32,8 @@ public sealed class PlatformOrderSuggestionService(IPlatformOrderSuggestionStore
             .Where(entry => titleById.ContainsKey(entry.Value.InventoryItemId))
             .ToDictionary(
                 entry => entry.Key,
-                entry => (entry.Value.InventoryItemId, titleById[entry.Value.InventoryItemId], entry.Value.AlreadySold));
+                entry => new PlatformLineSuggestion(
+                    entry.Value.InventoryItemId, titleById[entry.Value.InventoryItemId], entry.Value.AlreadySold, entry.Value.IsExact));
     }
 
     /// <summary>

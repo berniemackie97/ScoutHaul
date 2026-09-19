@@ -15813,6 +15813,9 @@
           },
           "suggestedInventoryItemAlreadySold": {
             "type": "boolean"
+          },
+          "suggestionExact": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false
@@ -15842,6 +15845,10 @@
               "$ref": "#/components/schemas/SaleDto"
             },
             "nullable": true
+          },
+          "createdItemCount": {
+            "type": "integer",
+            "format": "int32"
           }
         },
         "additionalProperties": false
@@ -16156,7 +16163,11 @@
           },
           "inventoryItemId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "nullable": true
+          },
+          "createItem": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false

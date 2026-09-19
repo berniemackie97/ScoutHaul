@@ -4,37 +4,18 @@ import { useActionState, useMemo, useState } from "react";
 import { useFormStatus } from "react-dom";
 import type { components } from "@overhaul/api-client";
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Textarea, formatCurrency, formatDate } from "@overhaul/ui";
+import { InventoryPicker } from "@/components/inventory/inventory-picker";
+import { confirmLabel, initialChoice, mappingRows, summarize, type LineChoice } from "@/features/imports/reconcile-model";
 import { reconcilePlatformOrder, ignorePlatformOrder, type ActionResult } from "./actions";
 
 type PlatformOrder = components["schemas"]["PlatformOrderDto"];
 type PlatformOrderLine = components["schemas"]["PlatformOrderLineDto"];
 
-export type MatchTarget = { id: string; title: string; isSold: boolean };
-
 const initial: ActionResult = { ok: false, message: "" };
-const selectClass =
-  "h-9 w-full rounded-lg border border-input bg-background px-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring";
 const currency = formatCurrency;
 
-function ReconcileButton({
-  disabled,
-  willCreate,
-  willCorrect,
-}: {
-  disabled: boolean;
-  willCreate: number;
-  willCorrect: number;
-}) {
+function ReconcileButton({ disabled, label }: { disabled: boolean; label: string }) {
   const { pending } = useFormStatus();
-  const label =
-    willCreate + willCorrect === 0
-      ? "Match every line first"
-      : [
-          willCreate > 0 ? `record ${willCreate}` : null,
-          willCorrect > 0 ? `correct ${willCorrect}` : null,
-        ]
-          .filter(Boolean)
-          .join(" · ");
   return (
     <Button type="submit" disabled={pending || disabled}>
       {pending ? "Saving…" : `Confirm (${label})`}
@@ -51,53 +32,22 @@ function IgnoreButton() {
   );
 }
 
-function OrderCard({ order, targets }: { order: PlatformOrder; targets: MatchTarget[] }) {
+function OrderCard({ order }: { order: PlatformOrder }) {
   const [reconcileState, reconcileAction] = useActionState(reconcilePlatformOrder, initial);
   const [ignoreState, ignoreAction] = useActionState(ignorePlatformOrder, initial);
   // `?? []` produced a fresh array on every render, so the useMemo keyed on `lines` below
   // recomputed every time and memoized nothing.
   const lines = useMemo(() => order.lines ?? [], [order.lines]);
 
-  const soldById = useMemo(
-    () => new Map(targets.map((target) => [target.id, target.isSold])),
-    [targets]
-  );
-  // Unsold first (a new sale), then already-recorded (a correction); each alphabetical.
-  const sortedTargets = useMemo(
-    () =>
-      [...targets].sort(
-        (a, b) => Number(a.isSold) - Number(b.isSold) || a.title.localeCompare(b.title)
-      ),
-    [targets]
+  const [choices, setChoices] = useState<Record<string, LineChoice | null>>(() =>
+    Object.fromEntries(lines.map((line) => [line.id ?? "", initialChoice(line)]))
   );
 
-  const [map, setMap] = useState<Record<string, string>>(() =>
-    Object.fromEntries(
-      lines.map((line) => [
-        line.id ?? "",
-        line.inventoryItemId ?? line.suggestedInventoryItemId ?? "",
-      ])
-    )
-  );
-
-  const chosen = Object.values(map).filter(Boolean);
-  const allMatched = lines.length > 0 && lines.every((line) => map[line.id ?? ""]);
-  const allDistinct = new Set(chosen).size === chosen.length;
+  const summary = summarize(lines, choices);
   // Fees not posted yet: settling now would write a sale with a profit that is not true.
   const feesPending = order.feesPending === true;
-  const canReconcile = allMatched && allDistinct && !feesPending;
-  const willCorrect = chosen.filter((id) => soldById.get(id)).length;
-  const willCreate = chosen.length - willCorrect;
-
-  const mappingJson = useMemo(
-    () =>
-      JSON.stringify(
-        lines
-          .filter((line) => line.id && map[line.id])
-          .map((line) => ({ platformOrderLineId: line.id, inventoryItemId: map[line.id!] }))
-      ),
-    [lines, map]
-  );
+  const canReconcile = summary.complete && summary.distinct && !feesPending;
+  const mappingJson = useMemo(() => JSON.stringify(mappingRows(lines, choices)), [lines, choices]);
 
   const hasPayout = typeof order.payoutAmount === "number";
   const variance = order.payoutVariance ?? 0;
@@ -175,8 +125,7 @@ function OrderCard({ order, targets }: { order: PlatformOrder; targets: MatchTar
               <tbody className="divide-y">
                 {lines.map((line: PlatformOrderLine) => {
                   const id = line.id ?? "";
-                  const selected = map[id];
-                  const willCorrectLine = selected ? soldById.get(selected) : false;
+                  const choice = choices[id] ?? null;
                   const importedMoneyDetails = [
                     typeof line.platformFees === "number"
                       ? `fees -${currency(line.platformFees)}`
@@ -204,31 +153,32 @@ function OrderCard({ order, targets }: { order: PlatformOrder; targets: MatchTar
                         {currency((line.unitPrice ?? 0) * (line.quantity ?? 1))}
                       </td>
                       <td className="px-3 py-2">
-                        <select
-                          className={selectClass}
-                          value={map[id] ?? ""}
-                          onChange={(event) =>
-                            setMap((current) => ({ ...current, [id]: event.target.value }))
+                        <InventoryPicker
+                          value={choice}
+                          lineTitle={line.title ?? "this line"}
+                          suggestion={
+                            line.suggestedInventoryItemId
+                              ? {
+                                  id: line.suggestedInventoryItemId,
+                                  title: line.suggestedInventoryItemTitle ?? "Suggested item",
+                                  alreadySold: line.suggestedInventoryItemAlreadySold ?? false,
+                                  exact: line.suggestionExact ?? false,
+                                }
+                              : null
                           }
-                        >
-                          <option value="">Choose an item…</option>
-                          {sortedTargets.map((target) => (
-                            <option key={target.id} value={target.id}>
-                              {target.title}
-                              {target.isSold ? " · recorded" : ""}
-                              {target.id === line.suggestedInventoryItemId ? " (suggested)" : ""}
-                            </option>
-                          ))}
-                        </select>
-                        {selected && (
+                          onChange={(next) => setChoices((current) => ({ ...current, [id]: next }))}
+                        />
+                        {choice ? (
                           <span
-                            className={`mt-1 block text-xs ${willCorrectLine ? "text-amber-700" : "text-emerald-700"}`}
+                            className={`mt-1 block text-xs ${choice.kind === "item" && choice.isSold ? "text-amber-700" : "text-emerald-700"}`}
                           >
-                            {willCorrectLine
-                              ? "→ corrects the recorded sale (exact fees)"
-                              : "→ records a new sale"}
+                            {choice.kind === "create"
+                              ? "→ creates the item and records the sale"
+                              : choice.isSold
+                                ? "→ corrects the recorded sale (exact fees)"
+                                : "→ records a new sale"}
                           </span>
-                        )}
+                        ) : null}
                       </td>
                     </tr>
                   );
@@ -237,7 +187,7 @@ function OrderCard({ order, targets }: { order: PlatformOrder; targets: MatchTar
             </table>
           </div>
 
-          {!allDistinct && (
+          {!summary.distinct && (
             <p className="text-destructive text-xs">
               Two lines point to the same item. Each item can match only one line.
             </p>
@@ -251,11 +201,7 @@ function OrderCard({ order, targets }: { order: PlatformOrder; targets: MatchTar
                 ? `${order.platform} has not posted this order's fees yet. The next sales scan after they appear brings them in; it can be settled then.`
                 : `Writes ${order.platform}'s exact price, shipping, tax, and fees. Items you already recorded are corrected in place (audited); the rest become new sales.`}
             </p>
-            <ReconcileButton
-              disabled={!canReconcile}
-              willCreate={willCreate}
-              willCorrect={willCorrect}
-            />
+            <ReconcileButton disabled={!canReconcile} label={confirmLabel(summary)} />
           </div>
 
           {reconcileState.message && (
@@ -278,13 +224,7 @@ function OrderCard({ order, targets }: { order: PlatformOrder; targets: MatchTar
   );
 }
 
-export function PlatformOrderReconciler({
-  orders,
-  targets,
-}: {
-  orders: PlatformOrder[];
-  targets: MatchTarget[];
-}) {
+export function PlatformOrderReconciler({ orders }: { orders: PlatformOrder[] }) {
   if (orders.length === 0) {
     return (
       <div className="bg-muted/20 text-muted-foreground rounded-xl border border-dashed p-12 text-center text-sm">
@@ -296,7 +236,7 @@ export function PlatformOrderReconciler({
   return (
     <div className="space-y-4">
       {orders.map((order) => (
-        <OrderCard key={order.id} order={order} targets={targets} />
+        <OrderCard key={order.id} order={order} />
       ))}
     </div>
   );
