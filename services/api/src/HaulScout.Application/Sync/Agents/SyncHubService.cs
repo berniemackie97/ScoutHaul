@@ -19,6 +19,7 @@ namespace HaulScout.Application.Sync.Agents;
 public sealed class SyncHubService(
     ISyncAgentStore store,
     IInventoryPhotoSyncStore photos,
+    IOrganizationMemberStore organizations,
     ICurrentUserContext currentUser,
     IOrganizationAuthorizer access,
     TimeProvider clock,
@@ -44,18 +45,21 @@ public sealed class SyncHubService(
         IReadOnlyList<SyncAgent> agents = await store.ListAgentsAsync(organizationId, cancellationToken);
         IReadOnlyList<SyncScanRequest> requests = await store.ListScanRequestsAsync(organizationId, now.AddHours(-24), 30, cancellationToken);
         IReadOnlyDictionary<Guid, string> people = await store.UserNamesAsync(agents.Select(agent => agent.PairedByUserId), cancellationToken);
-        IReadOnlyDictionary<Guid, int> photosWaiting = await photos.CountPendingByAccountAsync(cancellationToken);
+        Organization? organization = await organizations.FindOrganizationAsync(organizationId, cancellationToken);
 
         return new SyncOverviewDto(
             accounts
                 .Where(account => account.IsActive && !account.IsNativelySynced)
                 .OrderBy(account => SyncPlatforms.Find(account.Channel) is null)
                 .ThenBy(account => account.DisplayName, StringComparer.OrdinalIgnoreCase)
-                .Select(account => Account(account, loops, agents, photosWaiting, now))
+                .Select(account => Account(account, loops, agents, now))
                 .ToList(),
             agents.Select(agent => Agent(agent, people, now)).ToList(),
             requests.Select(request => Request(request, accounts, agents)).ToList(),
-            SyncPlatforms.All.Select(Settings).ToList());
+            SyncPlatforms.All.Select(Settings).ToList(),
+            new SyncPhotoSyncDto(
+                organization?.MarketplacePhotoSyncEnabled ?? false,
+                await photos.CountPendingAsync(cancellationToken)));
     }
 
     /// <summary>Sets how often each loop runs. Null switches a loop off, which is also where every account starts.</summary>
@@ -109,20 +113,15 @@ public sealed class SyncHubService(
     /// hands the account's listings' photos to the items they are linked to, replacing what those items show;
     /// it is off until someone asks for it.
     /// </summary>
-    public async Task<AppResult<SyncOverviewDto>> SetPhotoSyncAsync(Guid accountId, UpdatePhotoSyncRequest request, CancellationToken cancellationToken)
+    public async Task<AppResult<SyncOverviewDto>> SetPhotoSyncAsync(UpdatePhotoSyncRequest request, CancellationToken cancellationToken)
     {
-        ChannelAccount? account = await store.FindAccountAsync(currentUser.OrganizationId, accountId, cancellationToken);
-        if (account is null)
+        Organization? organization = await organizations.FindOrganizationAsync(currentUser.OrganizationId, cancellationToken);
+        if (organization is null)
         {
-            return AppResult<SyncOverviewDto>.NotFound("That account was not found.");
+            return AppResult<SyncOverviewDto>.NotFound("That organization was not found.");
         }
 
-        if (request.Enabled && SyncPlatforms.Find(account.Channel) is null)
-        {
-            return AppResult<SyncOverviewDto>.Validation($"{account.Channel} cannot be synced from a browser yet.", AppErrorCode.SyncUnavailable);
-        }
-
-        account.PhotoSyncEnabled = request.Enabled;
+        organization.MarketplacePhotoSyncEnabled = request.Enabled;
         await store.SaveChangesAsync(cancellationToken);
         return AppResult<SyncOverviewDto>.Ok(await OverviewAsync(cancellationToken));
     }
@@ -423,7 +422,6 @@ public sealed class SyncHubService(
         ChannelAccount account,
         IReadOnlyList<SyncLoop> loops,
         IReadOnlyList<SyncAgent> agents,
-        IReadOnlyDictionary<Guid, int> photosWaiting,
         DateTimeOffset now)
     {
         SyncPlatform? platform = SyncPlatforms.Find(account.Channel);
@@ -478,9 +476,7 @@ public sealed class SyncHubService(
                 session.Marketplace.Username,
                 session.Marketplace.MarketplaceUserId,
                 session.Marketplace.PausedUntil > now ? session.Marketplace.PausedUntil : null,
-                session.Marketplace.PausedUntil > now ? session.Marketplace.PauseReason : null)).ToList(),
-            account.PhotoSyncEnabled,
-            photosWaiting.TryGetValue(account.Id, out int waiting) ? waiting : 0);
+                session.Marketplace.PausedUntil > now ? session.Marketplace.PauseReason : null)).ToList());
     }
 
     /// <summary>One sentence on whether the account can sync right now, and if not, what would fix it.</summary>

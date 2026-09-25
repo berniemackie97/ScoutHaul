@@ -9,6 +9,8 @@ using HaulScout.Infrastructure.Inventory;
 using HaulScout.Infrastructure.Persistence;
 using HaulScout.Infrastructure.Sync;
 
+using HaulScout.Infrastructure.Organizations;
+
 namespace HaulScout.Tests;
 
 /// <summary>
@@ -125,7 +127,7 @@ public sealed class SyncAgentTranslationTests(PostgresFixture postgres)
             });
             await db.SaveChangesAsync();
 
-            SyncHubService hub = new(new EfSyncAgentStore(db), new EfInventoryPhotoSyncStore(db), new StubCurrentUser(org, user), new EveryPermission(), TimeProvider.System, Options.Create(new SyncAgentOptions()));
+            SyncHubService hub = new(new EfSyncAgentStore(db), new EfInventoryPhotoSyncStore(db), new EfOrganizationMemberStore(db), new StubCurrentUser(org, user), new EveryPermission(), TimeProvider.System, Options.Create(new SyncAgentOptions()));
             RequestScanResultDto requested = (await hub.RequestScanAsync(new RequestScanRequest(SyncScanScope.Sales), CancellationToken.None)).Value!;
             SyncOverviewDto overview = await hub.OverviewAsync(CancellationToken.None);
 

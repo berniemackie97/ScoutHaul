@@ -29,16 +29,11 @@ public sealed class EfInventoryPhotoSyncStore(HaulScoutDbContext db) : IInventor
 
     public async Task<IReadOnlyList<PlatformListing>> ListPhotoSourcesForItemAsync(Guid inventoryItemId, CancellationToken cancellationToken) =>
         await db.PlatformListings
-            .Where(listing => listing.ReconciledInventoryItemId == inventoryItemId
-                && listing.PhotoUrlsKey != null
-                && listing.ChannelAccount!.PhotoSyncEnabled)
+            .Where(listing => listing.ReconciledInventoryItemId == inventoryItemId && listing.PhotoUrlsKey != null)
             .ToListAsync(cancellationToken);
 
-    public async Task<IReadOnlyDictionary<Guid, int>> CountPendingByAccountAsync(CancellationToken cancellationToken) =>
-        await Pending(db.PlatformListings, DateTimeOffset.MaxValue)
-            .GroupBy(listing => listing.ChannelAccountId!.Value)
-            .Select(group => new { ChannelAccountId = group.Key, Waiting = group.Count() })
-            .ToDictionaryAsync(row => row.ChannelAccountId, row => row.Waiting, cancellationToken);
+    public Task<int> CountPendingAsync(CancellationToken cancellationToken) =>
+        Pending(db.PlatformListings, DateTimeOffset.MaxValue).CountAsync(cancellationToken);
 
     public void AddPhoto(InventoryPhoto photo) => db.InventoryPhotos.Add(photo);
 
@@ -47,14 +42,14 @@ public sealed class EfInventoryPhotoSyncStore(HaulScoutDbContext db) : IInventor
     public Task SaveChangesAsync(CancellationToken cancellationToken) => db.SaveChangesAsync(cancellationToken);
 
     /// <summary>
-    /// A listing owes its item photos when it has some, is linked to an item, belongs to an account whose photo
-    /// sync is on, and its photos have changed since they were last handed over. One that failed recently waits,
-    /// so an unreachable image cannot be retried in a tight loop.
+    /// A listing owes its item photos when it has some, is linked to an item, its organization keeps photos in step
+    /// with its marketplaces, and its photos have changed since they were last handed over. One that failed recently
+    /// waits, so an unreachable image cannot be retried in a tight loop.
     /// </summary>
     private static IQueryable<PlatformListing> Pending(IQueryable<PlatformListing> listings, DateTimeOffset retryBefore) =>
         listings.Where(listing => listing.PhotoUrlsKey != null
             && listing.PhotoSyncedKey != listing.PhotoUrlsKey
             && listing.ReconciledInventoryItemId != null
-            && listing.ChannelAccount!.PhotoSyncEnabled
+            && listing.Organization!.MarketplacePhotoSyncEnabled
             && (listing.PhotoSyncError == null || listing.PhotosSyncedAt == null || listing.PhotosSyncedAt < retryBefore));
 }

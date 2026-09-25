@@ -22,6 +22,9 @@ public sealed class Organization : EntityBase
 
     public const string DefaultTimeZoneId = "America/Los_Angeles";
 
+    /// <summary>Whether marketplace listings keep this organization's item photos up to date.</summary>
+    public bool MarketplacePhotoSyncEnabled { get; set; }
+
     public ICollection<OrganizationMember> Members { get; set; } = [];
     public ICollection<OrganizationRoleDefinition> Roles { get; set; } = [];
     public ICollection<OrganizationTeam> Teams { get; set; } = [];

@@ -110,6 +110,7 @@ public sealed class HaulScoutDbContext(
         {
             entity.ToTable("Organizations");
             entity.Property(item => item.Name).HasMaxLength(200).IsRequired();
+            entity.Property(item => item.MarketplacePhotoSyncEnabled).HasDefaultValue(false);
             entity.Property(item => item.StoreDomain).HasMaxLength(253);
             entity.Property(item => item.TimeZoneId).HasMaxLength(64).IsRequired()
                 .HasDefaultValue(Organization.DefaultTimeZoneId);
@@ -802,7 +803,6 @@ public sealed class HaulScoutDbContext(
             entity.Property(item => item.Notes).HasMaxLength(2000);
             entity.Property(item => item.BoundUsername).HasMaxLength(120);
             entity.Property(item => item.BoundMarketplaceUserId).HasMaxLength(120);
-            entity.Property(item => item.PhotoSyncEnabled).HasDefaultValue(false);
             entity.HasIndex(item => new { item.OrganizationId, item.Channel });
             entity.HasIndex(item => new { item.OrganizationId, item.DisplayName }).IsUnique();
         });

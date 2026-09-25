@@ -121,6 +121,8 @@ export function SyncHub({ overview }: { overview: SyncOverview }) {
         ) : null}
       </div>
 
+      <PhotoSync photos={overview.photos} pending={pending} onRun={run} />
+
       <section aria-labelledby="accounts-heading" className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 id="accounts-heading" className="text-sm font-semibold">Accounts</h2>
@@ -275,8 +277,6 @@ function AccountCard(props: {
             })}
           </div>
 
-          <PhotoSync account={account} pending={pending} onRun={onRun} />
-
           {account.boundUsername ? (
             <div className="flex flex-wrap items-end gap-2">
               <ScanButton loop="Sales" open={openRequestFor(requests, id, "Sales")} pending={pending} primary onScan={() => onScan("Sales", id)} />
@@ -312,52 +312,49 @@ function AccountCard(props: {
 }
 
 /**
- * Whether an item's photos follow this account's listings. Switching it on replaces those items' photos with the
- * listing's, so the choice is made plainly and confirmed before anything is overwritten.
+ * Whether item photos follow their marketplace listings. One switch for the business: an item's photos come from
+ * whichever of its listings shows the most of them, so there is nothing to choose per marketplace.
  */
 function PhotoSync(props: {
-  account: SyncAccount;
+  photos: SyncOverview["photos"];
   pending: boolean;
   onRun: (action: () => Promise<SyncActionResult>, wakeAfter?: boolean) => void;
 }) {
-  const { account, pending, onRun } = props;
-  const id = account.channelAccountId!;
-  const on = account.photoSyncEnabled === true;
-  const summary = photoSyncSummary(account);
+  const { photos, pending, onRun } = props;
+  const on = photos?.enabled === true;
+  const summary = photoSyncSummary(photos);
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3">
       <div className="flex items-start gap-2">
         <Images className="text-muted-foreground mt-0.5 h-4 w-4 shrink-0" aria-hidden />
         <div className="text-sm">
-          <p className="font-medium">Photos</p>
+          <p className="font-medium">Item photos follow their listings</p>
           <p className={`text-xs ${TEXT[summary.tone]}`}>{summary.text}</p>
-          {account.platform === "eBay" && !on ? (
-            <p className="text-muted-foreground mt-1 text-xs">
-              An eBay scan brings back one picture per listing. For an item listed on Vinted too, follow Vinted&rsquo;s photos instead.
-            </p>
-          ) : null}
+          <p className="text-muted-foreground mt-1 text-xs">
+            An item listed in more than one place takes its photos from the listing showing the most of them, so
+            turning this on can never leave an item with fewer photos than it has now.
+          </p>
         </div>
       </div>
       <Button
         variant={on ? "outline" : "default"}
         size="sm"
-        disabled={pending || !account.supported}
+        disabled={pending}
         onClick={() => {
           if (on) {
-            onRun(() => setPhotoSync(id, false));
+            onRun(() => setPhotoSync(false));
             return;
           }
 
           if (
             window.confirm(
-              `Keep ${account.displayName}'s item photos in step with its listings?\n\n`
-                + "Each linked item's photos are replaced by the photos its listing shows, in the listing's order. "
-                + "Photos uploaded in HaulScout for those items are replaced too. Items already matching are left alone.\n\n"
-                + "For an item listed in more than one place, the listing showing the most photos wins.",
+              "Keep item photos in step with their marketplace listings?\n\n"
+                + "Each linked item shows the photos its richest listing shows, in that listing's order. "
+                + "Photos uploaded in HaulScout for those items are replaced.",
             )
           ) {
-            onRun(() => setPhotoSync(id, true));
+            onRun(() => setPhotoSync(true));
           }
         }}
       >

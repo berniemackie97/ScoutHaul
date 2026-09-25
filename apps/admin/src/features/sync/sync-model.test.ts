@@ -43,12 +43,12 @@ describe("sync model", () => {
   });
 
   it("says where an account's photos stand", () => {
-    expect(photoSyncSummary({ photoSyncEnabled: false, photosWaiting: 0 }))
+    expect(photoSyncSummary({ enabled: false, waiting: 0 }))
       .toEqual({ text: "Item photos are left as they are", tone: "neutral" });
-    expect(photoSyncSummary({ photoSyncEnabled: true, photosWaiting: 0 }))
+    expect(photoSyncSummary({ enabled: true, waiting: 0 }))
       .toEqual({ text: "Item photos match their listings", tone: "success" });
-    expect(photoSyncSummary({ photoSyncEnabled: true, photosWaiting: 1 }).text).toBe("1 listing still to come over");
-    expect(photoSyncSummary({ photoSyncEnabled: true, photosWaiting: 12 }).text).toBe("12 listings still to come over");
+    expect(photoSyncSummary({ enabled: true, waiting: 1 }).text).toBe("1 listing still to come over");
+    expect(photoSyncSummary({ enabled: true, waiting: 12 }).text).toBe("12 listings still to come over");
   });
 
   it("offers each signed-in username once for binding", () => {

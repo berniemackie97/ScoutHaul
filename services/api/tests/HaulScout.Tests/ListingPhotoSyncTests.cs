@@ -70,13 +70,18 @@ public sealed class ListingPhotoSyncTests
             return item;
         }
 
-        public PlatformListing Listing(InventoryItem item, IEnumerable<string> photos, string externalId = "9482228763", ChannelAccount? account = null)
+        public PlatformListing Listing(
+            InventoryItem item,
+            IEnumerable<string> photos,
+            string externalId = "9482228763",
+            ChannelAccount? account = null,
+            string platform = "Vinted")
         {
             List<string> addresses = [.. photos];
             PlatformListing listing = new()
             {
                 OrganizationId = Org,
-                Platform = "Vinted",
+                Platform = platform,
                 ExternalListingId = externalId,
                 Title = item.Title,
                 ChannelAccountId = (account ?? Account).Id,
@@ -104,8 +109,9 @@ public sealed class ListingPhotoSyncTests
         HaulScoutDbContext db = new(
             new DbContextOptionsBuilder<HaulScoutDbContext>().UseInMemoryDatabase(Guid.NewGuid().ToString()).Options,
             tenant);
-        ChannelAccount account = new() { OrganizationId = org, Channel = "Vinted", DisplayName = "Overhaul Vinted", PhotoSyncEnabled = photoSyncEnabled };
+        ChannelAccount account = new() { OrganizationId = org, Channel = "Vinted", DisplayName = "Overhaul Vinted" };
         db.ChannelAccounts.Add(account);
+        db.Organizations.Add(new Organization { Id = org, Name = "Overhaul", MarketplacePhotoSyncEnabled = photoSyncEnabled });
         db.SaveChanges();
 
         FakeImages images = new();
@@ -244,7 +250,7 @@ public sealed class ListingPhotoSyncTests
     public async Task An_item_listed_twice_takes_its_photos_from_the_listing_showing_the_most()
     {
         await using Harness harness = NewHarness();
-        ChannelAccount ebay = new() { OrganizationId = harness.Org, Channel = "eBay", DisplayName = "Overhaul eBay", PhotoSyncEnabled = true };
+        ChannelAccount ebay = new() { OrganizationId = harness.Org, Channel = "eBay", DisplayName = "Overhaul eBay" };
         harness.Db.ChannelAccounts.Add(ebay);
         InventoryItem item = harness.Item();
         harness.Listing(item, [First, Second], "vinted-1");
@@ -290,5 +296,83 @@ public sealed class ListingPhotoSyncTests
 
         Assert.Empty(harness.Images.Fetched);
         Assert.Equal(0, outcome.PhotosAdded);
+    }
+
+    private const string EbayPhoto = "https://i.ebayimg.com/images/g/one/s-l1600.jpg";
+
+    [Fact]
+    public async Task A_marketplace_showing_fewer_photos_cannot_take_an_item_over()
+    {
+        // eBay's grid carries one picture per listing. It must never replace a Vinted gallery with that one picture.
+        await using Harness harness = NewHarness();
+        ChannelAccount ebay = new() { OrganizationId = harness.Org, Channel = "eBay", DisplayName = "Overhaul eBay" };
+        harness.Db.ChannelAccounts.Add(ebay);
+        InventoryItem item = harness.Item();
+        harness.Listing(item, [First, Second, Third]);
+        await harness.Db.SaveChangesAsync();
+        await harness.Sync.SyncPendingAsync(10, CancellationToken.None);
+
+        harness.Listing(item, [EbayPhoto], "377296454991", ebay, "eBay");
+        await harness.Db.SaveChangesAsync();
+        PhotoSyncOutcome outcome = await harness.Sync.SyncPendingAsync(10, CancellationToken.None);
+
+        Assert.Equal(0, outcome.PhotosRemoved);
+        InventoryItem synced = await harness.Reload(item.Id);
+        Assert.Equal([First, Second, Third], synced.Photos.OrderBy(photo => photo.SortOrder).Select(photo => photo.SourceUrl));
+    }
+
+    [Fact]
+    public async Task An_item_keeps_its_photos_when_the_only_listing_left_shows_fewer()
+    {
+        // The richer listing ended. Its photos are still the best pictures of the item, so they stay.
+        await using Harness harness = NewHarness();
+        ChannelAccount ebay = new() { OrganizationId = harness.Org, Channel = "eBay", DisplayName = "Overhaul eBay" };
+        harness.Db.ChannelAccounts.Add(ebay);
+        InventoryItem item = harness.Item();
+        PlatformListing vinted = harness.Listing(item, [First, Second, Third]);
+        await harness.Db.SaveChangesAsync();
+        await harness.Sync.SyncPendingAsync(10, CancellationToken.None);
+
+        harness.Db.PlatformListings.Remove(vinted);
+        harness.Listing(item, [EbayPhoto], "377296454991", ebay, "eBay");
+        await harness.Db.SaveChangesAsync();
+        PhotoSyncOutcome outcome = await harness.Sync.SyncPendingAsync(10, CancellationToken.None);
+
+        Assert.Equal(0, outcome.PhotosRemoved);
+        Assert.Equal(3, (await harness.Reload(item.Id)).Photos.Count);
+    }
+
+    [Fact]
+    public async Task The_listing_an_items_photos_came_from_may_still_take_one_away()
+    {
+        // A seller who removes a picture from their own listing means it: that one goes.
+        await using Harness harness = NewHarness();
+        InventoryItem item = harness.Item();
+        PlatformListing listing = harness.Listing(item, [First, Second, Third]);
+        await harness.Db.SaveChangesAsync();
+        await harness.Sync.SyncPendingAsync(10, CancellationToken.None);
+
+        listing.PhotoUrlsJson = System.Text.Json.JsonSerializer.Serialize(new[] { First, Second });
+        listing.PhotoUrlsKey = ListingPhotoRules.KeyOf([First, Second]);
+        listing.PhotoUrlsChangedAt = DateTimeOffset.UtcNow;
+        await harness.Db.SaveChangesAsync();
+        PhotoSyncOutcome outcome = await harness.Sync.SyncPendingAsync(10, CancellationToken.None);
+
+        Assert.Equal(1, outcome.PhotosRemoved);
+        Assert.Equal([First, Second], (await harness.Reload(item.Id)).Photos.OrderBy(photo => photo.SortOrder).Select(photo => photo.SourceUrl));
+    }
+
+    [Fact]
+    public async Task Photos_follow_listings_for_the_whole_business_or_not_at_all()
+    {
+        await using Harness harness = NewHarness(photoSyncEnabled: false);
+        InventoryItem item = harness.Item();
+        harness.Listing(item, [First, Second]);
+        await harness.Db.SaveChangesAsync();
+
+        PhotoSyncOutcome outcome = await harness.Sync.SyncPendingAsync(10, CancellationToken.None);
+
+        Assert.Equal(0, outcome.Listings);
+        Assert.Empty((await harness.Reload(item.Id)).Photos);
     }
 }

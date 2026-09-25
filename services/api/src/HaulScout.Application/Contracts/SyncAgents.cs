@@ -245,9 +245,7 @@ public sealed record SyncAccountDto(
     SyncAccountHealth Health,
     string HealthMessage,
     IReadOnlyList<SyncLoopDto> Loops,
-    IReadOnlyList<SyncSessionSeenDto> Sessions,
-    bool PhotoSyncEnabled,
-    int PhotosWaiting);
+    IReadOnlyList<SyncSessionSeenDto> Sessions);
 
 /// <summary>Whether an item's photos follow this account's listings. Off until someone switches it on.</summary>
 public sealed record UpdatePhotoSyncRequest(bool Enabled);
@@ -290,7 +288,15 @@ public sealed record SyncOverviewDto(
     IReadOnlyList<SyncAccountDto> Accounts,
     IReadOnlyList<SyncAgentDto> Agents,
     IReadOnlyList<SyncScanRequestDto> Requests,
-    IReadOnlyList<SyncPlatformSettingsDto> Platforms);
+    IReadOnlyList<SyncPlatformSettingsDto> Platforms,
+    SyncPhotoSyncDto Photos);
+
+/// <summary>
+/// Whether item photos follow the marketplaces, and how much is still owed. One switch for the whole business:
+/// photos come from whichever listing shows the most of them, so there is nothing to choose per marketplace and no
+/// way to pick the poorer source by mistake.
+/// </summary>
+public sealed record SyncPhotoSyncDto(bool Enabled, int Waiting);
 
 public sealed record CreateSyncPairingResultDto(Guid PairingId, string Code, DateTimeOffset ExpiresAt);
 

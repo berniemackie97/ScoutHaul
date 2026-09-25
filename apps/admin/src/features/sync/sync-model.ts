@@ -6,6 +6,7 @@ export type SyncAccount = components["schemas"]["SyncAccountDto"];
 export type SyncLoop = components["schemas"]["SyncLoopDto"];
 export type SyncAgent = components["schemas"]["SyncAgentDto"];
 export type SyncScanRequest = components["schemas"]["SyncScanRequestDto"];
+export type SyncPhotoSync = components["schemas"]["SyncPhotoSyncDto"];
 export type SyncPlatformSettings = components["schemas"]["SyncPlatformSettingsDto"];
 export type SyncSession = components["schemas"]["SyncSessionSeenDto"];
 export type LoopKind = components["schemas"]["SyncLoopKind"];
@@ -148,13 +149,13 @@ export function requestStatus(
   }
 }
 
-/** Where an account's photo sync stands, in a line. */
-export function photoSyncSummary(account: Pick<SyncAccount, "photoSyncEnabled" | "photosWaiting">): { text: string; tone: Tone } {
-  if (!account.photoSyncEnabled) {
+/** Where photo sync stands, in a line. */
+export function photoSyncSummary(photos: SyncPhotoSync | undefined): { text: string; tone: Tone } {
+  if (!photos?.enabled) {
     return { text: "Item photos are left as they are", tone: "neutral" };
   }
 
-  const waiting = account.photosWaiting ?? 0;
+  const waiting = photos.waiting ?? 0;
   return waiting > 0
     ? { text: `${waiting} ${waiting === 1 ? "listing" : "listings"} still to come over`, tone: "info" }
     : { text: "Item photos match their listings", tone: "success" };

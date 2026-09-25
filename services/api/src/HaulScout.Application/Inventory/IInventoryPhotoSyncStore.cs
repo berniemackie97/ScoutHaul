@@ -20,8 +20,8 @@ public interface IInventoryPhotoSyncStore
     /// <summary>Every listing that could give this item its photos, so the richest one is the one that does.</summary>
     Task<IReadOnlyList<PlatformListing>> ListPhotoSourcesForItemAsync(Guid inventoryItemId, CancellationToken cancellationToken);
 
-    /// <summary>How many linked listings are still waiting to hand their photos over, by account.</summary>
-    Task<IReadOnlyDictionary<Guid, int>> CountPendingByAccountAsync(CancellationToken cancellationToken);
+    /// <summary>How many linked listings are still waiting to hand their photos over.</summary>
+    Task<int> CountPendingAsync(CancellationToken cancellationToken);
 
     void AddPhoto(InventoryPhoto photo);
 
