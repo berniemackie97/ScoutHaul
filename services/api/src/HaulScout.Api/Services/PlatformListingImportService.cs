@@ -1,10 +1,11 @@
-using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
 using static HaulScout.Api.Helpers.StringHelpers;
 using HaulScout.Api.Mapping;
 using HaulScout.Application.Common;
 using HaulScout.Application.Contracts;
 using HaulScout.Application.Imports;
+using HaulScout.Application.Inventory;
 using HaulScout.Application.Security;
 using HaulScout.Application.Services;
 using HaulScout.Domain;
@@ -289,6 +290,37 @@ public sealed class PlatformListingImportService(HaulScoutDbContext db, ICurrent
         listing.EndsAt = input.EndsAt;
         listing.RawJson = TrimToNull(input.RawJson);
         listing.ScrapedAt = DateTimeOffset.UtcNow;
+        ApplyPhotoUrls(listing, input.PhotoUrls);
+    }
+
+    /// <summary>
+    /// The listing's photos, as the source showed them. A source that does not carry photos at all sends null,
+    /// which leaves what is known alone — only a source that reads photos may say a listing has none. The set is
+    /// kept with a key, so a listing read again with the same photos is not re-fetched.
+    /// </summary>
+    private static void ApplyPhotoUrls(PlatformListing listing, IReadOnlyList<string>? photoUrls)
+    {
+        if (photoUrls is null)
+        {
+            return;
+        }
+
+        List<string> addresses = photoUrls
+            .Select(url => (url ?? string.Empty).Trim())
+            .Where(url => url.Length is > 0 and <= 1000)
+            .Distinct(StringComparer.Ordinal)
+            .Take(ListingPhotoRules.MaxPhotosPerListing)
+            .ToList();
+
+        string key = ListingPhotoRules.KeyOf(addresses);
+        if (key == listing.PhotoUrlsKey)
+        {
+            return;
+        }
+
+        listing.PhotoUrlsJson = JsonSerializer.Serialize(addresses);
+        listing.PhotoUrlsKey = key;
+        listing.PhotoUrlsChangedAt = DateTimeOffset.UtcNow;
     }
 
     private static void ApplyQualitySnapshot(

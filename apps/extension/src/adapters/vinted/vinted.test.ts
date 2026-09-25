@@ -129,7 +129,9 @@ describe("a Vinted listing", () => {
       price: 15,
       quantitySold: 0,
       condition: "Very good",
-      primaryImageUrl: "https://images1.vinted.net/t/1-b/f800/1.webp",
+      // The main photo leads, and the full-size address is the one kept.
+      primaryImageUrl: "https://images1.vinted.net/tc/1-b/1.webp",
+      photoUrls: ["https://images1.vinted.net/tc/1-b/1.webp", "https://images1.vinted.net/tc/1-a/1.webp"],
     });
     expect(toIngestListing(wardrobeItem(2, { is_closed: true, item_closing_action: "sold" }))).toMatchObject({ status: "Sold", quantitySold: 1 });
     expect(toIngestListing(wardrobeItem(3, { is_hidden: true }))?.status).toBe("Ended");

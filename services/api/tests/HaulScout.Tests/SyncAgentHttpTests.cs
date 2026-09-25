@@ -43,6 +43,8 @@ public sealed class SyncAgentHttpTests(PostgresFixture postgres) : IAsyncLifetim
         SetEnvironment("ConnectionStrings__Postgres", postgres.ConnectionString);
         SetEnvironment("Authentication__Supabase__Url", "https://tests.supabase.co");
         SetEnvironment("Database__ApplyMigrationsOnStartup", "false");
+        // The photo worker is a background loop against the same database; these tests drive the API, not it.
+        SetEnvironment("Sync__Photos__Enabled", "false");
         factory = new ApiFactory();
         return Task.CompletedTask;
     }

@@ -236,6 +236,7 @@ public sealed class HaulScoutDbContext(
             entity.Property(item => item.Model).HasMaxLength(160);
             entity.Property(item => item.Color).HasMaxLength(120);
             entity.Property(item => item.Condition).HasMaxLength(120);
+            entity.Property(item => item.PhotoSourceKey).HasMaxLength(200);
             entity.Property(item => item.OwnershipType).HasConversion<string>().HasMaxLength(40);
             entity.Property(item => item.FunctionalStatus).HasConversion<string>().HasMaxLength(40);
             entity.Property(item => item.CompletenessStatus).HasConversion<string>().HasMaxLength(40);
@@ -329,6 +330,9 @@ public sealed class HaulScoutDbContext(
             entity.Property(item => item.ContentType).HasMaxLength(80).IsRequired();
             entity.Property(item => item.OriginalBytes).IsRequired();
             entity.Property(item => item.ThumbnailBytes).IsRequired();
+            entity.Property(item => item.SourceUrl).HasMaxLength(1000);
+            // One photo per address on an item: two syncs racing cannot leave the item holding the same photo twice.
+            entity.HasIndex(item => new { item.InventoryItemId, item.SourceUrl }).IsUnique().HasFilter("\"SourceUrl\" IS NOT NULL");
             entity.HasIndex(item => new { item.OrganizationId, item.InventoryItemId, item.SortOrder });
             entity.HasIndex(item => new { item.InventoryItemId, item.IsHero });
             entity.HasOne(item => item.Organization).WithMany().HasForeignKey(item => item.OrganizationId);
@@ -797,6 +801,7 @@ public sealed class HaulScoutDbContext(
             entity.Property(item => item.Notes).HasMaxLength(2000);
             entity.Property(item => item.BoundUsername).HasMaxLength(120);
             entity.Property(item => item.BoundMarketplaceUserId).HasMaxLength(120);
+            entity.Property(item => item.PhotoSyncEnabled).HasDefaultValue(false);
             entity.HasIndex(item => new { item.OrganizationId, item.Channel });
             entity.HasIndex(item => new { item.OrganizationId, item.DisplayName }).IsUnique();
         });
@@ -990,6 +995,10 @@ public sealed class HaulScoutDbContext(
             entity.Property(item => item.Condition).HasMaxLength(80);
             entity.Property(item => item.Url).HasMaxLength(500);
             entity.Property(item => item.PrimaryImageUrl).HasMaxLength(500);
+            entity.Property(item => item.PhotoUrlsJson).HasColumnType("jsonb");
+            entity.Property(item => item.PhotoUrlsKey).HasMaxLength(80);
+            entity.Property(item => item.PhotoSyncedKey).HasMaxLength(80);
+            entity.Property(item => item.PhotoSyncError).HasMaxLength(500);
             entity.Property(item => item.Status).HasConversion<string>().HasMaxLength(24);
             entity.Property(item => item.ReconcileStatus).HasConversion<string>().HasMaxLength(24);
             entity.Property(item => item.CreatedChannelListingOnReconcile).HasDefaultValue(false);

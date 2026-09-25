@@ -1,4 +1,3 @@
-using System.Text.Json;
 using HaulScout.Application.Common;
 using HaulScout.Application.Contracts;
 using HaulScout.Application.Security;
@@ -103,8 +102,8 @@ public sealed class InventoryPhotoWorkflowService(
 
         await photos.AddAsync(photo, cancellationToken);
 
-        List<string> photoUrls = ParsePhotoUrls(item.PhotoLocalReferencesJson);
-        string uploadedUrl = PhotoOriginalUrl(item.Id, photo.Id);
+        List<string> photoUrls = InventoryPhotoSet.ParseReferences(item.PhotoLocalReferencesJson);
+        string uploadedUrl = InventoryPhotoSet.OriginalUrl(item.Id, photo.Id);
         photoUrls.RemoveAll(url => string.Equals(url, uploadedUrl, StringComparison.OrdinalIgnoreCase));
         if (photo.IsHero || photoUrls.Count == 0)
         {
@@ -115,12 +114,12 @@ public sealed class InventoryPhotoWorkflowService(
             photoUrls.Add(uploadedUrl);
         }
 
-        item.PhotoLocalReferencesJson = JsonSerializer.Serialize(photoUrls);
+        item.PhotoLocalReferencesJson = InventoryPhotoSet.Serialize(photoUrls);
         await photos.SaveChangesAsync(cancellationToken);
 
         await photos.LoadPhotosAsync(item, cancellationToken);
         return AppResult<InventoryPhotoUploadResultDto>.Ok(
-            new InventoryPhotoUploadResultDto(item.Id, photoUrls, uploadedUrl, OrderedPhotos(item).Select(item => item.ToDto()).ToArray()));
+            new InventoryPhotoUploadResultDto(item.Id, photoUrls, uploadedUrl, InventoryPhotoSet.Ordered(item).Select(item => item.ToDto()).ToArray()));
     }
 
     public async Task<AppResult<InventoryPhotoUploadResultDto>> DeleteByUrlAsync(
@@ -145,13 +144,13 @@ public sealed class InventoryPhotoWorkflowService(
             photos.Remove(photo);
         }
 
-        List<string> photoUrls = ParsePhotoUrls(item.PhotoLocalReferencesJson);
+        List<string> photoUrls = InventoryPhotoSet.ParseReferences(item.PhotoLocalReferencesJson);
         bool removedLegacyUrl = photoUrls.RemoveAll(existing => string.Equals(existing, url, StringComparison.OrdinalIgnoreCase)) > 0;
         if (photo is not null)
         {
             photoUrls.RemoveAll(existing =>
-                string.Equals(existing, PhotoOriginalUrl(item.Id, photo.Id), StringComparison.OrdinalIgnoreCase)
-                || string.Equals(existing, PhotoThumbnailUrl(item.Id, photo.Id), StringComparison.OrdinalIgnoreCase));
+                string.Equals(existing, InventoryPhotoSet.OriginalUrl(item.Id, photo.Id), StringComparison.OrdinalIgnoreCase)
+                || string.Equals(existing, InventoryPhotoSet.ThumbnailUrl(item.Id, photo.Id), StringComparison.OrdinalIgnoreCase));
         }
 
         if (photo is null && !removedLegacyUrl)
@@ -159,7 +158,7 @@ public sealed class InventoryPhotoWorkflowService(
             return AppResult<InventoryPhotoUploadResultDto>.NotFound("Photo was not found on this inventory item.");
         }
 
-        item.PhotoLocalReferencesJson = photoUrls.Count == 0 ? null : JsonSerializer.Serialize(photoUrls);
+        item.PhotoLocalReferencesJson = photoUrls.Count == 0 ? null : InventoryPhotoSet.Serialize(photoUrls);
         if (photo is null)
         {
             await photoStorage.DeleteAsync(currentUser.OrganizationId, item.Id, url);
@@ -181,7 +180,7 @@ public sealed class InventoryPhotoWorkflowService(
         await photos.SaveChangesAsync(cancellationToken);
 
         return AppResult<InventoryPhotoUploadResultDto>.Ok(
-            new InventoryPhotoUploadResultDto(item.Id, photoUrls, UploadedUrl: null, OrderedPhotos(item).Where(candidate => candidate.Id != photo?.Id).Select(candidate => candidate.ToDto()).ToArray()));
+            new InventoryPhotoUploadResultDto(item.Id, photoUrls, UploadedUrl: null, InventoryPhotoSet.Ordered(item).Where(candidate => candidate.Id != photo?.Id).Select(candidate => candidate.ToDto()).ToArray()));
     }
 
     public async Task<AppResult<InventoryPhotoUploadResultDto>> SetHeroAsync(
@@ -209,11 +208,11 @@ public sealed class InventoryPhotoWorkflowService(
             }
         }
 
-        List<string> photoUrls = ParsePhotoUrls(item.PhotoLocalReferencesJson);
+        List<string> photoUrls = InventoryPhotoSet.ParseReferences(item.PhotoLocalReferencesJson);
         int index = photoUrls.FindIndex(existing => string.Equals(existing, url, StringComparison.OrdinalIgnoreCase));
         if (index < 0 && photo is not null)
         {
-            url = PhotoOriginalUrl(item.Id, photo.Id);
+            url = InventoryPhotoSet.OriginalUrl(item.Id, photo.Id);
             index = photoUrls.FindIndex(existing => string.Equals(existing, url, StringComparison.OrdinalIgnoreCase));
             if (index < 0)
             {
@@ -229,11 +228,11 @@ public sealed class InventoryPhotoWorkflowService(
 
         photoUrls.RemoveAt(index);
         photoUrls.Insert(0, url);
-        item.PhotoLocalReferencesJson = JsonSerializer.Serialize(photoUrls);
+        item.PhotoLocalReferencesJson = InventoryPhotoSet.Serialize(photoUrls);
         await photos.SaveChangesAsync(cancellationToken);
 
         return AppResult<InventoryPhotoUploadResultDto>.Ok(
-            new InventoryPhotoUploadResultDto(item.Id, photoUrls, UploadedUrl: null, OrderedPhotos(item).Select(item => item.ToDto()).ToArray()));
+            new InventoryPhotoUploadResultDto(item.Id, photoUrls, UploadedUrl: null, InventoryPhotoSet.Ordered(item).Select(item => item.ToDto()).ToArray()));
     }
 
     public async Task<AppResult<InventoryPhotoUploadResultDto>> DeleteByIdAsync(
@@ -254,11 +253,11 @@ public sealed class InventoryPhotoWorkflowService(
         }
 
         photos.Remove(photo);
-        List<string> photoUrls = ParsePhotoUrls(item.PhotoLocalReferencesJson);
+        List<string> photoUrls = InventoryPhotoSet.ParseReferences(item.PhotoLocalReferencesJson);
         photoUrls.RemoveAll(existing =>
-            string.Equals(existing, PhotoOriginalUrl(item.Id, photo.Id), StringComparison.OrdinalIgnoreCase)
-            || string.Equals(existing, PhotoThumbnailUrl(item.Id, photo.Id), StringComparison.OrdinalIgnoreCase));
-        item.PhotoLocalReferencesJson = photoUrls.Count == 0 ? null : JsonSerializer.Serialize(photoUrls);
+            string.Equals(existing, InventoryPhotoSet.OriginalUrl(item.Id, photo.Id), StringComparison.OrdinalIgnoreCase)
+            || string.Equals(existing, InventoryPhotoSet.ThumbnailUrl(item.Id, photo.Id), StringComparison.OrdinalIgnoreCase));
+        item.PhotoLocalReferencesJson = photoUrls.Count == 0 ? null : InventoryPhotoSet.Serialize(photoUrls);
 
         if (photo.IsHero)
         {
@@ -275,7 +274,7 @@ public sealed class InventoryPhotoWorkflowService(
 
         await photos.SaveChangesAsync(cancellationToken);
         return AppResult<InventoryPhotoUploadResultDto>.Ok(
-            new InventoryPhotoUploadResultDto(item.Id, photoUrls, UploadedUrl: null, OrderedPhotos(item).Where(candidate => candidate.Id != photo.Id).Select(candidate => candidate.ToDto()).ToArray()));
+            new InventoryPhotoUploadResultDto(item.Id, photoUrls, UploadedUrl: null, InventoryPhotoSet.Ordered(item).Where(candidate => candidate.Id != photo.Id).Select(candidate => candidate.ToDto()).ToArray()));
     }
 
     public async Task<InventoryPhotoFile?> GetThumbnailAsync(Guid itemId, Guid photoId, CancellationToken cancellationToken)
@@ -295,13 +294,6 @@ public sealed class InventoryPhotoWorkflowService(
 
     private Task<InventoryPhoto?> FindPhotoUnscopedAsync(Guid itemId, Guid photoId, CancellationToken cancellationToken) =>
         photos.FindPhotoUnscopedAsync(itemId, photoId, cancellationToken);
-
-    private static IReadOnlyList<InventoryPhoto> OrderedPhotos(InventoryItem item) =>
-        item.Photos
-            .OrderByDescending(photo => photo.IsHero)
-            .ThenBy(photo => photo.SortOrder)
-            .ThenBy(photo => photo.CreatedAt)
-            .ToArray();
 
     private static InventoryPhoto? ResolvePhotoByUrl(InventoryItem item, string url)
     {
@@ -323,24 +315,4 @@ public sealed class InventoryPhotoWorkflowService(
             && Guid.TryParse(parts[photosIndex + 1], out photoId);
     }
 
-    private static string PhotoOriginalUrl(Guid itemId, Guid photoId) => $"/api/inventory/{itemId}/photos/{photoId}/original";
-
-    private static string PhotoThumbnailUrl(Guid itemId, Guid photoId) => $"/api/inventory/{itemId}/photos/{photoId}/thumbnail";
-
-    private static List<string> ParsePhotoUrls(string? value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return [];
-        }
-
-        try
-        {
-            return JsonSerializer.Deserialize<List<string>>(value) ?? [];
-        }
-        catch (JsonException)
-        {
-            return [];
-        }
-    }
 }

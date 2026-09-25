@@ -245,7 +245,12 @@ public sealed record SyncAccountDto(
     SyncAccountHealth Health,
     string HealthMessage,
     IReadOnlyList<SyncLoopDto> Loops,
-    IReadOnlyList<SyncSessionSeenDto> Sessions);
+    IReadOnlyList<SyncSessionSeenDto> Sessions,
+    bool PhotoSyncEnabled,
+    int PhotosWaiting);
+
+/// <summary>Whether an item's photos follow this account's listings. Off until someone switches it on.</summary>
+public sealed record UpdatePhotoSyncRequest(bool Enabled);
 
 public sealed record SyncAgentMarketplaceDto(
     string Platform,

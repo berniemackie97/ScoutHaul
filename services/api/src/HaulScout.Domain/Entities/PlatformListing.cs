@@ -39,6 +39,26 @@ public sealed class PlatformListing : EntityBase, IOrganizationScoped
     public string? Url { get; set; }
     public string? PrimaryImageUrl { get; set; }
 
+    /// <summary>
+    /// Every photo the listing shows, in the order it shows them, as a JSON array of addresses. Null when the
+    /// source did not carry photos at all, which is different from a listing that has none.
+    /// </summary>
+    public string? PhotoUrlsJson { get; set; }
+
+    /// <summary>What <see cref="PhotoUrlsJson"/> currently is, as a short key; how a change is noticed cheaply.</summary>
+    public string? PhotoUrlsKey { get; set; }
+
+    /// <summary>When the set of photos last changed on the marketplace, as far as this listing has been read.</summary>
+    public DateTimeOffset? PhotoUrlsChangedAt { get; set; }
+
+    /// <summary>The <see cref="PhotoUrlsKey"/> whose photos were last put onto the linked item. Behind means work to do.</summary>
+    public string? PhotoSyncedKey { get; set; }
+
+    public DateTimeOffset? PhotosSyncedAt { get; set; }
+
+    /// <summary>Why the last attempt to put this listing's photos onto its item did not finish, in the operator's words.</summary>
+    public string? PhotoSyncError { get; set; }
+
     public DateTimeOffset? ListedAt { get; set; }
     public DateTimeOffset? EndsAt { get; set; }
 

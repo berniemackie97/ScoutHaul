@@ -38,6 +38,38 @@ public class PlatformListingIngestionTests
         new(id, title, price, status);
 
     [Fact]
+    public async Task A_listings_photos_are_kept_with_a_key_and_a_source_that_does_not_read_them_erases_nothing()
+    {
+        (HaulScoutDbContext db, Guid org, Guid user) = NewContext(nameof(A_listings_photos_are_kept_with_a_key_and_a_source_that_does_not_read_them_erases_nothing));
+        await using HaulScoutDbContext _ = db;
+        PlatformListingsController controller = new(db, new StubCurrentUser(org, user), new PlatformListingImportService(db, new StubCurrentUser(org, user)));
+        string[] photos = ["https://i.ebayimg.com/images/g/a/s-l1600.jpg", "https://i.ebayimg.com/images/g/b/s-l1600.jpg"];
+
+        await controller.Ingest(new IngestPlatformListingsRequest("eBay", [Listing("EB-1", "Denim Jacket", 40m) with { PhotoUrls = photos }]), CancellationToken.None);
+        PlatformListing listing = await db.PlatformListings.SingleAsync();
+        string? key = listing.PhotoUrlsKey;
+        DateTimeOffset? changed = listing.PhotoUrlsChangedAt;
+        Assert.NotNull(key);
+        Assert.Contains("s-l1600", listing.PhotoUrlsJson);
+
+        // The same photos again: nothing to re-read, so the key and the moment it changed stay as they were.
+        await controller.Ingest(new IngestPlatformListingsRequest("eBay", [Listing("EB-1", "Denim Jacket", 40m) with { PhotoUrls = photos }]), CancellationToken.None);
+        listing = await db.PlatformListings.SingleAsync();
+        Assert.Equal((key, changed), (listing.PhotoUrlsKey, listing.PhotoUrlsChangedAt));
+
+        // A source that does not read photos at all leaves the ones already known alone.
+        await controller.Ingest(new IngestPlatformListingsRequest("eBay", [Listing("EB-1", "Denim Jacket", 41m)]), CancellationToken.None);
+        listing = await db.PlatformListings.SingleAsync();
+        Assert.Equal(key, listing.PhotoUrlsKey);
+
+        // A different set is a change, and is noticed.
+        await controller.Ingest(new IngestPlatformListingsRequest("eBay", [Listing("EB-1", "Denim Jacket", 41m) with { PhotoUrls = [photos[0]] }]), CancellationToken.None);
+        listing = await db.PlatformListings.SingleAsync();
+        Assert.NotEqual(key, listing.PhotoUrlsKey);
+        Assert.True(listing.PhotoUrlsChangedAt >= changed);
+    }
+
+    [Fact]
     public async Task Ingest_creates_then_reingest_updates_in_place()
     {
         (HaulScoutDbContext db, Guid org, Guid user) = NewContext(nameof(Ingest_creates_then_reingest_updates_in_place));

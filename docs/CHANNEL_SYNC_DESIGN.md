@@ -148,6 +148,28 @@ marketplace's own web app in our logged-in browser: its **own JSON endpoints** w
 preferred wherever they exist — they are the formats the platform supports for sellers, and the
 parsers for eBay and Depop are already written and tested.
 
+### 4.1a Photos follow the listing *(as built)*
+
+An item's photos and its listing's photos drift apart, and the published ones are the ones buyers chose from. So a
+listings scan carries each listing's photo addresses, and HaulScout — not the extension — decides what to do with
+them:
+
+- **Per account, off by default** (`ChannelAccount.PhotoSyncEnabled`), switched on under Sync. Switching it on says
+  plainly that the listing's photos replace the item's, including photos uploaded in HaulScout.
+- **The listing is the truth.** Its photos become the item's, in its order, the first as the hero.
+- **A photo already held for an address is kept**, so photos keep their ids — and a storefront page's image
+  addresses keep working — instead of being replaced by copies of themselves.
+- **Nothing is removed until the replacement is in hand.** If every fetch fails, the item is left exactly as it
+  was and the listing is tried again later.
+- **Only the marketplace's own image hosts are followed** (`ListingPhotoRules`), since the addresses arrive from a
+  browser.
+- **An item listed twice** takes its photos from the listing showing the most of them, then the most recently
+  changed, so two accounts cannot take turns overwriting one item.
+- **Where it runs:** a background worker, a few listings at a time, because a first sync is hundreds of images and
+  no scan should wait on that. Photos are kept at up to 1600px, which is what a product page shows.
+- **On the storefront:** an item that was Listed and priced but held back for want of photos becomes shoppable once
+  it has them. That is the existing shelf rule, now satisfied automatically.
+
 ### 4.2 Pairing — not a pasted token
 
 Today the extension takes a pasted API token; a Supabase access token expires within the hour, so

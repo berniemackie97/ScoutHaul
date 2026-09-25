@@ -23,6 +23,10 @@ public sealed class SyncController(SyncHubService hub) : HaulScoutControllerBase
     public async Task<ActionResult<SyncOverviewDto>> UpdateSchedule(Guid accountId, UpdateSyncScheduleRequest request, CancellationToken cancellationToken) =>
         ToActionResult(await hub.UpdateScheduleAsync(accountId, request, cancellationToken));
 
+    [HttpPut("accounts/{accountId:guid}/photos")]
+    public async Task<ActionResult<SyncOverviewDto>> SetPhotoSync(Guid accountId, UpdatePhotoSyncRequest request, CancellationToken cancellationToken) =>
+        ToActionResult(await hub.SetPhotoSyncAsync(accountId, request, cancellationToken));
+
     [HttpPut("accounts/{accountId:guid}/binding")]
     public async Task<ActionResult<SyncOverviewDto>> Bind(Guid accountId, BindSyncAccountRequest request, CancellationToken cancellationToken) =>
         ToActionResult(await hub.BindAsync(accountId, request, cancellationToken));

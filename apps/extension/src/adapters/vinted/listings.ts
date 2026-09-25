@@ -18,7 +18,7 @@ export interface VintedWardrobeItem {
   size?: string | null;
   view_count?: number | null;
   favourite_count?: number | null;
-  photos?: { url?: string | null; is_main?: boolean | null }[] | null;
+  photos?: { url?: string | null; full_size_url?: string | null; is_main?: boolean | null }[] | null;
 }
 
 export interface VintedWardrobe {
@@ -44,7 +44,11 @@ export function toIngestListing(item: VintedWardrobeItem): IngestListing | null 
       : item.is_closed || item.is_hidden
         ? "Ended"
         : "Active";
-  const photo = item.photos?.find((candidate) => candidate.is_main)?.url ?? item.photos?.[0]?.url ?? null;
+  // The photos the listing shows, the main one first — the order an item's photos are put in.
+  const photos = [...(item.photos ?? [])]
+    .sort((left, right) => Number(right.is_main === true) - Number(left.is_main === true))
+    .map((candidate) => candidate.full_size_url?.trim() || candidate.url?.trim() || null)
+    .filter((url): url is string => url !== null);
   return {
     externalListingId: String(item.id),
     title: item.title?.trim() || "Untitled Vinted item",
@@ -56,7 +60,8 @@ export function toIngestListing(item: VintedWardrobeItem): IngestListing | null 
     currency: (item.price?.currency_code ?? item.currency ?? "USD").toUpperCase(),
     condition: item.status ?? null,
     url: item.url ?? null,
-    primaryImageUrl: photo,
+    primaryImageUrl: photos[0] ?? null,
+    photoUrls: photos,
     rawJson: JSON.stringify({
       reserved: item.is_reserved === true,
       hidden: item.is_hidden === true,

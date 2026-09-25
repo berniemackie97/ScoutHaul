@@ -8,6 +8,14 @@ const currencies: Record<string, string> = {
 };
 
 /**
+ * eBay serves one picture at many sizes, named in the address: `s-l140.jpg` is the grid's thumbnail, and the same
+ * picture at `s-l1600.jpg` is the one worth keeping. An address that is not named that way is left alone.
+ */
+function fullSize(url: string): string {
+  return url.replace(/\/s-l\d+(\.\w+)(?=$|\?)/i, "/s-l1600$1");
+}
+
+/**
  * Reads Manage active listings (`/sh/lst/active`), whose grid the page embeds as JSON under
  * `gridData`. Null when it does not — the page changed.
  */
@@ -54,7 +62,10 @@ export function readListingsPage(html: string): { listings: IngestListing[]; iss
       format: format === "AUCTION" ? "Auction" : format === "FIXED_PRICE" ? "FixedPrice" : null,
       sku: Array.isArray(sku) ? spans(sku[0]) : null,
       url: `https://www.ebay.com/itm/${id}`,
-      primaryImageUrl: typeof image === "string" ? image : null,
+      primaryImageUrl: typeof image === "string" ? fullSize(image) : null,
+      // Manage active listings shows one picture per listing, so that is what a scan can bring back; the rest
+      // of a listing's gallery lives on its own page, which a scan does not open.
+      photoUrls: typeof image === "string" ? [fullSize(image)] : [],
       listedAt: typeof startDate === "string" && !Number.isNaN(Date.parse(startDate)) ? new Date(startDate).toISOString() : null,
     });
   }

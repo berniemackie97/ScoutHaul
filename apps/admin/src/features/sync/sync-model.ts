@@ -148,6 +148,18 @@ export function requestStatus(
   }
 }
 
+/** Where an account's photo sync stands, in a line. */
+export function photoSyncSummary(account: Pick<SyncAccount, "photoSyncEnabled" | "photosWaiting">): { text: string; tone: Tone } {
+  if (!account.photoSyncEnabled) {
+    return { text: "Item photos are left as they are", tone: "neutral" };
+  }
+
+  const waiting = account.photosWaiting ?? 0;
+  return waiting > 0
+    ? { text: `${waiting} ${waiting === 1 ? "listing" : "listings"} still to come over`, tone: "info" }
+    : { text: "Item photos match their listings", tone: "success" };
+}
+
 /** The scan of one loop on one account that is queued or running, if there is one. */
 export function openRequestFor(requests: SyncScanRequest[], channelAccountId: string, loop: LoopKind): SyncScanRequest | undefined {
   return requests.find((request) => request.channelAccountId === channelAccountId && request.loop === loop && !request.from && isOpen(request));

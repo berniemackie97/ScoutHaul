@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CircleAlert, Loader2, ScanLine, X } from "lucide-react";
+import { CircleAlert, Images, Loader2, ScanLine, X } from "lucide-react";
 import { Badge, Button, Card, Input } from "@overhaul/ui";
 import type { Tone } from "@/features/imports/import-model";
 import {
@@ -16,6 +16,7 @@ import {
   loopName,
   loopSummary,
   openRequestFor,
+  photoSyncSummary,
   requestStatus,
   type LoopKind,
   type ScanScope,
@@ -25,7 +26,7 @@ import {
   type SyncScanRequest,
 } from "@/features/sync/sync-model";
 import { useSyncExtension } from "@/features/sync/use-sync-extension";
-import { bindAccount, cancelScan, requestScan, setSchedule, unbindAccount, type SyncActionResult } from "./actions";
+import { bindAccount, cancelScan, requestScan, setPhotoSync, setSchedule, unbindAccount, type SyncActionResult } from "./actions";
 
 const BADGE: Record<Tone, "success" | "warning" | "destructive" | "info" | "secondary"> = {
   success: "success",
@@ -274,6 +275,8 @@ function AccountCard(props: {
             })}
           </div>
 
+          <PhotoSync account={account} pending={pending} onRun={onRun} />
+
           {account.boundUsername ? (
             <div className="flex flex-wrap items-end gap-2">
               <ScanButton loop="Sales" open={openRequestFor(requests, id, "Sales")} pending={pending} primary onScan={() => onScan("Sales", id)} />
@@ -305,6 +308,56 @@ function AccountCard(props: {
         </>
       ) : null}
     </Card>
+  );
+}
+
+/**
+ * Whether an item's photos follow this account's listings. Switching it on replaces those items' photos with the
+ * listing's, so the choice is made plainly and confirmed before anything is overwritten.
+ */
+function PhotoSync(props: {
+  account: SyncAccount;
+  pending: boolean;
+  onRun: (action: () => Promise<SyncActionResult>, wakeAfter?: boolean) => void;
+}) {
+  const { account, pending, onRun } = props;
+  const id = account.channelAccountId!;
+  const on = account.photoSyncEnabled === true;
+  const summary = photoSyncSummary(account);
+
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3">
+      <div className="flex items-start gap-2">
+        <Images className="text-muted-foreground mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+        <div className="text-sm">
+          <p className="font-medium">Photos</p>
+          <p className={`text-xs ${TEXT[summary.tone]}`}>{summary.text}</p>
+        </div>
+      </div>
+      <Button
+        variant={on ? "outline" : "default"}
+        size="sm"
+        disabled={pending || !account.supported}
+        onClick={() => {
+          if (on) {
+            onRun(() => setPhotoSync(id, false));
+            return;
+          }
+
+          if (
+            window.confirm(
+              `Keep ${account.displayName}'s item photos in step with its listings?\n\n`
+                + "Each linked item's photos are replaced by the photos its listing shows, in the listing's order. "
+                + "Photos uploaded in HaulScout for those items are replaced too. Items already matching are left alone.",
+            )
+          ) {
+            onRun(() => setPhotoSync(id, true));
+          }
+        }}
+      >
+        {on ? "Stop following listings" : "Follow listing photos"}
+      </Button>
+    </div>
   );
 }
 
