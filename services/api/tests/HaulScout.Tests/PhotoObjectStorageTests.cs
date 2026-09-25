@@ -136,9 +136,12 @@ public sealed class PhotoObjectStorageTests
         InventoryPhoto photo = NewPhoto(heldInDatabase: true);
         await store.StoreAsync(photo, NewProcessed(), CancellationToken.None);
 
+        string original = photo.OriginalObjectKey!;
+        string thumbnail = photo.ThumbnailObjectKey!;
+
         await store.ForgetAsync(photo, CancellationToken.None);
 
-        Assert.Equal([photo.OriginalObjectKey, photo.ThumbnailObjectKey], objects.Deleted);
+        Assert.Equal([original, thumbnail], objects.Deleted);
         Assert.Empty(objects.Stored);
     }
 
