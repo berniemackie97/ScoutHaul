@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ledgerPage, listingsPage, ordersPage, profileJson, type FixtureOrder } from "../../test/ebay-fixtures";
+import { itemPage, ledgerPage, listingsPage, ordersPage, profileJson, type FixtureOrder } from "../../test/ebay-fixtures";
 import { memoryInMap } from "../../test/memory";
 import { AdapterError, type MarketplaceContext, type PageResponse, type Session } from "../types";
 import { ebayAdapter, salesFrom } from ".";
@@ -38,7 +38,9 @@ function context(routes: Record<string, string | PageResponse>): MarketplaceCont
   const requested: string[] = [];
   const opened: string[] = [];
   const serve = (url: string) => {
-    const route = routes[new URL(url).pathname];
+    const path = new URL(url).pathname;
+    const item = /^\/itm\/(\d+)$/.exec(path);
+    const route = routes[path] ?? (item ? itemPage([`${item[1]}a`, `${item[1]}b`]) : undefined);
     if (route === undefined) {
       throw new Error(`No fixture for ${url}`);
     }
@@ -160,7 +162,11 @@ describe("the eBay adapter", () => {
       sku: "649706ZAE47",
       // The grid's thumbnail address, asked for at the size worth keeping.
       primaryImageUrl: "https://i.ebayimg.com/images/g/377296454991/s-l1600.jpg",
-      photoUrls: ["https://i.ebayimg.com/images/g/377296454991/s-l1600.jpg"],
+      // The whole gallery, read from the listing's own page — the grid shows only the one picture.
+      photoUrls: [
+        "https://i.ebayimg.com/images/g/377296454991a/s-l1600.jpg",
+        "https://i.ebayimg.com/images/g/377296454991b/s-l1600.jpg",
+      ],
       url: "https://www.ebay.com/itm/377296454991",
       listedAt: "2026-06-26T04:11:52.000Z",
     });
@@ -175,12 +181,86 @@ describe("the eBay adapter", () => {
 
     expect(snapshot.listings).toHaveLength(200);
     expect(snapshot.complete).toBe(false);
-    expect(eBay.requested).toHaveLength(2);
+    // Two grid pages, and galleries for no more listings than one scan's budget allows.
+    expect(eBay.requested.filter((url) => url.includes("/sh/lst/active"))).toHaveLength(2);
+    expect(eBay.requested.filter((url) => url.includes("/itm/"))).toHaveLength(25);
   });
 
   it("does not call a partial snapshot complete", async () => {
     const eBay = context({ "/sh/lst/active": listingsPage([{ id: "1", title: "One", price: 5 }], 130) });
     expect((await ebayAdapter.snapshotListings(eBay, seller)).complete).toBe(false);
+  });
+
+
+  it("leaves a listing's photos alone when its gallery was not reached this scan", async () => {
+    const full = Array.from({ length: 200 }, (_, index) => ({ id: String(377100000000 + index), title: `Item ${index}`, price: 5 }));
+    const eBay = context({ "/sh/lst/active": listingsPage(full, 400) });
+
+    const snapshot = await ebayAdapter.snapshotListings(eBay, seller);
+
+    // Saying nothing is how a scan says "unchanged"; sending one picture would replace a whole gallery with it.
+    expect(snapshot.listings.slice(0, 25).every((listing) => listing.photoUrls?.length === 2)).toBe(true);
+    expect(snapshot.listings.slice(25).every((listing) => listing.photoUrls === undefined)).toBe(true);
+  });
+
+  it("reads a gallery once and remembers it while the listing's picture is unchanged", async () => {
+    const eBay = context({ "/sh/lst/active": listingsPage([{ id: "377296454991", title: "Shirt", price: 20 }]) });
+
+    const first = await ebayAdapter.snapshotListings(eBay, seller);
+    const second = await ebayAdapter.snapshotListings(eBay, seller);
+
+    expect(eBay.requested.filter((url) => url.includes("/itm/"))).toHaveLength(1);
+    expect(second.listings[0]!.photoUrls).toEqual(first.listings[0]!.photoUrls);
+  });
+
+  it("reads the gallery again once the listing's picture changes", async () => {
+    const eBay = context({ "/sh/lst/active": listingsPage([{ id: "377296454991", title: "Shirt", price: 20 }]) });
+    await ebayAdapter.snapshotListings(eBay, seller);
+
+    const changed = context({
+      "/sh/lst/active": listingsPage([{ id: "377296454991", title: "Shirt", price: 20 }]).replace("377296454991/s-l140.jpg", "377296454999/s-l140.jpg"),
+    });
+    changed.memory = eBay.memory;
+    await ebayAdapter.snapshotListings(changed, seller);
+
+    expect(changed.requested.filter((url) => url.includes("/itm/"))).toHaveLength(1);
+  });
+
+  it("reports a listing whose page carries no gallery without rejecting the listing", async () => {
+    const eBay = context({
+      "/sh/lst/active": listingsPage([{ id: "377296454991", title: "Shirt", price: 20 }]),
+      "/itm/377296454991": "<html><body>no pictures here</body></html>",
+    });
+
+    const snapshot = await ebayAdapter.snapshotListings(eBay, seller);
+
+    expect(snapshot.listings[0]!.photoUrls).toBeUndefined();
+    expect(snapshot.issues.some((issue) => !issue.rejected && issue.externalReference === "377296454991")).toBe(true);
+  });
+
+
+  it("does not fail a listings scan because one item page could not be read", async () => {
+    const eBay = context({
+      "/sh/lst/active": listingsPage([{ id: "377296454991", title: "Shirt", price: 20 }]),
+      "/itm/377296454991": { status: 404, url: "https://www.ebay.com/itm/377296454991", contentType: "text/html", body: "" },
+    });
+
+    const snapshot = await ebayAdapter.snapshotListings(eBay, seller);
+
+    // The listings were read. Their pictures can wait for the next scan.
+    expect(snapshot.listings).toHaveLength(1);
+    expect(snapshot.listings[0]!.photoUrls).toBeUndefined();
+    expect(snapshot.issues.some((issue) => !issue.rejected)).toBe(true);
+  });
+
+  it("stops the scan when an item page shows a security check", async () => {
+    const eBay = context({
+      "/sh/lst/active": listingsPage([{ id: "377296454991", title: "Shirt", price: 20 }]),
+      "/itm/377296454991": { status: 200, url: "https://www.ebay.com/splashui/challenge", contentType: "text/html", body: "" },
+    });
+
+    // Asking a marketplace that is already refusing is how a browser gets itself blocked.
+    await expect(ebayAdapter.snapshotListings(eBay, seller)).rejects.toMatchObject({ kind: "Challenge" });
   });
 
   it("knows who the browser is signed in as, and when it is not", async () => {

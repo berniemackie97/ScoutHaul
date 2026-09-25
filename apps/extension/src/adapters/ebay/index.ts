@@ -1,7 +1,9 @@
+import { waitsForAPerson } from "../../agent/failures";
 import type { IngestListing, IngestOrder, RunIssue } from "../../agent/types";
 import { dig, spans } from "../embedded-json";
-import type { ListingsSnapshot, MarketplaceAdapter, MarketplaceContext, PageKind, SalesScan, SalesWindow, Session } from "../types";
+import { AdapterError, type ListingsSnapshot, type MarketplaceAdapter, type MarketplaceContext, type PageKind, type SalesScan, type SalesWindow, type Session } from "../types";
 import { readLedgerPage, type LedgerOrder } from "./ledger";
+import { readGallery } from "./gallery";
 import { readListingsPage } from "./listings";
 import { readOrdersPage, toIngestOrder, type EbayOrderRow } from "./orders";
 import { assertReadable, siteChanged, unreadable } from "./pages";
@@ -17,6 +19,15 @@ export const historyDays = 90;
 export const routineDays = 14;
 
 const pageSize = 200;
+
+/**
+ * How many item pages one listings scan reads for their pictures. Each costs a request, paced by the governor, so
+ * a first scan of a large shop spreads its galleries over several scans rather than making one scan take an hour.
+ */
+const galleriesPerScan = 25;
+
+/** A gallery is read again only when the listing's own picture changed, or after this long. */
+const galleryStaleDays = 30;
 
 /** The first day a sales scan reads from. */
 export function salesFrom(window: SalesWindow, now: Date): Date {
@@ -190,10 +201,73 @@ export const ebayAdapter: MarketplaceAdapter = {
       }
     }
 
+    await readGalleries(context, [...listings.values()], issues);
     const complete = issues.every((issue) => !issue.rejected) && (total === null || listings.size === total);
     return { listings: [...listings.values()], issues, complete };
   },
 };
+
+/** What this browser has already read for one listing's pictures. */
+interface GalleryMemory {
+  at: number;
+  primary: string | null;
+  photos: string[];
+}
+
+/**
+ * Fills in the listings' galleries from their item pages, newest-changed first and only up to this scan's budget.
+ *
+ * A listing whose picture has not changed since its gallery was read is skipped entirely, so a shop that is not
+ * changing costs nothing. A listing not reached this time keeps `photoUrls` undefined, which tells the server to
+ * leave that listing's photos exactly as they are rather than replacing them with nothing.
+ */
+async function readGalleries(context: MarketplaceContext, listings: IngestListing[], issues: RunIssue[]): Promise<void> {
+  const stale = context.now().getTime() - galleryStaleDays * day;
+  let budget = galleriesPerScan;
+
+  for (const listing of listings) {
+    if (budget === 0) {
+      return;
+    }
+
+    const id = listing.externalListingId;
+    if (!id) {
+      continue;
+    }
+
+    const known = await context.memory.get<GalleryMemory>(`gallery:${id}`);
+    if (known && known.at > stale && known.primary === listing.primaryImageUrl) {
+      // Nothing about the listing's pictures has changed, so its gallery is still the one already held.
+      listing.photoUrls = known.photos;
+      continue;
+    }
+
+    budget--;
+    let photos: string[];
+    try {
+      const response = await context.request(`${origin}/itm/${id}`);
+      assertReadable(response);
+      photos = readGallery(response.body);
+    } catch (error) {
+      // A marketplace refusing or asking for a person is the whole scan's problem. Anything else is this one
+      // listing's, and the listings themselves have already been read — so say so and stop asking for pictures.
+      if (error instanceof AdapterError && waitsForAPerson(error.kind)) {
+        throw error;
+      }
+
+      issues.push({ message: "This listing's pictures could not be read from its page.", externalReference: id, rejected: false });
+      return;
+    }
+
+    if (photos.length === 0) {
+      issues.push({ message: "This listing's pictures could not be read from its page.", externalReference: id, rejected: false });
+      continue;
+    }
+
+    listing.photoUrls = photos;
+    await context.memory.set<GalleryMemory>(`gallery:${id}`, { at: context.now().getTime(), primary: listing.primaryImageUrl ?? null, photos });
+  }
+}
 
 function merge(left: LedgerOrder, right: LedgerOrder): LedgerOrder {
   return {
