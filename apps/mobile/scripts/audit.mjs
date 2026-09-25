@@ -13,16 +13,12 @@ import { promisify } from 'node:util';
 const deferred = {
   // GHSA-w3rx-r6r6-pgpr / GHSA-5p2g-fcmc-qvqq — `image-size` loops forever on a malformed ICNS,
   // JXL or HEIF file. It is reached only through the Metro bundler, which parses image assets at
-  // build time from this repo, so there is no untrusted input and nothing in the shipped app. The
-  // only remedy npm offers is expo@57, a major SDK upgrade (we are on 54) that needs its own slice.
-  'image-size': 'Expo SDK 54 → 57 upgrade',
-  '@expo/cli': 'Expo SDK 54 → 57 upgrade',
-  '@expo/metro': 'Expo SDK 54 → 57 upgrade',
-  '@expo/metro-config': 'Expo SDK 54 → 57 upgrade',
-  expo: 'Expo SDK 54 → 57 upgrade',
-  metro: 'Expo SDK 54 → 57 upgrade',
-  'metro-config': 'Expo SDK 54 → 57 upgrade',
-  'metro-transform-worker': 'Expo SDK 54 → 57 upgrade',
+  // build time from this repo, so there is no untrusted input and nothing in the shipped app.
+  //
+  // The fix is image-size 2.0.3, a major version Metro does not accept (`metro-transform-worker`
+  // asks for ^1.0.2), so forcing it through `overrides` would change the parser Metro bundles our
+  // assets with. It goes when Expo ships a Metro that asks for a patched one.
+  'image-size': 'Expo/Metro releasing a build that asks for image-size >= 2.0.3',
 };
 
 const run = promisify(execFile);

@@ -13,6 +13,7 @@ using HaulScout.Domain.Entities;
 using HaulScout.Infrastructure.Orders;
 using HaulScout.Infrastructure.Organizations;
 using HaulScout.Infrastructure.PlatformOrders;
+using HaulScout.Infrastructure.Inventory;
 using HaulScout.Infrastructure.Persistence;
 using HaulScout.Infrastructure.Sync;
 
@@ -154,7 +155,7 @@ public sealed class SyncAgentTests
             Granted = grantedSet,
             Ebay = ebay,
             Depop = depop,
-            Hub = new SyncHubService(new EfSyncAgentStore(db), new StubCurrentUser(org, user), new StubAuthorizer(grantedSet), clock, Microsoft.Extensions.Options.Options.Create(syncOptions)),
+            Hub = new SyncHubService(new EfSyncAgentStore(db), new EfInventoryPhotoSyncStore(db), new StubCurrentUser(org, user), new StubAuthorizer(grantedSet), clock, Microsoft.Extensions.Options.Options.Create(syncOptions)),
         };
     }
 
@@ -319,6 +320,48 @@ public sealed class SyncAgentTests
 
         harness.Clock.Advance(TimeSpan.FromMinutes(10));
         Assert.Equal(SyncAccountHealth.NoBrowser, (await harness.Hub.OverviewAsync(CancellationToken.None)).Accounts.Single(account => account.ChannelAccountId == harness.Ebay.Id).Health);
+    }
+
+    [Fact]
+    public async Task Photos_follow_an_accounts_listings_only_once_someone_asks()
+    {
+        Harness harness = NewHarness();
+        await harness.ReadyAgentAsync();
+
+        // Off to begin with, as every automation is.
+        SyncAccountDto account = (await harness.Hub.OverviewAsync(CancellationToken.None)).Accounts
+            .Single(candidate => candidate.ChannelAccountId == harness.Ebay.Id);
+        Assert.False(account.PhotoSyncEnabled);
+        Assert.Equal(0, account.PhotosWaiting);
+
+        // A listing with photos, linked to an item, is work as soon as the account asks for it.
+        InventoryItem item = new() { OrganizationId = harness.Org, Title = "Denim Jacket" };
+        harness.Db.InventoryItems.Add(item);
+        harness.Db.PlatformListings.Add(new PlatformListing
+        {
+            OrganizationId = harness.Org,
+            Platform = "eBay",
+            ExternalListingId = "377296454991",
+            Title = "Denim Jacket",
+            ChannelAccountId = harness.Ebay.Id,
+            ReconcileStatus = PlatformListingReconcileStatus.Linked,
+            ReconciledInventoryItemId = item.Id,
+            PhotoUrlsJson = """["https://i.ebayimg.com/images/g/a/s-l1600.jpg"]""",
+            PhotoUrlsKey = "abc",
+        });
+        await harness.Db.SaveChangesAsync();
+
+        Assert.Equal(0, (await harness.Hub.OverviewAsync(CancellationToken.None)).Accounts
+            .Single(candidate => candidate.ChannelAccountId == harness.Ebay.Id).PhotosWaiting);
+
+        SyncOverviewDto after = (await harness.Hub.SetPhotoSyncAsync(harness.Ebay.Id, new UpdatePhotoSyncRequest(true), CancellationToken.None)).Value!;
+        SyncAccountDto asked = after.Accounts.Single(candidate => candidate.ChannelAccountId == harness.Ebay.Id);
+        Assert.True(asked.PhotoSyncEnabled);
+        Assert.Equal(1, asked.PhotosWaiting);
+
+        // A marketplace with no adapter cannot be asked for photos, since nothing reads its listings.
+        Assert.Equal(AppResultStatus.Validation,
+            (await harness.Hub.SetPhotoSyncAsync(harness.Depop.Id, new UpdatePhotoSyncRequest(true), CancellationToken.None)).Status);
     }
 
     [Fact]

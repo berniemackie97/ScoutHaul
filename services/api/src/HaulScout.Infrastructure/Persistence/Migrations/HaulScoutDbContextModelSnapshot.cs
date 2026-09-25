@@ -488,6 +488,11 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("OrganizationId")
                         .HasColumnType("uuid");
 
+                    b.Property<bool>("PhotoSyncEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
                     b.Property<int?>("SalesScanEveryMinutes")
                         .HasColumnType("integer");
 
@@ -1133,6 +1138,10 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                     b.Property<string>("PhotoLocalReferencesJson")
                         .HasColumnType("text");
 
+                    b.Property<string>("PhotoSourceKey")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
                     b.Property<Guid?>("ProductIdentityId")
                         .HasColumnType("uuid");
 
@@ -1272,6 +1281,10 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                     b.Property<int>("SortOrder")
                         .HasColumnType("integer");
 
+                    b.Property<string>("SourceUrl")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
                     b.Property<long>("ThumbnailByteSize")
                         .HasColumnType("bigint");
 
@@ -1288,6 +1301,10 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("InventoryItemId", "IsHero");
+
+                    b.HasIndex("InventoryItemId", "SourceUrl")
+                        .IsUnique()
+                        .HasFilter("\"SourceUrl\" IS NOT NULL");
 
                     b.HasIndex("OrganizationId", "InventoryItemId", "SortOrder");
 
@@ -2124,6 +2141,27 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
 
                     b.Property<Guid>("OrganizationId")
                         .HasColumnType("uuid");
+
+                    b.Property<string>("PhotoSyncError")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("PhotoSyncedKey")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<DateTimeOffset?>("PhotoUrlsChangedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("PhotoUrlsJson")
+                        .HasColumnType("jsonb");
+
+                    b.Property<string>("PhotoUrlsKey")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<DateTimeOffset?>("PhotosSyncedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Platform")
                         .IsRequired()

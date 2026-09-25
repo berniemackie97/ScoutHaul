@@ -107,7 +107,7 @@ export function listingsPage(listings: FixtureListing[], total = listings.length
     marketplaceId: "0",
     title: {
       texts: [text(listing.title)],
-      image: { _type: "Image", title: listing.title, URL: `https://i.ebayimg.com/images/${listing.id}.jpg` },
+      image: { _type: "Image", title: listing.title, URL: `https://i.ebayimg.com/images/g/${listing.id}/s-l140.jpg` },
     },
     listingSKU: { content: listing.sku ? [text(listing.sku)] : [] },
     price: { content: { currencySymbol: "$", currentValue: listing.price.toFixed(2) } },

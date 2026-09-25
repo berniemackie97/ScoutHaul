@@ -51,6 +51,12 @@ public sealed class ChannelAccount : EntityBase, IOrganizationScoped
     /// <summary>How often a paired browser snapshots this account's live listings. Null — the default — is off.</summary>
     public int? ListingsScanEveryMinutes { get; set; }
 
+    /// <summary>
+    /// Whether an item's photos are kept in step with this account's listings. Off until someone switches it on:
+    /// the listing's photos then become the item's photos, replacing what the item had.
+    /// </summary>
+    public bool PhotoSyncEnabled { get; set; }
+
     public ICollection<ChannelListing> Listings { get; set; } = [];
 
     public bool IsBound => !string.IsNullOrWhiteSpace(BoundUsername);

@@ -27,9 +27,14 @@ public sealed record ProcessedPhoto(
 /// </summary>
 public interface IInventoryPhotoProcessor
 {
+    /// <param name="maxPixels">
+    /// The longest side the stored photo is kept at, or null to keep the file exactly as it arrived. A photo
+    /// someone uploads is kept as they made it; one fetched from a listing is brought down to a size a page
+    /// actually shows, because thousands of them are kept and every one is stored.
+    /// </param>
     /// <exception cref="InvalidOperationException">The upload is unusable — too large, empty, or not an allowed image
     /// type. The message is written for the operator and is surfaced as a validation failure.</exception>
-    Task<ProcessedPhoto> ProcessAsync(PhotoUpload upload, CancellationToken cancellationToken);
+    Task<ProcessedPhoto> ProcessAsync(PhotoUpload upload, CancellationToken cancellationToken, int? maxPixels = null);
 
     /// <summary>Removes a photo's backing file, for photos stored on disk rather than in the database.</summary>
     Task DeleteAsync(Guid organizationId, Guid inventoryItemId, string url);

@@ -91,6 +91,12 @@ public sealed class InventoryItem : EntityBase, IOrganizationScoped
     public string? Notes { get; set; }
     public string? Barcode { get; set; }
     public string? PhotoLocalReferencesJson { get; set; }
+
+    /// <summary>
+    /// Which listing's photos this item is currently showing, as "platform:listing id:key". Only set while the
+    /// photos came from a marketplace listing; photos someone uploaded leave it null.
+    /// </summary>
+    public string? PhotoSourceKey { get; set; }
     public bool IsArchived { get; set; }
     public bool IsBundle { get; set; }
     public DateTimeOffset? PurchasedAt { get; set; }
@@ -187,6 +193,13 @@ public sealed class InventoryPhoto : EntityBase, IOrganizationScoped
     public InventoryItem? InventoryItem { get; set; }
     public bool IsHero { get; set; }
     public int SortOrder { get; set; }
+
+    /// <summary>
+    /// The marketplace address this photo was fetched from, when it came from a listing rather than from someone
+    /// uploading it. It is how a photo already held is recognised, so a listing read again keeps the same photo —
+    /// and the same address on the storefront — instead of replacing it with a copy.
+    /// </summary>
+    public string? SourceUrl { get; set; }
     public string? OriginalFileName { get; set; }
     public required string ContentType { get; set; }
     public required byte[] OriginalBytes { get; set; }

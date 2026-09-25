@@ -7942,6 +7942,51 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/sync/accounts/{accountId}/photos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    accountId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["UpdatePhotoSyncRequest"];
+                    "text/json": components["schemas"]["UpdatePhotoSyncRequest"];
+                    "application/*+json": components["schemas"]["UpdatePhotoSyncRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SyncOverviewDto"];
+                        "application/json": components["schemas"]["SyncOverviewDto"];
+                        "text/json": components["schemas"]["SyncOverviewDto"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/sync/accounts/{accountId}/binding": {
         parameters: {
             query?: never;
@@ -9575,6 +9620,7 @@ export interface components {
             /** Format: date-time */
             endsAt?: string | null;
             rawJson?: string | null;
+            photoUrls?: string[] | null;
         };
         IngestPlatformListingsRequest: {
             platform?: string | null;
@@ -11657,6 +11703,9 @@ export interface components {
             healthMessage?: string | null;
             loops?: components["schemas"]["SyncLoopDto"][] | null;
             sessions?: components["schemas"]["SyncSessionSeenDto"][] | null;
+            photoSyncEnabled?: boolean;
+            /** Format: int32 */
+            photosWaiting?: number;
         };
         /** @enum {string} */
         SyncAccountHealth: "Ready" | "NotBound" | "NoBrowser" | "Paused" | "Disabled" | "Unsupported";
@@ -11882,6 +11931,9 @@ export interface components {
             /** Format: uuid */
             roleId?: string | null;
             legacyRole?: components["schemas"]["OrganizationRole"];
+        };
+        UpdatePhotoSyncRequest: {
+            enabled?: boolean;
         };
         UpdateSaleRequest: {
             platform?: string | null;

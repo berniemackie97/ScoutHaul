@@ -208,7 +208,8 @@ public sealed record IngestPlatformListingInput(
     string? PrimaryImageUrl = null,
     DateTimeOffset? ListedAt = null,
     DateTimeOffset? EndsAt = null,
-    string? RawJson = null);
+    string? RawJson = null,
+    IReadOnlyList<string>? PhotoUrls = null);
 
 public sealed record IngestPlatformListingsRequest(
     string Platform,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ago, bindableUsernames, cadenceOptions, dueIn, formatCode, healthBadge, loopSummary, requestStatus } from "./sync-model";
+import { ago, bindableUsernames, cadenceOptions, dueIn, formatCode, healthBadge, loopSummary, photoSyncSummary, requestStatus } from "./sync-model";
 
 const now = new Date("2026-09-18T20:00:00Z");
 const minutesAgo = (minutes: number) => new Date(now.getTime() - minutes * 60_000).toISOString();
@@ -40,6 +40,15 @@ describe("sync model", () => {
   it("says what a queued scan is waiting for, and that it runs by itself after", () => {
     expect(requestStatus({ status: "Queued" }, { health: "NoBrowser", healthMessage: "Laptop is signed out of eBay. Sign in to eBay there." }, true))
       .toEqual({ label: "Waiting", tone: "warning", note: "Laptop is signed out of eBay. Sign in to eBay there. It starts by itself after." });
+  });
+
+  it("says where an account's photos stand", () => {
+    expect(photoSyncSummary({ photoSyncEnabled: false, photosWaiting: 0 }))
+      .toEqual({ text: "Item photos are left as they are", tone: "neutral" });
+    expect(photoSyncSummary({ photoSyncEnabled: true, photosWaiting: 0 }))
+      .toEqual({ text: "Item photos match their listings", tone: "success" });
+    expect(photoSyncSummary({ photoSyncEnabled: true, photosWaiting: 1 }).text).toBe("1 listing still to come over");
+    expect(photoSyncSummary({ photoSyncEnabled: true, photosWaiting: 12 }).text).toBe("12 listings still to come over");
   });
 
   it("offers each signed-in username once for binding", () => {

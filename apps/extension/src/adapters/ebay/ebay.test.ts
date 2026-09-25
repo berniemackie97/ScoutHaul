@@ -158,6 +158,9 @@ describe("the eBay adapter", () => {
       status: "Active",
       format: "FixedPrice",
       sku: "649706ZAE47",
+      // The grid's thumbnail address, asked for at the size worth keeping.
+      primaryImageUrl: "https://i.ebayimg.com/images/g/377296454991/s-l1600.jpg",
+      photoUrls: ["https://i.ebayimg.com/images/g/377296454991/s-l1600.jpg"],
       url: "https://www.ebay.com/itm/377296454991",
       listedAt: "2026-06-26T04:11:52.000Z",
     });

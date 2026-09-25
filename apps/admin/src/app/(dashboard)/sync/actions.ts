@@ -60,6 +60,29 @@ export async function setSchedule(
   return { ok: true, message: minutes ? "Schedule saved." : `Scheduled ${loop.toLowerCase()} scans switched off.` };
 }
 
+/**
+ * Switches keeping an item's photos in step with this account's listings on or off. Switching it on hands the
+ * listings' photos to the items they are linked to, replacing the photos those items show.
+ */
+export async function setPhotoSync(channelAccountId: string, enabled: boolean): Promise<SyncActionResult> {
+  const api = await getApiClient();
+  const result = await api.PUT("/api/sync/accounts/{accountId}/photos", {
+    params: { path: { accountId: channelAccountId } },
+    body: { enabled },
+  });
+  if (!result.data) return { ok: false, message: errorMessage(result.error, "The photo setting could not be saved.") };
+
+  refresh();
+  const waiting = result.data.accounts?.find((account) => account.channelAccountId === channelAccountId)?.photosWaiting ?? 0;
+  if (!enabled) return { ok: true, message: "Photos no longer follow this account's listings." };
+  return {
+    ok: true,
+    message: waiting > 0
+      ? `Photos now follow this account's listings. ${waiting} ${waiting === 1 ? "listing is" : "listings are"} on the way.`
+      : "Photos now follow this account's listings.",
+  };
+}
+
 export async function bindAccount(channelAccountId: string, username: string): Promise<SyncActionResult> {
   const api = await getApiClient();
   const result = await api.PUT("/api/sync/accounts/{accountId}/binding", {

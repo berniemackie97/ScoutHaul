@@ -66,7 +66,10 @@ export function wardrobeItem(id: number, overrides: Partial<VintedWardrobeItem> 
     item_closing_action: null,
     url: `https://www.vinted.com/items/${id}-listing`,
     status: "Very good",
-    photos: [{ url: `https://images1.vinted.net/t/${id}-a/f800/1.webp`, is_main: false }, { url: `https://images1.vinted.net/t/${id}-b/f800/1.webp`, is_main: true }],
+    photos: [
+      { url: `https://images1.vinted.net/t/${id}-a/f800/1.webp`, full_size_url: `https://images1.vinted.net/tc/${id}-a/1.webp`, is_main: false },
+      { url: `https://images1.vinted.net/t/${id}-b/f800/1.webp`, full_size_url: `https://images1.vinted.net/tc/${id}-b/1.webp`, is_main: true },
+    ],
     ...overrides,
   };
 }

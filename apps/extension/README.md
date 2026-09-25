@@ -77,6 +77,11 @@ reasons. Vinted's own pages renew an expired sign-in as they load, and its bot p
 (DataDome) runs in them. A request DataDome blocks answers with a pointer to
 `captcha-delivery.com`; that is how a security check is recognised.
 
+**Photos.** A listings scan also brings back the addresses of the photos each listing shows. What happens to them
+is HaulScout's decision, per account and off until someone switches it on: when it is on, an item's photos are
+replaced by its listing's. Vinted carries a listing's whole gallery; eBay's Manage active listings shows one
+picture per listing, so that is what an eBay scan can bring back.
+
 **Pairing** uses a one-time code:
 1. HaulScout shows the code under **Sync → Browsers → Connect a browser**.
 2. You paste it into this popup.
