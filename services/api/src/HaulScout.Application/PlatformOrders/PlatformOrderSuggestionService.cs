@@ -53,9 +53,11 @@ public sealed class PlatformOrderSuggestionService(IPlatformOrderSuggestionStore
         CancellationToken cancellationToken)
     {
         Dictionary<Guid, PlatformLineMatch> suggestions = new();
-        List<PlatformOrderLine> openLines = orders
+        // The line is carried with its order, because which marketplace a line's item number belongs to
+        // is the order's, not the line's.
+        List<(PlatformOrder Order, PlatformOrderLine Line)> openLines = orders
             .Where(order => order.Status != PlatformOrderStatus.Reconciled)
-            .SelectMany(order => order.Lines.Where(line => line.InventoryItemId is null))
+            .SelectMany(order => order.Lines.Where(line => line.InventoryItemId is null).Select(line => (Order: order, Line: line)))
             .ToList();
         if (openLines.Count == 0)
         {
@@ -69,25 +71,30 @@ public sealed class PlatformOrderSuggestionService(IPlatformOrderSuggestionStore
             .Select(item => new InventoryMatchCandidate(item.Id, item.Title, item.Sku, InventoryLifecycle.IsSold(item.Status)))
             .ToList();
 
-        List<string> externalIds = openLines.Where(line => line.ExternalItemId is not null).Select(line => line.ExternalItemId!).Distinct().ToList();
+        List<string> externalIds = openLines
+            .Where(open => open.Line.ExternalItemId is not null)
+            .Select(open => open.Line.ExternalItemId!)
+            .Distinct()
+            .ToList();
         IReadOnlyList<PlatformOrderListingSuggestionCandidate> listingLinks = externalIds.Count == 0
             ? []
             : await store.ListListingCandidatesAsync(externalIds, cancellationToken);
 
-        // First link wins per item id — the store returns channel listings ahead of imported ones.
-        Dictionary<string, Guid> itemIdToInventoryId = new(StringComparer.OrdinalIgnoreCase);
+        // First link wins per listing — the store returns channel listings ahead of imported ones. The
+        // key carries the marketplace, so one platform's item number never answers another's.
+        Dictionary<string, Guid> itemIdToInventoryId = [];
         foreach (PlatformOrderListingSuggestionCandidate link in listingLinks)
         {
-            if (link.ExternalListingId is string externalId)
+            if (PlatformLineMatcher.ListingKey(link.Platform, link.ExternalListingId) is string key)
             {
-                itemIdToInventoryId.TryAdd(externalId, link.InventoryItemId);
+                itemIdToInventoryId.TryAdd(key, link.InventoryItemId);
             }
         }
 
-        foreach (PlatformOrderLine line in openLines)
+        foreach ((PlatformOrder order, PlatformOrderLine line) in openLines)
         {
             PlatformLineMatch? match = PlatformLineMatcher.Match(
-                new PlatformLineIdentity(line.ExternalItemId, line.Sku, line.Title),
+                new PlatformLineIdentity(order.Platform, line.ExternalItemId, line.Sku, line.Title),
                 itemIdToInventoryId,
                 candidates);
 
@@ -103,4 +110,5 @@ public sealed class PlatformOrderSuggestionService(IPlatformOrderSuggestionStore
 
 public sealed record PlatformOrderInventorySuggestionCandidate(Guid Id, string Title, string? Sku, InventoryStatus Status);
 
-public sealed record PlatformOrderListingSuggestionCandidate(string? ExternalListingId, Guid InventoryItemId);
+/// <param name="Platform">The marketplace whose listing this is; an item number is only that marketplace's.</param>
+public sealed record PlatformOrderListingSuggestionCandidate(string? Platform, string? ExternalListingId, Guid InventoryItemId);

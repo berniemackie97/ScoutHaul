@@ -39,7 +39,8 @@ public sealed class EfPlatformOrderSuggestionStore(HaulScoutDbContext db, ICurre
             .Where(listing => listing.OrganizationId == currentUser.OrganizationId
                 && listing.ExternalListingId != null
                 && externalListingIds.Contains(listing.ExternalListingId))
-            .Select(listing => new PlatformOrderListingSuggestionCandidate(listing.ExternalListingId, listing.InventoryItemId))
+            .Select(listing => new PlatformOrderListingSuggestionCandidate(
+                listing.ChannelAccount!.Channel, listing.ExternalListingId, listing.InventoryItemId))
             .ToListAsync(cancellationToken);
 
         List<PlatformOrderListingSuggestionCandidate> fromImportedListings = await db.PlatformListings
@@ -47,7 +48,7 @@ public sealed class EfPlatformOrderSuggestionStore(HaulScoutDbContext db, ICurre
                 && listing.ReconciledInventoryItemId != null
                 && externalListingIds.Contains(listing.ExternalListingId))
             .Select(listing => new PlatformOrderListingSuggestionCandidate(
-                listing.ExternalListingId, listing.ReconciledInventoryItemId!.Value))
+                listing.Platform, listing.ExternalListingId, listing.ReconciledInventoryItemId!.Value))
             .ToListAsync(cancellationToken);
 
         // Channel listings first: an explicit channel record is the more deliberate statement of

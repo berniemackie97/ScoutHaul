@@ -30,8 +30,12 @@ public sealed record PlatformLineMatch(Guid InventoryItemId, PlatformLineMatchSo
     public bool CanAutoSettle => IsExact && !AlreadySold;
 }
 
-/// <summary>What is known about an imported line that could identify it.</summary>
-public readonly record struct PlatformLineIdentity(string? ExternalItemId, string? Sku, string Title);
+/// <summary>
+/// What is known about an imported line that could identify it. <see cref="Platform"/> is part of it
+/// because an item number only means something on the marketplace that issued it: eBay and Vinted
+/// both number their listings, and nothing stops the same digits appearing on both.
+/// </summary>
+public readonly record struct PlatformLineIdentity(string Platform, string? ExternalItemId, string? Sku, string Title);
 
 /// <summary>An inventory item as a match target.</summary>
 public readonly record struct InventoryMatchCandidate(Guid Id, string Title, string? Sku, bool AlreadySold);
@@ -48,17 +52,29 @@ public static class PlatformLineMatcher
     /// The best available match, or null when nothing is confident enough to offer.
     /// </summary>
     /// <param name="itemIdToInventoryId">
-    /// Platform item number → inventory item, from listings already tied to an item (imported or
-    /// channel records). Supplied rather than searched so the caller can batch one lookup per import.
+    /// Listing → inventory item, from listings already tied to an item (imported or channel records),
+    /// keyed by <see cref="ListingKey"/>. Supplied rather than searched so the caller can batch one
+    /// lookup per import.
     /// </param>
+    /// <summary>
+    /// How a listing is looked up: its marketplace and its number together. Null when either is
+    /// missing, which is simply a line that cannot be matched this way.
+    /// </summary>
+    public static string? ListingKey(string? platform, string? externalListingId) =>
+        string.IsNullOrWhiteSpace(platform) || string.IsNullOrWhiteSpace(externalListingId)
+            ? null
+            : $"{platform.Trim().ToLowerInvariant()}\u0000{externalListingId.Trim().ToLowerInvariant()}";
+
     public static PlatformLineMatch? Match(
         PlatformLineIdentity line,
         IReadOnlyDictionary<string, Guid> itemIdToInventoryId,
         IReadOnlyList<InventoryMatchCandidate> candidates)
     {
         // 1. The platform's own item number — the strongest signal, because the seller listed it.
-        if (!string.IsNullOrWhiteSpace(line.ExternalItemId)
-            && itemIdToInventoryId.TryGetValue(line.ExternalItemId, out Guid byItemId))
+        //    Only on that platform: another marketplace's listing with the same number is a different
+        //    thing entirely, and matching across would post a sale against the wrong item.
+        if (ListingKey(line.Platform, line.ExternalItemId) is string key
+            && itemIdToInventoryId.TryGetValue(key, out Guid byItemId))
         {
             return Build(byItemId, PlatformLineMatchSource.PlatformItemId, candidates);
         }
