@@ -332,6 +332,11 @@ function PhotoSync(props: {
         <div className="text-sm">
           <p className="font-medium">Photos</p>
           <p className={`text-xs ${TEXT[summary.tone]}`}>{summary.text}</p>
+          {account.platform === "eBay" && !on ? (
+            <p className="text-muted-foreground mt-1 text-xs">
+              An eBay scan brings back one picture per listing. For an item listed on Vinted too, follow Vinted&rsquo;s photos instead.
+            </p>
+          ) : null}
         </div>
       </div>
       <Button
@@ -348,7 +353,8 @@ function PhotoSync(props: {
             window.confirm(
               `Keep ${account.displayName}'s item photos in step with its listings?\n\n`
                 + "Each linked item's photos are replaced by the photos its listing shows, in the listing's order. "
-                + "Photos uploaded in HaulScout for those items are replaced too. Items already matching are left alone.",
+                + "Photos uploaded in HaulScout for those items are replaced too. Items already matching are left alone.\n\n"
+                + "For an item listed in more than one place, the listing showing the most photos wins.",
             )
           ) {
             onRun(() => setPhotoSync(id, true));
