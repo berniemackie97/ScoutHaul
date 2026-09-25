@@ -137,6 +137,7 @@ builder.Services.AddInfrastructure(builder.Configuration);
 // Listing photos reach their inventory items in the background: a first sync is hundreds of images, which no
 // browser's scan should wait on. Tests run without it (`Sync:Photos:Enabled`).
 builder.Services.AddHostedService<ListingPhotoSyncWorker>();
+builder.Services.AddHostedService<PhotoObjectStorageBackfillWorker>();
 
 // ═════════════════════════════════════════════════════════════════
 WebApplication app = builder.Build();

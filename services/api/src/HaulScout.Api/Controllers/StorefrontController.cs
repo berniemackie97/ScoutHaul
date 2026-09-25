@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using HaulScout.Api.Services;
 using HaulScout.Application.Contracts;
+using HaulScout.Application.Inventory;
 using HaulScout.Application.Storefront;
 
 namespace HaulScout.Api.Controllers;
@@ -63,7 +64,7 @@ public sealed class StorefrontController(StorefrontStoreResolver resolver, Store
     public async Task<IActionResult> Photo(Guid photoId, [FromQuery] string? size, CancellationToken cancellationToken)
     {
         bool full = string.Equals(size, "full", StringComparison.OrdinalIgnoreCase);
-        PublicPhoto? photo = await catalog.FindPublicPhotoAsync(photoId, full, cancellationToken);
+        PhotoBytes? photo = await catalog.FindPublicPhotoAsync(photoId, full, cancellationToken);
         if (photo is null)
         {
             return Missing();

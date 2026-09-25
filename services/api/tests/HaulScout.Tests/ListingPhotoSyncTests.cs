@@ -117,7 +117,7 @@ public sealed class ListingPhotoSyncTests
             Images = images,
             Processor = processor,
             Account = account,
-            Sync = new InventoryPhotoSyncService(new EfInventoryPhotoSyncStore(db), images, processor, TimeProvider.System),
+            Sync = new InventoryPhotoSyncService(new EfInventoryPhotoSyncStore(db), images, processor, new DatabaseInventoryPhotoBlobStore(), TimeProvider.System),
         };
     }
 

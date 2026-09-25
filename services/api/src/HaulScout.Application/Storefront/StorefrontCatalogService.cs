@@ -2,13 +2,16 @@ using System.Text;
 using HaulScout.Application.Contracts;
 using HaulScout.Domain;
 
+using HaulScout.Application.Inventory;
+using HaulScout.Domain.Entities;
+
 namespace HaulScout.Application.Storefront;
 
 /// <summary>
 /// The public catalog: what an anonymous shopper sees. Paging limits, category-slug matching, URL/slug construction
 /// and the honest availability wording are decisions and live here; turning them into SQL lives behind the port.
 /// </summary>
-public sealed class StorefrontCatalogService(IStorefrontCatalogStore catalog)
+public sealed class StorefrontCatalogService(IStorefrontCatalogStore catalog, IInventoryPhotoBlobStore blobs)
 {
     private const int MaxPageSize = 60;
 
@@ -90,8 +93,18 @@ public sealed class StorefrontCatalogService(IStorefrontCatalogStore catalog)
             .Select((entry, index) => new StoreCategoryDto(Guid.Empty, entry.Name, Slugify(entry.Name), null, null, index, true))
             .ToList();
 
-    public Task<PublicPhoto?> FindPublicPhotoAsync(Guid photoId, bool fullSize, CancellationToken cancellationToken) =>
-        catalog.FindPublicPhotoAsync(photoId, fullSize, cancellationToken);
+    public async Task<PhotoBytes?> FindPublicPhotoAsync(Guid photoId, bool fullSize, CancellationToken cancellationToken)
+    {
+        InventoryPhoto? photo = await catalog.FindPublicPhotoAsync(photoId, cancellationToken);
+        if (photo is null)
+        {
+            return null;
+        }
+
+        return fullSize
+            ? await blobs.ReadOriginalAsync(photo, cancellationToken)
+            : await blobs.ReadThumbnailAsync(photo, cancellationToken);
+    }
 
     // Stable, unique public slug: "{title-slug}-{listingId:N}". The id suffix is the lookup key.
     internal static string BuildSlug(string title, Guid id) => $"{Slugify(title)}-{id:N}";

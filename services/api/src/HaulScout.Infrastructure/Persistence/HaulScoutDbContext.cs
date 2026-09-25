@@ -328,8 +328,9 @@ public sealed class HaulScoutDbContext(
             entity.ToTable("InventoryPhotos");
             entity.Property(item => item.OriginalFileName).HasMaxLength(240);
             entity.Property(item => item.ContentType).HasMaxLength(80).IsRequired();
-            entity.Property(item => item.OriginalBytes).IsRequired();
-            entity.Property(item => item.ThumbnailBytes).IsRequired();
+            // Nullable because the images may live in object storage instead; exactly one of the two holds each image.
+            entity.Property(item => item.OriginalObjectKey).HasMaxLength(400);
+            entity.Property(item => item.ThumbnailObjectKey).HasMaxLength(400);
             entity.Property(item => item.SourceUrl).HasMaxLength(1000);
             // One photo per address on an item: two syncs racing cannot leave the item holding the same photo twice.
             entity.HasIndex(item => new { item.InventoryItemId, item.SourceUrl }).IsUnique().HasFilter("\"SourceUrl\" IS NOT NULL");

@@ -1,5 +1,7 @@
 using HaulScout.Domain;
 
+using HaulScout.Domain.Entities;
+
 namespace HaulScout.Application.Storefront;
 
 /// <summary>What the public catalog asks of persistence. Filtering, search and paging must run as SQL, so the port
@@ -22,8 +24,9 @@ public interface IStorefrontCatalogStore
     Task<IReadOnlyList<(string Name, int Count)>> ListCategoriesAsync(Guid organizationId, CancellationToken cancellationToken);
 
     /// <summary>A photo that is public because its item's listing is public; null otherwise. Org-agnostic by design —
-    /// photo ids are unguessable and browsers fetch them without the store header.</summary>
-    Task<PublicPhoto?> FindPublicPhotoAsync(Guid photoId, bool fullSize, CancellationToken cancellationToken);
+    /// photo ids are unguessable and browsers fetch them without the store header. The row comes back rather than its
+    /// images: whether the bytes sit in these columns or in a bucket is settled above this port.</summary>
+    Task<InventoryPhoto?> FindPublicPhotoAsync(Guid photoId, CancellationToken cancellationToken);
 }
 
 public sealed record CatalogRow(
@@ -82,4 +85,3 @@ public sealed record CatalogItemSpecs(
     decimal? Weight,
     WeightUnit WeightUnit);
 
-public sealed record PublicPhoto(byte[] Bytes, string ContentType);

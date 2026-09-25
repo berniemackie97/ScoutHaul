@@ -1271,12 +1271,15 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                         .HasColumnType("bigint");
 
                     b.Property<byte[]>("OriginalBytes")
-                        .IsRequired()
                         .HasColumnType("bytea");
 
                     b.Property<string>("OriginalFileName")
                         .HasMaxLength(240)
                         .HasColumnType("character varying(240)");
+
+                    b.Property<string>("OriginalObjectKey")
+                        .HasMaxLength(400)
+                        .HasColumnType("character varying(400)");
 
                     b.Property<int>("SortOrder")
                         .HasColumnType("integer");
@@ -1289,8 +1292,11 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                         .HasColumnType("bigint");
 
                     b.Property<byte[]>("ThumbnailBytes")
-                        .IsRequired()
                         .HasColumnType("bytea");
+
+                    b.Property<string>("ThumbnailObjectKey")
+                        .HasMaxLength(400)
+                        .HasColumnType("character varying(400)");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
