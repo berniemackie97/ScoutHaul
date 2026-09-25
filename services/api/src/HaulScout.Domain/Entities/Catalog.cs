@@ -202,8 +202,21 @@ public sealed class InventoryPhoto : EntityBase, IOrganizationScoped
     public string? SourceUrl { get; set; }
     public string? OriginalFileName { get; set; }
     public required string ContentType { get; set; }
-    public required byte[] OriginalBytes { get; set; }
-    public required byte[] ThumbnailBytes { get; set; }
+
+    /// <summary>
+    /// The image itself, held in the database. It is null once the photo lives in object storage, which is where
+    /// photos are kept when one is configured: image bytes are by far the largest thing this schema stores, and
+    /// every one of them would otherwise be carried by every backup, restore and write-ahead log record.
+    /// </summary>
+    public byte[]? OriginalBytes { get; set; }
+    public byte[]? ThumbnailBytes { get; set; }
+
+    /// <summary>
+    /// Where the image lives in object storage, or null while it is still held in the database. Exactly one of the
+    /// two is set for each of the original and the thumbnail.
+    /// </summary>
+    public string? OriginalObjectKey { get; set; }
+    public string? ThumbnailObjectKey { get; set; }
     public long OriginalByteSize { get; set; }
     public long ThumbnailByteSize { get; set; }
     public int? Width { get; set; }

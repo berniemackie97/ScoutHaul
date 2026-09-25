@@ -31,6 +31,7 @@ public sealed class InventoryPhotoSyncService(
     IInventoryPhotoSyncStore store,
     IRemoteImageFetcher remoteImages,
     IInventoryPhotoProcessor processor,
+    IInventoryPhotoBlobStore blobs,
     TimeProvider clock)
 {
     /// <summary>Takes the listings waiting longest and puts their photos onto their items.</summary>
@@ -124,6 +125,7 @@ public sealed class InventoryPhotoSyncService(
         List<InventoryPhoto> letGo = before.Where(photo => !ordered.Contains(photo)).ToList();
         foreach (InventoryPhoto photo in letGo)
         {
+            await blobs.ForgetAsync(photo, cancellationToken);
             store.RemovePhoto(photo);
             item.Photos.Remove(photo);
         }
@@ -150,20 +152,20 @@ public sealed class InventoryPhotoSyncService(
             PhotoUpload upload = await remoteImages.FetchAsync(address, cancellationToken);
             await using Stream content = upload.Content;
             ProcessedPhoto processed = await processor.ProcessAsync(upload, cancellationToken, ListingPhotoRules.MaxPixels);
-            return new InventoryPhoto
+            InventoryPhoto photo = new()
             {
                 OrganizationId = item.OrganizationId,
                 InventoryItemId = item.Id,
                 SourceUrl = address,
                 OriginalFileName = processed.OriginalFileName,
                 ContentType = processed.ContentType,
-                OriginalBytes = processed.OriginalBytes,
-                ThumbnailBytes = processed.ThumbnailBytes,
                 OriginalByteSize = processed.OriginalByteSize,
                 ThumbnailByteSize = processed.ThumbnailByteSize,
                 Width = processed.Width,
                 Height = processed.Height,
             };
+            await blobs.StoreAsync(photo, processed, cancellationToken);
+            return photo;
         }
         catch (RemoteImageFetchException)
         {

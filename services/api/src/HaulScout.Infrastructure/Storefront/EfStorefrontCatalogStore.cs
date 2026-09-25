@@ -127,7 +127,7 @@ public sealed class EfStorefrontCatalogStore(HaulScoutDbContext db) : IStorefron
     /// photo can never outlive its listing's visibility. Org-agnostic and filter-free on purpose: browsers fetch
     /// images without the store header, and the photo id is unguessable.
     /// </summary>
-    public Task<PublicPhoto?> FindPublicPhotoAsync(Guid photoId, bool fullSize, CancellationToken cancellationToken) =>
+    public Task<InventoryPhoto?> FindPublicPhotoAsync(Guid photoId, CancellationToken cancellationToken) =>
         db.InventoryPhotos
             .IgnoreQueryFilters()
             .Where(photo => photo.Id == photoId
@@ -136,9 +136,6 @@ public sealed class EfStorefrontCatalogStore(HaulScoutDbContext db) : IStorefron
                     listing.InventoryItemId == photo.InventoryItemId
                     && listing.Status != StoreListingStatus.Draft
                     && listing.Status != StoreListingStatus.Archived))
-            .Select(photo => new PublicPhoto(
-                fullSize ? photo.OriginalBytes : photo.ThumbnailBytes,
-                fullSize ? photo.ContentType : "image/jpeg"))
             .FirstOrDefaultAsync(cancellationToken);
 
     /// <summary>What shoppers browse: Active listings only. Reserved/Sold stay reachable by direct link.</summary>

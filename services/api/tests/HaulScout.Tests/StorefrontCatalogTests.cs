@@ -11,6 +11,8 @@ using HaulScout.Domain.Entities;
 using HaulScout.Infrastructure.Persistence;
 using HaulScout.Infrastructure.Storefront;
 
+using HaulScout.Infrastructure.Inventory;
+
 namespace HaulScout.Tests;
 
 public class StorefrontCatalogTests
@@ -19,7 +21,7 @@ public class StorefrontCatalogTests
     {
         StorefrontController controller = new(
             new StorefrontStoreResolver(new EfStoreDirectory(db), tenant),
-            new StorefrontCatalogService(new EfStorefrontCatalogStore(db)));
+            new StorefrontCatalogService(new EfStorefrontCatalogStore(db), new DatabaseInventoryPhotoBlobStore()));
         DefaultHttpContext httpContext = new();
         if (storeHeader is Guid id)
         {

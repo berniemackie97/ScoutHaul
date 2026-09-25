@@ -1,3 +1,5 @@
+using Amazon.Runtime;
+using Amazon.S3;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -75,12 +77,42 @@ public static class DependencyInjection
         services.AddScoped<IPlatformOrderImportStore>(services => services.GetRequiredService<EfPlatformOrderStore>());
         services.AddScoped<IPlatformOrderFeeEnrichmentStore>(services => services.GetRequiredService<EfPlatformOrderStore>());
         services.AddScoped<IMarketplaceRefundImportStore>(services => services.GetRequiredService<EfPlatformOrderStore>());
+        services.AddScoped<IInventoryPhotoBackfillStore, EfInventoryPhotoBackfillStore>();
         services.AddScoped<IPlatformOrderSuggestionStore, EfPlatformOrderSuggestionStore>();
         services.AddScoped<IReferenceOverrideStore, EfReferenceOverrideStore>();
         services.AddScoped<ISalesChannelStore, EfSalesChannelStore>();
         services.AddScoped<ISessionBootstrapStore, EfSessionBootstrapStore>();
         services.AddScoped<IStoreSettingsStore, EfStoreSettingsStore>();
         services.AddHttpClient<IOrganizationInviteSender, SupabaseOrganizationInviteSender>();
+
+        // Where photo images live. Configuring a bucket moves them out of the database, which is what a deployment
+        // syncing whole wardrobes needs: image bytes are the only rows here that grow without limit, and in Postgres
+        // every one of them is carried by every backup, restore and write-ahead log record.
+        services.Configure<PhotoObjectStorageOptions>(configuration.GetSection(PhotoObjectStorageOptions.Section));
+        PhotoObjectStorageOptions photoStorage = new();
+        configuration.GetSection(PhotoObjectStorageOptions.Section).Bind(photoStorage);
+        if (photoStorage.IsConfigured)
+        {
+            if (photoStorage.DescribeMisconfiguration() is string problem)
+            {
+                throw new InvalidOperationException($"Photo object storage is misconfigured. {problem}");
+            }
+
+            services.AddSingleton<IAmazonS3>(_ => new AmazonS3Client(
+                new BasicAWSCredentials(photoStorage.AccessKeyId, photoStorage.SecretAccessKey),
+                new AmazonS3Config
+                {
+                    ServiceURL = photoStorage.ServiceUrl,
+                    AuthenticationRegion = photoStorage.Region,
+                    ForcePathStyle = true,
+                }));
+            services.AddSingleton<IPhotoObjectClient, S3PhotoObjectClient>();
+            services.AddScoped<IInventoryPhotoBlobStore, ObjectStoreInventoryPhotoBlobStore>();
+        }
+        else
+        {
+            services.AddScoped<IInventoryPhotoBlobStore, DatabaseInventoryPhotoBlobStore>();
+        }
 
         // Photo import by URL — fetches an image from an operator-pasted link (their live listing).
         // Short timeout + no redirect-follow-limit surprises: a paste should fail fast, not hang.

@@ -121,7 +121,7 @@ public sealed class InventoryController(
     [ResponseCache(Duration = 86400, Location = ResponseCacheLocation.Client)]
     public async Task<IActionResult> GetPhotoThumbnail(Guid id, Guid photoId, CancellationToken cancellationToken)
     {
-        InventoryPhotoWorkflowService.InventoryPhotoFile? photo = await photos.GetThumbnailAsync(id, photoId, cancellationToken);
+        PhotoBytes? photo = await photos.GetThumbnailAsync(id, photoId, cancellationToken);
         return photo is null ? NotFound() : File(photo.Bytes, photo.ContentType);
     }
 
@@ -130,7 +130,7 @@ public sealed class InventoryController(
     [ResponseCache(Duration = 86400, Location = ResponseCacheLocation.Client)]
     public async Task<IActionResult> GetPhotoOriginal(Guid id, Guid photoId, CancellationToken cancellationToken)
     {
-        InventoryPhotoWorkflowService.InventoryPhotoFile? photo = await photos.GetOriginalAsync(id, photoId, cancellationToken);
+        PhotoBytes? photo = await photos.GetOriginalAsync(id, photoId, cancellationToken);
         return photo is null ? NotFound() : File(photo.Bytes, photo.ContentType);
     }
 

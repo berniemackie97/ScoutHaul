@@ -9,10 +9,9 @@ public sealed class InventoryPhotoWorkflowService(
     IInventoryPhotoStore photos,
     ICurrentUserContext currentUser,
     IInventoryPhotoProcessor photoStorage,
+    IInventoryPhotoBlobStore blobs,
     IRemoteImageFetcher remoteImages)
 {
-    public sealed record InventoryPhotoFile(byte[] Bytes, string ContentType);
-
     /// <summary>
     /// Attaches an image that lives on the web (the operator's own listing on eBay/Vinted/etc.) by URL,
     /// so photos don't have to be saved to a device first. The bytes are fetched, then handed to the
@@ -92,14 +91,13 @@ public sealed class InventoryPhotoWorkflowService(
             SortOrder = item.Photos.Count == 0 ? 0 : item.Photos.Max(existing => existing.SortOrder) + 1,
             OriginalFileName = processed.OriginalFileName,
             ContentType = processed.ContentType,
-            OriginalBytes = processed.OriginalBytes,
-            ThumbnailBytes = processed.ThumbnailBytes,
             OriginalByteSize = processed.OriginalByteSize,
             ThumbnailByteSize = processed.ThumbnailByteSize,
             Width = processed.Width,
             Height = processed.Height
         };
 
+        await blobs.StoreAsync(photo, processed, cancellationToken);
         await photos.AddAsync(photo, cancellationToken);
 
         List<string> photoUrls = InventoryPhotoSet.ParseReferences(item.PhotoLocalReferencesJson);
@@ -141,6 +139,7 @@ public sealed class InventoryPhotoWorkflowService(
         InventoryPhoto? photo = ResolvePhotoByUrl(item, url);
         if (photo is not null)
         {
+            await blobs.ForgetAsync(photo, cancellationToken);
             photos.Remove(photo);
         }
 
@@ -252,6 +251,7 @@ public sealed class InventoryPhotoWorkflowService(
             return AppResult<InventoryPhotoUploadResultDto>.NotFound("Photo was not found on this inventory item.");
         }
 
+        await blobs.ForgetAsync(photo, cancellationToken);
         photos.Remove(photo);
         List<string> photoUrls = InventoryPhotoSet.ParseReferences(item.PhotoLocalReferencesJson);
         photoUrls.RemoveAll(existing =>
@@ -277,16 +277,16 @@ public sealed class InventoryPhotoWorkflowService(
             new InventoryPhotoUploadResultDto(item.Id, photoUrls, UploadedUrl: null, InventoryPhotoSet.Ordered(item).Where(candidate => candidate.Id != photo.Id).Select(candidate => candidate.ToDto()).ToArray()));
     }
 
-    public async Task<InventoryPhotoFile?> GetThumbnailAsync(Guid itemId, Guid photoId, CancellationToken cancellationToken)
+    public async Task<PhotoBytes?> GetThumbnailAsync(Guid itemId, Guid photoId, CancellationToken cancellationToken)
     {
         InventoryPhoto? photo = await FindPhotoUnscopedAsync(itemId, photoId, cancellationToken);
-        return photo is null ? null : new InventoryPhotoFile(photo.ThumbnailBytes, "image/jpeg");
+        return photo is null ? null : await blobs.ReadThumbnailAsync(photo, cancellationToken);
     }
 
-    public async Task<InventoryPhotoFile?> GetOriginalAsync(Guid itemId, Guid photoId, CancellationToken cancellationToken)
+    public async Task<PhotoBytes?> GetOriginalAsync(Guid itemId, Guid photoId, CancellationToken cancellationToken)
     {
         InventoryPhoto? photo = await FindPhotoUnscopedAsync(itemId, photoId, cancellationToken);
-        return photo is null ? null : new InventoryPhotoFile(photo.OriginalBytes, photo.ContentType);
+        return photo is null ? null : await blobs.ReadOriginalAsync(photo, cancellationToken);
     }
 
     private Task<InventoryItem?> FindItemAsync(Guid id, CancellationToken cancellationToken) =>

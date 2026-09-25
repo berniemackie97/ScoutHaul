@@ -32,6 +32,35 @@ Required live events:
 
 The storefront does not need a Stripe publishable key because checkout uses Stripe-hosted Checkout Sessions.
 
+## Photo storage
+
+Photo images are kept in the database until an object storage bucket is configured, and in the bucket after that.
+Both are read through the same port, and reads fall back to the database, so turning it on is a setting rather than
+a migration: existing photos keep serving while a background worker moves them across.
+
+| Variable | Example | Notes |
+| --- | --- | --- |
+| `Storage__Photos__ObjectStorage__Bucket` | `haulscout-photos` | Setting this is what enables object storage. |
+| `Storage__Photos__ObjectStorage__ServiceUrl` | `https://<account-id>.r2.cloudflarestorage.com` | Must be https. |
+| `Storage__Photos__ObjectStorage__AccessKeyId` | | From the bucket's own API token. |
+| `Storage__Photos__ObjectStorage__SecretAccessKey` | | Never leaves Railway. |
+| `Storage__Photos__ObjectStorage__Region` | `auto` | Optional; `auto` is the default and is what R2 wants. |
+| `Storage__Photos__ObjectStorage__Prefix` | `production` | Optional; lets one bucket hold more than one environment. |
+
+Set the credentials **before** the bucket. A bucket configured without credentials is refused at startup, on purpose
+— a deployment that cannot store photos should fail loudly rather than write them somewhere unintended.
+
+The bucket stays private. Images are served by the API from its existing photo routes, so nothing in the storefront
+or the admin app changes, and a bucket that is never public cannot leak one organization's photos to another.
+
+Moving existing photos is done by the backfill worker, which stops for good once the backlog is empty
+(`Storage__Photos__Backfill__Enabled` turns it off). The space those images occupied is not returned to the volume
+until the table is rewritten, which is an operator's choice of moment:
+
+```sql
+VACUUM FULL "InventoryPhotos";
+```
+
 ## Local profiles
 
 Profile files are gitignored and should stay local:
