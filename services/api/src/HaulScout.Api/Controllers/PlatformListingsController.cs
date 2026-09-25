@@ -13,6 +13,8 @@ using HaulScout.Domain;
 using HaulScout.Domain.Entities;
 using HaulScout.Infrastructure.Persistence;
 
+using HaulScout.Application.Inventory;
+
 namespace HaulScout.Api.Controllers;
 
 /// <summary>
@@ -234,6 +236,9 @@ public sealed class PlatformListingsController(
         channelListing.Quantity = listing.Quantity;
         channelListing.ListedAt ??= listing.ListedAt;
         channelListing.LastSyncedAt = DateTimeOffset.UtcNow;
+
+        // The listing knows things about the item that nobody has typed in yet.
+        ListingDetailFill.Apply(item, listing);
 
         listing.ReconcileStatus = PlatformListingReconcileStatus.Linked;
         listing.ReconciledInventoryItemId = item.Id;

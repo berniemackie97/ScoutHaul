@@ -141,11 +141,19 @@ export function profileJson(username: string | null): string {
  * `data-zoom-src`, and — deliberately — a seller avatar and a recommended listing's picture, neither of which
  * belongs to this listing.
  */
-export function itemPage(photoIds: string[]): string {
+export function itemPage(photoIds: string[], specifics: Record<string, string> = {}): string {
   const buttons = photoIds
     .map((id, index) => `<button class=ux-image-grid-item data-idx=${index} data-zoom-src=https://i.ebayimg.com/images/g/${id}/s-l1600.jpg><img src=https://i.ebayimg.com/images/g/${id}/s-l140.webp></button>`)
     .join("");
   const avatar = `<div class=avatar><img alt src=https://i.ebayimg.com/images/g/AVATARxxxxxxxxxx/s-l64.jpg></div>`;
   const recommended = `<li class=item><img src=https://i.ebayimg.com/images/g/OTHERLISTINGxxxx/s-l300.jpg></li>`;
-  return `<html><body><div class=ux-image-carousel>${buttons}</div>${avatar}${recommended}</body></html>`;
+  // eBay publishes its item specifics as structured data, alongside a page-level block that is not the product.
+  const product = JSON.stringify({
+    "@type": "Product",
+    "@context": "https://schema.org",
+    name: "An item",
+    additionalProperty: Object.entries(specifics).map(([name, value]) => ({ "@type": "PropertyValue", name, value })),
+  });
+  const structured = `<script type="application/ld+json">{"@type":"ItemPage"}</script><script type="application/ld+json">${product}</script>`;
+  return `<html><body>${structured}<div class=ux-image-carousel>${buttons}</div>${avatar}${recommended}</body></html>`;
 }

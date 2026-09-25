@@ -125,6 +125,21 @@ public sealed class PlatformListingImportService(HaulScoutDbContext db, ICurrent
             .Include(listing => listing.ReconciledInventoryItem)
             .Where(listing => listing.OrganizationId == currentUser.OrganizationId && touched.Contains(listing.Id))
             .ToListAsync(cancellationToken);
+        // A listing already linked to an item hands over what that item does not know about itself yet.
+        bool filled = false;
+        foreach (PlatformListing listing in refreshed)
+        {
+            if (listing.ReconciledInventoryItem is InventoryItem linked)
+            {
+                filled |= ListingDetailFill.Apply(linked, listing);
+            }
+        }
+
+        if (filled)
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+
         Dictionary<Guid, (Guid Id, string Title, bool AlreadySold)> suggestions = await BuildSuggestions(refreshed, cancellationToken);
         List<PlatformListingDto> dtos = refreshed.Select(listing => listing.ToDto(Suggestion(suggestions, listing))).ToList();
         return AppResult<IngestPlatformListingsResultDto>.Ok(new IngestPlatformListingsResultDto(created, updated, skipped, dtos, unchanged));
@@ -284,6 +299,13 @@ public sealed class PlatformListingImportService(HaulScoutDbContext db, ICurrent
         listing.Sku = TrimToNull(input.Sku);
         listing.CategoryName = TrimToNull(input.CategoryName);
         listing.Condition = TrimToNull(input.Condition);
+
+        // A source that does not carry a detail sends null, which leaves what is known alone; only a source that
+        // reads it may change it.
+        listing.Description = TrimToNull(input.Description) ?? listing.Description;
+        listing.Brand = TrimToNull(input.Brand) ?? listing.Brand;
+        listing.Color = TrimToNull(input.Color) ?? listing.Color;
+        listing.Size = TrimToNull(input.Size) ?? listing.Size;
         listing.Url = TrimToNull(input.Url);
         listing.PrimaryImageUrl = TrimToNull(input.PrimaryImageUrl);
         listing.ListedAt = input.ListedAt;
