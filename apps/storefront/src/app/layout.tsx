@@ -1,28 +1,34 @@
 import type { Metadata } from "next";
-import { Source_Serif_4, Source_Sans_3, Source_Code_Pro } from "next/font/google";
+import localFont from "next/font/local";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { STORE } from "@/lib/store";
 import "@overhaul/ui/globals.css";
 
-const serif = Source_Serif_4({
-  subsets: ["latin"],
+// Served from this app, not from Google: a build that reaches a third party's CDN fails when that CDN does, and
+// the fonts are the brand. Variable files, so every weight the design uses costs one request.
+const serif = localFont({
+  src: [
+    { path: "./fonts/source-serif-4.woff2", weight: "200 900", style: "normal" },
+    { path: "./fonts/source-serif-4-italic.woff2", weight: "200 900", style: "italic" },
+  ],
   variable: "--font-serif",
   display: "swap",
-  weight: ["400", "500", "600", "700"],
 });
 
-const sans = Source_Sans_3({
-  subsets: ["latin"],
+const sans = localFont({
+  src: [
+    { path: "./fonts/source-sans-3.woff2", weight: "200 900", style: "normal" },
+    { path: "./fonts/source-sans-3-italic.woff2", weight: "200 900", style: "italic" },
+  ],
   variable: "--font-sans",
   display: "swap",
 });
 
-const mono = Source_Code_Pro({
-  subsets: ["latin"],
+const mono = localFont({
+  src: [{ path: "./fonts/source-code-pro.woff2", weight: "200 900", style: "normal" }],
   variable: "--font-mono",
   display: "swap",
-  weight: ["400", "500", "600"],
 });
 
 export const metadata: Metadata = {

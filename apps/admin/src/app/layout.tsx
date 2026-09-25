@@ -1,18 +1,21 @@
 import type { Metadata, Viewport } from "next";
-import { Source_Sans_3, Source_Code_Pro } from "next/font/google";
+import localFont from "next/font/local";
 import "@overhaul/ui/globals.css";
 
-const sans = Source_Sans_3({
-  subsets: ["latin"],
+// Served from this app, not from Google: a build that reaches a third party's CDN fails when that CDN does.
+const sans = localFont({
+  src: [
+    { path: "./fonts/source-sans-3.woff2", weight: "200 900", style: "normal" },
+    { path: "./fonts/source-sans-3-italic.woff2", weight: "200 900", style: "italic" },
+  ],
   variable: "--font-sans",
   display: "swap",
 });
 
-const mono = Source_Code_Pro({
-  subsets: ["latin"],
+const mono = localFont({
+  src: [{ path: "./fonts/source-code-pro.woff2", weight: "200 900", style: "normal" }],
   variable: "--font-mono",
   display: "swap",
-  weight: ["400", "500", "600"],
 });
 
 export const metadata: Metadata = {
