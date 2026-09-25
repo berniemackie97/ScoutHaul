@@ -264,6 +264,15 @@ public sealed class PlatformOrderIngestionService(
         order.OrderedAt = input.OrderedAt;
         order.PaidAt = input.PaidAt ?? order.PaidAt;
         order.ShippedAt = input.ShippedAt ?? order.ShippedAt;
+        order.DeliveredAt = input.DeliveredAt ?? order.DeliveredAt;
+
+        // A marketplace only moves an order forward. A scan that read an older page must not walk it back.
+        if (input.FulfillmentStage > order.FulfillmentStage)
+        {
+            order.FulfillmentStage = input.FulfillmentStage;
+        }
+
+        order.FulfillmentDetail = Text.TrimToNull(input.FulfillmentDetail) ?? order.FulfillmentDetail;
         order.ItemsSubtotal = input.ItemsSubtotal;
         order.ShippingCharged = input.ShippingCharged;
         order.TaxCollected = input.TaxCollected;

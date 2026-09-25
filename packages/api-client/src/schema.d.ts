@@ -9675,6 +9675,10 @@ export interface components {
             paidAt?: string | null;
             /** Format: date-time */
             shippedAt?: string | null;
+            /** Format: date-time */
+            deliveredAt?: string | null;
+            fulfillmentStage?: components["schemas"]["PlatformFulfillmentStage"];
+            fulfillmentDetail?: string | null;
             feeBreakdownJson?: string | null;
             rawJson?: string | null;
             feesPending?: boolean;
@@ -10392,6 +10396,8 @@ export interface components {
         PermissionCatalogDto: {
             permissions?: string[] | null;
         };
+        /** @enum {string} */
+        PlatformFulfillmentStage: "Unknown" | "NeedsShipping" | "LabelCreated" | "Shipped" | "Delivered";
         PlatformListingDto: {
             /** Format: uuid */
             id?: string;
@@ -10531,6 +10537,10 @@ export interface components {
             paidAt?: string | null;
             /** Format: date-time */
             shippedAt?: string | null;
+            /** Format: date-time */
+            deliveredAt?: string | null;
+            fulfillmentStage?: components["schemas"]["PlatformFulfillmentStage"];
+            fulfillmentDetail?: string | null;
             status?: components["schemas"]["PlatformOrderStatus"];
             /** Format: uuid */
             reconciledSaleGroupId?: string | null;

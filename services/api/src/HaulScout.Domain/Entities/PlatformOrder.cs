@@ -40,6 +40,12 @@ public sealed class PlatformOrder : EntityBase, IOrganizationScoped
     public DateTimeOffset OrderedAt { get; set; }
     public DateTimeOffset? PaidAt { get; set; }
     public DateTimeOffset? ShippedAt { get; set; }
+    public DateTimeOffset? DeliveredAt { get; set; }
+
+    public PlatformFulfillmentStage FulfillmentStage { get; set; } = PlatformFulfillmentStage.Unknown;
+
+    /// <summary>The marketplace's own words for that stage ("Carrier scan Sep 24"), shown as it wrote them.</summary>
+    public string? FulfillmentDetail { get; set; }
 
     // Exactly as the platform reports them.
     public decimal ItemsSubtotal { get; set; }

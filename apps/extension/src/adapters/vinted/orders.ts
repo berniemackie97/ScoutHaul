@@ -1,4 +1,4 @@
-import type { IngestOrder, IngestOrderLine, RunIssue } from "../../agent/types";
+import type { FulfillmentStage, IngestOrder, IngestOrderLine, RunIssue } from "../../agent/types";
 import { cents } from "../amounts";
 
 /** Money as Vinted's API writes it: `{ amount: "8.5", currency_code: "USD" }`. */
@@ -41,6 +41,34 @@ export interface VintedTransaction {
       items?: { id?: number | string; title?: string | null; price?: VintedMoney | null }[] | null;
     } | null;
   };
+}
+
+/**
+ * How far Vinted says a parcel has got, from the shipment's own words ("Package delivered.") and, failing that,
+ * the order's ("Payment successful!" — paid for, not yet sent). A phrase this does not know is reported as nothing
+ * rather than guessed at.
+ */
+export function fulfillment(row: VintedOrderRow, shipment: string | null): { stage: FulfillmentStage; detail: string | null } {
+  const detail = shipment ?? row.status ?? null;
+  const words = `${shipment ?? ""} ${row.status ?? ""}`;
+
+  if (/delivered|buyer accepted/i.test(words)) {
+    return { stage: "Delivered", detail };
+  }
+
+  if (/on its way|in transit|shipped|sent|handed over|collected/i.test(words)) {
+    return { stage: "Shipped", detail };
+  }
+
+  if (/label|ready to ship|print/i.test(words)) {
+    return { stage: "LabelCreated", detail };
+  }
+
+  if (/payment successful|waiting for the seller|to be shipped|awaiting/i.test(words)) {
+    return { stage: "NeedsShipping", detail };
+  }
+
+  return { stage: "Unknown", detail };
 }
 
 /** Where a sale stands: under way, done and paid out, or called off. */
@@ -134,6 +162,7 @@ export function toIngestOrder(row: VintedOrderRow, detail: VintedTransaction): {
   const ownShipping = transaction.order?.custom_shipment === true;
   const shipping = ownShipping ? amount(transaction.order?.custom_shipment_price) ?? 0 : 0;
   const completed = saleState(row) === "completed";
+  const stage = fulfillment(row, transaction.shipment?.status_title || null);
   return {
     order: {
       externalOrderId: id,
@@ -152,6 +181,8 @@ export function toIngestOrder(row: VintedOrderRow, detail: VintedTransaction): {
       platform: "Vinted",
       lines,
       buyerReference: transaction.buyer?.login ?? null,
+      fulfillmentStage: stage.stage,
+      fulfillmentDetail: stage.detail,
       rawJson: JSON.stringify({ status: row.status ?? null, sellerStatus: row.transaction_user_status ?? null, shipment: transaction.shipment?.status_title || null }),
     },
     issues,

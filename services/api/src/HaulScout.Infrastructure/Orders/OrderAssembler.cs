@@ -40,7 +40,8 @@ public sealed class OrderAssembler(HaulScoutDbContext db, ICurrentUserContext cu
         string? shipToPostalCode = null,
         string? shipToCountry = null,
         DateTimeOffset? paidAt = null,
-        DateTimeOffset? shippedAt = null)
+        DateTimeOffset? shippedAt = null,
+        DateTimeOffset? deliveredAt = null)
     {
         string? normalizedExternalOrderId = TrimToNull(externalOrderId);
         string? normalizedTrackingNumber = TrimToNull(trackingNumber);
@@ -78,11 +79,17 @@ public sealed class OrderAssembler(HaulScoutDbContext db, ICurrentUserContext cu
             existing.ExternalOrderUrl ??= TrimToNull(externalOrderUrl);
             existing.BuyerReference ??= TrimToNull(buyerReference);
             existing.ChannelAccountId ??= channelAccountId;
-            existing.ShippingCarrier ??= normalizedCarrier;
-            existing.TrackingNumber ??= normalizedTrackingNumber;
             existing.CustomerNote ??= TrimToNull(buyerNote);
             existing.PaidAt ??= paidAt ?? orderedAt;
-            existing.ShippedAt ??= shippedAt;
+
+            // Getting an order to the buyer is the one part of it that keeps changing: a label is bought, a carrier
+            // scans it, it arrives. These are the marketplace's facts about its own order, so a later scan that
+            // knows more replaces what an earlier one knew — but a scan that knows nothing never erases anything.
+            existing.ShippingCarrier = normalizedCarrier ?? existing.ShippingCarrier;
+            existing.TrackingNumber = normalizedTrackingNumber ?? existing.TrackingNumber;
+            existing.ShippedAt = shippedAt ?? existing.ShippedAt;
+            existing.DeliveredAt = deliveredAt ?? existing.DeliveredAt;
+            AdvanceFulfillment(existing);
             ApplyShipTo(existing, shipToName, shipToPhone, shipToLine1, shipToLine2, shipToCity, shipToRegion, shipToPostalCode, shipToCountry);
             return existing;
         }
@@ -111,6 +118,8 @@ public sealed class OrderAssembler(HaulScoutDbContext db, ICurrentUserContext cu
             CreatedAt = orderedAt,
             ShippingCarrier = normalizedCarrier,
             TrackingNumber = normalizedTrackingNumber,
+            ShippedAt = shippedAt,
+            DeliveredAt = deliveredAt,
             CustomerNote = TrimToNull(buyerNote),
             ShipToName = TrimToNull(shipToName),
             ShipToLine1 = TrimToNull(shipToLine1),
@@ -119,10 +128,22 @@ public sealed class OrderAssembler(HaulScoutDbContext db, ICurrentUserContext cu
             ShipToRegion = TrimToNull(shipToRegion),
             ShipToPostalCode = TrimToNull(shipToPostalCode),
             ShipToCountry = NormalizeCountry(shipToCountry),
-            ShippedAt = shippedAt,
         };
+        AdvanceFulfillment(order);
         db.Orders.Add(order);
         return order;
+    }
+
+    /// <summary>
+    /// An order the marketplace has shipped or delivered is fulfilled. Only ever forwards: a scan cannot un-ship an
+    /// order someone has already marked as gone.
+    /// </summary>
+    private static void AdvanceFulfillment(Order order)
+    {
+        if (order.FulfillmentStatus != FulfillmentStatus.Fulfilled && (order.ShippedAt is not null || order.DeliveredAt is not null))
+        {
+            order.FulfillmentStatus = FulfillmentStatus.Fulfilled;
+        }
     }
 
     /// <summary>

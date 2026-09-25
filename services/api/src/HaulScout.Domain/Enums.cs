@@ -355,6 +355,19 @@ public enum FulfillmentStatus
     Fulfilled
 }
 
+/// <summary>
+/// How far a marketplace says an order has got. Deliberately small: every marketplace has its own wording, and an
+/// adapter that cannot place a phrase reports nothing rather than guessing.
+/// </summary>
+public enum PlatformFulfillmentStage
+{
+    Unknown,
+    NeedsShipping,
+    LabelCreated,
+    Shipped,
+    Delivered
+}
+
 public enum ReviewStatus
 {
     Pending,

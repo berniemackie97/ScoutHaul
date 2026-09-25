@@ -2409,6 +2409,9 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                         .HasMaxLength(3)
                         .HasColumnType("character varying(3)");
 
+                    b.Property<DateTimeOffset?>("DeliveredAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("ExternalOrderId")
                         .IsRequired()
                         .HasMaxLength(120)
@@ -2425,6 +2428,13 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValue(false);
+
+                    b.Property<string>("FulfillmentDetail")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int>("FulfillmentStage")
+                        .HasColumnType("integer");
 
                     b.Property<decimal>("ItemsSubtotal")
                         .HasPrecision(12, 2)

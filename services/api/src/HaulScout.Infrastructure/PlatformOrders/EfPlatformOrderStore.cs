@@ -178,7 +178,8 @@ public sealed class EfPlatformOrderStore(
             platformOrder.ShipToPostalCode,
             platformOrder.ShipToCountry,
             platformOrder.PaidAt,
-            platformOrder.ShippedAt);
+            platformOrder.ShippedAt,
+            platformOrder.DeliveredAt);
 
     public async Task<IReadOnlyList<Sale>> ListExistingSalesForReconciliationAsync(
         Guid organizationId,
