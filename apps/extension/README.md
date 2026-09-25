@@ -91,8 +91,20 @@ connect your browser to someone else's organization.
 ```bash
 pnpm --filter @overhaul/extension dev          # Firefox, against the local API (localhost:5080) and portal (localhost:3001)
 pnpm --filter @overhaul/extension test
-pnpm --filter @overhaul/extension build        # Firefox, production → .output/firefox-mv3
-pnpm --filter @overhaul/extension build:chrome # Chrome/Edge, production → .output/chrome-mv3
+pnpm --filter @overhaul/extension release      # both browsers → apps/extension/dist (what you load)
+pnpm --filter @overhaul/extension build        # Firefox only → .output/firefox-mv3 (WXT's working copy)
+pnpm --filter @overhaul/extension build:chrome # Chrome/Edge only → .output/chrome-mv3
+```
+
+`release` is the one to run before loading the add-on. `.output/` is WXT's working directory — wiped
+and rewritten on every build — so it puts what you actually load in `dist/`, at the same path every
+time:
+
+```
+apps/extension/dist/
+  firefox/manifest.json      ← Load Temporary Add-on… picks this
+  haulscout-sync-<version>.xpi
+  chrome/                    ← chrome://extensions → Load unpacked
 ```
 
 To point a build at another API, set `WXT_API_ORIGIN`. For the portal, set `WXT_PORTAL_ORIGINS`
@@ -101,8 +113,13 @@ anywhere else cannot wake the extension, and its scans wait for the next heartbe
 defaults to the portal's Vercel address.
 
 **Load a build in Firefox for testing:** open `about:debugging#/runtime/this-firefox`, choose
-**Load Temporary Add-on…**, and pick `.output/firefox-mv3/manifest.json`. A temporary add-on is
-removed when Firefox restarts.
+**Load Temporary Add-on…**, and pick `dist/firefox/manifest.json`. A temporary add-on is removed when
+Firefox restarts; loading it again after a rebuild is the same two clicks, and the path never changes.
+
+**Why it cannot simply be installed:** `about:addons` → Install Add-on From File only accepts a
+*signed* add-on, so an unsigned build is refused there. Signing it (below) makes that route work and
+the add-on survive restarts; Firefox Developer Edition and ESR can also be told to accept unsigned
+builds (`about:config` → `xpinstall.signatures.required` → false).
 
 **Keep it installed:** a release build must be signed by Mozilla.
 1. Package it with `pnpm --filter @overhaul/extension zip`.
