@@ -1,8 +1,8 @@
-import type { IngestOrder, IngestOrderLine, RunIssue } from "../../agent/types";
+import type { FulfillmentStage, IngestOrder, IngestOrderLine, RunIssue } from "../../agent/types";
 import { dig, jsonAfter, spans } from "../embedded-json";
 import type { LedgerOrder } from "./ledger";
 import { cents } from "../amounts";
-import { money, saleTime } from "./text";
+import { dayFrom, money, saleTime } from "./text";
 
 /** One order as Seller Hub's order list carries it. */
 export interface EbayOrderRow {
@@ -92,6 +92,42 @@ function line(item: unknown): EbayOrderLine {
 }
 
 /**
+ * How far eBay says an order has got, from the words it puts in the order list: "Delivered Sep 22", "Shipped" with
+ * a sub-status of "Carrier scan Sep 24", and so on. A phrase this does not know is reported as nothing rather than
+ * guessed at, because a wrong stage is worse than an absent one.
+ */
+export function fulfillment(row: EbayOrderRow, now: Date): {
+  stage: FulfillmentStage;
+  detail: string | null;
+  shippedAt: string | null;
+  deliveredAt: string | null;
+} {
+  const status = row.status ?? "";
+  const detail = [row.status, row.subStatus].filter(Boolean).join(" — ") || null;
+
+  if (/^delivered/i.test(status)) {
+    const day = dayFrom(status, now);
+    return { stage: "Delivered", detail, shippedAt: null, deliveredAt: day ? day.toISOString() : null };
+  }
+
+  if (/^(shipped|in transit|out for delivery)/i.test(status)) {
+    // The sub-status carries the day the carrier first scanned it, which is the day it truly left.
+    const day = dayFrom(row.subStatus, now);
+    return { stage: "Shipped", detail, shippedAt: day ? day.toISOString() : null, deliveredAt: null };
+  }
+
+  if (/label (created|printed)|ready to ship/i.test(`${status} ${row.subStatus ?? ""}`)) {
+    return { stage: "LabelCreated", detail, shippedAt: null, deliveredAt: null };
+  }
+
+  if (/awaiting shipment|not shipped|needs? shipping|paid/i.test(status)) {
+    return { stage: "NeedsShipping", detail, shippedAt: null, deliveredAt: null };
+  }
+
+  return { stage: "Unknown", detail, shippedAt: null, deliveredAt: null };
+}
+
+/**
  * One order, as the landing ingest takes it: the order list's facts, with the money after the sale
  * taken from the seller's ledger. An order the ledger has not caught up with yet is sent with its
  * fees marked pending — never with fees of nought — and is completed by a later scan.
@@ -134,6 +170,7 @@ export function toIngestOrder(row: EbayOrderRow, ledger: LedgerOrder | undefined
   const adFees = ledger ? cents(ledger.adFees.reduce((sum, fee) => sum + fee, 0)) : 0;
   const transactionFees = posted ? cents(ledger!.gross! - ledger!.net!) : null;
 
+  const stage = fulfillment(row, now);
   const order: IngestOrder = {
     externalOrderId: row.orderId,
     orderedAt: orderedAt.toISOString(),
@@ -160,6 +197,10 @@ export function toIngestOrder(row: EbayOrderRow, ledger: LedgerOrder | undefined
     shipToPostalCode: row.postalCode,
     carrier: ledger?.carrier ?? null,
     trackingNumber: row.lines.map((item) => item.tracking).find((tracking) => tracking) ?? null,
+    fulfillmentStage: stage.stage,
+    fulfillmentDetail: stage.detail,
+    shippedAt: stage.shippedAt,
+    deliveredAt: stage.deliveredAt,
     rawJson: JSON.stringify({ status: row.status, subStatus: row.subStatus }),
   };
 

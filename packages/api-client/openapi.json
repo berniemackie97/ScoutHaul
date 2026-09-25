@@ -13226,6 +13226,18 @@
             "format": "date-time",
             "nullable": true
           },
+          "deliveredAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "fulfillmentStage": {
+            "$ref": "#/components/schemas/PlatformFulfillmentStage"
+          },
+          "fulfillmentDetail": {
+            "type": "string",
+            "nullable": true
+          },
           "feeBreakdownJson": {
             "type": "string",
             "nullable": true
@@ -15439,6 +15451,16 @@
         },
         "additionalProperties": false
       },
+      "PlatformFulfillmentStage": {
+        "enum": [
+          "Unknown",
+          "NeedsShipping",
+          "LabelCreated",
+          "Shipped",
+          "Delivered"
+        ],
+        "type": "string"
+      },
       "PlatformListingDto": {
         "type": "object",
         "properties": {
@@ -15852,6 +15874,18 @@
           "shippedAt": {
             "type": "string",
             "format": "date-time",
+            "nullable": true
+          },
+          "deliveredAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "fulfillmentStage": {
+            "$ref": "#/components/schemas/PlatformFulfillmentStage"
+          },
+          "fulfillmentDetail": {
+            "type": "string",
             "nullable": true
           },
           "status": {

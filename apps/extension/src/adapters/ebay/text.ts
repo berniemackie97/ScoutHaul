@@ -83,3 +83,27 @@ export function orderNumber(text: string): string | null {
 export function isoDay(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
+
+/**
+ * A day as eBay writes it beside a status — "Sep 22", or "Sep 22, 2025". No time of day is given, so the day is
+ * taken at noon UTC: near enough for a delivery date, and far enough from midnight that no time zone moves it.
+ * A day that would fall in the future belongs to last year.
+ */
+export function dayFrom(text: string | null | undefined, now: Date): Date | null {
+  const match = /([A-Za-z]{3})[a-z]*\.?\s+(\d{1,2})(?:,\s*(\d{4}))?/.exec((text ?? "").trim());
+  if (!match) {
+    return null;
+  }
+
+  const month = months[match[1]!.toLowerCase()];
+  if (month === undefined) {
+    return null;
+  }
+
+  const day = Number(match[2]);
+  const year = match[3] ? Number(match[3]) : now.getUTCFullYear();
+  const at = new Date(Date.UTC(year, month, day, 12));
+  return !match[3] && at.getTime() > now.getTime() + 2 * 24 * 60 * 60 * 1000
+    ? new Date(Date.UTC(year - 1, month, day, 12))
+    : at;
+}

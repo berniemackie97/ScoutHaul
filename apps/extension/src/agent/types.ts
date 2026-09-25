@@ -13,6 +13,7 @@ export type RunIssue = Schemas["AgentRunIssueInput"];
 export type IngestOrder = Schemas["IngestPlatformOrderInput"];
 export type IngestOrderLine = Schemas["IngestPlatformOrderLineInput"];
 export type IngestListing = Schemas["IngestPlatformListingInput"];
+export type FulfillmentStage = Schemas["PlatformFulfillmentStage"];
 export type SyncRun = Schemas["SyncRunDto"];
 export type LoopKind = Schemas["SyncLoopKind"];
 export type Trigger = Schemas["SyncTrigger"];
