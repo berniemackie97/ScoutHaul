@@ -1,19 +1,12 @@
 import type { IngestListing, RunIssue } from "../../agent/types";
 import { dig, jsonAfter, spans } from "../embedded-json";
+import { fullSize } from "./gallery";
 import { money } from "./text";
 
 const currencies: Record<string, string> = {
   EBAY_US: "USD", EBAY_MOTORS_US: "USD", EBAY_GB: "GBP", EBAY_CA: "CAD", EBAY_AU: "AUD",
   EBAY_DE: "EUR", EBAY_FR: "EUR", EBAY_IT: "EUR", EBAY_ES: "EUR", EBAY_IE: "EUR",
 };
-
-/**
- * eBay serves one picture at many sizes, named in the address: `s-l140.jpg` is the grid's thumbnail, and the same
- * picture at `s-l1600.jpg` is the one worth keeping. An address that is not named that way is left alone.
- */
-function fullSize(url: string): string {
-  return url.replace(/\/s-l\d+(\.\w+)(?=$|\?)/i, "/s-l1600$1");
-}
 
 /**
  * Reads Manage active listings (`/sh/lst/active`), whose grid the page embeds as JSON under
@@ -63,9 +56,9 @@ export function readListingsPage(html: string): { listings: IngestListing[]; iss
       sku: Array.isArray(sku) ? spans(sku[0]) : null,
       url: `https://www.ebay.com/itm/${id}`,
       primaryImageUrl: typeof image === "string" ? fullSize(image) : null,
-      // Manage active listings shows one picture per listing, so that is what a scan can bring back; the rest
-      // of a listing's gallery lives on its own page, which a scan does not open.
-      photoUrls: typeof image === "string" ? [fullSize(image)] : [],
+      // Left undefined: this grid carries one picture, and one picture is not a gallery. The item page is read
+      // separately for that, and until it has been, saying nothing leaves the item's photos alone.
+      photoUrls: undefined,
       listedAt: typeof startDate === "string" && !Number.isNaN(Date.parse(startDate)) ? new Date(startDate).toISOString() : null,
     });
   }

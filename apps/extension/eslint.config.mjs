@@ -7,7 +7,7 @@ import reactHooks from "eslint-plugin-react-hooks";
  */
 export default tseslint.config(
   // Built extensions (`firefox-mv3/` and the like, wherever they are unpacked) are output, not source.
-  { ignores: [".output/**", ".wxt/**", "node_modules/**", "coverage/**", "*-mv2/**", "*-mv3/**"] },
+  { ignores: [".output/**", ".wxt/**", "dist/**", "node_modules/**", "coverage/**", "*-mv2/**", "*-mv3/**"] },
   ...tseslint.configs.recommended,
   {
     plugins: { "react-hooks": reactHooks },
