@@ -5,6 +5,7 @@ import { AdapterError, type ListingsSnapshot, type MarketplaceAdapter, type Mark
 import { readLedgerPage, type LedgerOrder } from "./ledger";
 import { readGallery } from "./gallery";
 import { readListingsPage } from "./listings";
+import { readSpecifics } from "./specifics";
 import { readOrdersPage, toIngestOrder, type EbayOrderRow } from "./orders";
 import { assertReadable, siteChanged, unreadable } from "./pages";
 import { isoDay, saleTime } from "./text";
@@ -244,10 +245,12 @@ async function readGalleries(context: MarketplaceContext, listings: IngestListin
 
     budget--;
     let photos: string[];
+    let body = "";
     try {
       const response = await context.request(`${origin}/itm/${id}`);
       assertReadable(response);
-      photos = readGallery(response.body);
+      body = response.body;
+      photos = readGallery(body);
     } catch (error) {
       // A marketplace refusing or asking for a person is the whole scan's problem. Anything else is this one
       // listing's, and the listings themselves have already been read — so say so and stop asking for pictures.
@@ -258,6 +261,12 @@ async function readGalleries(context: MarketplaceContext, listings: IngestListin
       issues.push({ message: "This listing's pictures could not be read from its page.", externalReference: id, rejected: false });
       return;
     }
+
+    // The same page says what the thing is, so it is read while it is in hand.
+    const specifics = readSpecifics(body);
+    listing.brand = specifics.brand;
+    listing.color = specifics.color;
+    listing.size = specifics.size;
 
     if (photos.length === 0) {
       issues.push({ message: "This listing's pictures could not be read from its page.", externalReference: id, rejected: false });

@@ -138,6 +138,16 @@ describe("a Vinted listing", () => {
     expect(toIngestListing(wardrobeItem(4, { is_draft: true }))?.status).toBe("Draft");
     expect(toIngestListing(wardrobeItem(5, { price: null }))).toBeNull();
   });
+
+  it("hands over what Vinted says the thing is", () => {
+    // Vinted carries these on the wardrobe item itself, so they cost no extra request.
+    expect(toIngestListing(wardrobeItem(1, { brand: "Carhartt", size: "M" }))).toMatchObject({
+      brand: "Carhartt",
+      size: "M",
+      condition: "Very good",
+    });
+    expect(toIngestListing(wardrobeItem(2))).toMatchObject({ brand: null, size: null });
+  });
 });
 
 describe("scanning Vinted sales", () => {

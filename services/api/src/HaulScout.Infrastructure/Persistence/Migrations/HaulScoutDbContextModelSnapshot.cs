@@ -2106,12 +2106,20 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("Brand")
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)");
+
                     b.Property<string>("CategoryName")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
                     b.Property<Guid?>("ChannelAccountId")
                         .HasColumnType("uuid");
+
+                    b.Property<string>("Color")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
 
                     b.Property<string>("Condition")
                         .HasMaxLength(80)
@@ -2129,6 +2137,10 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(3)
                         .HasColumnType("character varying(3)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(8000)
+                        .HasColumnType("character varying(8000)");
 
                     b.Property<DateTimeOffset?>("EndsAt")
                         .HasColumnType("timestamp with time zone");
@@ -2207,6 +2219,10 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
 
                     b.Property<DateTimeOffset>("ScrapedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Size")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
 
                     b.Property<string>("Sku")
                         .HasMaxLength(120)

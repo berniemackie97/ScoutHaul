@@ -263,6 +263,20 @@ describe("the eBay adapter", () => {
     await expect(ebayAdapter.snapshotListings(eBay, seller)).rejects.toMatchObject({ kind: "Challenge" });
   });
 
+
+  it("brings back what the item page says the thing is, from the page it already read", async () => {
+    const eBay = context({
+      "/sh/lst/active": listingsPage([{ id: "377296454991", title: "Gucci Oxford Shirt", price: 249.99 }]),
+      "/itm/377296454991": itemPage(["AAA111", "BBB222"], { Brand: "Gucci", Color: "White", Size: "16" }),
+    });
+
+    const snapshot = await ebayAdapter.snapshotListings(eBay, seller);
+
+    expect(snapshot.listings[0]).toMatchObject({ brand: "Gucci", color: "White", size: "16" });
+    // One request for the page, serving both its pictures and its specifics.
+    expect(eBay.requested.filter((url) => url.includes("/itm/"))).toHaveLength(1);
+  });
+
   it("knows who the browser is signed in as, and when it is not", async () => {
     expect(await ebayAdapter.detectSession(context({ "/gh/user_profile": profileJson("overhaultradingcompany") })))
       .toEqual({ signedIn: true, username: "overhaultradingcompany", marketplaceUserId: null });

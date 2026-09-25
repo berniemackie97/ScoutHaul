@@ -9611,6 +9611,10 @@ export interface components {
             sku?: string | null;
             categoryName?: string | null;
             condition?: string | null;
+            description?: string | null;
+            brand?: string | null;
+            color?: string | null;
+            size?: string | null;
             url?: string | null;
             primaryImageUrl?: string | null;
             /** Format: date-time */

@@ -995,6 +995,10 @@ public sealed class HaulScoutDbContext(
             entity.Property(item => item.Sku).HasMaxLength(120);
             entity.Property(item => item.CategoryName).HasMaxLength(200);
             entity.Property(item => item.Condition).HasMaxLength(80);
+            entity.Property(item => item.Description).HasMaxLength(8000);
+            entity.Property(item => item.Brand).HasMaxLength(160);
+            entity.Property(item => item.Color).HasMaxLength(80);
+            entity.Property(item => item.Size).HasMaxLength(80);
             entity.Property(item => item.Url).HasMaxLength(500);
             entity.Property(item => item.PrimaryImageUrl).HasMaxLength(500);
             entity.Property(item => item.PhotoUrlsJson).HasColumnType("jsonb");

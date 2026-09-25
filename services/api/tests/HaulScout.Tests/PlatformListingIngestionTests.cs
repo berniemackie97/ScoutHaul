@@ -69,6 +69,48 @@ public class PlatformListingIngestionTests
         Assert.True(listing.PhotoUrlsChangedAt >= changed);
     }
 
+
+    [Fact]
+    public async Task A_linked_item_learns_what_its_listing_says_about_it()
+    {
+        (HaulScoutDbContext db, Guid org, Guid user) = NewContext(nameof(A_linked_item_learns_what_its_listing_says_about_it));
+        await using HaulScoutDbContext _ = db;
+        StubCurrentUser currentUser = new(org, user);
+        PlatformListingsController controller = new(db, currentUser, new PlatformListingImportService(db, currentUser));
+
+        InventoryItem item = new() { OrganizationId = org, Title = "Denim Jacket", Brand = "Levi's" };
+        db.InventoryItems.Add(item);
+        db.PlatformListings.Add(new PlatformListing
+        {
+            OrganizationId = org,
+            Platform = "eBay",
+            ExternalListingId = "EB-1",
+            Title = "Denim Jacket",
+            ReconcileStatus = PlatformListingReconcileStatus.Linked,
+            ReconciledInventoryItemId = item.Id,
+        });
+        await db.SaveChangesAsync();
+
+        await controller.Ingest(
+            new IngestPlatformListingsRequest("eBay", [
+                Listing("EB-1", "Denim Jacket", 40m) with
+                {
+                    Brand = "Wrangler",
+                    Color = "Indigo",
+                    Size = "L",
+                    Description = "A jacket.",
+                },
+            ]),
+            CancellationToken.None);
+
+        InventoryItem filled = await db.InventoryItems.SingleAsync();
+        Assert.Equal("Indigo", filled.Color);
+        Assert.Equal("L", filled.SizeValue);
+        Assert.Equal("A jacket.", filled.Description);
+        // The brand someone typed stands; the listing does not get to correct them.
+        Assert.Equal("Levi's", filled.Brand);
+    }
+
     [Fact]
     public async Task Ingest_creates_then_reingest_updates_in_place()
     {

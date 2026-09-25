@@ -36,6 +36,12 @@ public sealed class PlatformListing : EntityBase, IOrganizationScoped
     public string? Sku { get; set; }
     public string? CategoryName { get; set; }
     public string? Condition { get; set; }
+
+    /// <summary>What the listing says about the thing itself. Null means the source did not carry it.</summary>
+    public string? Description { get; set; }
+    public string? Brand { get; set; }
+    public string? Color { get; set; }
+    public string? Size { get; set; }
     public string? Url { get; set; }
     public string? PrimaryImageUrl { get; set; }
 
