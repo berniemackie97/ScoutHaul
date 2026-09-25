@@ -9719,21 +9719,10 @@
         }
       }
     },
-    "/api/sync/accounts/{accountId}/photos": {
+    "/api/sync/photos": {
       "put": {
         "tags": [
           "Sync"
-        ],
-        "parameters": [
-          {
-            "name": "accountId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
         ],
         "requestBody": {
           "content": {
@@ -19152,13 +19141,6 @@
               "$ref": "#/components/schemas/SyncSessionSeenDto"
             },
             "nullable": true
-          },
-          "photoSyncEnabled": {
-            "type": "boolean"
-          },
-          "photosWaiting": {
-            "type": "integer",
-            "format": "int32"
           }
         },
         "additionalProperties": false
@@ -19357,6 +19339,9 @@
               "$ref": "#/components/schemas/SyncPlatformSettingsDto"
             },
             "nullable": true
+          },
+          "photos": {
+            "$ref": "#/components/schemas/SyncPhotoSyncDto"
           }
         },
         "additionalProperties": false
@@ -19388,6 +19373,19 @@
           "Expired"
         ],
         "type": "string"
+      },
+      "SyncPhotoSyncDto": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "waiting": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
       },
       "SyncPlatformSettingsDto": {
         "type": "object",

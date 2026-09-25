@@ -69,9 +69,7 @@ public sealed class InventoryPhotoSyncService(
             return await FinishAsync(listing, now, error: null, cancellationToken);
         }
 
-        // An item listed on more than one marketplace takes its photos from the listing that shows the most of
-        // them, and the most recently changed of those. Every other listing stands aside until its own photos
-        // change, so two accounts cannot take turns overwriting one item.
+        // An item listed on more than one marketplace takes its photos from the listing showing the most of them.
         IReadOnlyList<PlatformListing> sources = await store.ListPhotoSourcesForItemAsync(item.Id, cancellationToken);
         PlatformListing owner = sources
             .OrderByDescending(candidate => InventoryPhotoSet.ParseReferences(candidate.PhotoUrlsJson).Count)
@@ -79,6 +77,14 @@ public sealed class InventoryPhotoSyncService(
             .ThenBy(candidate => candidate.Id)
             .FirstOrDefault() ?? listing;
         if (owner.Id != listing.Id)
+        {
+            return await FinishAsync(listing, now, error: null, cancellationToken);
+        }
+
+        // A different listing may only take an item over with at least as many photos as it already shows. The
+        // listing an item's photos came from may shrink them — a seller removed one — but no other listing can.
+        bool sameSource = ListingPhotoRules.CameFrom(item.PhotoSourceKey, listing.Platform, listing.ExternalListingId);
+        if (!sameSource && wanted.Count < item.Photos.Count)
         {
             return await FinishAsync(listing, now, error: null, cancellationToken);
         }

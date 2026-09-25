@@ -38,7 +38,15 @@ public static class ListingPhotoRules
 
     /// <summary>Names the photos an item is showing, so the item itself says which listing they came from.</summary>
     public static string SourceKey(string platform, string externalListingId, string photoUrlsKey) =>
-        $"{platform}:{externalListingId}:{photoUrlsKey}";
+        $"{SourceOwner(platform, externalListingId)}:{photoUrlsKey}";
+
+    /// <summary>The listing a set of photos came from, without which set it was.</summary>
+    public static string SourceOwner(string platform, string externalListingId) =>
+        $"{platform}:{externalListingId}";
+
+    /// <summary>Whether an item is already showing photos from this listing, whichever set.</summary>
+    public static bool CameFrom(string? sourceKey, string platform, string externalListingId) =>
+        sourceKey is not null && sourceKey.StartsWith($"{SourceOwner(platform, externalListingId)}:", StringComparison.Ordinal);
 
     /// <summary>Whether a photo address is one of the marketplace's own, and may be fetched.</summary>
     public static bool IsTrustedImageAddress(string platform, string url)

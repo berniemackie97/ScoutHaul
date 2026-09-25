@@ -7942,7 +7942,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/sync/accounts/{accountId}/photos": {
+    "/api/sync/photos": {
         parameters: {
             query?: never;
             header?: never;
@@ -7954,9 +7954,7 @@ export interface paths {
             parameters: {
                 query?: never;
                 header?: never;
-                path: {
-                    accountId: string;
-                };
+                path?: never;
                 cookie?: never;
             };
             requestBody?: {
@@ -11703,9 +11701,6 @@ export interface components {
             healthMessage?: string | null;
             loops?: components["schemas"]["SyncLoopDto"][] | null;
             sessions?: components["schemas"]["SyncSessionSeenDto"][] | null;
-            photoSyncEnabled?: boolean;
-            /** Format: int32 */
-            photosWaiting?: number;
         };
         /** @enum {string} */
         SyncAccountHealth: "Ready" | "NotBound" | "NoBrowser" | "Paused" | "Disabled" | "Unsupported";
@@ -11762,6 +11757,7 @@ export interface components {
             agents?: components["schemas"]["SyncAgentDto"][] | null;
             requests?: components["schemas"]["SyncScanRequestDto"][] | null;
             platforms?: components["schemas"]["SyncPlatformSettingsDto"][] | null;
+            photos?: components["schemas"]["SyncPhotoSyncDto"];
         };
         SyncPairingDto: {
             /** Format: uuid */
@@ -11773,6 +11769,11 @@ export interface components {
         };
         /** @enum {string} */
         SyncPairingStatus: "Waiting" | "Paired" | "Expired";
+        SyncPhotoSyncDto: {
+            enabled?: boolean;
+            /** Format: int32 */
+            waiting?: number;
+        };
         SyncPlatformSettingsDto: {
             platform?: string | null;
             loops?: components["schemas"]["SyncLoopKind"][] | null;
