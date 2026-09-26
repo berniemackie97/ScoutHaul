@@ -4,6 +4,7 @@ import { ArrowLeft, Check } from "lucide-react";
 import { Badge, Card, CardContent, CardHeader, CardTitle, formatCurrency, formatDate } from "@overhaul/ui";
 import { getApiClient } from "@/lib/api";
 import { CustomerEditor } from "./customer-editor";
+import { refusal } from "@/lib/page-access";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +18,9 @@ const orderStatusVariant = (status: string | undefined) => {
 };
 
 export default async function CustomerDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const refused = await refusal("/customers");
+  if (refused) return refused;
+
   const { id } = await params;
   const api = await getApiClient();
   const { data: customer } = await api.GET("/api/customers/{id}", { params: { path: { id } } });

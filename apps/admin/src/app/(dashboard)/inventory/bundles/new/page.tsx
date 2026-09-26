@@ -3,10 +3,14 @@ import { ArrowLeft } from "lucide-react";
 import type { InventoryItem } from "@/features/inventory/inventory-operations";
 import { getApiClient } from "@/lib/api";
 import { BundleCreator } from "./bundle-creator";
+import { refusal } from "@/lib/page-access";
 
 export const dynamic = "force-dynamic";
 
 export default async function NewInventoryBundlePage() {
+  const refused = await refusal("/inventory/bundles/new");
+  if (refused) return refused;
+
   const api = await getApiClient();
   const { data } = await api.GET("/api/inventory", {
     params: { query: { lifecycle: "Active", includeArchived: false } },

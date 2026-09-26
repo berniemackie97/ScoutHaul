@@ -2,11 +2,15 @@ import Link from "next/link";
 import { Mail, Users, Wallet } from "lucide-react";
 import { Card, formatCurrency, formatDate } from "@overhaul/ui";
 import { getApiClient } from "@/lib/api";
+import { refusal } from "@/lib/page-access";
 
 export const dynamic = "force-dynamic";
 
 
 export default async function CustomersPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
+  const refused = await refusal("/customers");
+  if (refused) return refused;
+
   const { q } = await searchParams;
   const api = await getApiClient();
   const { data } = await api.GET("/api/customers", { params: { query: q ? { search: q } : {} } });

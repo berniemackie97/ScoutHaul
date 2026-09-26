@@ -7,8 +7,9 @@ import { useState } from "react";
 import { cn, Button } from "@overhaul/ui";
 import { CommandPaletteTrigger } from "@/components/search/command-palette-trigger";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import type { Granted } from "@/lib/permissions";
 import type { Operator } from "@/lib/session";
-import { isActiveHref, navGroups } from "./navigation";
+import { isActiveHref, visibleGroups } from "./navigation";
 
 /**
  * Below lg the sidebar is an off-canvas drawer (fixed, slides in over a backdrop, controlled by `mobileOpen`); at lg+
@@ -17,12 +18,14 @@ import { isActiveHref, navGroups } from "./navigation";
  */
 export function Sidebar({
   operator,
+  granted,
   mobileOpen = false,
   onClose,
   onOpenSearch,
 }: {
   /** Who is signed in. Null only if the session could not be read — the footer then says so. */
   operator: Operator | null;
+  granted: Granted;
   mobileOpen?: boolean;
   onClose?: () => void;
   onOpenSearch: () => void;
@@ -99,7 +102,7 @@ export function Sidebar({
 
         {/* Nav */}
         <nav className="flex-1 space-y-1 overflow-y-auto px-2 py-4">
-          {navGroups.map((group) => (
+          {visibleGroups(granted).map((group) => (
             <div key={group.label} className="mb-4">
               <p
                 className={cn(

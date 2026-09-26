@@ -6,11 +6,15 @@ import { getApiClient } from "@/lib/api";
 import { errorMessage } from "@/lib/api-error";
 import { BrowserList } from "./browser-list";
 import { ConnectBrowser } from "./connect-browser";
+import { refusal } from "@/lib/page-access";
 
 export const dynamic = "force-dynamic";
 
 /** The browsers paired to sync, what each can see, and connecting another. */
 export default async function BrowsersPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const refused = await refusal("/sync/browsers");
+  if (refused) return refused;
+
   const query = await searchParams;
   const api = await getApiClient();
   const { data: overview, error } = await api.GET("/api/sync/overview", {});

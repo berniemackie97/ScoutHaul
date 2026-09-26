@@ -12,9 +12,11 @@ public sealed record SessionRemoteCountsDto(
     int Listings,
     int Tasks,
     int PendingSyncOperations);
+/// <param name="Permissions">What the caller may do in the selected organization, so a client offers only what will work.</param>
 public sealed record SessionBootstrapDto(
     SessionUserDto User,
     IReadOnlyList<OrganizationDto> Organizations,
     Guid? SelectedOrganizationId,
     SessionRemoteCountsDto RemoteCounts,
-    DateTimeOffset ServerTime);
+    DateTimeOffset ServerTime,
+    IReadOnlyList<string> Permissions);

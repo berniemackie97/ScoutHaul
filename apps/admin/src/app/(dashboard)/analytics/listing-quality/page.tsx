@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { Badge, Card } from "@overhaul/ui";
 import { getApiAccessToken, getApiBaseUrl } from "@/lib/api";
+import { refusal } from "@/lib/page-access";
 
 export const dynamic = "force-dynamic";
 
@@ -69,6 +70,9 @@ const dateLabel = (value: string | null | undefined) =>
     : "—";
 
 export default async function ListingQualityPage() {
+  const refused = await refusal("/analytics/listing-quality");
+  if (refused) return refused;
+
   const snapshots = await getQualitySnapshots();
   const latest = latestByListing(snapshots);
   const categories = categoryRollups(latest);

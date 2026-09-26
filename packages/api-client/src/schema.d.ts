@@ -11534,6 +11534,7 @@ export interface components {
             remoteCounts?: components["schemas"]["SessionRemoteCountsDto"];
             /** Format: date-time */
             serverTime?: string;
+            permissions?: string[] | null;
         };
         SessionRemoteCountsDto: {
             /** Format: int32 */

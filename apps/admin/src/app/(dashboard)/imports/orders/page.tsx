@@ -5,11 +5,15 @@ import { getApiClient } from "@/lib/api";
 import { PlatformOrderReconciler } from "./reconciler";
 import { AutoMatchPanel } from "./auto-match-panel";
 import { CancelledAfterSalePanel } from "./cancelled-panel";
+import { refusal } from "@/lib/page-access";
 
 export const dynamic = "force-dynamic";
 
 
 export default async function PlatformOrdersPage() {
+  const refused = await refusal("/imports/orders");
+  if (refused) return refused;
+
   const api = await getApiClient();
   const [openResult, reconciledResult, cancelledResult, autoMatchResult] = await Promise.all([
     api.GET("/api/platform-orders", { params: { query: { status: "Imported" } } }),

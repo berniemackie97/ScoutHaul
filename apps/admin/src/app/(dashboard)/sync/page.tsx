@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/list/list-search";
 import { getApiClient } from "@/lib/api";
 import { errorMessage } from "@/lib/api-error";
 import { SyncHub } from "./sync-hub";
+import { refusal } from "@/lib/page-access";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +14,9 @@ export const dynamic = "force-dynamic";
  * doing now. Nothing here runs on its own until a schedule is switched on.
  */
 export default async function SyncPage() {
+  const refused = await refusal("/sync");
+  if (refused) return refused;
+
   const api = await getApiClient();
   const { data: overview, error } = await api.GET("/api/sync/overview", {});
 

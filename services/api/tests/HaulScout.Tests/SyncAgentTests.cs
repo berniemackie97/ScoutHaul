@@ -44,6 +44,9 @@ public sealed class SyncAgentTests
         public Task<bool> HasPermission(Guid organizationId, string permission, CancellationToken cancellationToken) =>
             Task.FromResult(granted.Contains(permission));
 
+        public Task<IReadOnlyList<string>> ListPermissions(Guid organizationId, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<string>>(granted.ToArray());
+
         public Task RequireOwner(Guid organizationId, CancellationToken cancellationToken) => Task.CompletedTask;
     }
 

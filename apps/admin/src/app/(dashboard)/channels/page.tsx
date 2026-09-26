@@ -3,10 +3,14 @@ import { Card } from "@overhaul/ui";
 import { Radio, Store, Globe, AlertTriangle } from "lucide-react";
 import { getApiClient } from "@/lib/api";
 import { ChannelManager } from "./channel-manager";
+import { refusal } from "@/lib/page-access";
 
 export const dynamic = "force-dynamic";
 
 export default async function ChannelsPage() {
+  const refused = await refusal("/channels");
+  if (refused) return refused;
+
   const api = await getApiClient();
   const [{ data: accounts }, { data: reference }, { data: delist }, { data: sold }] = await Promise.all([
     api.GET("/api/channel-accounts", {}),

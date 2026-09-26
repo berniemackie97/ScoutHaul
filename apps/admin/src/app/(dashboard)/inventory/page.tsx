@@ -13,6 +13,7 @@ import {
 import type { components } from "@overhaul/api-client";
 import { getApiAssetUrl, getApiClient } from "@/lib/api";
 import { InventoryTable, type InventoryTableRow } from "./inventory-table";
+import { refusal } from "@/lib/page-access";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +33,9 @@ export default async function InventoryPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  const refused = await refusal("/inventory");
+  if (refused) return refused;
+
   const query = await searchParams;
   const search = typeof query.q === "string" ? query.q.trim() : "";
   const selectedStatus = typeof query.status === "string" && INVENTORY_STATUSES.includes(query.status as InventoryStatus)

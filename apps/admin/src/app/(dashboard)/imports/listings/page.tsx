@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowLeft, FileSpreadsheet } from "lucide-react";
 import { getApiClient } from "@/lib/api";
 import { ListingsBoard, type ListingMatchTarget } from "./listings-board";
+import { refusal } from "@/lib/page-access";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +18,9 @@ export default async function ListingsPage({
 }: {
   searchParams: Promise<{ view?: string }>;
 }) {
+  const refused = await refusal("/imports/listings");
+  if (refused) return refused;
+
   const { view: rawView } = await searchParams;
   const activeView = safeView(rawView);
 

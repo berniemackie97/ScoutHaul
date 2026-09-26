@@ -4,6 +4,7 @@ import { Card, formatCurrency, formatDate } from "@overhaul/ui";
 import { ListEmpty, PageHeader } from "@/components/list/list-search";
 import { StatCard, StatRow } from "@/components/list/stat-card";
 import { getApiClient } from "@/lib/api";
+import { refusal } from "@/lib/page-access";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +17,9 @@ export const dynamic = "force-dynamic";
  * rollup now happens over every lot in one query.
  */
 export default async function SuppliersPage() {
+  const refused = await refusal("/suppliers");
+  if (refused) return refused;
+
   const api = await getApiClient();
   const { data } = await api.GET("/api/acquisition-lots/suppliers", {});
 

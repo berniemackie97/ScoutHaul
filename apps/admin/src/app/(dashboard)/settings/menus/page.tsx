@@ -2,10 +2,14 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { getApiClient } from "@/lib/api";
 import { MenusManager } from "./menus-manager";
+import { refusal } from "@/lib/page-access";
 
 export const dynamic = "force-dynamic";
 
 export default async function MenusPage() {
+  const refused = await refusal("/settings/menus");
+  if (refused) return refused;
+
   const api = await getApiClient();
   const [{ data: referenceData }, { data: overrides }] = await Promise.all([
     api.GET("/api/inventory/reference-data"),

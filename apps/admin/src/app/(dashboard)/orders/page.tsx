@@ -7,6 +7,7 @@ import { StatCard, StatRow } from "@/components/list/stat-card";
 import { ORDER_STAGES } from "@/features/orders/order-stages";
 import { getApiClient } from "@/lib/api";
 import { OrdersTable } from "./orders-table";
+import { refusal } from "@/lib/page-access";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +34,9 @@ export default async function OrdersPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  const refused = await refusal("/orders");
+  if (refused) return refused;
+
   const query = await searchParams;
   const stage = typeof query.stage === "string" ? query.stage : undefined;
   const search = typeof query.q === "string" ? query.q.trim() : "";

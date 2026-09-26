@@ -29,6 +29,12 @@ public sealed class EfOrganizationAuthorizer(HaulScoutDbContext db, ICurrentUser
         return membership is not null && HasPermission(membership, permission);
     }
 
+    public async Task<IReadOnlyList<string>> ListPermissions(Guid organizationId, CancellationToken cancellationToken)
+    {
+        OrganizationMember? membership = await FindMembership(organizationId, cancellationToken);
+        return membership is null ? [] : HaulScoutPermissions.All.Where(permission => HasPermission(membership, permission)).ToArray();
+    }
+
     public async Task RequireOwner(Guid organizationId, CancellationToken cancellationToken)
     {
         OrganizationMember membership = await LoadMembership(organizationId, cancellationToken);

@@ -16,6 +16,7 @@ import {
 import { Badge, Card, formatCurrency, formatDate } from "@overhaul/ui";
 import { getApiClient } from "@/lib/api";
 import { AgingChart, InventoryStatusChart, PerformanceChart, PlatformChart } from "./report-charts";
+import { refusal } from "@/lib/page-access";
 
 export const dynamic = "force-dynamic";
 
@@ -57,6 +58,9 @@ function Kpi({ label, value, detail, icon: Icon, change, invert }: { label: stri
 }
 
 export default async function AnalyticsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const refused = await refusal("/analytics");
+  if (refused) return refused;
+
   const query = await searchParams;
   const to = validDate(query.to, isoDaysAgo(0));
   const from = validDate(query.from, isoDaysAgo(89));

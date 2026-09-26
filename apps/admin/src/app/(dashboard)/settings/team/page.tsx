@@ -2,10 +2,14 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { getApiClient } from "@/lib/api";
 import { TeamAccess } from "./team-access";
+import { refusal } from "@/lib/page-access";
 
 export const dynamic = "force-dynamic";
 
 export default async function TeamAccessPage() {
+  const refused = await refusal("/settings/team");
+  if (refused) return refused;
+
   const api = await getApiClient();
   const { data: session } = await api.GET("/api/session/bootstrap", {});
   const orgId = session?.selectedOrganizationId ?? undefined;

@@ -8,6 +8,7 @@ import { OrderStatusControl } from "./order-status-control";
 import { OrderTrackingCard } from "./order-tracking-card";
 import { OrderDeleteButton } from "./order-delete-button";
 import { LineItems } from "./line-items";
+import { refusal } from "@/lib/page-access";
 
 export const dynamic = "force-dynamic";
 
@@ -70,6 +71,9 @@ type SaleFinancials = {
 };
 
 export default async function OrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const refused = await refusal("/orders");
+  if (refused) return refused;
+
   const { id } = await params;
   const api = await getApiClient();
   const { data: order } = await api.GET("/api/orders/{id}", { params: { path: { id } } });

@@ -7,6 +7,7 @@ import { StatCard, StatRow } from "@/components/list/stat-card";
 import type { InventoryItem } from "@/features/inventory/inventory-operations";
 import { getApiClient } from "@/lib/api";
 import { PurchaseLotCreator } from "./purchase-lot-creator";
+import { refusal } from "@/lib/page-access";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +25,9 @@ export default async function PurchasesPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  const refused = await refusal("/purchases");
+  if (refused) return refused;
+
   const query = await searchParams;
   const search = typeof query.q === "string" ? query.q.trim() : "";
   const page = Math.max(1, Number(query.page) || 1);
