@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using HaulScout.Application.Channels;
 using HaulScout.Application.Contracts;
 using HaulScout.Application.Inventory;
 using HaulScout.Application.Organizations;
@@ -29,6 +30,7 @@ public sealed class OperatorConsoleService(
     InventoryQueryService inventory,
     IStorefrontOfferStore offers,
     IPlatformOrderStore platformOrders,
+    ChannelDelistService delisting,
     BusinessReportService reports,
     TimeProvider clock)
 {
@@ -83,6 +85,8 @@ public sealed class OperatorConsoleService(
         {
             // Each filter is exactly the one the destination list applies for the link the portal
             // builds from the key. That is the whole contract of this method.
+            // Sold here, still for sale there: the one queue where waiting costs a sale that has to be refunded.
+            queues.Add(new("listings.pendingDelist", Attention, await delisting.CountAsync(cancellationToken)));
             queues.Add(new("inventory.readyToList", Work, await inventory.CountAsync(new InventoryFilter(Status: InventoryStatus.ReadyToList), cancellationToken)));
             queues.Add(new("inventory.benchWork", Work, await inventory.CountAsync(new InventoryFilter(NeedsBenchWork: true), cancellationToken)));
             queues.Add(new("inventory.missingCost", Hygiene, await inventory.CountAsync(new InventoryFilter(Attention: InventoryAttention.MissingCost), cancellationToken)));

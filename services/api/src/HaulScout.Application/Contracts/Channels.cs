@@ -52,3 +52,19 @@ public sealed record UpsertChannelListingRequest(
     string? ExternalListingId,
     string? ExternalUrl,
     string? ImageHash);
+
+/// <summary>
+/// A listing still live on a marketplace for an item that has already sold somewhere else. The operator takes it
+/// down themselves, on the marketplace; this carries what they need to do that and to know why.
+/// </summary>
+public sealed record PendingDelistDto(
+    Guid ChannelListingId,
+    Guid InventoryItemId,
+    string ItemTitle,
+    string Channel,
+    string? AccountName,
+    string? ExternalListingId,
+    string? ExternalUrl,
+    decimal? ListedPrice,
+    string? SoldOnChannel,
+    DateTimeOffset? SoldAt);

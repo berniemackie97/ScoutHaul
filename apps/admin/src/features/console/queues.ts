@@ -54,6 +54,11 @@ export const QUEUES: Record<string, QueuePresentation> = {
   "orders.toShip": { label: "To ship", why: "Packed and waiting on a label or a carrier.", href: ordersHref("ToShip") },
   "orders.readyForPickup": { label: "Ready for pickup", why: "Waiting for the buyer to collect.", href: ordersHref("ReadyForPickup") },
   "orders.awaitingPayment": { label: "Awaiting payment", why: "Ordered but not yet paid.", href: ordersHref("AwaitingPayment") },
+  "listings.pendingDelist": {
+    label: "Still for sale after selling",
+    why: "Sold on one marketplace and still live on another, where it can be bought again.",
+    href: "/channels/delist",
+  },
   "inventory.readyToList": {
     label: "Ready to list",
     why: "Prepared — only the listing is missing.",

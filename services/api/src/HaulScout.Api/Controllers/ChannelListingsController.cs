@@ -4,6 +4,7 @@ using HaulScout.Api.Authorization;
 using static HaulScout.Api.Helpers.StringHelpers;
 using HaulScout.Api.Mapping;
 using HaulScout.Api.Services;
+using HaulScout.Application.Channels;
 using HaulScout.Application.Contracts;
 using HaulScout.Application.Security;
 using HaulScout.Domain;
@@ -15,7 +16,10 @@ namespace HaulScout.Api.Controllers;
 [ApiController]
 [Route("api/inventory/{itemId:guid}/channel-listings")]
 [RequireOrganizationPermission(HaulScoutPermissions.ManageListings)]
-public sealed class ChannelListingsController(HaulScoutDbContext db, ICurrentUserContext currentUser) : HaulScoutControllerBase
+public sealed class ChannelListingsController(
+    HaulScoutDbContext db,
+    ICurrentUserContext currentUser,
+    ChannelDelistService delisting) : HaulScoutControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<ChannelListingDto>>> List(Guid itemId, CancellationToken cancellationToken)
@@ -125,6 +129,24 @@ public sealed class ChannelListingsController(HaulScoutDbContext db, ICurrentUse
         await db.SaveChangesAsync(cancellationToken);
         return NoContent();
     }
+
+    /// <summary>
+    /// Listings still live for items that have already sold elsewhere. Nothing is removed from any marketplace by
+    /// this API: the operator removes it there, and says so here.
+    /// </summary>
+    [HttpGet("~/api/channel-listings/pending-delist")]
+    public async Task<ActionResult<IReadOnlyList<PendingDelistDto>>> PendingDelist(CancellationToken cancellationToken) =>
+        Ok(await delisting.ListAsync(cancellationToken));
+
+    /// <summary>The operator has taken this listing down on the marketplace.</summary>
+    [HttpPost("~/api/channel-listings/{channelListingId:guid}/delisted")]
+    public async Task<ActionResult<PendingDelistDto>> MarkDelisted(Guid channelListingId, CancellationToken cancellationToken) =>
+        ToActionResult(await delisting.MarkDelistedAsync(channelListingId, cancellationToken));
+
+    /// <summary>This listing should stay up after all — the sale it was flagged for did not take this item.</summary>
+    [HttpPost("~/api/channel-listings/{channelListingId:guid}/keep-listed")]
+    public async Task<ActionResult<PendingDelistDto>> KeepListed(Guid channelListingId, CancellationToken cancellationToken) =>
+        ToActionResult(await delisting.KeepListedAsync(channelListingId, cancellationToken));
 
     /// <summary>Org-wide channel-listing worklist across all items (for example status=PendingDelist).</summary>
     [HttpGet("~/api/channel-listings")]

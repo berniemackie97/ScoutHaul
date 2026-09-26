@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using HaulScout.Application.Channels;
 using HaulScout.Application.Common;
 using HaulScout.Application.Inventory;
 using HaulScout.Application.Search;
@@ -51,6 +52,7 @@ public static class DependencyInjection
         services.AddScoped<PlatformOrderImportWorkflowService>();
         services.AddScoped<PlatformOrderIngestionService>();
         services.AddScoped<PlatformOrderCancellationService>();
+        services.AddScoped<ChannelDelistService>();
         services.AddScoped<PlatformOrderWorkflowService>();
         services.AddScoped<PlatformOrderAutoMatchService>();
         services.AddScoped<ReferenceOverrideWorkflowService>();
