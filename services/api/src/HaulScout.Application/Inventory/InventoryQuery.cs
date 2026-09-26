@@ -15,6 +15,7 @@ namespace HaulScout.Application.Inventory;
 /// a switch rather than a nullable flag because "only items that need no bench work" is not a queue
 /// anyone asks for.
 /// </param>
+/// <param name="LotCandidates">Only items that can still join a purchase lot: in none yet, and not folded into a bundle.</param>
 public sealed record InventoryFilter(
     InventoryStatus? Status = null,
     InventoryLifecycleGroup? Lifecycle = null,
@@ -22,7 +23,8 @@ public sealed record InventoryFilter(
     string? Search = null,
     InventoryAttention? Attention = null,
     InventoryOwnershipType? Ownership = null,
-    bool NeedsBenchWork = false);
+    bool NeedsBenchWork = false,
+    bool LotCandidates = false);
 
 /// <summary>The sortable columns, as a closed set. A string sort key from the wire is mapped onto this by the
 /// Application, so an unknown value can never reach the database as a column name.</summary>

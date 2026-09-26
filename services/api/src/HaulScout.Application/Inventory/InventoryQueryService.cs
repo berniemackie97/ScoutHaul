@@ -45,12 +45,13 @@ public sealed class InventoryQueryService(IInventoryStore inventory, ICurrentUse
         int pageSize,
         InventoryOwnershipType? ownership,
         bool needsBenchWork,
+        bool lotCandidates,
         CancellationToken cancellationToken)
     {
         page = Math.Max(1, page);
         pageSize = Math.Clamp(pageSize, 1, MaxPageSize);
 
-        InventoryFilter filter = new(status, lifecycle, includeArchived, TrimToNull(search), attention, ownership, needsBenchWork);
+        InventoryFilter filter = new(status, lifecycle, includeArchived, TrimToNull(search), attention, ownership, needsBenchWork, lotCandidates);
         Guid organizationId = currentUser.OrganizationId;
 
         IReadOnlyList<InventoryScalars> scalars = await inventory.ListScalarsAsync(organizationId, filter, cancellationToken);

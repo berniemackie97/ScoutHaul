@@ -25,7 +25,6 @@ export default async function AddInventoryPage({ searchParams }: { searchParams:
   if (!referenceData) throw new Error("Inventory reference data could not be loaded.");
 
   const items = (inventory ?? []) as InventoryItem[];
-  const lotCandidates = items.filter((item) => !item.acquisitionLotId && item.status !== "Bundled");
   const bundleCandidates = items.filter((item) => item.status !== "Bundled" && !item.isSold && item.status !== "Listed");
 
   return (
@@ -37,7 +36,7 @@ export default async function AddInventoryPage({ searchParams }: { searchParams:
         <h1 className="mt-2 text-2xl font-semibold tracking-tight">Add inventory</h1>
         <p className="text-muted-foreground mt-1 text-sm">One place to add a single item, record a purchase lot to itemize, or bundle existing items.</p>
       </div>
-      <AddInventory referenceData={referenceData} lotCandidates={lotCandidates} bundleCandidates={bundleCandidates} initialMode={initialMode} />
+      <AddInventory referenceData={referenceData} bundleCandidates={bundleCandidates} initialMode={initialMode} />
     </div>
   );
 }

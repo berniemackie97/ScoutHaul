@@ -6,5 +6,5 @@ public interface ISalesChannelStore
 {
     Task<IReadOnlyList<string>> ListExistingChannelsAsync(CancellationToken cancellationToken);
 
-    Task<IReadOnlyList<SaleCandidateDto>> ListSaleCandidatesAsync(CancellationToken cancellationToken);
+    Task<IReadOnlyList<SaleCandidateDto>> ListSaleCandidatesAsync(string? search, int take, CancellationToken cancellationToken);
 }

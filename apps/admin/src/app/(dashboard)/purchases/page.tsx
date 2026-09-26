@@ -4,7 +4,6 @@ import { Badge, formatCurrency, formatDate } from "@overhaul/ui";
 import { ListEmpty, ListSearch, PageHeader } from "@/components/list/list-search";
 import { Pager } from "@/components/list/pager";
 import { StatCard, StatRow } from "@/components/list/stat-card";
-import type { InventoryItem } from "@/features/inventory/inventory-operations";
 import { getApiClient } from "@/lib/api";
 import { PurchaseLotCreator } from "./purchase-lot-creator";
 import { refusal } from "@/lib/page-access";
@@ -33,16 +32,16 @@ export default async function PurchasesPage({
   const page = Math.max(1, Number(query.page) || 1);
 
   const api = await getApiClient();
-  const [{ data: lots }, { data: inventory }] = await Promise.all([
+  const [{ data: lots }, { data: open }] = await Promise.all([
     api.GET("/api/acquisition-lots/browse", {
       params: { query: { search: search || undefined, page, pageSize: 25 } },
     }),
-    api.GET("/api/inventory", { params: { query: { lifecycle: "Active", includeArchived: false } } }),
+    // Only the count is shown, so one row is asked for; the total is over every item.
+    api.GET("/api/inventory/browse", { params: { query: { lifecycle: "Active", lotCandidates: true, page: 1, pageSize: 1 } } }),
   ]);
 
   const acquisitionLots = lots?.items ?? [];
   const summary = lots?.summary;
-  const candidates = ((inventory ?? []) as InventoryItem[]).filter((item) => !item.acquisitionLotId && item.status !== "Bundled");
   const totalSpend = summary?.totalSpend ?? 0;
   const allocated = summary?.totalAllocated ?? 0;
   const unallocated = summary?.unallocated ?? 0;
@@ -76,13 +75,13 @@ export default async function PurchasesPage({
         />
         <StatCard
           label="Open candidates"
-          value={String(candidates.length)}
+          value={open ? String(open.total ?? 0) : "—"}
           detail="Active items not yet in a lot"
           icon={Boxes}
         />
       </StatRow>
 
-      <PurchaseLotCreator candidates={candidates} />
+      <PurchaseLotCreator />
 
       <section className="space-y-3">
         <div>

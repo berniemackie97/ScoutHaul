@@ -95,6 +95,7 @@ public sealed class OperationsQueryTruthTests
             pageSize: pageSize,
             ownership: ownership,
             needsBenchWork: needsBenchWork,
+            lotCandidates: false,
             CancellationToken.None);
 
     [Fact]

@@ -4,6 +4,7 @@ import { useActionState, useEffect, useMemo, useState } from "react";
 import { useFormStatus } from "react-dom";
 import type { components } from "@overhaul/api-client";
 import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Label, Textarea, formatCurrency } from "@overhaul/ui";
+import { ItemSearch } from "@/components/inventory/item-search";
 import { createSale, type CreateSaleResult } from "./actions";
 
 type Candidate = components["schemas"]["SaleCandidateDto"];
@@ -73,12 +74,13 @@ function MoneyField({
   );
 }
 
-export function SaleCreator({ candidates, channels }: { candidates: Candidate[]; channels: Channel[] }) {
+export function SaleCreator({ channels }: { channels: Channel[] }) {
   const [state, action] = useActionState(createSale, initial);
   const values = state.values ?? {};
   const fieldErrors = state.fieldErrors ?? {};
   const formKey = state.formKey ?? "initial";
-  const [candidateId, setCandidateId] = useState("");
+  // Held whole, not as an id into a list: the item may be one no list on this page ever loaded.
+  const [selected, setSelected] = useState<Candidate | null>(null);
   const [channel, setChannel] = useState("");
   const [feeProfileId, setFeeProfileId] = useState("");
   const [soldPrice, setSoldPrice] = useState("");
@@ -94,7 +96,6 @@ export function SaleCreator({ candidates, channels }: { candidates: Candidate[];
   useEffect(() => {
     if (!state.values) return;
 
-    setCandidateId(state.values.inventoryItemId ?? "");
     setChannel(state.values.platform ?? "");
     setSoldPrice(state.values.soldPrice ?? "");
     setShippingCharged(state.values.shippingCharged ?? "");
@@ -111,7 +112,6 @@ export function SaleCreator({ candidates, channels }: { candidates: Candidate[];
     setFeeProfileId(defaultProfile?.id ?? "");
   }, [channels, state.formKey, state.values]);
 
-  const selected = candidates.find((candidate) => candidate.inventoryItemId === candidateId);
   const totalCosts = [platformFees, paymentFees, shippingCost, suppliesCost, otherCosts].reduce(
     (sum, value) => sum + (Number(value) || 0),
     0
@@ -162,10 +162,8 @@ export function SaleCreator({ candidates, channels }: { candidates: Candidate[];
     return result;
   }, [channels]);
 
-  function chooseCandidate(id: string) {
-    setCandidateId(id);
-    const item = candidates.find((candidate) => candidate.inventoryItemId === id);
-    if (!item) return;
+  function chooseCandidate(item: Candidate) {
+    setSelected(item);
     setSoldPrice(String(item.listingPrice ?? item.expectedSalePrice ?? ""));
     if (item.listingPlatform) chooseChannel(item.listingPlatform);
   }
@@ -183,23 +181,37 @@ export function SaleCreator({ candidates, channels }: { candidates: Candidate[];
           </CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="inventoryItemId">Inventory item</Label>
-              <select
-                id="inventoryItemId"
-                name="inventoryItemId"
-                value={candidateId}
-                onChange={(event) => chooseCandidate(event.target.value)}
-                className={selectClass}
-                required
-                aria-invalid={fieldErrors.inventoryItemId ? "true" : undefined}
-              >
-                <option value="">Select an eligible item…</option>
-                {candidates.map((candidate) => (
-                  <option key={candidate.inventoryItemId} value={candidate.inventoryItemId}>
-                    {candidate.title} · {candidate.status} · cost {currency(candidate.costOfGoods ?? 0)}
-                  </option>
-                ))}
-              </select>
+              <Label>Inventory item</Label>
+              <input type="hidden" name="inventoryItemId" value={selected?.inventoryItemId ?? ""} />
+              {selected ? (
+                <div className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2">
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-medium">{selected.title}</span>
+                    <span className="text-muted-foreground block text-xs">
+                      {selected.status} · cost {currency(selected.costOfGoods ?? 0)}
+                    </span>
+                  </span>
+                  <Button type="button" variant="outline" size="sm" onClick={() => setSelected(null)}>
+                    Change
+                  </Button>
+                </div>
+              ) : (
+                <ItemSearch<Candidate>
+                  label="Search for the item that sold"
+                  source={(query) => `/api/sales/candidates?q=${encodeURIComponent(query)}`}
+                  idOf={(item) => item.inventoryItemId ?? ""}
+                  onPick={chooseCandidate}
+                  render={(item) => (
+                    <span className="block">
+                      <span className="block truncate font-medium">{item.title}</span>
+                      <span className="text-muted-foreground block text-xs">
+                        {item.status} · cost {currency(item.costOfGoods ?? 0)}
+                        {item.listingPlatform ? ` · listed on ${item.listingPlatform}` : ""}
+                      </span>
+                    </span>
+                  )}
+                />
+              )}
               {fieldErrors.inventoryItemId && <p className="text-destructive text-xs">{fieldErrors.inventoryItemId}</p>}
             </div>
             <div className="space-y-2">

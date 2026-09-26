@@ -72,7 +72,7 @@ public class SalesChannelWorkflowServiceTests
             new Sale { OrganizationId = org, InventoryItem = released, Platform = "eBay", SoldPrice = 30m, CostOfGoods = 12m, Status = SaleStatus.Returned });
         await db.SaveChangesAsync();
 
-        IReadOnlyList<SaleCandidateDto> result = await service.CandidatesAsync(CancellationToken.None);
+        IReadOnlyList<SaleCandidateDto> result = await service.CandidatesAsync(null, null, CancellationToken.None);
 
         Assert.Contains(result, item => item.InventoryItemId == clean.Id);
         Assert.Contains(result, item => item.InventoryItemId == released.Id);
@@ -96,5 +96,28 @@ public class SalesChannelWorkflowServiceTests
         Assert.Equal(AppResultStatus.Validation, invalidProfile.Status);
         Assert.Equal(AppResultStatus.Ok, valid.Status);
         Assert.NotNull(valid.Value);
+    }
+
+    [Fact]
+    public async Task A_search_reaches_an_item_the_unsearched_list_stops_short_of()
+    {
+        (HaulScoutDbContext db, SalesChannelWorkflowService service, Guid org) = NewService();
+        await using HaulScoutDbContext _ = db;
+        InventoryItem old = new() { OrganizationId = org, Title = "Vintage Nikon F3", Status = InventoryStatus.Listed };
+        db.InventoryItems.Add(old);
+        await db.SaveChangesAsync();
+        await Task.Delay(5);
+        InventoryItem recent = new() { OrganizationId = org, Title = "Canon AE-1", Status = InventoryStatus.Listed };
+        InventoryItem held = new() { OrganizationId = org, Title = "Nikon FM2", Status = InventoryStatus.Sold };
+        db.InventoryItems.AddRange(recent, held);
+        db.Sales.Add(new Sale { OrganizationId = org, InventoryItem = held, Platform = "eBay", SoldPrice = 90m, Status = SaleStatus.Delivered });
+        await db.SaveChangesAsync();
+
+        IReadOnlyList<SaleCandidateDto> first = await service.CandidatesAsync(null, 1, CancellationToken.None);
+        IReadOnlyList<SaleCandidateDto> searched = await service.CandidatesAsync("  NIKON ", 1, CancellationToken.None);
+
+        Assert.DoesNotContain(first, item => item.InventoryItemId == old.Id);
+        // Still only what can be sold: the Nikon already on a sale is left out.
+        Assert.Equal(old.Id, Assert.Single(searched).InventoryItemId);
     }
 }

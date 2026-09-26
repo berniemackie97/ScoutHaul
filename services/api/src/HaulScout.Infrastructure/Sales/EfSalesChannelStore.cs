@@ -3,7 +3,9 @@ using HaulScout.Application.Contracts;
 using HaulScout.Application.Sales;
 using HaulScout.Application.Security;
 using HaulScout.Domain;
+using HaulScout.Domain.Entities;
 using HaulScout.Domain.Services;
+using HaulScout.Infrastructure.Inventory;
 using HaulScout.Infrastructure.Persistence;
 
 namespace HaulScout.Infrastructure.Sales;
@@ -36,15 +38,22 @@ public sealed class EfSalesChannelStore(HaulScoutDbContext db, ICurrentUserConte
         return saleChannels.Concat(listingChannels).Concat(accountChannels).ToArray();
     }
 
-    public async Task<IReadOnlyList<SaleCandidateDto>> ListSaleCandidatesAsync(CancellationToken cancellationToken) =>
-        await db.InventoryItems
+    public async Task<IReadOnlyList<SaleCandidateDto>> ListSaleCandidatesAsync(string? search, int take, CancellationToken cancellationToken)
+    {
+        IQueryable<InventoryItem> eligible = db.InventoryItems
             .AsNoTracking()
             .Where(item => item.OrganizationId == currentUser.OrganizationId
                 && !item.IsArchived
                 && item.Status != InventoryStatus.Bundled
-                && !item.Sales.Any(sale => !SaleWorkflow.InventoryReleaseStatuses.Contains(sale.Status)))
+                && !item.Sales.Any(sale => !SaleWorkflow.InventoryReleaseStatuses.Contains(sale.Status)));
+        if (search is not null)
+        {
+            eligible = eligible.Where(InventorySearch.Matching(search));
+        }
+
+        return await eligible
             .OrderByDescending(item => item.UpdatedAt)
-            .Take(500)
+            .Take(take)
             .Select(item => new SaleCandidateDto(
                 item.Id,
                 item.Title,
@@ -67,4 +76,5 @@ public sealed class EfSalesChannelStore(HaulScoutDbContext db, ICurrentUserConte
                     .Select(listing => (decimal?)listing.ListPrice)
                     .FirstOrDefault()))
             .ToListAsync(cancellationToken);
+    }
 }

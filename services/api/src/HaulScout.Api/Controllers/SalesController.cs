@@ -33,8 +33,11 @@ public sealed class SalesController(
         ToActionResult(await salesChannels.EstimateFeesAsync(request, cancellationToken));
 
     [HttpGet("candidates")]
-    public async Task<ActionResult<IReadOnlyList<SaleCandidateDto>>> Candidates(CancellationToken cancellationToken) =>
-        Ok(await salesChannels.CandidatesAsync(cancellationToken));
+    public async Task<ActionResult<IReadOnlyList<SaleCandidateDto>>> Candidates(
+        [FromQuery] string? search,
+        [FromQuery] int? take,
+        CancellationToken cancellationToken) =>
+        Ok(await salesChannels.CandidatesAsync(search, take, cancellationToken));
 
     // ── Reads ──────────────────────────────────────────────────────────────
     [HttpGet]

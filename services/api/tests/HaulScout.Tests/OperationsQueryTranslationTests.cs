@@ -129,14 +129,39 @@ public sealed class OperationsQueryTranslationTests(PostgresFixture postgres)
         InventoryQueryService queries = new(new EfInventoryStore(db), new StubCurrentUser(org, user));
 
         InventoryListDto bench = await queries.BrowseAsync(
-            null, null, false, null, null, null, true, 1, 25, ownership: null, needsBenchWork: true, CancellationToken.None);
+            null, null, false, null, null, null, true, 1, 25, ownership: null, needsBenchWork: true, lotCandidates: false, CancellationToken.None);
         Assert.Equal(2, bench.Total);
         Assert.Equal(1, bench.Summary.CustomerOwned);
 
         InventoryListDto consigned = await queries.BrowseAsync(
-            null, null, false, null, null, null, true, 1, 25, InventoryOwnershipType.Consigned, false, CancellationToken.None);
+            null, null, false, null, null, null, true, 1, 25, InventoryOwnershipType.Consigned, false, false, CancellationToken.None);
         Assert.Equal(1, consigned.Total);
         Assert.Equal(200m, consigned.Summary.AskingValue);
+    }
+
+    [Fact]
+    public async Task Lot_candidates_and_sale_candidate_search_translate_to_sql()
+    {
+        (HaulScoutDbContext db, Guid org, Guid user) = await postgres.NewOrganizationAsync();
+        await using HaulScoutDbContext _ = db;
+
+        AcquisitionLot lot = new() { OrganizationId = org, Name = "Estate pickup", PurchaseSubtotal = 50m };
+        InventoryItem inLot = new() { OrganizationId = org, Title = "Lotted lamp", Status = InventoryStatus.ReadyToList };
+        InventoryItem bundled = new() { OrganizationId = org, Title = "Bundled lamp", Status = InventoryStatus.Bundled };
+        InventoryItem loose = new() { OrganizationId = org, Title = "Loose lamp", Status = InventoryStatus.ReadyToList, Barcode = "0712345" };
+        db.AddRange(lot, inLot, bundled, loose);
+        db.AcquisitionLotItems.Add(new AcquisitionLotItem { OrganizationId = org, AcquisitionLot = lot, InventoryItem = inLot, AllocatedCost = 50m });
+        await db.SaveChangesAsync();
+
+        StubCurrentUser currentUser = new(org, user);
+        InventoryListDto candidates = await new InventoryQueryService(new EfInventoryStore(db), currentUser).BrowseAsync(
+            null, InventoryLifecycleGroup.Active, false, "LAMP", null, null, true, 1, 25, null, false, lotCandidates: true, CancellationToken.None);
+        IReadOnlyList<SaleCandidateDto> byBarcode = await new HaulScout.Infrastructure.Sales.EfSalesChannelStore(db, currentUser)
+            .ListSaleCandidatesAsync("0712345", 10, CancellationToken.None);
+
+        Assert.Equal("Loose lamp", Assert.Single(candidates.Items).Title);
+        Assert.Equal(1, candidates.Total);
+        Assert.Equal(loose.Id, Assert.Single(byBarcode).InventoryItemId);
     }
 
     [Fact]

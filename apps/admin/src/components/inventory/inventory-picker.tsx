@@ -5,6 +5,7 @@ import { Check, ChevronDown, PackagePlus, Search, TriangleAlert } from "lucide-r
 import { formatCurrency } from "@overhaul/ui";
 import type { LineChoice } from "@/features/imports/reconcile-model";
 import type { PickerItem } from "@/app/api/inventory/picker/route";
+import { useServerSearch } from "./use-server-search";
 
 export type PickerSuggestion = { id: string; title: string; alreadySold: boolean; exact: boolean };
 
@@ -27,40 +28,12 @@ export function InventoryPicker(props: {
   const { value, suggestion, lineTitle, disabled, onChange } = props;
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<PickerItem[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [failed, setFailed] = useState(false);
   const [active, setActive] = useState(0);
   const root = useRef<HTMLDivElement>(null);
   const listId = useId();
+  const { results, loading, failed } = useServerSearch<PickerItem>(open ? `/api/inventory/picker?q=${encodeURIComponent(query)}` : null);
 
-  // Search as the operator types, a beat after they pause, cancelling the search before.
-  useEffect(() => {
-    if (!open) return;
-    const controller = new AbortController();
-    const timer = setTimeout(async () => {
-      setLoading(true);
-      setFailed(false);
-      try {
-        const response = await fetch(`/api/inventory/picker?q=${encodeURIComponent(query)}`, { signal: controller.signal, cache: "no-store" });
-        if (!response.ok) throw new Error(String(response.status));
-        setResults((await response.json()) as PickerItem[]);
-        setActive(0);
-      } catch (error) {
-        if (!controller.signal.aborted) {
-          setFailed(true);
-          setResults([]);
-        }
-        void error;
-      } finally {
-        if (!controller.signal.aborted) setLoading(false);
-      }
-    }, 250);
-    return () => {
-      clearTimeout(timer);
-      controller.abort();
-    };
-  }, [open, query]);
+  useEffect(() => setActive(0), [results]);
 
   // Close when the operator clicks anywhere else.
   useEffect(() => {
