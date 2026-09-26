@@ -264,6 +264,15 @@ function HeadlineBar({ headline: line }: { headline: Headline }) {
 
 function Marketplace(props: { adapter: MarketplaceAdapter; status: MarketplaceStatus; now: Date; send: Send }) {
   const { adapter, status, now, send } = props;
+  const [accessProblem, setAccessProblem] = useState<string | null>(null);
+
+  const askForAccess = () => {
+    // Asked from the click itself: browsers only show the prompt for a person's gesture.
+    browser.permissions.request({ origins: adapter.origins }).then(
+      (granted) => setAccessProblem(granted ? null : `Access to ${adapter.platform} was not allowed, so it cannot be synced from this browser.`),
+      () => setAccessProblem(`This build of HaulScout Sync cannot ask for access to ${adapter.platform}. Install the latest build.`),
+    );
+  };
 
   let body: ReactNode;
   switch (status.kind) {
@@ -277,13 +286,10 @@ function Marketplace(props: { adapter: MarketplaceAdapter; status: MarketplaceSt
             HaulScout Sync needs your permission to read your {adapter.platform} seller pages in this browser. It only reads — it never changes
             anything on {adapter.platform}.
           </p>
-          <button
-            className="button button-primary"
-            // Asked from the click itself: browsers only show the prompt for a person's gesture.
-            onClick={() => void browser.permissions.request({ origins: adapter.origins })}
-          >
+          <button className="button button-primary" onClick={askForAccess}>
             Allow access to {adapter.platform}
           </button>
+          {accessProblem ? <p className="notice notice-warning">{accessProblem}</p> : null}
         </>
       );
       break;

@@ -1,4 +1,5 @@
 import { defineConfig } from "wxt";
+import { marketplaceOrigins } from "./src/adapters/origins";
 
 /**
  * Where this build talks to. A development build (`pnpm dev`) points at the API and portal running
@@ -22,9 +23,6 @@ function origins(mode: string) {
         : ["https://scout-haul-admin-ten.vercel.app"],
   };
 }
-
-/** The marketplaces an adapter exists for. Access to each is asked for only when it is connected. */
-const marketplaceOrigins = ["https://*.ebay.com/*", "https://*.vinted.com/*"];
 
 export default defineConfig({
   srcDir: "src",
