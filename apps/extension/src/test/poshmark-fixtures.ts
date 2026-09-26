@@ -19,7 +19,7 @@ export interface FixtureListing {
   status?: string;
 }
 
-export function closetPage(listings: FixtureListing[], more = false): string {
+export function closetPage(listings: FixtureListing[], more: boolean | string = false): string {
   const data = listings.map((listing) => ({
     id: listing.id,
     title: listing.title,
@@ -61,9 +61,23 @@ export function closetPage(listings: FixtureListing[], more = false): string {
     userCookies: { userInfo: { dh: "overhaultrading", uid: "6a28968fe948982883b29ccf" } },
     $_closet: {
       closetUserInfo: { data: { id: "6a28968fe948982883b29ccf", username: "overhaultrading" } },
-      listingsPostData: { data, more: { index: "posts", is_next_max_id_present: more, total: data.length } },
+      listingsPostData: {
+        data,
+        more: {
+          index: "posts",
+          is_next_max_id_present: more !== false,
+          // Poshmark sends its own cursor only when there is a next page.
+          ...(typeof more === "string" ? { next_max_id: more } : {}),
+          total: data.length,
+        },
+      },
     },
   });
+}
+
+/** A closet page whose state carries no list at all — what a changed site looks like. */
+export function closetPageWithoutListings(): string {
+  return statePage({ auth: { isUserLoggedIn: true }, $_closet: { listingsPostData: { more: {} } } });
 }
 
 /** The home page, which is where the adapter asks who is signed in. */

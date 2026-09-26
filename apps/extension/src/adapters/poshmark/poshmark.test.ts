@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { closetPage, homePage } from "../../test/poshmark-fixtures";
+import { closetPage, closetPageWithoutListings, homePage } from "../../test/poshmark-fixtures";
 import { memoryInMap } from "../../test/memory";
 import { AdapterError, type MarketplaceContext, type PageResponse, type Session } from "../types";
 import { poshmarkAdapter } from ".";
@@ -71,8 +71,9 @@ describe("a Poshmark closet", () => {
     expect(readClosetPage(closetPage([{ id: "1", title: "Tee", price: 5 }])).listings).toHaveLength(1);
   });
 
-  it("says a page carries no listings rather than inventing them", () => {
-    expect(readClosetPage(closetPage([])).listings).toEqual([]);
+  it("tells an empty closet apart from a page that lost its listings", () => {
+    expect(readClosetPage(closetPage([]))).toMatchObject({ listings: [], found: true });
+    expect(readClosetPage(closetPageWithoutListings())).toMatchObject({ listings: [], found: false });
     expect(() => readClosetPage("<html><body>nothing here</body></html>")).toThrow(AdapterError);
   });
 });
@@ -85,16 +86,17 @@ describe("a Poshmark scan", () => {
       .toEqual({ signedIn: false, username: null, marketplaceUserId: null });
   });
 
-  it("reads the whole closet, page by page, and its sold listings too", async () => {
+  it("follows Poshmark's own cursor through the closet, and reads its sold listings too", async () => {
     const context = poshmark((url) => {
-      const page = Number(url.searchParams.get("max_id") ?? "1");
+      const cursor = url.searchParams.get("max_id");
       if (url.searchParams.get("availability") === "sold_out") {
-        return page === 1 ? closetPage([{ id: "sold-1", title: "Sold tee", price: 15, inventoryStatus: "sold_out", available: 0, sold: 1 }]) : closetPage([]);
+        return closetPage([{ id: "sold-1", title: "Sold tee", price: 15, inventoryStatus: "sold_out", available: 0, sold: 1 }]);
       }
 
-      return page === 1
-        ? closetPage([{ id: "a", title: "First", price: 10 }], true)
-        : page === 2
+      // The first page is asked for without a cursor, and hands out the one for the second.
+      return cursor === null
+        ? closetPage([{ id: "a", title: "First", price: 10 }], "cursor-abc")
+        : cursor === "cursor-abc"
           ? closetPage([{ id: "b", title: "Second", price: 20 }])
           : closetPage([]);
     });
@@ -103,8 +105,45 @@ describe("a Poshmark scan", () => {
 
     expect(snapshot.complete).toBe(true);
     expect(snapshot.listings.map((listing) => listing.externalListingId)).toEqual(["a", "b", "sold-1"]);
-    // Two pages of the closet, and one of its sold listings: nothing is asked for twice.
+    expect(context.read[0]).not.toContain("max_id");
+    expect(context.read[1]).toContain("max_id=cursor-abc");
     expect(context.read.filter((url) => url.includes("availability=sold_out"))).toHaveLength(1);
+  });
+
+  it("falls back to the page number when a closet says there is more but not where", async () => {
+    // Observed behaviour: a closet also answers to a plain page number, so a missing cursor does not strand a scan.
+    const context = poshmark((url) => {
+      const cursor = url.searchParams.get("max_id");
+      if (url.searchParams.get("availability") === "sold_out") {
+        return closetPage([]);
+      }
+
+      return cursor === null ? closetPage([{ id: "a", title: "First", price: 10 }], true) : closetPage([{ id: "b", title: "Second", price: 20 }]);
+    });
+
+    const snapshot = await poshmarkAdapter.snapshotListings(context, seller);
+
+    expect(context.read[1]).toContain("max_id=2");
+    expect(snapshot.listings.map((listing) => listing.externalListingId)).toEqual(["a", "b"]);
+  });
+
+  it("reads a closet whose listings have all sold", async () => {
+    // Nothing active is an ordinary state, not a changed site — and its sold listings still have to be read.
+    const context = poshmark((url) =>
+      url.searchParams.get("availability") === "sold_out"
+        ? closetPage([{ id: "sold-1", title: "Sold tee", price: 15, inventoryStatus: "sold_out", available: 0, sold: 1 }])
+        : closetPage([]));
+
+    const snapshot = await poshmarkAdapter.snapshotListings(context, seller);
+
+    expect(snapshot.complete).toBe(true);
+    expect(snapshot.listings.map((listing) => listing.externalListingId)).toEqual(["sold-1"]);
+  });
+
+  it("says the site changed when a closet page carries no list at all", async () => {
+    const context = poshmark(() => closetPageWithoutListings());
+
+    await expect(poshmarkAdapter.snapshotListings(context, seller)).rejects.toMatchObject({ kind: "SiteChanged" });
   });
 
   it("stops at a security check rather than asking again", async () => {

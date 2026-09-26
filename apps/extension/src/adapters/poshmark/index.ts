@@ -84,6 +84,10 @@ export const poshmarkAdapter: MarketplaceAdapter = {
 
     // Sold listings are a separate view of the same closet, and a sale that ends a listing has to be seen.
     for (const availability of [null, "sold_out"]) {
+      // Poshmark pages by a cursor of its own: the first page is asked for without one, and each answer carries the
+      // next. It is echoed back untouched, never built here. A closet that says there is more without saying where
+      // falls back to the page number its pages also answer to.
+      let cursor: string | null = null;
       for (let page = 1; ; page++) {
         if (page > maxPages) {
           issues.push({ message: "This closet has more listings than one scan reads; the rest come next time.", rejected: false });
@@ -91,11 +95,16 @@ export const poshmarkAdapter: MarketplaceAdapter = {
           break;
         }
 
-        const filter = availability === null ? "" : `&availability=${availability}`;
-        const response = await context.page(`${origin}/closet/${encodeURIComponent(closet)}?max_id=${page}${filter}`);
+        const query = [
+          cursor === null ? null : `max_id=${encodeURIComponent(cursor)}`,
+          availability === null ? null : `availability=${availability}`,
+        ].filter((part) => part !== null);
+        const address = `${origin}/closet/${encodeURIComponent(closet)}${query.length === 0 ? "" : `?${query.join("&")}`}`;
+        const response = await context.page(address);
         assertReadable(response);
         const read = readClosetPage(response.body);
-        if (page === 1 && read.listings.length === 0 && availability === null) {
+        if (!read.found) {
+          // No list at all, which is not the same as a closet with nothing in it.
           throw siteChanged("closet");
         }
 
@@ -107,6 +116,8 @@ export const poshmarkAdapter: MarketplaceAdapter = {
         if (!read.more || listings.size === before) {
           break;
         }
+
+        cursor = read.nextMaxId ?? String(page + 1);
       }
     }
 

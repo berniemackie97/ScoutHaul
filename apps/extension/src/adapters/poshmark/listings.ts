@@ -2,10 +2,14 @@ import type { IngestListing } from "../../agent/types";
 import { dig } from "../embedded-json";
 import { readState } from "./state";
 
-/** One page of a closet, and whether Poshmark says there is another. */
+/** One page of a closet, and how to ask for the next. */
 export interface ClosetPage {
   listings: IngestListing[];
   more: boolean;
+  /** Poshmark's own cursor for the next page. Opaque: it is echoed back, never constructed. */
+  nextMaxId: string | null;
+  /** Whether the page carried a list at all. An empty list is a closet with nothing in it; no list is a changed site. */
+  found: boolean;
 }
 
 /**
@@ -18,15 +22,18 @@ export function readClosetPage(html: string): ClosetPage {
   const posts = dig(state, "$_closet", "listingsPostData");
   const data = dig(posts, "data");
   if (!Array.isArray(data)) {
-    return { listings: [], more: false };
+    return { listings: [], more: false, nextMaxId: null, found: false };
   }
 
+  const cursor = dig(posts, "more", "next_max_id");
   return {
     listings: data.flatMap((post) => {
       const listing = toIngestListing(post);
       return listing ? [listing] : [];
     }),
     more: dig(posts, "more", "is_next_max_id_present") === true,
+    nextMaxId: typeof cursor === "string" && cursor.length > 0 ? cursor : null,
+    found: true,
   };
 }
 
