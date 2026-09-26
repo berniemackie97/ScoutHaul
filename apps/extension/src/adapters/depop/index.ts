@@ -64,9 +64,9 @@ export const depopAdapter: MarketplaceAdapter = {
   async detectSession(context: MarketplaceContext): Promise<Session> {
     const response = await context.page(origin);
     assertReadable(response);
-    // Depop names the signed-in seller in the page it serves them; a signed-out page invites them to sign up.
-    const handle = /"username"\s*:\s*"([A-Za-z0-9_.-]{2,40})"/.exec(response.body)
-      ?? /\/users\/([A-Za-z0-9_.-]{2,40})\/?"[^>]*>\s*My Depop/i.exec(response.body);
+    // The header's own Likes link is the signed-in seller's, and it is the only handle on the page that is
+    // certainly theirs: a page can show any number of other people's, and an order page shows the buyer's.
+    const handle = /href="\/([A-Za-z0-9_.-]{2,40})\/likes\/"/.exec(response.body);
     return handle
       ? { signedIn: true, username: handle[1]!, marketplaceUserId: null }
       : { signedIn: false, username: null, marketplaceUserId: null };

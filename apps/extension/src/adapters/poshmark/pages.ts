@@ -14,7 +14,7 @@ export function assertReadable(response: PageResponse): void {
     throw new AdapterError("RateLimited", "Poshmark asked for a slower pace.");
   }
 
-  if (response.status === 403 || /captcha|unusual activity|are you a robot/i.test(response.body.slice(0, 20_000))) {
+  if (response.status === 403 || challenged(response.body)) {
     throw new AdapterError("Challenge", "Poshmark showed a security check.");
   }
 
@@ -25,6 +25,15 @@ export function assertReadable(response: PageResponse): void {
   if (response.status !== 200) {
     throw new AdapterError("Error", `Poshmark answered ${response.status}.`);
   }
+}
+
+/**
+ * A security check, told apart from a listing that merely mentions one. Matching the word "captcha" anywhere in a
+ * page would stop a scan over someone's description of a puzzle book.
+ */
+function challenged(body: string): boolean {
+  const head = body.slice(0, 20_000);
+  return /cdn-cgi\/challenge-platform|cf-chl-|<title>[^<]*(just a moment|attention required|access denied)/i.test(head);
 }
 
 export function siteChanged(page: string): AdapterError {

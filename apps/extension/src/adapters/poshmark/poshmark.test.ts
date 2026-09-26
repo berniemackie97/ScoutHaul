@@ -151,7 +151,7 @@ describe("a Poshmark scan", () => {
       status: 403,
       url: url.toString(),
       contentType: "text/html",
-      body: "<html><body>Are you a robot?</body></html>",
+      body: "<html><head><title>Just a moment...</title></head><body>/cdn-cgi/challenge-platform/</body></html>",
     }));
 
     await expect(poshmarkAdapter.snapshotListings(context, seller)).rejects.toMatchObject({ kind: "Challenge" });

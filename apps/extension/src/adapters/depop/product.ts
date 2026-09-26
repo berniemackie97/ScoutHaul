@@ -38,7 +38,7 @@ export function readProduct(slug: string, html: string): IngestListing {
 
 /** The `Product` block Depop publishes for every listing. */
 function structuredProduct(html: string): Record<string, unknown> {
-  for (const block of html.matchAll(/<script type="application\/ld\+json">(.*?)<\/script>/gs)) {
+  for (const block of html.matchAll(/<script\b[^>]*type=["']application\/ld\+json["'][^>]*>(.*?)<\/script>/gis)) {
     let data: unknown;
     try {
       data = JSON.parse(block[1]!);

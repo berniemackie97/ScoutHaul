@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { homePage, productPage, shopPage } from "../../test/depop-fixtures";
+import { challengePage, homePage, productPage, shopPage } from "../../test/depop-fixtures";
 import { memoryInMap } from "../../test/memory";
 import { AdapterError, type MarketplaceContext, type PageResponse, type Session } from "../types";
 import { depopAdapter, readShop } from ".";
@@ -156,6 +156,38 @@ describe("a Depop scan", () => {
       .toMatchObject({ signedIn: true, username: "overhaultrading" });
     expect(await depopAdapter.detectSession(depop(() => homePage(null))))
       .toMatchObject({ signedIn: false, username: null });
+  });
+
+  it("takes the signed-in seller's own handle, never another shop's on the same page", async () => {
+    // Depop pages link to other people constantly — an order page links to the buyer. Scanning theirs would pull a
+    // stranger's listings into this operator's inventory.
+    const session = await depopAdapter.detectSession(depop(() => homePage("overhaultrading", ["slapoint", "someone_else"])));
+
+    expect(session.username).toBe("overhaultrading");
+  });
+
+  it("stops at Cloudflare's own check, and not at a listing that merely mentions one", async () => {
+    const blocked = depop(() => ({ status: 200, url: "https://www.depop.com/overhaultrading/", contentType: "text/html", body: challengePage() }));
+    await expect(depopAdapter.snapshotListings(blocked, seller)).rejects.toMatchObject({ kind: "Challenge" });
+
+    // A listing about a puzzle book is not a security check.
+    const chatty = depop((url) =>
+      url.pathname === "/overhaultrading/"
+        ? shopPage(["a-1"])
+        : productPage({ slug: "a-1", title: "Captcha puzzle book", price: "5.00", description: "Are you a robot? A book of captcha puzzles." }));
+    const snapshot = await depopAdapter.snapshotListings(chatty, seller);
+    expect(snapshot.listings[0]!.title).toBe("Captcha puzzle book");
+  });
+
+  it("reads structured data whichever attributes its script tag carries", async () => {
+    const page = productPage({ slug: "a-1", title: "Tee", price: "5.00" })
+      .replace('<script type="application/ld+json">{"@type":"BreadcrumbList"}</script>', "")
+      .replace('<script type="application/ld+json">', '<script data-nscript="beforeInteractive" type=\'application/ld+json\' nonce="abc">');
+    const context = depop((url) => (url.pathname === "/overhaultrading/" ? shopPage(["a-1"]) : page));
+
+    const snapshot = await depopAdapter.snapshotListings(context, seller);
+
+    expect(snapshot.listings[0]!.title).toBe("Tee");
   });
 
   it("does not pretend to read sales", async () => {

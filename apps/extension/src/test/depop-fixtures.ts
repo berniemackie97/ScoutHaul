@@ -56,9 +56,20 @@ export function productPage(product: FixtureProduct): string {
     + `</head><body><h1>${product.title}</h1><div><span>${attributes}</span></div></body></html>`;
 }
 
-/** The home page, where the adapter asks who is signed in. */
-export function homePage(username: string | null): string {
+/**
+ * The home page, where the adapter asks who is signed in. A signed-in page carries the seller's own Likes link in
+ * its header — and, like any Depop page, may also link to other people's shops, which is the whole point of the
+ * test that follows it.
+ */
+export function homePage(username: string | null, alsoLinking: string[] = []): string {
+  const others = alsoLinking.map((handle) => `<a href="/${handle}/">Another seller</a>`).join("");
   return username === null
-    ? `<!doctype html><html><body><a href="/signup/?redirect=%2Fproducts%2Fcreate%2F">Sign up to sell</a></body></html>`
-    : `<!doctype html><html><body><script>window.__DATA__={"user":{"username":"${username}"}}</script></body></html>`;
+    ? `<!doctype html><html><body>${others}<a href="/signup/?redirect=%2Fproducts%2Fcreate%2F">Sign up to sell</a></body></html>`
+    : `<!doctype html><html><body><header>${others}<a aria-label="Likes" href="/${username}/likes/">Likes</a></header></body></html>`;
+}
+
+/** What Cloudflare answers with when it stops a request. */
+export function challengePage(): string {
+  return `<!doctype html><html><head><title>Just a moment...</title></head>`
+    + `<body><script src="/cdn-cgi/challenge-platform/h/b/scripts/jsd/main.js"></script></body></html>`;
 }
