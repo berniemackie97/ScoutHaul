@@ -16,17 +16,7 @@ public sealed class SoldListingService(ISoldListingStore store, ICurrentUserCont
     public async Task<IReadOnlyList<SoldNotRecordedDto>> ListAsync(CancellationToken cancellationToken)
     {
         IReadOnlyList<PlatformListing> sold = await store.ListSoldUnrecordedAsync(currentUser.OrganizationId, MostToShow, cancellationToken);
-        return sold
-            .Select(listing => new SoldNotRecordedDto(
-                listing.Id,
-                listing.ReconciledInventoryItemId!.Value,
-                listing.ReconciledInventoryItem?.Title ?? listing.Title,
-                listing.Platform,
-                listing.ExternalListingId,
-                listing.Url,
-                listing.Price,
-                listing.MarkedSoldAt))
-            .ToArray();
+        return sold.Select(Describe).ToArray();
     }
 
     public Task<int> CountAsync(CancellationToken cancellationToken) =>
@@ -35,27 +25,28 @@ public sealed class SoldListingService(ISoldListingStore store, ICurrentUserCont
     /// <summary>Settles one without a sale: recorded elsewhere, or never sold. The listing itself is left alone.</summary>
     public async Task<AppResult<SoldNotRecordedDto>> AcknowledgeAsync(Guid platformListingId, CancellationToken cancellationToken)
     {
-        PlatformListing? listing = await store.FindAsync(currentUser.OrganizationId, platformListingId, cancellationToken);
+        // Only what the queue is asking about can be answered. Anything else would leave a mark that silently
+        // suppresses a later sale of the same listing.
+        PlatformListing? listing = await store.FindUnrecordedAsync(currentUser.OrganizationId, platformListingId, cancellationToken);
         if (listing is null)
         {
-            return AppResult<SoldNotRecordedDto>.NotFound("That listing was not found.");
-        }
-
-        if (listing.SoldAcknowledgedAt is not null)
-        {
-            return AppResult<SoldNotRecordedDto>.Validation("That listing has already been dealt with. Reload to see where it stands.");
+            return await store.ExistsAsync(currentUser.OrganizationId, platformListingId, cancellationToken)
+                ? AppResult<SoldNotRecordedDto>.Validation("That listing is no longer waiting on an answer. Reload to see where it stands.")
+                : AppResult<SoldNotRecordedDto>.NotFound("That listing was not found.");
         }
 
         listing.SoldAcknowledgedAt = clock.GetUtcNow();
         await store.SaveChangesAsync(cancellationToken);
-        return AppResult<SoldNotRecordedDto>.Ok(new SoldNotRecordedDto(
-            listing.Id,
-            listing.ReconciledInventoryItemId ?? Guid.Empty,
-            listing.ReconciledInventoryItem?.Title ?? listing.Title,
-            listing.Platform,
-            listing.ExternalListingId,
-            listing.Url,
-            listing.Price,
-            listing.MarkedSoldAt));
+        return AppResult<SoldNotRecordedDto>.Ok(Describe(listing));
     }
+
+    private static SoldNotRecordedDto Describe(PlatformListing listing) => new(
+        listing.Id,
+        listing.ReconciledInventoryItemId!.Value,
+        listing.ReconciledInventoryItem?.Title ?? listing.Title,
+        listing.Platform,
+        listing.ExternalListingId,
+        listing.Url,
+        listing.Price,
+        listing.MarkedSoldAt);
 }

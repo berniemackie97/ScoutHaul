@@ -298,10 +298,11 @@ public sealed class PlatformListingImportService(HaulScoutDbContext db, ICurrent
         if (input.Status == PlatformListingStatus.Sold && listing.Status != PlatformListingStatus.Sold)
         {
             listing.MarkedSoldAt ??= DateTimeOffset.UtcNow;
+            listing.SoldAcknowledgedAt = null;
         }
-        else if (input.Status == PlatformListingStatus.Active && listing.Status != PlatformListingStatus.Active)
+        else if (input.Status != PlatformListingStatus.Sold && listing.Status == PlatformListingStatus.Sold)
         {
-            // Back on sale: whatever it was, it was not a sale anyone still needs to answer for.
+            // No longer sold, whichever way it went: there is no sale left for anyone to answer for.
             listing.MarkedSoldAt = null;
             listing.SoldAcknowledgedAt = null;
         }

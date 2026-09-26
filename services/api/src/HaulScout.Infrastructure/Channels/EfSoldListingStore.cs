@@ -18,10 +18,13 @@ public sealed class EfSoldListingStore(HaulScoutDbContext db) : ISoldListingStor
     public Task<int> CountSoldUnrecordedAsync(Guid organizationId, CancellationToken cancellationToken) =>
         Unrecorded(organizationId).CountAsync(cancellationToken);
 
-    public async Task<PlatformListing?> FindAsync(Guid organizationId, Guid platformListingId, CancellationToken cancellationToken) =>
-        await db.PlatformListings
+    public async Task<PlatformListing?> FindUnrecordedAsync(Guid organizationId, Guid platformListingId, CancellationToken cancellationToken) =>
+        await Unrecorded(organizationId)
             .Include(listing => listing.ReconciledInventoryItem)
-            .SingleOrDefaultAsync(listing => listing.Id == platformListingId && listing.OrganizationId == organizationId, cancellationToken);
+            .SingleOrDefaultAsync(listing => listing.Id == platformListingId, cancellationToken);
+
+    public Task<bool> ExistsAsync(Guid organizationId, Guid platformListingId, CancellationToken cancellationToken) =>
+        db.PlatformListings.AnyAsync(listing => listing.Id == platformListingId && listing.OrganizationId == organizationId, cancellationToken);
 
     /// <summary>Sold, linked, unanswered, and holding no sale that still stands — a cancelled one is not an answer.</summary>
     private IQueryable<PlatformListing> Unrecorded(Guid organizationId) =>

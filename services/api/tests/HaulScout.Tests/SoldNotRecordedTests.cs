@@ -131,6 +131,42 @@ public sealed class SoldNotRecordedTests
     }
 
     [Fact]
+    public async Task A_listing_the_queue_is_not_asking_about_cannot_be_answered()
+    {
+        // Otherwise an answer given to a listing that is still for sale would silently bury its next sale.
+        Harness harness = NewHarness(nameof(A_listing_the_queue_is_not_asking_about_cannot_be_answered), PlatformListingStatus.Active);
+        await using HaulScoutDbContext _ = harness.Db;
+
+        AppResult<SoldNotRecordedDto> refused = await harness.Sold.AcknowledgeAsync(harness.Listing.Id, CancellationToken.None);
+
+        Assert.Equal(AppResultStatus.Validation, refused.Status);
+        Assert.Null((await harness.Db.PlatformListings.SingleAsync()).SoldAcknowledgedAt);
+    }
+
+    [Fact]
+    public async Task A_sold_listing_with_no_item_behind_it_cannot_be_answered_either()
+    {
+        Harness harness = NewHarness(nameof(A_sold_listing_with_no_item_behind_it_cannot_be_answered_either));
+        await using HaulScoutDbContext _ = harness.Db;
+        PlatformListing listing = await harness.Db.PlatformListings.SingleAsync();
+        listing.ReconciledInventoryItemId = null;
+        listing.ReconcileStatus = PlatformListingReconcileStatus.Pending;
+        await harness.Db.SaveChangesAsync();
+
+        Assert.Equal(AppResultStatus.Validation, (await harness.Sold.AcknowledgeAsync(listing.Id, CancellationToken.None)).Status);
+        Assert.Null((await harness.Db.PlatformListings.SingleAsync()).SoldAcknowledgedAt);
+    }
+
+    [Fact]
+    public async Task A_listing_that_belongs_to_nobody_here_is_not_found()
+    {
+        Harness harness = NewHarness(nameof(A_listing_that_belongs_to_nobody_here_is_not_found));
+        await using HaulScoutDbContext _ = harness.Db;
+
+        Assert.Equal(AppResultStatus.NotFound, (await harness.Sold.AcknowledgeAsync(Guid.NewGuid(), CancellationToken.None)).Status);
+    }
+
+    [Fact]
     public async Task A_sold_listing_nobody_has_linked_to_an_item_is_not_asked_about()
     {
         // Linking it is the imports queue's job; asking twice in two places helps nobody.

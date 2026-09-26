@@ -9,7 +9,10 @@ public interface ISoldListingStore
 
     Task<int> CountSoldUnrecordedAsync(Guid organizationId, CancellationToken cancellationToken);
 
-    Task<PlatformListing?> FindAsync(Guid organizationId, Guid platformListingId, CancellationToken cancellationToken);
+    /// <summary>The one the queue is asking about, or null when it is not asking about it.</summary>
+    Task<PlatformListing?> FindUnrecordedAsync(Guid organizationId, Guid platformListingId, CancellationToken cancellationToken);
+
+    Task<bool> ExistsAsync(Guid organizationId, Guid platformListingId, CancellationToken cancellationToken);
 
     Task SaveChangesAsync(CancellationToken cancellationToken);
 }

@@ -62,6 +62,7 @@ public sealed class OperatorConsoleTests
     [
         HaulScoutPermissions.ManageOrders,
         HaulScoutPermissions.ManageInventory,
+        HaulScoutPermissions.ManageListings,
         HaulScoutPermissions.ManageFinance,
         HaulScoutPermissions.ViewReports,
     ];
@@ -169,6 +170,26 @@ public sealed class OperatorConsoleTests
             sort: null, desc: true, page: 1, pageSize: 25, listFilter.Ownership, listFilter.NeedsBenchWork, CancellationToken.None);
 
         Assert.Equal(list.Total, Queue(console, key).Count);
+    }
+
+    [Fact]
+    public async Task The_listings_queues_follow_the_permission_that_opens_the_pages_they_link_to()
+    {
+        // Both link to pages behind ManageListings. Showing them to someone holding only ManageInventory
+        // offers work they cannot open; hiding them from someone holding only ManageListings buries work
+        // that is theirs.
+        Harness inventoryOnly = NewHarness(HaulScoutPermissions.ManageInventory);
+        OperatorConsoleDto withoutListings = await inventoryOnly.Console.BuildAsync(CancellationToken.None);
+
+        Assert.DoesNotContain(withoutListings.Queues, queue => queue.Key.StartsWith("listings.", StringComparison.Ordinal));
+        Assert.Contains(withoutListings.Queues, queue => queue.Key == "inventory.readyToList");
+
+        Harness listingsOnly = NewHarness(HaulScoutPermissions.ManageListings);
+        OperatorConsoleDto withListings = await listingsOnly.Console.BuildAsync(CancellationToken.None);
+
+        Assert.Equal(0, Queue(withListings, "listings.pendingDelist").Count);
+        Assert.Equal(0, Queue(withListings, "listings.soldNotRecorded").Count);
+        Assert.DoesNotContain(withListings.Queues, queue => queue.Key.StartsWith("inventory.", StringComparison.Ordinal));
     }
 
     [Fact]

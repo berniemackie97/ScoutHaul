@@ -75,6 +75,34 @@ public class PlatformListingIngestionTests
 
 
     [Fact]
+    public async Task A_listing_that_sells_again_after_leaving_sold_is_asked_about_again()
+    {
+        (HaulScoutDbContext db, Guid org, Guid user) = NewContext(nameof(A_listing_that_sells_again_after_leaving_sold_is_asked_about_again));
+        await using HaulScoutDbContext _ = db;
+        StubCurrentUser currentUser = new(org, user);
+        PlatformListingsController controller = new(db, currentUser, new PlatformListingImportService(db, currentUser), new SoldListingService(new EfSoldListingStore(db), currentUser, TimeProvider.System));
+
+        await controller.Ingest(new IngestPlatformListingsRequest("Poshmark", [Listing("PM-1", "Denim Jacket", 40m, PlatformListingStatus.Sold)]), CancellationToken.None);
+        PlatformListing listing = await db.PlatformListings.SingleAsync();
+        DateTimeOffset? firstSold = listing.MarkedSoldAt;
+        Assert.NotNull(firstSold);
+
+        // Answered, then relisted through a status that is neither Sold nor Active: both signals go with the sale.
+        listing.SoldAcknowledgedAt = DateTimeOffset.UtcNow;
+        await db.SaveChangesAsync();
+        await controller.Ingest(new IngestPlatformListingsRequest("Poshmark", [Listing("PM-1", "Denim Jacket", 40m, PlatformListingStatus.Ended)]), CancellationToken.None);
+        listing = await db.PlatformListings.SingleAsync();
+        Assert.Null(listing.MarkedSoldAt);
+        Assert.Null(listing.SoldAcknowledgedAt);
+
+        // Selling again is news of its own, not something the old answer covers.
+        await controller.Ingest(new IngestPlatformListingsRequest("Poshmark", [Listing("PM-1", "Denim Jacket", 40m, PlatformListingStatus.Sold)]), CancellationToken.None);
+        listing = await db.PlatformListings.SingleAsync();
+        Assert.NotNull(listing.MarkedSoldAt);
+        Assert.Null(listing.SoldAcknowledgedAt);
+    }
+
+    [Fact]
     public async Task A_linked_item_learns_what_its_listing_says_about_it()
     {
         (HaulScoutDbContext db, Guid org, Guid user) = NewContext(nameof(A_linked_item_learns_what_its_listing_says_about_it));
