@@ -122,7 +122,25 @@ describe("running one piece of work", () => {
     const result = await runWork({ ...sales, trigger: "Requested", scanRequestId: "request-1" }, heartbeat, closed, deps);
 
     expect(result).toMatchObject({ status: "failed", kind: "Interrupted" });
-    expect(api.reportWorkFailure).toHaveBeenCalledWith({ channelAccountId: account, loop: "Sales", kind: "Interrupted", message: null, scanRequestId: "request-1" });
+    expect(api.reportWorkFailure).toHaveBeenCalledWith({ channelAccountId: account, loop: "Sales", kind: "Interrupted", message: "The sync tab was closed.", scanRequestId: "request-1" });
+  });
+
+  it("says which page failed to load, so a slow site is told apart from a broken read", async () => {
+    const { api, deps } = harness({});
+    const slow: MarketplaceTab = {
+      page: async () => {
+        throw new AdapterError("Network", "The page took too long to load.");
+      },
+      request: async () => {
+        throw new AdapterError("Network", "The page took too long to load.");
+      },
+    };
+
+    const result = await runWork({ ...sales, trigger: "Requested", scanRequestId: "request-1" }, heartbeat, slow, deps);
+
+    expect(result).toMatchObject({ status: "failed", kind: "Network" });
+    expect(result.status === "failed" && result.text).toContain("took too long to load");
+    expect(api.reportWorkFailure).toHaveBeenCalledWith(expect.objectContaining({ kind: "Network", message: "The page took too long to load." }));
   });
 
   it("does not hold a scan asked for in the popup against the account's schedule", async () => {
