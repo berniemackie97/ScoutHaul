@@ -147,6 +147,13 @@ describe("a Vinted listing", () => {
       condition: "Very good",
     });
     expect(toIngestListing(wardrobeItem(2))).toMatchObject({ brand: null, size: null });
+
+    // A wardrobe item that carries a description hands it over; one that does not says nothing, which leaves
+    // whatever is known alone rather than erasing it.
+    expect(toIngestListing(wardrobeItem(3, { description: "  Worn twice, no flaws.  " }))?.description)
+      .toBe("Worn twice, no flaws.");
+    expect(toIngestListing(wardrobeItem(4))?.description).toBeUndefined();
+    expect(toIngestListing(wardrobeItem(5, { description: "   " }))?.description).toBeUndefined();
   });
 });
 
