@@ -3,7 +3,8 @@ import { defineBackground } from "wxt/utils/define-background";
 import { Agent } from "../agent/agent";
 import { portalOrigins } from "../agent/config";
 import type { AgentResponse, BridgeRequest, BridgeStatus, PopupRequest } from "../agent/messages";
-import { pairingItem, portalItem, queuedItem, runningItem } from "../agent/storage";
+import { afterUpdate } from "../agent/governor";
+import { pairingItem, portalItem, queuedItem, runningItem, updateGovernors } from "../agent/storage";
 import { SyncTabs } from "../agent/transport";
 
 const heartbeatAlarm = "haulscout-heartbeat";
@@ -18,7 +19,12 @@ export default defineBackground(() => {
 
   // The heartbeat is an alarm, not a timer: it survives the background being stopped between checks.
   const ensureAlarm = () => browser.alarms.create(heartbeatAlarm, { periodInMinutes: 1, delayInMinutes: 0.1 });
-  browser.runtime.onInstalled.addListener(() => void ensureAlarm());
+  browser.runtime.onInstalled.addListener(({ reason }) => {
+    void ensureAlarm();
+    if (reason === "update") {
+      void updateGovernors((states) => Object.fromEntries(Object.entries(states).map(([platform, state]) => [platform, afterUpdate(state)])));
+    }
+  });
   browser.runtime.onStartup.addListener(() => void ensureAlarm());
   browser.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name === heartbeatAlarm) {

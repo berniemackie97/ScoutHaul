@@ -1,5 +1,5 @@
 import { storage } from "wxt/utils/storage";
-import type { GovernorState } from "./governor";
+import { initialGovernorState, type GovernorState } from "./governor";
 import type { Heartbeat } from "./types";
 
 /**
@@ -71,6 +71,19 @@ export const heartbeatItem = storage.defineItem<(Heartbeat & { receivedAt: strin
 export const sessionsItem = storage.defineItem<Record<string, StoredSession>>("local:sessions", { fallback: {} });
 
 export const governorItem = storage.defineItem<Record<string, GovernorState>>("local:governor", { fallback: {} });
+
+let governorWrites: Promise<unknown> = Promise.resolve();
+
+/** Every change to the governor, one after another: each reads what the last wrote, so none is lost. */
+export function updateGovernors(change: (states: Record<string, GovernorState>) => Record<string, GovernorState>): Promise<void> {
+  const write = governorWrites.then(async () => governorItem.setValue(change(await governorItem.getValue())));
+  governorWrites = write.catch(() => undefined);
+  return write;
+}
+
+export function updateGovernor(platform: string, change: (state: GovernorState) => GovernorState): Promise<void> {
+  return updateGovernors((states) => ({ ...states, [platform]: change(states[platform] ?? initialGovernorState()) }));
+}
 
 export const activityItem = storage.defineItem<ActivityEntry[]>("local:activity", { fallback: [] });
 

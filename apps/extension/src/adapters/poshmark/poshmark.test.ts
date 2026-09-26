@@ -66,15 +66,19 @@ describe("a Poshmark closet", () => {
     expect(readClosetPage(page).listings[0]).toMatchObject({ status: "Sold", quantity: 0, quantitySold: 1 });
   });
 
-  it("reads the state out of the page without being fooled by a brace in a string", () => {
-    // The fixture writes another script after the state whose value contains a closing brace.
-    expect(readClosetPage(closetPage([{ id: "1", title: "Tee", price: 5 }])).listings).toHaveLength(1);
+  it("reads the state the page built, since the script that wrote it is gone from the HTML", () => {
+    const page = closetPage([{ id: "1", title: "Tee", price: 5 }]);
+
+    expect(page.body).not.toContain("__INITIAL_STATE__");
+    expect(readClosetPage(page).listings).toHaveLength(1);
+    expect(() => readClosetPage({ ...page, global: null })).toThrow(AdapterError);
   });
 
   it("tells an empty closet apart from a page that lost its listings", () => {
     expect(readClosetPage(closetPage([]))).toMatchObject({ listings: [], found: true });
     expect(readClosetPage(closetPageWithoutListings())).toMatchObject({ listings: [], found: false });
-    expect(() => readClosetPage("<html><body>nothing here</body></html>")).toThrow(AdapterError);
+    expect(() => readClosetPage({ status: 200, url: "https://poshmark.com/", contentType: "text/html", body: "<html><body>nothing here</body></html>" }))
+      .toThrow(AdapterError);
   });
 });
 

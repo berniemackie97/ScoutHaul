@@ -6,7 +6,7 @@ import { syncTabsItem } from "./storage";
 /** A marketplace tab the agent reads through. */
 export interface MarketplaceTab {
   /** Navigates the tab to a page, as a person's click would, and reads it once loaded. */
-  page(url: string): Promise<PageResponse>;
+  page(url: string, global?: string): Promise<PageResponse>;
   /** A request made from the marketplace's own page, for the JSON endpoints its pages call. */
   request(url: string): Promise<PageResponse>;
 }
@@ -33,17 +33,28 @@ async function pageFetch(url: string): Promise<PageResponse> {
 }
 
 /**
- * Reads the page the tab has loaded — including the data it embeds in its inline scripts, which stay
- * in the document after it renders. Self-contained, like pageFetch.
+ * Reads the page the tab has loaded, and with it, when asked, a variable the page built for itself — in one go, so both
+ * come from the same document. The variable needs the page's own world: the extension's cannot see it, and a
+ * server-rendered page often deletes the script that wrote it, so it is not in the HTML. Self-contained, like pageFetch.
  */
-function readLoadedPage(): PageResponse {
+function readLoadedPage(global: string | null): PageResponse {
   const navigation = performance.getEntriesByType("navigation")[0] as (PerformanceEntry & { responseStatus?: number }) | undefined;
-  return {
+  const page: PageResponse = {
     status: navigation?.responseStatus || 200,
     url: location.href,
     contentType: document.contentType,
     body: document.documentElement.outerHTML,
   };
+  if (global === null) {
+    return page;
+  }
+
+  try {
+    const value = (window as unknown as Record<string, unknown>)[global];
+    return { ...page, global: value === undefined ? null : JSON.stringify(value) };
+  } catch {
+    return { ...page, global: null };
+  }
 }
 
 /** One look at a tab: how far it has loaded, and where it is. */
@@ -351,12 +362,16 @@ export class SyncTabs {
         browser.tabs.onUpdated.removeListener(listener);
       }
     };
-    const read = () => inTab<PageResponse>(tabId, adapter, this.clock, () => browser.scripting.executeScript({ target: { tabId }, func: readLoadedPage }));
+    const read = (global: string | undefined) =>
+      inTab<PageResponse>(tabId, adapter, this.clock, () =>
+        global === undefined
+          ? browser.scripting.executeScript({ target: { tabId }, func: readLoadedPage, args: [null] })
+          : browser.scripting.executeScript({ target: { tabId }, world: "MAIN", func: readLoadedPage, args: [global] }));
 
     return {
-      page: async (url: string) => {
+      page: async (url: string, global?: string) => {
         const before = await navigate(url);
-        const loaded = await read();
+        const loaded = await read(global);
         if (before === undefined || loaded.url !== before || url === before) {
           return loaded;
         }
@@ -364,7 +379,7 @@ export class SyncTabs {
         // Still the page it was leaving: the browser said the new one had loaded before it had
         // replaced the old. Wait for the address to move on, then read again.
         await waitForPage(() => lookAt(tabId), { ...this.clock, readable: adapter.readable, begun: (seen) => seen.url !== before, timeoutMs: pageLoadTimeoutMs });
-        return read();
+        return read(global);
       },
       request: async (url: string) => {
         // A request is the site's own only from a page on the site's own origin.

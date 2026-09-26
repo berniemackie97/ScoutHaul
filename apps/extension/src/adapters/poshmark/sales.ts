@@ -1,6 +1,7 @@
 import type { FulfillmentStage, IngestOrder, IngestOrderLine, RunIssue } from "../../agent/types";
 import { cents } from "../amounts";
 import { dig } from "../embedded-json";
+import type { PageResponse } from "../types";
 import { readState } from "./state";
 
 /** One page of Seller Hub's sales list, and how to ask for the next. */
@@ -10,8 +11,8 @@ export interface SalesPage {
   found: boolean;
 }
 
-export function readSalesPage(html: string): SalesPage {
-  const data = dig(readState(html, "sales"), "$_order_list", "userSales", "data");
+export function readSalesPage(response: PageResponse): SalesPage {
+  const data = dig(readState(response, "sales"), "$_order_list", "userSales", "data");
   const sales = dig(data, "sales_summary");
   if (!Array.isArray(sales)) {
     return { sales: [], nextMaxId: null, found: false };

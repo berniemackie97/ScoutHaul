@@ -6,7 +6,7 @@ import { ApiError, type AgentApi } from "./api";
 import { describeFailure, waitsForAPerson } from "./failures";
 import { initialGovernorState, nextSlot, pauseOf, recordOutcome, recordRequest, type GovernorPolicy, type Outcome } from "./governor";
 import { adapterMemory } from "./memory";
-import { governorItem, sessionsItem, type StoredSession } from "./storage";
+import { governorItem, sessionsItem, updateGovernor, type StoredSession } from "./storage";
 import type { MarketplaceTab } from "./transport";
 import type { AgentAccount, FailureKind, Heartbeat, Work } from "./types";
 
@@ -73,15 +73,14 @@ export function governedContext(tab: MarketplaceTab, platform: string, policy: G
       await deps.sleep(slot.waitMs);
     }
 
-    const latest = await governorItem.getValue();
-    await governorItem.setValue({ ...latest, [platform]: recordRequest(latest[platform] ?? initialGovernorState(), deps.now().getTime()) });
+    await updateGovernor(platform, (state) => recordRequest(state, deps.now().getTime()));
     onRequest?.();
     return go();
   };
 
   return {
     now: () => deps.now(),
-    page: (url: string) => paced(() => tab.page(url)),
+    page: (url: string, global?: string) => paced(() => tab.page(url, global)),
     request: (url: string) => paced(() => tab.request(url)),
     memory: adapterMemory(platform),
   };
@@ -94,8 +93,7 @@ export async function learn(platform: string, kind: FailureKind | "ok", now: Dat
     return;
   }
 
-  const states = await governorItem.getValue();
-  await governorItem.setValue({ ...states, [platform]: recordOutcome(states[platform] ?? initialGovernorState(), outcome, now.getTime(), platform) });
+  await updateGovernor(platform, (state) => recordOutcome(state, outcome, now.getTime(), platform));
 }
 
 /**
@@ -136,7 +134,8 @@ export function kindOf(error: unknown): FailureKind {
 
 /** Detail worth passing on beside the reason: an adapter's own account of a page, or HaulScout's refusal. Never a raw browser message. */
 function detailOf(error: unknown): string | null {
-  if (error instanceof AdapterError && (error.kind === "SiteChanged" || error.kind === "Error")) {
+  // Which page failed, and how, is what tells a slow site from a broken read; a person's trouble explains itself.
+  if (error instanceof AdapterError && !waitsForAPerson(error.kind)) {
     return error.message;
   }
 
@@ -215,7 +214,11 @@ export async function notStarted(adapter: MarketplaceAdapter, work: Work, kind: 
       .catch(() => undefined);
   }
 
-  return { status: "failed", kind, text: kind === "WrongAccount" && detail ? detail : describeFailure(kind, adapter.platform) };
+  return { status: "failed", kind, text: kind === "WrongAccount" && detail ? detail : withDetail(describeFailure(kind, adapter.platform), detail) };
+}
+
+function withDetail(text: string, detail: string | null): string {
+  return detail ? `${text} ${detail}` : text;
 }
 
 function chunks<T>(items: T[], size: number): T[][] {
@@ -321,8 +324,9 @@ export async function runWork(work: Work, heartbeat: Heartbeat, tab: Marketplace
     }
 
     const kind = kindOf(error);
-    await deps.api.fail(runId, kind, detailOf(error)).catch(() => undefined);
+    const detail = detailOf(error);
+    await deps.api.fail(runId, kind, detail).catch(() => undefined);
     await learn(adapter.platform, kind, deps.now());
-    return { status: "failed", kind, text: describeFailure(kind, adapter.platform) };
+    return { status: "failed", kind, text: withDetail(describeFailure(kind, adapter.platform), detail) };
   }
 }

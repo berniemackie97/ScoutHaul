@@ -1,5 +1,7 @@
+import type { PageResponse } from "../adapters/types";
+
 /**
- * Poshmark pages in the shape it serves them: a state object written into the HTML, with each closet listing whole
+ * Poshmark pages in the shape it serves them: a state object the page builds for itself, with each closet listing whole
  * inside it. The field names and values here were taken from a real closet page, not invented.
  */
 
@@ -19,7 +21,7 @@ export interface FixtureListing {
   status?: string;
 }
 
-export function closetPage(listings: FixtureListing[], more: boolean | string = false): string {
+export function closetPage(listings: FixtureListing[], more: boolean | string = false): PageResponse {
   const data = listings.map((listing) => ({
     id: listing.id,
     title: listing.title,
@@ -76,12 +78,12 @@ export function closetPage(listings: FixtureListing[], more: boolean | string = 
 }
 
 /** A closet page whose state carries no list at all — what a changed site looks like. */
-export function closetPageWithoutListings(): string {
+export function closetPageWithoutListings(): PageResponse {
   return statePage({ auth: { isUserLoggedIn: true }, $_closet: { listingsPostData: { more: {} } } });
 }
 
 /** The home page, which is where the adapter asks who is signed in. */
-export function homePage(handle: string | null): string {
+export function homePage(handle: string | null): PageResponse {
   return statePage({
     auth: handle === null
       ? { isUserLoggedIn: false, identity: null, isGuestLoggedIn: true }
@@ -104,7 +106,7 @@ export interface FixtureSale {
 }
 
 /** Seller Hub's sales page. Field names and value shapes as read from a real one; the people are invented. */
-export function salesPage(sales: FixtureSale[], nextMaxId: string | null = null): string {
+export function salesPage(sales: FixtureSale[], nextMaxId: string | null = null): PageResponse {
   const money = (val: string) => ({ val, currency_code: "USD", currency_symbol: "$" });
   const summary = sales.map((sale) => ({
     id: sale.id,
@@ -133,7 +135,7 @@ export function salesPage(sales: FixtureSale[], nextMaxId: string | null = null)
 }
 
 /** A sale's own page. Its layout is unconfirmed; the adapter reads only the picture addresses in it. */
-export function salePage(listingIds: string[]): string {
+export function salePage(listingIds: string[]): PageResponse {
   return statePage({
     $_order_details: {
       data: { items: listingIds.map((id) => ({ picture_url: `https://di2ponv0v5otw.cloudfront.net/posts/2026/07/05/${id}/m` })) },
@@ -141,9 +143,13 @@ export function salePage(listingIds: string[]): string {
   });
 }
 
-/** Poshmark writes its state into a script tag, with the page's markup around it. */
-function statePage(state: unknown): string {
-  return `<!doctype html><html><body><div id="app"></div>`
-    + `<script>window.__INITIAL_STATE__ = ${JSON.stringify(state)};window.__OTHER__={"a":"}"};</script>`
-    + `</body></html>`;
+/** A page as the extension finds it: the script that wrote the state has removed itself, and the state lives on the page. */
+function statePage(state: unknown): PageResponse {
+  return {
+    status: 200,
+    url: "https://poshmark.com/",
+    contentType: "text/html",
+    body: `<!doctype html><html><body><div id="app"></div></body></html>`,
+    global: JSON.stringify(state),
+  };
 }

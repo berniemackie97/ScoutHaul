@@ -13,7 +13,7 @@ import {
 import { readClosetPage } from "./listings";
 import { assertReadable, siteChanged } from "./pages";
 import { bookedAt, bundleSize, listingIds, readSalesPage, saleId, saleStamp, saleState, toIngestOrder } from "./sales";
-import { readState } from "./state";
+import { readState, stateGlobal } from "./state";
 
 const origin = "https://poshmark.com";
 
@@ -32,9 +32,9 @@ async function bundleListings(context: MarketplaceContext, id: string, size: num
   }
 
   try {
-    const response = await context.page(`${origin}/order/sales/${encodeURIComponent(id)}`);
+    const response = await context.page(`${origin}/order/sales/${encodeURIComponent(id)}`, stateGlobal);
     assertReadable(response);
-    const ids = listingIds(JSON.stringify(readState(response.body, "sale")));
+    const ids = listingIds(JSON.stringify(readState(response, "sale")));
     if (ids.length !== size) {
       return null;
     }
@@ -97,9 +97,9 @@ export const poshmarkAdapter: MarketplaceAdapter = {
   },
 
   async detectSession(context: MarketplaceContext): Promise<Session> {
-    const response = await context.page(origin);
+    const response = await context.page(origin, stateGlobal);
     assertReadable(response);
-    const state = readState(response.body, "home");
+    const state = readState(response, "home");
     const auth = dig(state, "auth");
     if (dig(auth, "isUserLoggedIn") !== true) {
       return { signedIn: false, username: null, marketplaceUserId: null };
@@ -135,9 +135,9 @@ export const poshmarkAdapter: MarketplaceAdapter = {
       let cursor = start;
       while (budget > 0) {
         budget--;
-        const response = await context.page(cursor === null ? salesPage : `${salesPage}?max_id=${encodeURIComponent(cursor)}`);
+        const response = await context.page(cursor === null ? salesPage : `${salesPage}?max_id=${encodeURIComponent(cursor)}`, stateGlobal);
         assertReadable(response);
-        const read = readSalesPage(response.body);
+        const read = readSalesPage(response);
         if (!read.found) {
           throw siteChanged("sales");
         }
@@ -247,9 +247,9 @@ export const poshmarkAdapter: MarketplaceAdapter = {
           availability === null ? null : `availability=${availability}`,
         ].filter((part) => part !== null);
         const address = `${origin}/closet/${encodeURIComponent(closet)}${query.length === 0 ? "" : `?${query.join("&")}`}`;
-        const response = await context.page(address);
+        const response = await context.page(address, stateGlobal);
         assertReadable(response);
-        const read = readClosetPage(response.body);
+        const read = readClosetPage(response);
         if (!read.found) {
           // No list at all, which is not the same as a closet with nothing in it.
           throw siteChanged("closet");
