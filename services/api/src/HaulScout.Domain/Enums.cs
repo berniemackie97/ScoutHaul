@@ -368,6 +368,19 @@ public enum PlatformFulfillmentStage
     Delivered
 }
 
+/// <summary>What was decided about an order the marketplace cancelled after it had already been recorded as a sale.</summary>
+public enum PlatformOrderCancellationOutcome
+{
+    /// <summary>Not cancelled, or cancelled and still waiting on a person.</summary>
+    None,
+
+    /// <summary>The sale was undone: the item went back into stock and the money came off the books.</summary>
+    Reversed,
+
+    /// <summary>The sale stands, whatever the marketplace says — the operator gave a reason.</summary>
+    Kept
+}
+
 public enum ReviewStatus
 {
     Pending,

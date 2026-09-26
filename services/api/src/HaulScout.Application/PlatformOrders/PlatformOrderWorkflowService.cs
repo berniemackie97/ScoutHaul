@@ -27,6 +27,17 @@ public sealed class PlatformOrderWorkflowService(
         return orders.Select(order => PlatformOrderDtoFactory.ToPlatformOrderDto(order, suggestions)).ToArray();
     }
 
+    /// <summary>
+    /// Every order the marketplace cancelled that nobody has ruled on. Asked for separately because the ordinary
+    /// list is capped, and a cancellation that falls off the end of it is a question nobody can answer.
+    /// </summary>
+    public async Task<IReadOnlyList<PlatformOrderDto>> ListAwaitingCancellationDecisionAsync(CancellationToken cancellationToken)
+    {
+        IReadOnlyList<PlatformOrder> orders =
+            await store.ListAwaitingCancellationDecisionAsync(currentUser.OrganizationId, 200, cancellationToken);
+        return orders.Select(order => PlatformOrderDtoFactory.ToPlatformOrderDto(order)).ToArray();
+    }
+
     public async Task<AppResult<PlatformOrderDto>> GetAsync(Guid id, CancellationToken cancellationToken)
     {
         PlatformOrder? order = await store.GetAsync(currentUser.OrganizationId, id, cancellationToken);

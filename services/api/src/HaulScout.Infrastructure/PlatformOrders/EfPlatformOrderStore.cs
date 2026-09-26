@@ -181,6 +181,40 @@ public sealed class EfPlatformOrderStore(
             platformOrder.ShippedAt,
             platformOrder.DeliveredAt);
 
+    public async Task<bool> TryClaimCancellationDecisionAsync(PlatformOrder order, CancellationToken cancellationToken)
+    {
+        // Conditional on the row still being undecided, so two operators answering at once cannot both win.
+        int claimed = await db.PlatformOrders
+            .Where(candidate => candidate.Id == order.Id
+                && candidate.OrganizationId == order.OrganizationId
+                && candidate.CancellationOutcome == PlatformOrderCancellationOutcome.None)
+            .ExecuteUpdateAsync(
+                set => set
+                    .SetProperty(candidate => candidate.CancellationOutcome, order.CancellationOutcome)
+                    .SetProperty(candidate => candidate.CancellationDecidedAt, order.CancellationDecidedAt)
+                    .SetProperty(candidate => candidate.CancellationNote, order.CancellationNote),
+                cancellationToken);
+        return claimed == 1;
+    }
+
+    public async Task<IReadOnlyList<PlatformOrder>> ListAwaitingCancellationDecisionAsync(Guid organizationId, int take, CancellationToken cancellationToken) =>
+        await db.PlatformOrders
+            .Include(order => order.Lines).ThenInclude(line => line.InventoryItem)
+            .Where(order => order.OrganizationId == organizationId
+                && order.CancelledOnPlatformAt != null
+                && order.CancellationOutcome == PlatformOrderCancellationOutcome.None)
+            .OrderBy(order => order.CancelledOnPlatformAt)
+            .Take(take)
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<Guid>> ListLiveSaleIdsInGroupAsync(Guid organizationId, Guid saleGroupId, CancellationToken cancellationToken) =>
+        await db.Sales
+            .Where(sale => sale.OrganizationId == organizationId
+                && sale.SaleGroupId == saleGroupId
+                && sale.Status != SaleStatus.Cancelled)
+            .Select(sale => sale.Id)
+            .ToListAsync(cancellationToken);
+
     public async Task<IReadOnlyList<Sale>> ListExistingSalesForReconciliationAsync(
         Guid organizationId,
         IReadOnlyCollection<Guid> inventoryItemIds,

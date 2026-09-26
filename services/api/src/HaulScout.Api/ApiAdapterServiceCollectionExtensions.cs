@@ -1,6 +1,7 @@
 using HaulScout.Api.Authentication;
 using HaulScout.Api.Services;
 using HaulScout.Application.Inventory;
+using HaulScout.Application.PlatformOrders;
 using HaulScout.Application.Security;
 using HaulScout.Application.Storefront;
 using HaulScout.Application.Sync.Agents;
@@ -41,6 +42,7 @@ public static class ApiAdapterServiceCollectionExtensions
         services.AddScoped<SaleGroupingWorkflowService>();
         services.AddScoped<SaleDeletionWorkflowService>();
         services.AddScoped<SaleTransitionWorkflowService>();
+        services.AddScoped<ISaleCanceller, SaleTransitionCanceller>();
         services.AddScoped<SaleCorrectionWorkflowService>();
         services.AddScoped<SaleRefundWorkflowService>();
         services.AddScoped<ICurrentUserContext, JwtCurrentUserContext>();

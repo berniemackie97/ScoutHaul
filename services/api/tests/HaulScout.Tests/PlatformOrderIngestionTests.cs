@@ -12,6 +12,8 @@ using HaulScout.Infrastructure.Orders;
 using HaulScout.Infrastructure.PlatformOrders;
 using HaulScout.Infrastructure.Persistence;
 
+using HaulScout.Infrastructure.Common;
+
 namespace HaulScout.Tests;
 
 public class PlatformOrderIngestionTests
@@ -53,7 +55,9 @@ public class PlatformOrderIngestionTests
             workflow,
             new MarketplaceRefundImportService(platformOrderStore, currentUser, TimeProvider.System),
             new PlatformOrderImportWorkflowService(platformOrderStore, currentUser, ingestion, feeEnrichment),
-            autoMatch);
+            autoMatch,
+            new PlatformOrderCancellationService(platformOrderStore, currentUser, new SaleTransitionCanceller(new SaleTransitionWorkflowService(db, currentUser, orderAssembler, new SaleFinancialStateService(db, currentUser))), new EfUnitOfWork(db),
+                TimeProvider.System));
     }
 
     private static InventoryItem SeedItem(HaulScoutDbContext db, Guid org, string title, decimal cost)
