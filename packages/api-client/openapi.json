@@ -11112,6 +11112,10 @@
           "updatedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "version": {
+            "type": "string",
+            "format": "uuid"
           }
         },
         "additionalProperties": false
@@ -11297,6 +11301,14 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/NewLotItemDto"
+            },
+            "nullable": true
+          },
+          "attachInventoryItemIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
             },
             "nullable": true
           }
@@ -20653,6 +20665,11 @@
             "items": {
               "$ref": "#/components/schemas/AcquisitionLotItemInputDto"
             },
+            "nullable": true
+          },
+          "expectedVersion": {
+            "type": "string",
+            "format": "uuid",
             "nullable": true
           }
         },

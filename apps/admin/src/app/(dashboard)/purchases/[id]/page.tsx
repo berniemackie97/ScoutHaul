@@ -124,7 +124,8 @@ export default async function AcquisitionLotDetailPage({ params }: { params: Pro
 
       <AttachItems lotId={lot.id!} candidates={attachCandidates} />
       <ItemizeForm lotId={lot.id!} allocationMethod={(lot.allocationMethod ?? "Equal") as "Equal" | "WeightedByExpectedValue" | "Manual"} />
-      <LotEditor lot={lot} />
+      {/* Keyed on the version, so the form is always the copy of the lot its save will be checked against. */}
+      <LotEditor key={lot.version} lot={lot} />
     </div>
   );
 }
