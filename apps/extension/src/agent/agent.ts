@@ -6,7 +6,7 @@ import { ApiError, createAgentApi, type AgentApi } from "./api";
 import { recheckMs, signedInFreshMs } from "./config";
 import { describeBrowser } from "./environment";
 import { describeFailure, waitsForAPerson } from "./failures";
-import { initialGovernorState, pauseOf, resume } from "./governor";
+import { pauseOf, resume } from "./governor";
 import { forgetAdapterMemory } from "./memory";
 import {
   checkSession,
@@ -34,6 +34,7 @@ import {
   queuedItem,
   runningItem,
   sessionsItem,
+  updateGovernor,
   workKey,
   type StoredPairing,
 } from "./storage";
@@ -216,8 +217,7 @@ export class Agent {
   }
 
   private async resumePlatform(platform: string, message: string): Promise<void> {
-    const states = await governorItem.getValue();
-    await governorItem.setValue({ ...states, [platform]: resume(states[platform] ?? initialGovernorState()) });
+    await updateGovernor(platform, resume);
     await logActivity("info", message, this.deps.now());
   }
 

@@ -6,7 +6,7 @@ import { ApiError, type AgentApi } from "./api";
 import { describeFailure, waitsForAPerson } from "./failures";
 import { initialGovernorState, nextSlot, pauseOf, recordOutcome, recordRequest, type GovernorPolicy, type Outcome } from "./governor";
 import { adapterMemory } from "./memory";
-import { governorItem, sessionsItem, type StoredSession } from "./storage";
+import { governorItem, sessionsItem, updateGovernor, type StoredSession } from "./storage";
 import type { MarketplaceTab } from "./transport";
 import type { AgentAccount, FailureKind, Heartbeat, Work } from "./types";
 
@@ -73,8 +73,7 @@ export function governedContext(tab: MarketplaceTab, platform: string, policy: G
       await deps.sleep(slot.waitMs);
     }
 
-    const latest = await governorItem.getValue();
-    await governorItem.setValue({ ...latest, [platform]: recordRequest(latest[platform] ?? initialGovernorState(), deps.now().getTime()) });
+    await updateGovernor(platform, (state) => recordRequest(state, deps.now().getTime()));
     onRequest?.();
     return go();
   };
@@ -94,8 +93,7 @@ export async function learn(platform: string, kind: FailureKind | "ok", now: Dat
     return;
   }
 
-  const states = await governorItem.getValue();
-  await governorItem.setValue({ ...states, [platform]: recordOutcome(states[platform] ?? initialGovernorState(), outcome, now.getTime(), platform) });
+  await updateGovernor(platform, (state) => recordOutcome(state, outcome, now.getTime(), platform));
 }
 
 /**

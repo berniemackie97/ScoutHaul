@@ -33,29 +33,27 @@ async function pageFetch(url: string): Promise<PageResponse> {
 }
 
 /**
- * Reads the page the tab has loaded — including the data it embeds in its inline scripts, which stay
- * in the document after it renders. Self-contained, like pageFetch.
+ * Reads the page the tab has loaded, and with it, when asked, a variable the page built for itself — in one go, so both
+ * come from the same document. The variable needs the page's own world: the extension's cannot see it, and a
+ * server-rendered page often deletes the script that wrote it, so it is not in the HTML. Self-contained, like pageFetch.
  */
-function readLoadedPage(): PageResponse {
+function readLoadedPage(global: string | null): PageResponse {
   const navigation = performance.getEntriesByType("navigation")[0] as (PerformanceEntry & { responseStatus?: number }) | undefined;
-  return {
+  const page: PageResponse = {
     status: navigation?.responseStatus || 200,
     url: location.href,
     contentType: document.contentType,
     body: document.documentElement.outerHTML,
   };
-}
+  if (global === null) {
+    return page;
+  }
 
-/**
- * A variable the page built for itself, as JSON. Runs in the page's own world, since the extension's cannot see it;
- * a server-rendered page often deletes the script that wrote it once it has run, so it is not in the HTML to read.
- */
-function readGlobal(name: string): { json: string | null } {
   try {
-    const value = (window as unknown as Record<string, unknown>)[name];
-    return { json: value === undefined ? null : JSON.stringify(value) };
+    const value = (window as unknown as Record<string, unknown>)[global];
+    return { ...page, global: value === undefined ? null : JSON.stringify(value) };
   } catch {
-    return { json: null };
+    return { ...page, global: null };
   }
 }
 
@@ -364,17 +362,11 @@ export class SyncTabs {
         browser.tabs.onUpdated.removeListener(listener);
       }
     };
-    const readPage = () => inTab<PageResponse>(tabId, adapter, this.clock, () => browser.scripting.executeScript({ target: { tabId }, func: readLoadedPage }));
-    const read = async (global: string | undefined): Promise<PageResponse> => {
-      const loaded = await readPage();
-      if (global === undefined) {
-        return loaded;
-      }
-
-      const captured = await inTab<{ json: string | null }>(tabId, adapter, this.clock, () =>
-        browser.scripting.executeScript({ target: { tabId }, world: "MAIN", func: readGlobal, args: [global] }));
-      return { ...loaded, global: captured.json };
-    };
+    const read = (global: string | undefined) =>
+      inTab<PageResponse>(tabId, adapter, this.clock, () =>
+        global === undefined
+          ? browser.scripting.executeScript({ target: { tabId }, func: readLoadedPage, args: [null] })
+          : browser.scripting.executeScript({ target: { tabId }, world: "MAIN", func: readLoadedPage, args: [global] }));
 
     return {
       page: async (url: string, global?: string) => {

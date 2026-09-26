@@ -4,7 +4,7 @@ import { Agent } from "../agent/agent";
 import { portalOrigins } from "../agent/config";
 import type { AgentResponse, BridgeRequest, BridgeStatus, PopupRequest } from "../agent/messages";
 import { afterUpdate } from "../agent/governor";
-import { governorItem, pairingItem, portalItem, queuedItem, runningItem } from "../agent/storage";
+import { pairingItem, portalItem, queuedItem, runningItem, updateGovernors } from "../agent/storage";
 import { SyncTabs } from "../agent/transport";
 
 const heartbeatAlarm = "haulscout-heartbeat";
@@ -22,8 +22,7 @@ export default defineBackground(() => {
   browser.runtime.onInstalled.addListener(({ reason }) => {
     void ensureAlarm();
     if (reason === "update") {
-      void governorItem.getValue().then((states) =>
-        governorItem.setValue(Object.fromEntries(Object.entries(states).map(([platform, state]) => [platform, afterUpdate(state)]))));
+      void updateGovernors((states) => Object.fromEntries(Object.entries(states).map(([platform, state]) => [platform, afterUpdate(state)])));
     }
   });
   browser.runtime.onStartup.addListener(() => void ensureAlarm());
