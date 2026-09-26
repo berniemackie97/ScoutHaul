@@ -5,12 +5,10 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Menu, Package2 } from "lucide-react";
 import { Button } from "@overhaul/ui";
-import { NoAccess } from "@/components/feedback/no-access";
 import { CommandPalette } from "@/components/search/command-palette";
-import { allows } from "@/lib/permissions";
+import type { Granted } from "@/lib/permissions";
 import type { Operator } from "@/lib/session";
 import { CommandPaletteTrigger } from "@/components/search/command-palette-trigger";
-import { pageAt } from "./navigation";
 import { Sidebar } from "./sidebar";
 import { SessionKeepAlive } from "./session-keep-alive";
 
@@ -36,9 +34,7 @@ export function DashboardShell({
   permissions: string[] | null;
 }) {
   const pathname = usePathname();
-  const granted = useMemo(() => (permissions === null ? null : new Set(permissions)), [permissions]);
-  const page = pageAt(pathname);
-  const refused = page?.requires && !allows(granted, page.requires) ? { name: page.name, requires: page.requires } : null;
+  const granted: Granted = useMemo(() => (permissions === null ? null : new Set(permissions)), [permissions]);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
 
@@ -110,7 +106,7 @@ export function DashboardShell({
         </header>
         <main className="flex-1 overflow-y-auto">
           <div className="p-4 pb-[calc(1rem_+_env(safe-area-inset-bottom))] sm:p-6 lg:p-8">
-            {refused ? <NoAccess page={refused.name} requires={refused.requires} granted={granted} /> : children}
+            {children}
           </div>
         </main>
       </div>

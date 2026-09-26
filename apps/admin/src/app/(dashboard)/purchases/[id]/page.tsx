@@ -7,6 +7,7 @@ import { getApiClient } from "@/lib/api";
 import { ItemizeForm } from "./itemize-form";
 import { LotEditor } from "./lot-editor";
 import { AttachItems } from "./attach-items";
+import { refusal } from "@/lib/page-access";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +18,9 @@ const methodLabel: Record<string, string> = {
 };
 
 export default async function AcquisitionLotDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const refused = await refusal("/purchases");
+  if (refused) return refused;
+
   const { id } = await params;
   const api = await getApiClient();
   const [{ data: lot }, { data: inventory }] = await Promise.all([

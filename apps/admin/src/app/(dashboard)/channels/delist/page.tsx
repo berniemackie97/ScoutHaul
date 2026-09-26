@@ -2,10 +2,14 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { getApiClient } from "@/lib/api";
 import { DelistQueue } from "./delist-queue";
+import { refusal } from "@/lib/page-access";
 
 export const dynamic = "force-dynamic";
 
 export default async function DelistPage() {
+  const refused = await refusal("/channels/delist");
+  if (refused) return refused;
+
   const api = await getApiClient();
   const { data } = await api.GET("/api/channel-listings/pending-delist", {});
   const listings = data ?? [];

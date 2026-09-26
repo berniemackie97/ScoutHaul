@@ -2,10 +2,14 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { getApiClient } from "@/lib/api";
 import { SaleCreator } from "./sale-creator";
+import { refusal } from "@/lib/page-access";
 
 export const dynamic = "force-dynamic";
 
 export default async function NewSalePage() {
+  const refused = await refusal("/orders/new");
+  if (refused) return refused;
+
   const api = await getApiClient();
   const [{ data: candidates }, { data: reference }] = await Promise.all([
     api.GET("/api/sales/candidates"),

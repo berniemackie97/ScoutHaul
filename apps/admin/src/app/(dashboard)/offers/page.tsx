@@ -5,6 +5,7 @@ import { formatCurrency, formatDateTime } from "@overhaul/ui";
 import { StatCard, StatRow } from "@/components/list/stat-card";
 import { getApiClient } from "@/lib/api";
 import { decideOffer } from "./actions";
+import { refusal } from "@/lib/page-access";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +28,9 @@ export default async function OffersPage({
 }: {
   searchParams: Promise<{ status?: string }>;
 }) {
+  const refused = await refusal("/offers");
+  if (refused) return refused;
+
   const { status } = await searchParams;
   const active = FILTERS.includes((status ?? "All") as (typeof FILTERS)[number])
     ? ((status ?? "All") as (typeof FILTERS)[number])

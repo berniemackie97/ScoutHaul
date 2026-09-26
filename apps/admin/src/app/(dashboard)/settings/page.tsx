@@ -5,6 +5,7 @@ import { getApiClient } from "@/lib/api";
 import { permission, type Permission } from "@/lib/permissions";
 import { getSession } from "@/lib/session";
 import { StoreConnectionForm } from "./store-connection-form";
+import { refusal } from "@/lib/page-access";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +17,9 @@ const plannedModules = [
 ];
 
 export default async function SettingsPage() {
+  const refused = await refusal("/settings");
+  if (refused) return refused;
+
   // Only what this role can use is shown; the rest would be forms its requests are refused from.
   const session = await getSession();
   const can = (key: Permission) => !session || (session.permissions ?? []).includes(key);

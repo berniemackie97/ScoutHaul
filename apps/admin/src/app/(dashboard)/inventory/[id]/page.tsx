@@ -19,6 +19,7 @@ import { RecordSaleCard } from "./record-sale-card";
 import { DeleteInventoryCard } from "./delete-inventory-card";
 import { StorefrontPolicyCard } from "./storefront-policy-card";
 import { StatusConflictNotice } from "./status-conflict-notice";
+import { refusal } from "@/lib/page-access";
 
 export const dynamic = "force-dynamic";
 
@@ -31,6 +32,9 @@ export default async function InventoryDetailPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  const refused = await refusal("/inventory");
+  if (refused) return refused;
+
   const { id } = await params;
   // Set when an operator arrives from a marketplace listing that sold, so the sale card opens knowing what it can.
   const query = await searchParams;

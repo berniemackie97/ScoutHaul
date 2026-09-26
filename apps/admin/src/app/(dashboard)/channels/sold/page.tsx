@@ -2,10 +2,14 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { getApiClient } from "@/lib/api";
 import { SoldQueue } from "./sold-queue";
+import { refusal } from "@/lib/page-access";
 
 export const dynamic = "force-dynamic";
 
 export default async function SoldNotRecordedPage() {
+  const refused = await refusal("/channels/sold");
+  if (refused) return refused;
+
   const api = await getApiClient();
   const { data } = await api.GET("/api/platform-listings/sold-unrecorded", {});
 

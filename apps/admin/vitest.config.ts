@@ -2,6 +2,8 @@ import { defineConfig } from "vitest/config";
 import path from "path";
 
 export default defineConfig({
+  // The JSX runtime Next compiles with.
+  esbuild: { jsx: "automatic" },
   test: {
     environment: "node",
     globals: true,

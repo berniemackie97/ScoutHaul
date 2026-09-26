@@ -3,6 +3,7 @@ import { ArrowLeft } from "lucide-react";
 import type { InventoryItem } from "@/features/inventory/inventory-operations";
 import { getApiClient } from "@/lib/api";
 import { AddInventory } from "./add-inventory";
+import { refusal } from "@/lib/page-access";
 
 export const dynamic = "force-dynamic";
 
@@ -10,6 +11,9 @@ type Mode = "single" | "lot" | "bundle";
 const MODES = new Set<Mode>(["single", "lot", "bundle"]);
 
 export default async function AddInventoryPage({ searchParams }: { searchParams: Promise<{ mode?: string }> }) {
+  const refused = await refusal("/inventory/add");
+  if (refused) return refused;
+
   const { mode } = await searchParams;
   const initialMode = (MODES.has(mode as Mode) ? mode : "single") as Mode;
 

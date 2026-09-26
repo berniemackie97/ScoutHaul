@@ -6,6 +6,7 @@ import { Pager } from "@/components/list/pager";
 import { StatCard, StatRow } from "@/components/list/stat-card";
 import { inventoryStatusLabel } from "@/features/inventory/inventory-operations";
 import { getApiClient } from "@/lib/api";
+import { refusal } from "@/lib/page-access";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +22,9 @@ export default async function ConsignmentsPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  const refused = await refusal("/consignments");
+  if (refused) return refused;
+
   const query = await searchParams;
   const search = typeof query.q === "string" ? query.q.trim() : "";
   const page = Math.max(1, Number(query.page) || 1);
