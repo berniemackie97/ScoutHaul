@@ -99,7 +99,8 @@ export interface FixtureSale {
   bookedAt?: string;
   state?: string;
   displayStatus?: string;
-  bundleSize?: number;
+  bundleSize?: number | null;
+  isBundle?: boolean;
 }
 
 /** Seller Hub's sales page. Field names and value shapes as read from a real one; the people are invented. */
@@ -110,14 +111,14 @@ export function salesPage(sales: FixtureSale[], nextMaxId: string | null = null)
     user_id: "5f1c0a9e3b8d2a0012345678",
     seller_id: "6a28968fe948982883b29ccf",
     state: sale.state ?? "seller_confirm_initiated",
-    is_bundle: (sale.bundleSize ?? 1) > 1,
+    is_bundle: sale.isBundle ?? (sale.bundleSize ?? 1) > 1,
     title: sale.title ?? "Ripple Junction Blue Dunder Mifflin Graphic Tee",
     total_price_amount: money(sale.total ?? "4.0"),
     picture_url: `https://di2ponv0v5otw.cloudfront.net/posts/2026/07/05/${sale.listingId ?? "6a4a90a11986c2a9de9f4f69"}/m`,
     inventory_booked_at: sale.bookedAt ?? "2026-07-18T20:32:28-07:00",
     shipping_address: { id: "a1", name: "Jordan Rivera", street: "12 Elm St", street2: "Apt 4", city: "Springfield", state: "IL", zip: "62701", country: "US" },
     size: "XL",
-    bundle_size: sale.bundleSize ?? 1,
+    ...(sale.bundleSize === null ? {} : { bundle_size: sale.bundleSize ?? 1 }),
     buyer: { id: "b1", username: "jrivera", display_handle: "jrivera", first_name: "Jordan", last_name: "Rivera", full_name: "Jordan Rivera", fb_user_id: null, status: "active" },
     seller: { id: "6a28968fe948982883b29ccf", username: "overhaultrading" },
     ...(sale.earning === null ? {} : { seller_earning_amount: money(sale.earning ?? "1.05") }),

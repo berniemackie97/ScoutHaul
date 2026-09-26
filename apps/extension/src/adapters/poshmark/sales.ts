@@ -66,13 +66,14 @@ export function bookedAt(sale: unknown): number {
   return typeof at === "string" ? Date.parse(at) : Number.NaN;
 }
 
-export function bundleSize(sale: unknown): number {
+/** Null for a bundle that does not say how many listings it held. */
+export function bundleSize(sale: unknown): number | null {
   if (dig(sale, "is_bundle") !== true) {
     return 1;
   }
 
   const size = Number(dig(sale, "bundle_size"));
-  return Number.isInteger(size) && size > 1 ? size : 1;
+  return Number.isInteger(size) && size > 1 ? size : null;
 }
 
 /** Poshmark names no listing on a sale; the listing id is the folder its pictures are kept in. */
@@ -101,6 +102,12 @@ export function toIngestOrder(sale: unknown, bundleListingIds: string[] | null):
 
   const title = text(dig(sale, "title")) ?? "Untitled Poshmark item";
   const size = bundleSize(sale);
+  if (size === null) {
+    return reject(
+      `Poshmark sold a bundle for $${total.toFixed(2)} without saying how many listings it held. `
+      + "The next listings scan puts each of them under Sold, not recorded; record them there, splitting the total between them.");
+  }
+
   let lines: IngestOrderLine[];
   const issues: RunIssue[] = [];
   if (size > 1) {

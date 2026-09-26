@@ -51,6 +51,24 @@ async function bundleListings(context: MarketplaceContext, id: string, size: num
   }
 }
 
+interface SalesCursor {
+  newest: string | null;
+  resume: string | null;
+}
+
+function readCursor(cursor: string | null): SalesCursor | null {
+  if (!cursor) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(cursor) as Partial<SalesCursor>;
+    return { newest: typeof parsed.newest === "string" ? parsed.newest : null, resume: typeof parsed.resume === "string" ? parsed.resume : null };
+  } catch {
+    return { newest: cursor, resume: null };
+  }
+}
+
 /**
  * Poshmark, read the way its own pages are served: a closet page carries its listings whole, and Seller Hub's sales
  * page carries every sale with its money, buyer and ship-to, in the state Poshmark writes into the HTML. No API is
@@ -100,89 +118,101 @@ export const poshmarkAdapter: MarketplaceAdapter = {
   async scanSales(context: MarketplaceContext, window: SalesWindow): Promise<SalesScan> {
     const now = context.now();
     const since = window.from?.getTime() ?? null;
+    const previous = readCursor(window.cursor);
     // The first scan and a history scan read every page. A routine scan reads on until a page holds nothing new and
     // no sale still under way, so a sale completing weeks later still has its payout recorded.
-    const everything = since !== null || window.cursor === null;
+    const everything = since !== null || previous === null;
     const orders: IngestOrder[] = [];
     const cancelledOrderIds: string[] = [];
     const issues: RunIssue[] = [];
     const seen = new Set<string>();
-    let newest = Date.parse(window.cursor ?? "");
+    let newest = Date.parse(previous?.newest ?? "");
     let oldest = now.getTime();
-    let cursor: string | null = null;
+    let budget = maxSalesPages;
 
-    for (let page = 1; ; page++) {
-      const response = await context.page(cursor === null ? salesPage : `${salesPage}?max_id=${encodeURIComponent(cursor)}`);
-      assertReadable(response);
-      const read = readSalesPage(response.body);
-      if (!read.found) {
-        throw siteChanged("sales");
+    /** Reads pages from a cursor; answers where it had to stop for the page budget, or null when it finished. */
+    const readFrom = async (start: string | null, stopWhenSettled: boolean): Promise<string | null> => {
+      let cursor = start;
+      while (budget > 0) {
+        budget--;
+        const response = await context.page(cursor === null ? salesPage : `${salesPage}?max_id=${encodeURIComponent(cursor)}`);
+        assertReadable(response);
+        const read = readSalesPage(response.body);
+        if (!read.found) {
+          throw siteChanged("sales");
+        }
+
+        let unsettled = 0;
+        for (const sale of read.sales) {
+          const id = saleId(sale);
+          if (id === null) {
+            issues.push({ message: "A sale in Poshmark's sales list has no id.", externalReference: null, rejected: true });
+            continue;
+          }
+
+          if (seen.has(id)) {
+            continue;
+          }
+
+          seen.add(id);
+          const at = bookedAt(sale);
+          if (since !== null && Number.isFinite(at) && at < since) {
+            continue;
+          }
+
+          if (Number.isFinite(at)) {
+            newest = Number.isFinite(newest) ? Math.max(newest, at) : at;
+            oldest = Math.min(oldest, at);
+          }
+
+          const key = `sale:${id}`;
+          const stamp = saleStamp(sale);
+          const state = saleState(sale);
+          if (state === "open" || (await context.memory.get<string>(key)) !== stamp) {
+            unsettled++;
+          }
+
+          if (state === "cancelled") {
+            cancelledOrderIds.push(id);
+            await context.memory.set(key, stamp);
+            continue;
+          }
+
+          const size = bundleSize(sale);
+          const sold = toIngestOrder(sale, size !== null && size > 1 ? await bundleListings(context, id, size) : null);
+          issues.push(...sold.issues);
+          if (sold.order) {
+            orders.push(sold.order);
+            await context.memory.set(key, stamp);
+          }
+        }
+
+        if (read.nextMaxId === null || read.nextMaxId === cursor || read.sales.length === 0 || (stopWhenSettled && unsettled === 0)) {
+          return null;
+        }
+
+        cursor = read.nextMaxId;
       }
 
-      let fresh = 0;
-      let unsettled = 0;
-      for (const sale of read.sales) {
-        const id = saleId(sale);
-        if (id === null) {
-          issues.push({ message: "A sale in Poshmark's sales list has no id.", externalReference: null, rejected: true });
-          continue;
-        }
+      return cursor;
+    };
 
-        if (seen.has(id)) {
-          continue;
-        }
+    // Where a scan ran out of pages is carried in the loop's own cursor, so the next one picks the history up there
+    // after reading what is new, instead of stopping at the settled pages above it for good.
+    let resume = await readFrom(null, !everything);
+    if (resume === null && previous?.resume) {
+      resume = await readFrom(previous.resume, false);
+    }
 
-        seen.add(id);
-        fresh++;
-        const at = bookedAt(sale);
-        if (since !== null && Number.isFinite(at) && at < since) {
-          continue;
-        }
-
-        if (Number.isFinite(at)) {
-          newest = Number.isFinite(newest) ? Math.max(newest, at) : at;
-          oldest = Math.min(oldest, at);
-        }
-
-        const key = `sale:${id}`;
-        const stamp = saleStamp(sale);
-        const state = saleState(sale);
-        if (state === "open" || (await context.memory.get<string>(key)) !== stamp) {
-          unsettled++;
-        }
-
-        if (state === "cancelled") {
-          cancelledOrderIds.push(id);
-          await context.memory.set(key, stamp);
-          continue;
-        }
-
-        const size = bundleSize(sale);
-        const sold = toIngestOrder(sale, size > 1 ? await bundleListings(context, id, size) : null);
-        issues.push(...sold.issues);
-        if (sold.order) {
-          orders.push(sold.order);
-          await context.memory.set(key, stamp);
-        }
-      }
-
-      if (read.nextMaxId === null || fresh === 0 || (!everything && unsettled === 0)) {
-        break;
-      }
-
-      if (page >= maxSalesPages) {
-        issues.push({ message: "Poshmark lists more sales than one scan reads; the oldest were not read.", externalReference: null, rejected: false });
-        break;
-      }
-
-      cursor = read.nextMaxId;
+    if (resume !== null) {
+      issues.push({ message: "Poshmark lists more sales than one scan reads; the next scan carries on from where this one stopped.", externalReference: null, rejected: false });
     }
 
     return {
       orders,
       cancelledOrderIds,
       issues,
-      cursor: Number.isFinite(newest) ? new Date(newest).toISOString() : window.cursor,
+      cursor: JSON.stringify({ newest: Number.isFinite(newest) ? new Date(newest).toISOString() : null, resume }),
       coversFrom: new Date(since ?? oldest).toISOString(),
       coversTo: now.toISOString(),
     };

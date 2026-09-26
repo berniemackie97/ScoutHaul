@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { closetPage, closetPageWithoutListings, homePage, salePage, salesPage } from "../../test/poshmark-fixtures";
 import { memoryInMap } from "../../test/memory";
 import { AdapterError, type MarketplaceContext, type PageResponse, type Session } from "../types";
-import { poshmarkAdapter } from ".";
+import { maxSalesPages, poshmarkAdapter } from ".";
 import { readClosetPage } from "./listings";
 
 const now = new Date("2026-09-26T12:00:00Z");
@@ -202,7 +202,7 @@ describe("Poshmark sales", () => {
       fulfillmentDetail: "Order Complete",
       lines: [{ title: "Ripple Junction Blue Dunder Mifflin Graphic Tee", unitPrice: 4, quantity: 1, externalItemId: "6a4a90a11986c2a9de9f4f69" }],
     });
-    expect(scan.cursor).toBe("2026-07-19T03:32:28.000Z");
+    expect(JSON.parse(scan.cursor!)).toEqual({ newest: "2026-07-19T03:32:28.000Z", resume: null });
   });
 
   it("leaves the payout open until Poshmark completes the order", async () => {
@@ -264,6 +264,39 @@ describe("Poshmark sales", () => {
     expect(scan.issues[0]).toMatchObject({ externalReference: "b1", rejected: true });
     expect(scan.issues[0]!.message).toContain("Sold, not recorded");
     await expect(context.memory.get("sale:b1")).resolves.toBeUndefined();
+  });
+
+  it("refuses a bundle that does not say how many listings it held", async () => {
+    const context = poshmark(() => salesPage([{ id: "b1", total: "30.0", isBundle: true, bundleSize: null }]));
+
+    const scan = await poshmarkAdapter.scanSales(context, first, seller);
+
+    expect(scan.orders).toEqual([]);
+    expect(scan.issues[0]).toMatchObject({ externalReference: "b1", rejected: true });
+    expect(context.read).toHaveLength(1);
+  });
+
+  it("carries on next scan from where a scan ran out of pages, after reading what is new", async () => {
+    const pages = maxSalesPages + 50;
+    const context = poshmark((url) => {
+      const page = Number(url.searchParams.get("max_id") ?? "1");
+      return salesPage([{ id: `s${page}` }], page < pages ? String(page + 1) : null);
+    });
+
+    const capped = await poshmarkAdapter.scanSales(context, first, seller);
+
+    expect(capped.orders).toHaveLength(maxSalesPages);
+    expect(JSON.parse(capped.cursor!).resume).toBe(String(maxSalesPages + 1));
+    expect(capped.issues.map((issue) => issue.rejected)).toEqual([false]);
+
+    context.read.length = 0;
+    const resumed = await poshmarkAdapter.scanSales(context, { from: null, cursor: capped.cursor }, seller);
+
+    expect(context.read[0]).not.toContain("max_id");
+    expect(context.read[1]).toContain(`max_id=${maxSalesPages + 1}`);
+    expect(resumed.orders.map((order) => order.externalOrderId)).toEqual(["s1", ...Array.from({ length: 50 }, (_, index) => `s${maxSalesPages + 1 + index}`)]);
+    expect(JSON.parse(resumed.cursor!).resume).toBeNull();
+    expect(resumed.issues).toEqual([]);
   });
 
   it("follows Poshmark's cursor through the whole history on a first scan", async () => {
