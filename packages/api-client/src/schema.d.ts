@@ -9157,6 +9157,8 @@ export interface components {
             createdAt?: string;
             /** Format: date-time */
             updatedAt?: string;
+            /** Format: uuid */
+            version?: string;
         };
         AcquisitionLotItemDto: {
             /** Format: uuid */
@@ -9228,6 +9230,7 @@ export interface components {
         };
         AddLotItemsRequest: {
             items?: components["schemas"]["NewLotItemDto"][] | null;
+            attachInventoryItemIds?: string[] | null;
         };
         AddOrganizationMemberRequest: {
             email?: string | null;
@@ -12380,6 +12383,8 @@ export interface components {
             externalReference?: string | null;
             notes?: string | null;
             items?: components["schemas"]["AcquisitionLotItemInputDto"][] | null;
+            /** Format: uuid */
+            expectedVersion?: string | null;
         };
         UpsertChannelAccountRequest: {
             channel?: string | null;

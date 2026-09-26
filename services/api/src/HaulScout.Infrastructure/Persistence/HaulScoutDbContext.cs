@@ -279,6 +279,7 @@ public sealed class HaulScoutDbContext(
         {
             entity.ToTable("AcquisitionLots");
             entity.Property(item => item.Name).HasMaxLength(240).IsRequired();
+            entity.Property(item => item.Version).IsConcurrencyToken();
             entity.Property(item => item.SupplierName).HasMaxLength(240);
             entity.Property(item => item.ExternalReference).HasMaxLength(240);
             entity.Property(item => item.AllocationMethod).HasConversion<string>().HasMaxLength(40);

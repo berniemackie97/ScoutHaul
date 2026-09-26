@@ -116,7 +116,8 @@ public static class InventoryMapping
             .Select(lotItem => lotItem.ToDto())
             .ToArray(),
         item.CreatedAt,
-        item.UpdatedAt);
+        item.UpdatedAt,
+        item.Version);
 
     public static AcquisitionLotItemDto ToDto(this AcquisitionLotItem item) => new(
         item.Id,

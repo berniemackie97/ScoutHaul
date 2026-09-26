@@ -59,6 +59,7 @@ export function LotEditor({ lot }: { lot: AcquisitionLot }) {
       </CardHeader>
       <CardContent>
         <form action={action} className="space-y-5">
+          <input type="hidden" name="version" value={lot.version ?? ""} />
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2 sm:col-span-2">
               <Label htmlFor="name">Lot name</Label>

@@ -239,7 +239,8 @@ public sealed record UpsertAcquisitionLotRequest(
     Guid? SourcingTripStopId,
     string? ExternalReference,
     string? Notes,
-    IReadOnlyList<AcquisitionLotItemInputDto> Items);
+    IReadOnlyList<AcquisitionLotItemInputDto> Items,
+    Guid? ExpectedVersion = null);
 
 public sealed record AcquisitionLotItemDto(
     Guid Id,
@@ -263,7 +264,8 @@ public sealed record NewLotItemDto(
     string? Notes = null);
 
 /// <summary>Creates draft inventory items inside an existing lot, then re-allocates landed cost across all items.</summary>
-public sealed record AddLotItemsRequest(IReadOnlyList<NewLotItemDto> Items);
+/// <summary>New items to create inside a lot, existing ones to attach to it, or both — added to whatever the lot holds when the request lands.</summary>
+public sealed record AddLotItemsRequest(IReadOnlyList<NewLotItemDto>? Items, IReadOnlyList<Guid>? AttachInventoryItemIds = null);
 
 public sealed record AcquisitionLotDto(
     Guid Id,
@@ -285,7 +287,8 @@ public sealed record AcquisitionLotDto(
     string? Notes,
     IReadOnlyList<AcquisitionLotItemDto> Items,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    Guid Version);
 
 public sealed record CreateInventoryBundleRequest(
     string Title,

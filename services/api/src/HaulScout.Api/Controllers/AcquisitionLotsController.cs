@@ -2,6 +2,7 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
+using Npgsql;
 using HaulScout.Api.Authorization;
 using static HaulScout.Api.Helpers.StringHelpers;
 using HaulScout.Api.Mapping;
@@ -22,6 +23,11 @@ namespace HaulScout.Api.Controllers;
 [RequireOrganizationPermission(HaulScoutPermissions.ManageFinance)]
 public sealed class AcquisitionLotsController(HaulScoutDbContext db, ICurrentUserContext currentUser) : HaulScoutControllerBase
 {
+    private const string LotChanged = "This lot changed since you opened it. Reload to see the latest.";
+    private const string ItemTakenMeanwhile = "One of these items was just added to another lot. Reload to see where it went.";
+    private const string ChangedWhileSaving = "This lot or one of its items changed while you were saving. Reload to see the latest.";
+    private const int AttemptsToAdd = 5;
+
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<AcquisitionLotDto>>> List(CancellationToken cancellationToken)
     {
@@ -153,7 +159,16 @@ public sealed class AcquisitionLotsController(HaulScoutDbContext db, ICurrentUse
     [HttpPost]
     public async Task<ActionResult<AcquisitionLotDto>> Create(UpsertAcquisitionLotRequest request, CancellationToken cancellationToken)
     {
-        ActionResult<AcquisitionLotDto> result = await Upsert(existingLotId: null, request, cancellationToken);
+        ActionResult<AcquisitionLotDto> result;
+        try
+        {
+            result = await Upsert(existingLotId: null, request, cancellationToken);
+        }
+        catch (DbUpdateException exception) when (InAnotherLot(exception))
+        {
+            return Blocked(ItemTakenMeanwhile);
+        }
+
         if (result.Result is not null)
         {
             return result.Result;
@@ -165,27 +180,66 @@ public sealed class AcquisitionLotsController(HaulScoutDbContext db, ICurrentUse
     [HttpPut("{id:guid}")]
     public async Task<ActionResult<AcquisitionLotDto>> Update(Guid id, UpsertAcquisitionLotRequest request, CancellationToken cancellationToken)
     {
-        return await Upsert(id, request, cancellationToken);
+        try
+        {
+            return await Upsert(id, request, cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return Blocked(LotChanged);
+        }
+        catch (DbUpdateException exception) when (InAnotherLot(exception))
+        {
+            // Another save to this lot re-inserting the same item, or another lot taking it: both mean reload.
+            return Blocked(ChangedWhileSaving);
+        }
     }
 
     /// <summary>
-    /// Itemize a lot: create draft inventory items directly inside it, then re-allocate landed cost across
-    /// all items (existing + new) using the lot's current allocation method. This is the natural sourcing
-    /// order — record the lot first, then inventory each item out of it.
+    /// Adds to a lot: new draft items created inside it, existing items attached to it, or both — then re-allocates
+    /// landed cost across everything it holds. The merge happens here, against the lot as it is when the request lands,
+    /// so nothing another person added in the meantime is dropped.
     /// </summary>
     [HttpPost("{id:guid}/items")]
     public async Task<ActionResult<AcquisitionLotDto>> AddItems(Guid id, AddLotItemsRequest request, CancellationToken cancellationToken)
     {
-        if (request.Items is null || request.Items.Count == 0)
+        IReadOnlyList<NewLotItemDto> newItems = request.Items ?? [];
+        IReadOnlyList<Guid> attach = request.AttachInventoryItemIds ?? [];
+        if (newItems.Count == 0 && attach.Count == 0)
         {
             return Invalid("Provide at least one item to add to the lot.");
         }
 
-        if (request.Items.Any(item => string.IsNullOrWhiteSpace(item.Title)))
+        if (newItems.Any(item => string.IsNullOrWhiteSpace(item.Title)))
         {
             return Invalid("Every new lot item needs a title.");
         }
 
+        for (int attempt = 1; ; attempt++)
+        {
+            try
+            {
+                return await AddItemsOnce(id, newItems, attach, cancellationToken);
+            }
+            catch (DbUpdateException exception) when (attempt < AttemptsToAdd && (exception is DbUpdateConcurrencyException || InAnotherLot(exception)))
+            {
+                // Another save to this lot landed first. Adding is safe to repeat against the lot as it now is; an item
+                // another lot has taken is then refused by name before anything is written.
+                db.ChangeTracker.Clear();
+            }
+            catch (DbUpdateException exception) when (exception is DbUpdateConcurrencyException || InAnotherLot(exception))
+            {
+                return Blocked(ChangedWhileSaving);
+            }
+        }
+    }
+
+    private async Task<ActionResult<AcquisitionLotDto>> AddItemsOnce(
+        Guid id,
+        IReadOnlyList<NewLotItemDto> newItems,
+        IReadOnlyList<Guid> attach,
+        CancellationToken cancellationToken)
+    {
         AcquisitionLot? lot = await db.AcquisitionLots
             .Include(item => item.Items)
             .SingleOrDefaultAsync(item => item.Id == id && item.OrganizationId == currentUser.OrganizationId, cancellationToken);
@@ -199,7 +253,7 @@ public sealed class AcquisitionLotsController(HaulScoutDbContext db, ICurrentUse
         await using IDbContextTransaction transaction = await db.Database.BeginTransactionAsync(cancellationToken);
 
         List<(InventoryItem Item, NewLotItemDto Input)> created = [];
-        foreach (NewLotItemDto input in request.Items)
+        foreach (NewLotItemDto input in newItems)
         {
             InventoryItem item = new()
             {
@@ -234,6 +288,10 @@ public sealed class AcquisitionLotsController(HaulScoutDbContext db, ICurrentUse
                 ManualAllocatedCost: entry.Input.ManualAllocatedCost,
                 AllocationWeight: entry.Input.AllocationWeight,
                 Notes: TrimToNull(entry.Input.Notes))))
+            .Concat(attach
+                .Distinct()
+                .Where(inventoryItemId => lot.Items.All(existing => existing.InventoryItemId != inventoryItemId))
+                .Select(inventoryItemId => new AcquisitionLotItemInputDto(inventoryItemId, ManualAllocatedCost: null, AllocationWeight: null, Notes: null)))
             .ToList();
 
         UpsertAcquisitionLotRequest mergedRequest = new(
@@ -251,7 +309,8 @@ public sealed class AcquisitionLotsController(HaulScoutDbContext db, ICurrentUse
             lot.SourcingTripStopId,
             lot.ExternalReference,
             lot.Notes,
-            mergedItems);
+            mergedItems,
+            lot.Version);
 
         ActionResult<AcquisitionLotDto> result = await Upsert(id, mergedRequest, cancellationToken);
         if (result.Result is not null)
@@ -318,6 +377,11 @@ public sealed class AcquisitionLotsController(HaulScoutDbContext db, ICurrentUse
                 return Missing();
             }
 
+            if (request.ExpectedVersion is Guid expected && expected != existingLot.Version)
+            {
+                return Blocked(LotChanged);
+            }
+
             lot = existingLot;
             oldItemIds = lot.Items.Select(item => item.InventoryItemId).ToArray();
             db.AcquisitionLotItems.RemoveRange(lot.Items);
@@ -329,6 +393,7 @@ public sealed class AcquisitionLotsController(HaulScoutDbContext db, ICurrentUse
         }
 
         Apply(request, lot);
+        lot.MarkChanged();
 
         Dictionary<Guid, decimal> allocations = Allocate(request, items);
         Dictionary<Guid, AcquisitionLotItemInputDto> inputs = request.Items
@@ -516,6 +581,9 @@ public sealed class AcquisitionLotsController(HaulScoutDbContext db, ICurrentUse
         Status = sale.Status.ToString(),
         sale.Notes,
     });
+
+    private static bool InAnotherLot(DbUpdateException exception) =>
+        exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation, ConstraintName: "IX_AcquisitionLotItems_OrganizationId_InventoryItemId" };
 
     private static Dictionary<Guid, decimal> Allocate(UpsertAcquisitionLotRequest request, IReadOnlyList<InventoryItem> items)
     {

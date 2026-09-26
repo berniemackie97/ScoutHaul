@@ -157,7 +157,12 @@ public sealed class AcquisitionLot : EntityBase, IOrganizationScoped
     public string? Notes { get; set; }
     public ICollection<AcquisitionLotItem> Items { get; set; } = [];
 
+    /// <summary>Replaced on every change to the lot or its items, so a write made from an older copy is refused.</summary>
+    public Guid Version { get; private set; } = Guid.NewGuid();
+
     public decimal TotalLandedCost => PurchaseSubtotal + ShippingCost + TaxCost + FeeCost + OtherCost;
+
+    public void MarkChanged() => Version = Guid.NewGuid();
 }
 
 public sealed class AcquisitionLotItem : EntityBase, IOrganizationScoped
