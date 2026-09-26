@@ -34,6 +34,9 @@ public interface IPlatformOrderStore
         IReadOnlyCollection<SaleStatus> releasedInventoryStatuses,
         CancellationToken cancellationToken);
 
+    /// <summary>The sales an order was reconciled into that are still standing, so cancelling skips the settled ones.</summary>
+    Task<IReadOnlyList<Guid>> ListLiveSaleIdsInGroupAsync(Guid organizationId, Guid saleGroupId, CancellationToken cancellationToken);
+
     Task<IReadOnlyList<ChannelListing>> ListChannelListingsAsync(Guid organizationId, Guid inventoryItemId, CancellationToken cancellationToken);
 
     Task<MarketObservation?> GetInternalSaleObservationAsync(

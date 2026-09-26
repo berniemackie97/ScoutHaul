@@ -2410,6 +2410,19 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
+                    b.Property<DateTimeOffset?>("CancellationDecidedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CancellationNote")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<int>("CancellationOutcome")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset?>("CancelledOnPlatformAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("Carrier")
                         .HasMaxLength(60)
                         .HasColumnType("character varying(60)");

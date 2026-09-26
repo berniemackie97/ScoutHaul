@@ -132,6 +132,10 @@ public sealed record PlatformOrderDto(
     DateTimeOffset? DeliveredAt,
     PlatformFulfillmentStage FulfillmentStage,
     string? FulfillmentDetail,
+    DateTimeOffset? CancelledOnPlatformAt,
+    PlatformOrderCancellationOutcome CancellationOutcome,
+    DateTimeOffset? CancellationDecidedAt,
+    string? CancellationNote,
     PlatformOrderStatus Status,
     Guid? ReconciledSaleGroupId,
     DateTimeOffset? ReconciledAt,
@@ -141,6 +145,12 @@ public sealed record PlatformOrderDto(
     bool FeesPending = false);
 
 public sealed record PlatformOrderDeletedDto(Guid PlatformOrderId);
+
+/// <summary>
+/// What to do about an order the marketplace cancelled after it was recorded as a sale: undo the sale, or keep it
+/// and say why.
+/// </summary>
+public sealed record ResolvePlatformOrderCancellationRequest(PlatformOrderCancellationOutcome Outcome, string? Note = null);
 
 /// <summary>What settling the backlog would do. Shown before anything is written.</summary>
 /// <param name="PendingOrders">Orders currently waiting on a decision.</param>

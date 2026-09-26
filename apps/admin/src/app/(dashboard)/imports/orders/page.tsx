@@ -1,9 +1,10 @@
 import Link from "next/link";
-import { ArrowLeft, FileSpreadsheet, PlugZap, ScanLine, Wallet } from "lucide-react";
+import { AlertTriangle, ArrowLeft, FileSpreadsheet, PlugZap, ScanLine, Wallet } from "lucide-react";
 import { Badge, Card, formatCurrency, formatDate } from "@overhaul/ui";
 import { getApiClient } from "@/lib/api";
 import { PlatformOrderReconciler } from "./reconciler";
 import { AutoMatchPanel } from "./auto-match-panel";
+import { CancelledAfterSalePanel } from "./cancelled-panel";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +20,10 @@ export default async function PlatformOrdersPage() {
 
   const openOrders = openResult.data ?? [];
   const reconciled = reconciledResult.data ?? [];
+  // Cancelled by the marketplace after the sale was recorded, and nobody has ruled on it yet.
+  const cancelled = reconciled.filter(
+    (order) => order.cancelledOnPlatformAt && order.cancellationOutcome === "None"
+  );
   const flagged = openOrders.filter(
     (order) => typeof order.payoutAmount === "number" && Math.abs(order.payoutVariance ?? 0) >= 0.01
   ).length;
@@ -29,6 +34,12 @@ export default async function PlatformOrdersPage() {
       value: String(openOrders.length),
       detail: "Imported platform orders not yet posted to sales",
       icon: ScanLine,
+    },
+    {
+      label: "Cancelled after sale",
+      value: String(cancelled.length),
+      detail: "Marketplace cancelled an order already on the books",
+      icon: AlertTriangle,
     },
     {
       label: "Payout variances",
@@ -75,7 +86,7 @@ export default async function PlatformOrdersPage() {
         </div>
       </header>
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {kpis.map((kpi) => (
           <Card key={kpi.label} className="p-5">
             <div className="flex items-center justify-between">
@@ -87,6 +98,8 @@ export default async function PlatformOrdersPage() {
           </Card>
         ))}
       </div>
+
+      <CancelledAfterSalePanel orders={cancelled} />
 
       <AutoMatchPanel canSettle={autoMatchResult.data?.canSettle ?? 0} />
 

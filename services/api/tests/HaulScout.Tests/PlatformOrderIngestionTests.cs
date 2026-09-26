@@ -53,7 +53,8 @@ public class PlatformOrderIngestionTests
             workflow,
             new MarketplaceRefundImportService(platformOrderStore, currentUser, TimeProvider.System),
             new PlatformOrderImportWorkflowService(platformOrderStore, currentUser, ingestion, feeEnrichment),
-            autoMatch);
+            autoMatch,
+            new PlatformOrderCancellationService(platformOrderStore, currentUser, new SaleTransitionCanceller(new SaleTransitionWorkflowService(db, currentUser, orderAssembler, new SaleFinancialStateService(db, currentUser))), TimeProvider.System));
     }
 
     private static InventoryItem SeedItem(HaulScoutDbContext db, Guid org, string title, decimal cost)

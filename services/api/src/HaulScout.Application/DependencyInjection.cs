@@ -50,6 +50,7 @@ public static class DependencyInjection
         services.AddScoped<PlatformOrderFeeEnrichmentService>();
         services.AddScoped<PlatformOrderImportWorkflowService>();
         services.AddScoped<PlatformOrderIngestionService>();
+        services.AddScoped<PlatformOrderCancellationService>();
         services.AddScoped<PlatformOrderWorkflowService>();
         services.AddScoped<PlatformOrderAutoMatchService>();
         services.AddScoped<ReferenceOverrideWorkflowService>();

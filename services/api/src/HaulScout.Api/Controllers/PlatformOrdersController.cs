@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using HaulScout.Api.Authorization;
+using HaulScout.Api.Services;
 using HaulScout.Application.Common;
 using HaulScout.Application.Contracts;
 using HaulScout.Application.PlatformOrders;
@@ -19,7 +20,8 @@ public sealed class PlatformOrdersController(
     PlatformOrderWorkflowService platformOrders,
     MarketplaceRefundImportService marketplaceRefundImportService,
     PlatformOrderImportWorkflowService platformOrderImports,
-    PlatformOrderAutoMatchService autoMatch) : HaulScoutControllerBase
+    PlatformOrderAutoMatchService autoMatch,
+    PlatformOrderCancellationService cancellations) : HaulScoutControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<PlatformOrderDto>>> List(
@@ -30,6 +32,14 @@ public sealed class PlatformOrdersController(
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<PlatformOrderDto>> Get(Guid id, CancellationToken cancellationToken) =>
         ToActionResult(await platformOrders.GetAsync(id, cancellationToken));
+
+    /// <summary>Settles an order the marketplace cancelled after it was recorded as a sale: undo the sale, or keep it.</summary>
+    [HttpPost("{id:guid}/cancellation")]
+    public async Task<ActionResult<PlatformOrderDto>> ResolveCancellation(
+        Guid id,
+        ResolvePlatformOrderCancellationRequest request,
+        CancellationToken cancellationToken) =>
+        ToActionResult(await cancellations.DecideAsync(id, request, cancellationToken));
 
     /// <summary>What settling the waiting backlog would do — nothing is written.</summary>
     [HttpGet("auto-match/preview")]

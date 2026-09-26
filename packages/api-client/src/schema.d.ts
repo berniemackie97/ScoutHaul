@@ -4159,6 +4159,51 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/platform-orders/{id}/cancellation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["ResolvePlatformOrderCancellationRequest"];
+                    "text/json": components["schemas"]["ResolvePlatformOrderCancellationRequest"];
+                    "application/*+json": components["schemas"]["ResolvePlatformOrderCancellationRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["PlatformOrderDto"];
+                        "application/json": components["schemas"]["PlatformOrderDto"];
+                        "text/json": components["schemas"]["PlatformOrderDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/platform-orders/auto-match/preview": {
         parameters: {
             query?: never;
@@ -10493,6 +10538,8 @@ export interface components {
         PlatformListingReconcileStatus: "Pending" | "Linked" | "Ignored";
         /** @enum {string} */
         PlatformListingStatus: "Active" | "Draft" | "Scheduled" | "Ended" | "Sold" | "Unsold" | "OutOfStock";
+        /** @enum {string} */
+        PlatformOrderCancellationOutcome: "None" | "Reversed" | "Kept";
         PlatformOrderDeletedDto: {
             /** Format: uuid */
             platformOrderId?: string;
@@ -10545,6 +10592,12 @@ export interface components {
             deliveredAt?: string | null;
             fulfillmentStage?: components["schemas"]["PlatformFulfillmentStage"];
             fulfillmentDetail?: string | null;
+            /** Format: date-time */
+            cancelledOnPlatformAt?: string | null;
+            cancellationOutcome?: components["schemas"]["PlatformOrderCancellationOutcome"];
+            /** Format: date-time */
+            cancellationDecidedAt?: string | null;
+            cancellationNote?: string | null;
             status?: components["schemas"]["PlatformOrderStatus"];
             /** Format: uuid */
             reconciledSaleGroupId?: string | null;
@@ -10999,6 +11052,10 @@ export interface components {
             dueAt?: string | null;
             /** Format: date-time */
             createdAt?: string;
+        };
+        ResolvePlatformOrderCancellationRequest: {
+            outcome?: components["schemas"]["PlatformOrderCancellationOutcome"];
+            note?: string | null;
         };
         ResolveReturnRequest: {
             /** Format: double */

@@ -79,6 +79,23 @@ public sealed class PlatformOrder : EntityBase, IOrganizationScoped
 
     public PlatformOrderStatus Status { get; set; } = PlatformOrderStatus.Imported;
 
+    /// <summary>
+    /// When the marketplace said this order was cancelled. An order not yet reconciled is simply set aside; one
+    /// already recorded as a sale cannot be, because undoing a sale moves stock and money — so it waits here for a
+    /// person, rather than being reversed behind their back or lost in a scan's notes.
+    /// </summary>
+    public DateTimeOffset? CancelledOnPlatformAt { get; set; }
+
+    public PlatformOrderCancellationOutcome CancellationOutcome { get; set; } = PlatformOrderCancellationOutcome.None;
+
+    public DateTimeOffset? CancellationDecidedAt { get; set; }
+
+    public string? CancellationNote { get; set; }
+
+    /// <summary>A cancelled sale nobody has ruled on yet: the books still say it happened.</summary>
+    public bool AwaitingCancellationDecision =>
+        CancelledOnPlatformAt is not null && CancellationOutcome == PlatformOrderCancellationOutcome.None;
+
     /// <summary>Links to the sale group created when this order was reconciled.</summary>
     public Guid? ReconciledSaleGroupId { get; set; }
     public DateTimeOffset? ReconciledAt { get; set; }

@@ -369,11 +369,14 @@ public sealed class PlatformOrderIngestionService(
             }
             else if (order.Status == PlatformOrderStatus.Reconciled)
             {
+                // Recorded as a sale already. Undoing one moves stock and money, so it is written down and put in
+                // front of a person instead of being reversed behind their back.
+                order.CancelledOnPlatformAt ??= DateTimeOffset.UtcNow;
                 stillRecorded.Add(order.ExternalOrderId);
             }
         }
 
-        if (setAside > 0)
+        if (setAside > 0 || stillRecorded.Count > 0)
         {
             await store.SaveChangesAsync(cancellationToken);
         }

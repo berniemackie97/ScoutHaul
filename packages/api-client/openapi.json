@@ -5233,6 +5233,65 @@
         }
       }
     },
+    "/api/platform-orders/{id}/cancellation": {
+      "post": {
+        "tags": [
+          "PlatformOrders"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolvePlatformOrderCancellationRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolvePlatformOrderCancellationRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolvePlatformOrderCancellationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformOrderDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformOrderDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformOrderDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/platform-orders/auto-match/preview": {
       "get": {
         "tags": [
@@ -15752,6 +15811,14 @@
         ],
         "type": "string"
       },
+      "PlatformOrderCancellationOutcome": {
+        "enum": [
+          "None",
+          "Reversed",
+          "Kept"
+        ],
+        "type": "string"
+      },
       "PlatformOrderDeletedDto": {
         "type": "object",
         "properties": {
@@ -15901,6 +15968,23 @@
             "$ref": "#/components/schemas/PlatformFulfillmentStage"
           },
           "fulfillmentDetail": {
+            "type": "string",
+            "nullable": true
+          },
+          "cancelledOnPlatformAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "cancellationOutcome": {
+            "$ref": "#/components/schemas/PlatformOrderCancellationOutcome"
+          },
+          "cancellationDecidedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "cancellationNote": {
             "type": "string",
             "nullable": true
           },
@@ -17154,6 +17238,19 @@
           "createdAt": {
             "type": "string",
             "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ResolvePlatformOrderCancellationRequest": {
+        "type": "object",
+        "properties": {
+          "outcome": {
+            "$ref": "#/components/schemas/PlatformOrderCancellationOutcome"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false

@@ -56,7 +56,8 @@ public class OrderChannelUnificationTests
             workflow,
             new MarketplaceRefundImportService(platformOrderStore, currentUser, TimeProvider.System),
             new PlatformOrderImportWorkflowService(platformOrderStore, currentUser, ingestion, feeEnrichment),
-            autoMatch);
+            autoMatch,
+            new PlatformOrderCancellationService(platformOrderStore, currentUser, new SaleTransitionCanceller(new SaleTransitionWorkflowService(db, currentUser, orderAssembler, new SaleFinancialStateService(db, currentUser))), TimeProvider.System));
     }
 
     private static SalesController NewSales(HaulScoutDbContext db, Guid org, Guid user)

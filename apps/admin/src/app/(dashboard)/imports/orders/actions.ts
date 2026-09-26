@@ -120,3 +120,34 @@ export async function deleteImportedOrder(id: string): Promise<{ ok: boolean; me
   revalidatePath("/imports");
   return { ok: true, message: "Import row deleted." };
 }
+
+
+/**
+ * Settles an order the marketplace cancelled after it was recorded as a sale. Reversing undoes the sale — the item
+ * goes back into stock and the money comes off the books — so the reason is kept either way.
+ */
+export async function resolveCancellation(
+  _previous: ActionResult,
+  formData: FormData
+): Promise<ActionResult> {
+  const orderId = formData.get("orderId");
+  const outcome = formData.get("outcome");
+  const note = formData.get("note");
+  if (typeof orderId !== "string" || !orderId) return { ok: false, message: "Missing order." };
+  if (outcome !== "Reversed" && outcome !== "Kept") return { ok: false, message: "Choose whether the sale is reversed or kept." };
+
+  const api = await getApiClient();
+  const result = await api.POST("/api/platform-orders/{id}/cancellation", {
+    params: { path: { id: orderId } },
+    body: { outcome, note: typeof note === "string" && note.trim() ? note.trim() : undefined },
+  });
+  if (!result.data) return { ok: false, message: errorMessage(result.error, "That cancellation could not be settled.") };
+
+  revalidatePath("/imports/orders");
+  return {
+    ok: true,
+    message: outcome === "Reversed"
+      ? "Sale reversed. The item is back in stock."
+      : "Sale kept, with your reason on the order.",
+  };
+}

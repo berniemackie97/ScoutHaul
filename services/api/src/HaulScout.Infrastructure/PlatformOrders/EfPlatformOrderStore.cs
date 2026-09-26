@@ -181,6 +181,14 @@ public sealed class EfPlatformOrderStore(
             platformOrder.ShippedAt,
             platformOrder.DeliveredAt);
 
+    public async Task<IReadOnlyList<Guid>> ListLiveSaleIdsInGroupAsync(Guid organizationId, Guid saleGroupId, CancellationToken cancellationToken) =>
+        await db.Sales
+            .Where(sale => sale.OrganizationId == organizationId
+                && sale.SaleGroupId == saleGroupId
+                && sale.Status != SaleStatus.Cancelled)
+            .Select(sale => sale.Id)
+            .ToListAsync(cancellationToken);
+
     public async Task<IReadOnlyList<Sale>> ListExistingSalesForReconciliationAsync(
         Guid organizationId,
         IReadOnlyCollection<Guid> inventoryItemIds,
