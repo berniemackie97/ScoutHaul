@@ -5226,6 +5226,84 @@
         }
       }
     },
+    "/api/platform-listings/sold-unrecorded": {
+      "get": {
+        "tags": [
+          "PlatformListings"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SoldNotRecordedDto"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SoldNotRecordedDto"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SoldNotRecordedDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/platform-listings/{id}/sold-acknowledged": {
+      "post": {
+        "tags": [
+          "PlatformListings"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/SoldNotRecordedDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SoldNotRecordedDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SoldNotRecordedDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/platform-orders": {
       "get": {
         "tags": [
@@ -18179,6 +18257,45 @@
           },
           "reason": {
             "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "SoldNotRecordedDto": {
+        "type": "object",
+        "properties": {
+          "platformListingId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "inventoryItemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "itemTitle": {
+            "type": "string",
+            "nullable": true
+          },
+          "platform": {
+            "type": "string",
+            "nullable": true
+          },
+          "externalListingId": {
+            "type": "string",
+            "nullable": true
+          },
+          "listingUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "listedPrice": {
+            "type": "number",
+            "format": "double"
+          },
+          "markedSoldAt": {
+            "type": "string",
+            "format": "date-time",
             "nullable": true
           }
         },

@@ -8,14 +8,16 @@ export const dynamic = "force-dynamic";
 
 export default async function ChannelsPage() {
   const api = await getApiClient();
-  const [{ data: accounts }, { data: reference }, { data: delist }] = await Promise.all([
+  const [{ data: accounts }, { data: reference }, { data: delist }, { data: sold }] = await Promise.all([
     api.GET("/api/channel-accounts", {}),
     api.GET("/api/sales/reference-data", {}),
     api.GET("/api/channel-listings", { params: { query: { status: "PendingDelist" } } }),
+    api.GET("/api/platform-listings/sold-unrecorded", {}),
   ]);
 
   const list = accounts ?? [];
   const pendingDelist = delist ?? [];
+  const soldNotRecorded = sold ?? [];
   const nativeCount = list.filter((account) => account.isNativelySynced && account.isActive).length;
   const externalCount = list.filter((account) => !account.isNativelySynced && account.isActive).length;
 
@@ -65,6 +67,28 @@ export default async function ChannelsPage() {
               className="hover:bg-muted inline-flex h-9 shrink-0 items-center rounded-md border px-3 text-sm font-medium"
             >
               Work through them
+            </Link>
+          </div>
+        </Card>
+      )}
+
+      {soldNotRecorded.length > 0 && (
+        <Card className="border-amber-300 p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-2 text-sm font-semibold text-amber-700">
+                <AlertTriangle className="h-4 w-4" /> Sold, but not on the books ({soldNotRecorded.length})
+              </div>
+              <p className="text-muted-foreground mt-1 text-xs">
+                A marketplace says these sold and no sale here accounts for the money. Poshmark and Depop do not hand
+                over their sales, so the listing is the only word of one.
+              </p>
+            </div>
+            <Link
+              href="/channels/sold"
+              className="hover:bg-muted inline-flex h-9 shrink-0 items-center rounded-md border px-3 text-sm font-medium"
+            >
+              Record them
             </Link>
           </div>
         </Card>

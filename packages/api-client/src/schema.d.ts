@@ -4173,6 +4173,82 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/platform-listings/sold-unrecorded": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SoldNotRecordedDto"][];
+                        "application/json": components["schemas"]["SoldNotRecordedDto"][];
+                        "text/json": components["schemas"]["SoldNotRecordedDto"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/platform-listings/{id}/sold-acknowledged": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SoldNotRecordedDto"];
+                        "application/json": components["schemas"]["SoldNotRecordedDto"];
+                        "text/json": components["schemas"]["SoldNotRecordedDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/platform-orders": {
         parameters: {
             query?: never;
@@ -11487,6 +11563,20 @@ export interface components {
             channelAccountId?: string;
             accountName?: string | null;
             reason?: string | null;
+        };
+        SoldNotRecordedDto: {
+            /** Format: uuid */
+            platformListingId?: string;
+            /** Format: uuid */
+            inventoryItemId?: string;
+            itemTitle?: string | null;
+            platform?: string | null;
+            externalListingId?: string | null;
+            listingUrl?: string | null;
+            /** Format: double */
+            listedPrice?: number;
+            /** Format: date-time */
+            markedSoldAt?: string | null;
         };
         SourcingRouteDetailDto: {
             trip?: components["schemas"]["SourcingTripDto"];

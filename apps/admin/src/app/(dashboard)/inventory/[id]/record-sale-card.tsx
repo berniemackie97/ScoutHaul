@@ -29,16 +29,33 @@ function Money({ label, name, value, onChange }: { label: string; name: string; 
   );
 }
 
-export function RecordSaleCard({ itemId, cost, channels }: { itemId: string; cost: number; channels: Channel[] }) {
+// `prefill` arrives from a marketplace listing that sold: the card opens knowing everything but the fees.
+export function RecordSaleCard({
+  itemId,
+  cost,
+  channels,
+  prefill,
+}: {
+  itemId: string;
+  cost: number;
+  channels: Channel[];
+  prefill?: { platform?: string; price?: string; soldOn?: string };
+}) {
   const [state, action] = useActionState(recordSaleForItem.bind(null, itemId), initial);
-  const [open, setOpen] = useState(false);
-  const [soldPrice, setSoldPrice] = useState("");
+  const [open, setOpen] = useState(prefill !== undefined);
+  const [soldPrice, setSoldPrice] = useState(prefill?.price ?? "");
   const [shippingCharged, setShippingCharged] = useState("");
   const [platformFees, setPlatformFees] = useState("");
   const [paymentFees, setPaymentFees] = useState("");
   const [shipping, setShipping] = useState("");
   const [tax, setTax] = useState("");
   const [taxRemitted, setTaxRemitted] = useState(true);
+
+  // The listing's platform is already a channel value, but match it loosely so odd casing still lands on the channel.
+  const prefilledChannel = useMemo(
+    () => channels.find((option) => option.value?.toLowerCase() === prefill?.platform?.toLowerCase())?.value ?? "",
+    [channels, prefill?.platform],
+  );
 
   const groups = useMemo(() => {
     const map = new Map<string, Channel[]>();
@@ -74,7 +91,7 @@ export function RecordSaleCard({ itemId, cost, channels }: { itemId: string; cos
         <form action={action} className="space-y-3">
           <div className="space-y-1">
             <Label htmlFor="platform" className="text-xs">Channel</Label>
-            <select id="platform" name="platform" required className={selectClass} defaultValue="">
+            <select id="platform" name="platform" required className={selectClass} defaultValue={prefilledChannel}>
               <option value="">Select channel…</option>
               {[...groups.entries()].map(([group, options]) => (
                 <optgroup key={group} label={group}>
@@ -88,7 +105,7 @@ export function RecordSaleCard({ itemId, cost, channels }: { itemId: string; cos
             <Money label="Buyer shipping charged" name="shippingCharged" value={shippingCharged} onChange={setShippingCharged} />
             <div className="space-y-1">
               <Label htmlFor="soldAt" className="text-xs">Sold date</Label>
-              <Input id="soldAt" name="soldAt" type="date" defaultValue={today()} className="h-9" />
+              <Input id="soldAt" name="soldAt" type="date" defaultValue={prefill?.soldOn ?? today()} className="h-9" />
             </div>
             <Money label="Platform fees" name="platformFees" value={platformFees} onChange={setPlatformFees} />
             <Money label="Payment fees" name="paymentFees" value={paymentFees} onChange={setPaymentFees} />

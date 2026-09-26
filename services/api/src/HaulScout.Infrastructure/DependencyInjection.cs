@@ -79,6 +79,7 @@ public static class DependencyInjection
         services.AddScoped<IPlatformOrderFeeEnrichmentStore>(services => services.GetRequiredService<EfPlatformOrderStore>());
         services.AddScoped<IMarketplaceRefundImportStore>(services => services.GetRequiredService<EfPlatformOrderStore>());
         services.AddScoped<IChannelDelistStore, EfChannelDelistStore>();
+        services.AddScoped<ISoldListingStore, EfSoldListingStore>();
         services.AddScoped<IInventoryPhotoBackfillStore, EfInventoryPhotoBackfillStore>();
         services.AddScoped<IPlatformOrderSuggestionStore, EfPlatformOrderSuggestionStore>();
         services.AddScoped<IReferenceOverrideStore, EfReferenceOverrideStore>();

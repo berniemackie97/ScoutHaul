@@ -24,8 +24,21 @@ export const dynamic = "force-dynamic";
 
 
 
-export default async function InventoryDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function InventoryDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const { id } = await params;
+  // Set when an operator arrives from a marketplace listing that sold, so the sale card opens knowing what it can.
+  const query = await searchParams;
+  const one = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value);
+  const soldOnPlatform = one(query.soldOn);
+  const prefill = soldOnPlatform
+    ? { platform: soldOnPlatform, price: one(query.price), soldOn: one(query.soldAt) }
+    : undefined;
   const api = await getApiClient();
   const [
     { data: item },
@@ -90,7 +103,7 @@ export default async function InventoryDetailPage({ params }: { params: Promise<
           <ListingGenerator item={inventoryItem} />
           <StatusControl item={inventoryItem} />
           {!inventoryItem.isSold && (
-            <RecordSaleCard itemId={inventoryItem.id} cost={cost ?? 0} channels={salesReference?.channels ?? []} />
+            <RecordSaleCard itemId={inventoryItem.id} cost={cost ?? 0} channels={salesReference?.channels ?? []} prefill={prefill} />
           )}
           <ChannelPresencePanel
             itemId={inventoryItem.id}

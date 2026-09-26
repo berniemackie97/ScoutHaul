@@ -5,6 +5,7 @@ using HaulScout.Api.Authorization;
 using static HaulScout.Api.Helpers.StringHelpers;
 using HaulScout.Api.Mapping;
 using HaulScout.Api.Services;
+using HaulScout.Application.Channels;
 using HaulScout.Application.Contracts;
 using HaulScout.Application.Imports;
 using HaulScout.Application.Security;
@@ -30,7 +31,8 @@ namespace HaulScout.Api.Controllers;
 public sealed class PlatformListingsController(
     HaulScoutDbContext db,
     ICurrentUserContext currentUser,
-    PlatformListingImportService listingImports) : HaulScoutControllerBase
+    PlatformListingImportService listingImports,
+    SoldListingService soldListings) : HaulScoutControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<PlatformListingDto>>> List(
@@ -299,6 +301,16 @@ public sealed class PlatformListingsController(
         await db.SaveChangesAsync(cancellationToken);
         return listing.ToDto();
     }
+
+    /// <summary>Listings a marketplace says sold, for items the books still show as unsold.</summary>
+    [HttpGet("sold-unrecorded")]
+    public async Task<ActionResult<IReadOnlyList<SoldNotRecordedDto>>> SoldUnrecorded(CancellationToken cancellationToken) =>
+        Ok(await soldListings.ListAsync(cancellationToken));
+
+    /// <summary>Settles one without recording a sale: it was recorded elsewhere, or it never sold.</summary>
+    [HttpPost("{id:guid}/sold-acknowledged")]
+    public async Task<ActionResult<SoldNotRecordedDto>> AcknowledgeSold(Guid id, CancellationToken cancellationToken) =>
+        ToActionResult(await soldListings.AcknowledgeAsync(id, cancellationToken));
 
     private static ChannelListingStatus MapChannelStatus(PlatformListingStatus status) => status switch
     {

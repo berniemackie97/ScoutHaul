@@ -13,6 +13,10 @@ using HaulScout.Domain;
 using HaulScout.Domain.Entities;
 using HaulScout.Infrastructure.Persistence;
 
+using HaulScout.Application.Channels;
+
+using HaulScout.Infrastructure.Channels;
+
 namespace HaulScout.Tests;
 
 public sealed class EbayListingQualityWorkbookImportTests
@@ -71,7 +75,7 @@ public sealed class EbayListingQualityWorkbookImportTests
         });
         await db.SaveChangesAsync();
 
-        PlatformListingsController controller = new(db, new StubCurrentUser(org, user), new PlatformListingImportService(db, new StubCurrentUser(org, user)));
+        PlatformListingsController controller = new(db, new StubCurrentUser(org, user), new PlatformListingImportService(db, new StubCurrentUser(org, user)), new SoldListingService(new EfSoldListingStore(db), new StubCurrentUser(org, user), TimeProvider.System));
         string content = Convert.ToBase64String(BuildListingQualityWorkbook());
 
         ActionResult<ImportPlatformListingQualityResultDto> first = await controller.ImportEbayListingQualityWorkbook(
