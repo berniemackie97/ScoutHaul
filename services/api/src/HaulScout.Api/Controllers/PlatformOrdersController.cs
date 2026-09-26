@@ -29,6 +29,11 @@ public sealed class PlatformOrdersController(
         CancellationToken cancellationToken) =>
         Ok(await platformOrders.ListAsync(status, cancellationToken));
 
+    /// <summary>Orders the marketplace cancelled after they were recorded as sales, still waiting on a person.</summary>
+    [HttpGet("cancellations")]
+    public async Task<ActionResult<IReadOnlyList<PlatformOrderDto>>> ListCancellations(CancellationToken cancellationToken) =>
+        Ok(await platformOrders.ListAwaitingCancellationDecisionAsync(cancellationToken));
+
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<PlatformOrderDto>> Get(Guid id, CancellationToken cancellationToken) =>
         ToActionResult(await platformOrders.GetAsync(id, cancellationToken));

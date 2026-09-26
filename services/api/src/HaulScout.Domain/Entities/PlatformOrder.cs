@@ -92,6 +92,8 @@ public sealed class PlatformOrder : EntityBase, IOrganizationScoped
 
     public string? CancellationNote { get; set; }
 
+    public const int CancellationNoteLimit = 500;
+
     /// <summary>A cancelled sale nobody has ruled on yet: the books still say it happened.</summary>
     public bool AwaitingCancellationDecision =>
         CancelledOnPlatformAt is not null && CancellationOutcome == PlatformOrderCancellationOutcome.None;

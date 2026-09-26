@@ -5155,6 +5155,44 @@
         }
       }
     },
+    "/api/platform-orders/cancellations": {
+      "get": {
+        "tags": [
+          "PlatformOrders"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PlatformOrderDto"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PlatformOrderDto"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PlatformOrderDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/platform-orders/{id}": {
       "get": {
         "tags": [

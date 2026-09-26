@@ -4097,6 +4097,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/platform-orders/cancellations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["PlatformOrderDto"][];
+                        "application/json": components["schemas"]["PlatformOrderDto"][];
+                        "text/json": components["schemas"]["PlatformOrderDto"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/platform-orders/{id}": {
         parameters: {
             query?: never;

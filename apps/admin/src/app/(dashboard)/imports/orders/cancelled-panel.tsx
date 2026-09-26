@@ -70,11 +70,33 @@ function CancelledOrder({ order }: { order: PlatformOrder }) {
             name="note"
             value={note}
             onChange={(event) => setNote(event.target.value)}
+            onKeyDown={(event) => {
+              // Enter in a text field submits through the first button, which here undoes the sale. Undoing a sale
+              // is not something anyone should do by pressing Enter while typing their reason for keeping it.
+              if (event.key === "Enter") event.preventDefault();
+            }}
             className="mt-1 h-9 w-full rounded-md border px-2 text-sm"
             placeholder="e.g. buyer paid by bank transfer instead"
           />
         </label>
-        <Button type="submit" name="outcome" value="Reversed" variant="destructive" size="sm" disabled={pending}>
+        <Button
+          type="submit"
+          name="outcome"
+          value="Reversed"
+          variant="destructive"
+          size="sm"
+          disabled={pending}
+          onClick={(event) => {
+            if (
+              !window.confirm(
+                `Reverse the sale for ${order.platform} order ${order.externalOrderId}?\n\n`
+                  + "Its item goes back into stock and the money comes off the books.",
+              )
+            ) {
+              event.preventDefault();
+            }
+          }}
+        >
           Reverse the sale
         </Button>
         <Button type="submit" name="outcome" value="Kept" variant="outline" size="sm" disabled={pending || note.trim().length === 0}>

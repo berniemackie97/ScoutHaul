@@ -11,19 +11,19 @@ export const dynamic = "force-dynamic";
 
 export default async function PlatformOrdersPage() {
   const api = await getApiClient();
-  const [openResult, reconciledResult, autoMatchResult] = await Promise.all([
+  const [openResult, reconciledResult, cancelledResult, autoMatchResult] = await Promise.all([
     api.GET("/api/platform-orders", { params: { query: { status: "Imported" } } }),
     api.GET("/api/platform-orders", { params: { query: { status: "Reconciled" } } }),
+    // Asked for on its own: the reconciled list is capped, and a cancellation that falls off the end of it is a
+    // question nobody could answer.
+    api.GET("/api/platform-orders/cancellations", {}),
     // A preview only — it reports what could be settled and writes nothing.
     api.GET("/api/platform-orders/auto-match/preview", {}),
   ]);
 
   const openOrders = openResult.data ?? [];
   const reconciled = reconciledResult.data ?? [];
-  // Cancelled by the marketplace after the sale was recorded, and nobody has ruled on it yet.
-  const cancelled = reconciled.filter(
-    (order) => order.cancelledOnPlatformAt && order.cancellationOutcome === "None"
-  );
+  const cancelled = cancelledResult.data ?? [];
   const flagged = openOrders.filter(
     (order) => typeof order.payoutAmount === "number" && Math.abs(order.payoutVariance ?? 0) >= 0.01
   ).length;

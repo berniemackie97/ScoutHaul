@@ -856,7 +856,7 @@ public sealed class HaulScoutDbContext(
             entity.Property(item => item.Carrier).HasMaxLength(60);
             entity.Property(item => item.TrackingNumber).HasMaxLength(120);
             entity.Property(item => item.FulfillmentDetail).HasMaxLength(200);
-            entity.Property(item => item.CancellationNote).HasMaxLength(500);
+            entity.Property(item => item.CancellationNote).HasMaxLength(PlatformOrder.CancellationNoteLimit);
             entity.Property(item => item.Status).HasConversion<string>().HasMaxLength(24);
             entity.Property(item => item.FeeBreakdownJson).HasColumnType("jsonb");
             entity.Property(item => item.RawJson).HasColumnType("jsonb");

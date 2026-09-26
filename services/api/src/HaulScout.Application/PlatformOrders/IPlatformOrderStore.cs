@@ -34,6 +34,15 @@ public interface IPlatformOrderStore
         IReadOnlyCollection<SaleStatus> releasedInventoryStatuses,
         CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Writes a cancellation decision onto an order, but only while no decision has been made. False means someone
+    /// else got there first, which is the one case where doing nothing is the right answer.
+    /// </summary>
+    Task<bool> TryClaimCancellationDecisionAsync(PlatformOrder order, CancellationToken cancellationToken);
+
+    /// <summary>Orders the marketplace cancelled that nobody has ruled on, whatever else is in the queue.</summary>
+    Task<IReadOnlyList<PlatformOrder>> ListAwaitingCancellationDecisionAsync(Guid organizationId, int take, CancellationToken cancellationToken);
+
     /// <summary>The sales an order was reconciled into that are still standing, so cancelling skips the settled ones.</summary>
     Task<IReadOnlyList<Guid>> ListLiveSaleIdsInGroupAsync(Guid organizationId, Guid saleGroupId, CancellationToken cancellationToken);
 

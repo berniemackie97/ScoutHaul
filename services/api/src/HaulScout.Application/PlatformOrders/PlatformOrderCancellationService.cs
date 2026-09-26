@@ -16,6 +16,7 @@ public sealed class PlatformOrderCancellationService(
     IPlatformOrderStore store,
     ICurrentUserContext currentUser,
     ISaleCanceller sales,
+    IUnitOfWork unitOfWork,
     TimeProvider clock)
 {
     public async Task<AppResult<PlatformOrderDto>> DecideAsync(
@@ -50,18 +51,46 @@ public sealed class PlatformOrderCancellationService(
             return AppResult<PlatformOrderDto>.Validation("Keeping a cancelled sale needs a reason.");
         }
 
-        if (request.Outcome == PlatformOrderCancellationOutcome.Reversed
-            && await ReverseSalesAsync(order, request.Note, cancellationToken) is AppResult<PlatformOrderDto> failure)
+        string? note = string.IsNullOrWhiteSpace(request.Note) ? null : request.Note.Trim();
+        if (note is not null && note.Length > PlatformOrder.CancellationNoteLimit)
         {
-            return failure;
+            // Checked before anything is undone: a note the column cannot hold would otherwise fail the save after
+            // the sale had already been cancelled, leaving the sale reversed and the order still asking.
+            return AppResult<PlatformOrderDto>.Validation(
+                $"That reason is too long. Keep it under {PlatformOrder.CancellationNoteLimit} characters.");
         }
 
-        order.CancellationOutcome = request.Outcome;
-        order.CancellationDecidedAt = clock.GetUtcNow();
-        order.CancellationNote = string.IsNullOrWhiteSpace(request.Note) ? null : request.Note.Trim();
-        await store.SaveChangesAsync(cancellationToken);
-        return AppResult<PlatformOrderDto>.Ok(PlatformOrderDtoFactory.ToPlatformOrderDto(order));
+        // The reversal and the decision are one act. Either the sale is cancelled and the order says so, or neither
+        // happened — an order recorded as kept while its sale is gone is the one outcome worse than doing nothing.
+        try
+        {
+            return await unitOfWork.InTransactionAsync(async token =>
+            {
+                order.CancellationOutcome = request.Outcome;
+                order.CancellationDecidedAt = clock.GetUtcNow();
+                order.CancellationNote = note;
+                if (!await store.TryClaimCancellationDecisionAsync(order, token))
+                {
+                    return AppResult<PlatformOrderDto>.Validation("Someone settled this cancellation a moment ago. Reload to see what they decided.");
+                }
+
+                if (request.Outcome == PlatformOrderCancellationOutcome.Reversed
+                    && await ReverseSalesAsync(order, note, token) is AppResult<PlatformOrderDto> failure)
+                {
+                    throw new ReversalFailed(failure.Message ?? "That sale could not be reversed.");
+                }
+
+                return AppResult<PlatformOrderDto>.Ok(PlatformOrderDtoFactory.ToPlatformOrderDto(order));
+            }, cancellationToken);
+        }
+        catch (ReversalFailed failed)
+        {
+            // Thrown to roll the transaction back; the order is left asking rather than half-settled.
+            return AppResult<PlatformOrderDto>.Validation(failed.Message);
+        }
     }
+
+    private sealed class ReversalFailed(string message) : Exception(message);
 
     /// <summary>Cancels every sale this order was reconciled into, or explains why it could not.</summary>
     private async Task<AppResult<PlatformOrderDto>?> ReverseSalesAsync(
