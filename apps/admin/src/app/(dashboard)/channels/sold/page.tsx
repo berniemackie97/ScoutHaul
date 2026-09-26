@@ -20,8 +20,13 @@ export default async function SoldNotRecordedPage() {
           <h1 className="mt-1 text-2xl font-semibold tracking-tight">Sold on a marketplace, not on the books</h1>
           <p className="text-muted-foreground mt-1 max-w-3xl text-sm">
             A marketplace shows these listings as sold, and no sale here accounts for them — so the money is missing
-            and the items still count as stock. Poshmark and Depop do not hand over their sales, so a listing turning
-            sold is the whole of the news from them. Recording the sale happens on the item, where the fees go.
+            and the items still count as stock. Depop does not hand over its sales, and a Poshmark bundle may not say
+            which listings it held, so a listing turning sold can be the whole of the news. A sale the marketplace did
+            hand over waits in{" "}
+            <Link href="/imports/orders" className="text-brand-600 underline">
+              Orders to match
+            </Link>{" "}
+            instead, with its real fees. Recording the sale happens on the item.
           </p>
         </div>
       </header>

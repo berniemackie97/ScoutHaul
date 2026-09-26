@@ -26,7 +26,10 @@ public sealed class EfSoldListingStore(HaulScoutDbContext db) : ISoldListingStor
     public Task<bool> ExistsAsync(Guid organizationId, Guid platformListingId, CancellationToken cancellationToken) =>
         db.PlatformListings.AnyAsync(listing => listing.Id == platformListingId && listing.OrganizationId == organizationId, cancellationToken);
 
-    /// <summary>Sold, linked, unanswered, and holding no sale that still stands — a cancelled one is not an answer.</summary>
+    /// <summary>
+    /// Sold, linked, unanswered, holding no sale that still stands, and with no marketplace order for it waiting in the
+    /// orders queue — that queue asks about it with the real figures, and asking twice invites recording it twice.
+    /// </summary>
     private IQueryable<PlatformListing> Unrecorded(Guid organizationId) =>
         db.PlatformListings.Where(listing =>
             listing.OrganizationId == organizationId
@@ -36,7 +39,13 @@ public sealed class EfSoldListingStore(HaulScoutDbContext db) : ISoldListingStor
             && !db.Sales.Any(sale =>
                 sale.OrganizationId == organizationId
                 && sale.InventoryItemId == listing.ReconciledInventoryItemId
-                && sale.Status != SaleStatus.Cancelled));
+                && sale.Status != SaleStatus.Cancelled)
+            && !db.PlatformOrderLines.Any(line =>
+                line.OrganizationId == organizationId
+                && line.ExternalItemId == listing.ExternalListingId
+                && line.PlatformOrder!.Platform == listing.Platform
+                && line.PlatformOrder.Status != PlatformOrderStatus.Ignored
+                && line.PlatformOrder.CancelledOnPlatformAt == null));
 
     public Task SaveChangesAsync(CancellationToken cancellationToken) => db.SaveChangesAsync(cancellationToken);
 }

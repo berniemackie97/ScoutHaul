@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { closetPage, closetPageWithoutListings, homePage } from "../../test/poshmark-fixtures";
+import { closetPage, closetPageWithoutListings, homePage, salePage, salesPage } from "../../test/poshmark-fixtures";
 import { memoryInMap } from "../../test/memory";
 import { AdapterError, type MarketplaceContext, type PageResponse, type Session } from "../types";
 import { poshmarkAdapter } from ".";
@@ -165,7 +165,162 @@ describe("a Poshmark scan", () => {
     expect(context.read).toEqual([]);
   });
 
-  it("does not pretend to read sales", async () => {
-    await expect(poshmarkAdapter.scanSales(poshmark(() => ""), { from: null, cursor: null }, seller)).rejects.toThrow(AdapterError);
+});
+
+describe("Poshmark sales", () => {
+  const first = { from: null, cursor: null };
+  const routine = { from: null, cursor: "2026-07-18T00:00:00.000Z" };
+
+  it("records a sale with Poshmark's cut, the buyer and where it ships", async () => {
+    const scan = await poshmarkAdapter.scanSales(poshmark(() => salesPage([{ id: "68f1a2b3c4d5e6f708192a3b" }])), first, seller);
+
+    expect(scan.issues).toEqual([]);
+    expect(scan.orders).toHaveLength(1);
+    expect(scan.orders[0]).toMatchObject({
+      externalOrderId: "68f1a2b3c4d5e6f708192a3b",
+      platform: "Poshmark",
+      orderedAt: "2026-07-19T03:32:28.000Z",
+      itemsSubtotal: 4,
+      shippingCharged: 0,
+      shippingCost: 0,
+      taxCollected: 0,
+      taxRemittedByPlatform: true,
+      feeTotal: 2.95,
+      feesPending: false,
+      payoutAmount: 1.05,
+      currency: "USD",
+      buyerName: "Jordan Rivera",
+      buyerReference: "jrivera",
+      shipToName: "Jordan Rivera",
+      shipToLine1: "12 Elm St",
+      shipToLine2: "Apt 4",
+      shipToCity: "Springfield",
+      shipToRegion: "IL",
+      shipToPostalCode: "62701",
+      shipToCountry: "US",
+      fulfillmentStage: "Delivered",
+      fulfillmentDetail: "Order Complete",
+      lines: [{ title: "Ripple Junction Blue Dunder Mifflin Graphic Tee", unitPrice: 4, quantity: 1, externalItemId: "6a4a90a11986c2a9de9f4f69" }],
+    });
+    expect(scan.cursor).toBe("2026-07-19T03:32:28.000Z");
+  });
+
+  it("leaves the payout open until Poshmark completes the order", async () => {
+    const scan = await poshmarkAdapter.scanSales(
+      poshmark(() => salesPage([{ id: "s1", total: "25.0", earning: "20.0", displayStatus: "Sold" }])), first, seller);
+
+    expect(scan.orders[0]).toMatchObject({ feeTotal: 5, payoutAmount: null, fulfillmentStage: "NeedsShipping" });
+  });
+
+  it("reports a cancelled or refunded sale as one, and records no money for it", async () => {
+    const scan = await poshmarkAdapter.scanSales(poshmark(() => salesPage([
+      { id: "c1", displayStatus: "Cancelled" },
+      { id: "r1", displayStatus: "Returned" },
+      { id: "o1", displayStatus: "Return Requested" },
+    ])), first, seller);
+
+    expect(scan.cancelledOrderIds).toEqual(["c1", "r1"]);
+    expect(scan.orders.map((order) => order.externalOrderId)).toEqual(["o1"]);
+  });
+
+  it("keeps a sale whose cut cannot be read, with its fees left open", async () => {
+    const scan = await poshmarkAdapter.scanSales(poshmark(() => salesPage([{ id: "s1", earning: null }])), first, seller);
+
+    expect(scan.orders[0]).toMatchObject({ feeTotal: null, feesPending: true, payoutAmount: null });
+    expect(scan.issues[0]).toMatchObject({ externalReference: "s1", rejected: false });
+  });
+
+  it("splits a bundle into the listings its own page shows, and reads that page once", async () => {
+    const ids = ["6a4a90a11986c2a9de9f4f69", "6a4a90a11986c2a9de9f4f70", "6a4a90a11986c2a9de9f4f71"];
+    const context = poshmark((url) =>
+      url.pathname === "/order/sales/b1" ? salePage(ids) : salesPage([{ id: "b1", total: "30.0", earning: "24.0", bundleSize: 3 }]));
+
+    const scan = await poshmarkAdapter.scanSales(context, first, seller);
+
+    expect(scan.orders[0]!.lines!.map((line) => [line.externalItemId, line.unitPrice])).toEqual([[ids[0], 10], [ids[1], 10], [ids[2], 10]]);
+    expect(scan.orders[0]).toMatchObject({ itemsSubtotal: 30, feeTotal: 6, payoutAmount: 24 });
+    expect(scan.issues[0]).toMatchObject({ externalReference: "b1", rejected: false });
+
+    await poshmarkAdapter.scanSales(context, first, seller);
+    expect(context.read.filter((url) => url.includes("/order/sales/b1"))).toHaveLength(1);
+  });
+
+  it("puts the rounding on the last item of a bundle, so the lines add up to the total", async () => {
+    const ids = ["6a4a90a11986c2a9de9f4f69", "6a4a90a11986c2a9de9f4f70", "6a4a90a11986c2a9de9f4f71"];
+    const context = poshmark((url) => url.pathname === "/order/sales/b1" ? salePage(ids) : salesPage([{ id: "b1", total: "10.0", bundleSize: 3 }]));
+
+    const lines = (await poshmarkAdapter.scanSales(context, first, seller)).orders[0]!.lines!;
+
+    expect(lines.map((line) => line.unitPrice)).toEqual([3.33, 3.33, 3.34]);
+  });
+
+  it("refuses to guess a bundle its page does not account for, and asks again next scan", async () => {
+    const context = poshmark((url) =>
+      url.pathname === "/order/sales/b1" ? salePage(["6a4a90a11986c2a9de9f4f69"]) : salesPage([{ id: "b1", total: "30.0", bundleSize: 3 }]));
+
+    const scan = await poshmarkAdapter.scanSales(context, first, seller);
+
+    expect(scan.orders).toEqual([]);
+    expect(scan.issues[0]).toMatchObject({ externalReference: "b1", rejected: true });
+    expect(scan.issues[0]!.message).toContain("Sold, not recorded");
+    await expect(context.memory.get("sale:b1")).resolves.toBeUndefined();
+  });
+
+  it("follows Poshmark's cursor through the whole history on a first scan", async () => {
+    const context = poshmark((url) => url.searchParams.get("max_id") === "next-1"
+      ? salesPage([{ id: "old" }])
+      : salesPage([{ id: "new" }], "next-1"));
+
+    const scan = await poshmarkAdapter.scanSales(context, first, seller);
+
+    expect(scan.orders.map((order) => order.externalOrderId)).toEqual(["new", "old"]);
+    expect(context.read[1]).toContain("max_id=next-1");
+  });
+
+  it("stops a routine scan at a page with nothing new and nothing still under way", async () => {
+    const context = poshmark((url) => url.searchParams.get("max_id") === "next-1"
+      ? salesPage([{ id: "old" }])
+      : salesPage([{ id: "new" }], "next-1"));
+    await poshmarkAdapter.scanSales(context, first, seller);
+    context.read.length = 0;
+
+    await poshmarkAdapter.scanSales(context, routine, seller);
+
+    expect(context.read).toHaveLength(1);
+  });
+
+  it("reads on past a page whose sales are still under way, so a later payout is not missed", async () => {
+    const context = poshmark((url) => url.searchParams.get("max_id") === "next-1"
+      ? salesPage([{ id: "old" }])
+      : salesPage([{ id: "new", displayStatus: "Shipped" }], "next-1"));
+    await poshmarkAdapter.scanSales(context, first, seller);
+    context.read.length = 0;
+
+    await poshmarkAdapter.scanSales(context, routine, seller);
+
+    expect(context.read).toHaveLength(2);
+  });
+
+  it("reads only sales booked since the date a history scan asks for", async () => {
+    const context = poshmark(() => salesPage([
+      { id: "recent", bookedAt: "2026-09-01T10:00:00-07:00" },
+      { id: "older", bookedAt: "2026-06-01T10:00:00-07:00" },
+    ]));
+
+    const scan = await poshmarkAdapter.scanSales(context, { from: new Date("2026-08-01T00:00:00Z"), cursor: null }, seller);
+
+    expect(scan.orders.map((order) => order.externalOrderId)).toEqual(["recent"]);
+    expect(scan.coversFrom).toBe("2026-08-01T00:00:00.000Z");
+  });
+
+  it("says the site changed when the sales page carries no list", async () => {
+    await expect(poshmarkAdapter.scanSales(poshmark(() => homePage("overhaultrading")), first, seller))
+      .rejects.toMatchObject({ kind: "SiteChanged" });
+  });
+
+  it("says it is signed out when Poshmark sends the sales page to sign-in", async () => {
+    const context = poshmark((url) => ({ status: 200, url: "https://poshmark.com/login?next=/seller-hub/sales", contentType: "text/html", body: url.toString() }));
+
+    await expect(poshmarkAdapter.scanSales(context, first, seller)).rejects.toMatchObject({ kind: "SignedOut" });
   });
 });

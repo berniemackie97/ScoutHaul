@@ -1,4 +1,4 @@
-import type { IngestListing, RunIssue } from "../../agent/types";
+import type { IngestListing, IngestOrder, RunIssue } from "../../agent/types";
 import { dig } from "../embedded-json";
 import {
   AdapterError,
@@ -7,23 +7,54 @@ import {
   type MarketplaceContext,
   type PageKind,
   type SalesScan,
+  type SalesWindow,
   type Session,
 } from "../types";
 import { readClosetPage } from "./listings";
 import { assertReadable, siteChanged } from "./pages";
+import { bookedAt, bundleSize, listingIds, readSalesPage, saleId, saleStamp, saleState, toIngestOrder } from "./sales";
 import { readState } from "./state";
 
 const origin = "https://poshmark.com";
 
+const salesPage = `${origin}/seller-hub/sales`;
+
 /** A scan never reads more closet pages than this; past it, it stops and says the snapshot is partial. */
 export const maxPages = 40;
+export const maxSalesPages = 100;
+
+/** The listings a bundle held, read once from the sale's own page and remembered. Null when the page does not say. */
+async function bundleListings(context: MarketplaceContext, id: string, size: number): Promise<string[] | null> {
+  const key = `bundle:${id}`;
+  const known = await context.memory.get<string[]>(key);
+  if (known?.length === size) {
+    return known;
+  }
+
+  try {
+    const response = await context.page(`${origin}/order/sales/${encodeURIComponent(id)}`);
+    assertReadable(response);
+    const ids = listingIds(JSON.stringify(readState(response.body, "sale")));
+    if (ids.length !== size) {
+      return null;
+    }
+
+    await context.memory.set(key, ids);
+    return ids;
+  } catch (error) {
+    // One bundle's page not saying is that bundle's problem; the site going wrong stops the scan.
+    if (error instanceof AdapterError && (error.kind === "Error" || error.kind === "SiteChanged")) {
+      return null;
+    }
+
+    throw error;
+  }
+}
 
 /**
- * Poshmark, read the way its own pages are served: a closet page carries its listings whole, in the state Poshmark
- * writes into the HTML. No API is called and nothing private is read — a closet is the same page a shopper sees.
- *
- * Sales are not read yet. They live behind the seller's own order pages, which look nothing like a closet, and an
- * adapter that guessed at them would be worse than one that says it cannot.
+ * Poshmark, read the way its own pages are served: a closet page carries its listings whole, and Seller Hub's sales
+ * page carries every sale with its money, buyer and ship-to, in the state Poshmark writes into the HTML. No API is
+ * called.
  */
 export const poshmarkAdapter: MarketplaceAdapter = {
   platform: "Poshmark",
@@ -44,7 +75,7 @@ export const poshmarkAdapter: MarketplaceAdapter = {
       return "challenge";
     }
 
-    return /^https:\/\/poshmark\.com\/(closet|feed|order|my)/i.test(url) ? "seller" : "other";
+    return /^https:\/\/poshmark\.com\/(closet|feed|order|my|seller-hub)/i.test(url) ? "seller" : "other";
   },
 
   async detectSession(context: MarketplaceContext): Promise<Session> {
@@ -66,9 +97,95 @@ export const poshmarkAdapter: MarketplaceAdapter = {
     };
   },
 
-  scanSales(): Promise<SalesScan> {
-    // Listed as a listings-only marketplace, so the server never asks. Saying so beats inventing sales.
-    return Promise.reject(new AdapterError("Error", "Poshmark sales are not read from the browser yet."));
+  async scanSales(context: MarketplaceContext, window: SalesWindow): Promise<SalesScan> {
+    const now = context.now();
+    const since = window.from?.getTime() ?? null;
+    // The first scan and a history scan read every page. A routine scan reads on until a page holds nothing new and
+    // no sale still under way, so a sale completing weeks later still has its payout recorded.
+    const everything = since !== null || window.cursor === null;
+    const orders: IngestOrder[] = [];
+    const cancelledOrderIds: string[] = [];
+    const issues: RunIssue[] = [];
+    const seen = new Set<string>();
+    let newest = Date.parse(window.cursor ?? "");
+    let oldest = now.getTime();
+    let cursor: string | null = null;
+
+    for (let page = 1; ; page++) {
+      const response = await context.page(cursor === null ? salesPage : `${salesPage}?max_id=${encodeURIComponent(cursor)}`);
+      assertReadable(response);
+      const read = readSalesPage(response.body);
+      if (!read.found) {
+        throw siteChanged("sales");
+      }
+
+      let fresh = 0;
+      let unsettled = 0;
+      for (const sale of read.sales) {
+        const id = saleId(sale);
+        if (id === null) {
+          issues.push({ message: "A sale in Poshmark's sales list has no id.", externalReference: null, rejected: true });
+          continue;
+        }
+
+        if (seen.has(id)) {
+          continue;
+        }
+
+        seen.add(id);
+        fresh++;
+        const at = bookedAt(sale);
+        if (since !== null && Number.isFinite(at) && at < since) {
+          continue;
+        }
+
+        if (Number.isFinite(at)) {
+          newest = Number.isFinite(newest) ? Math.max(newest, at) : at;
+          oldest = Math.min(oldest, at);
+        }
+
+        const key = `sale:${id}`;
+        const stamp = saleStamp(sale);
+        const state = saleState(sale);
+        if (state === "open" || (await context.memory.get<string>(key)) !== stamp) {
+          unsettled++;
+        }
+
+        if (state === "cancelled") {
+          cancelledOrderIds.push(id);
+          await context.memory.set(key, stamp);
+          continue;
+        }
+
+        const size = bundleSize(sale);
+        const sold = toIngestOrder(sale, size > 1 ? await bundleListings(context, id, size) : null);
+        issues.push(...sold.issues);
+        if (sold.order) {
+          orders.push(sold.order);
+          await context.memory.set(key, stamp);
+        }
+      }
+
+      if (read.nextMaxId === null || fresh === 0 || (!everything && unsettled === 0)) {
+        break;
+      }
+
+      if (page >= maxSalesPages) {
+        issues.push({ message: "Poshmark lists more sales than one scan reads; the oldest were not read.", externalReference: null, rejected: false });
+        break;
+      }
+
+      cursor = read.nextMaxId;
+    }
+
+    return {
+      orders,
+      cancelledOrderIds,
+      issues,
+      cursor: Number.isFinite(newest) ? new Date(newest).toISOString() : window.cursor,
+      coversFrom: new Date(since ?? oldest).toISOString(),
+      coversTo: now.toISOString(),
+    };
   },
 
   async snapshotListings(context: MarketplaceContext, session: Session): Promise<ListingsSnapshot> {

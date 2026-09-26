@@ -74,7 +74,7 @@ describe("sync model", () => {
 describe("what a marketplace can be asked for", () => {
   it("offers only the scans its adapter reads", () => {
     expect(scannableLoops({ supportedLoops: ["Sales", "Listings"] })).toEqual(["Sales", "Listings"]);
-    // Poshmark reads listings only; a sales button there would always come back skipped.
+    // Depop reads listings only; a sales button there would always come back skipped.
     expect(scannableLoops({ supportedLoops: ["Listings"] })).toEqual(["Listings"]);
     expect(scannableLoops({ supportedLoops: [] })).toEqual([]);
     expect(scannableLoops({})).toEqual([]);
@@ -82,8 +82,8 @@ describe("what a marketplace can be asked for", () => {
 
   it("says where a marketplace's sales come from instead, when the browser cannot read them", () => {
     expect(salesNote({ supportedLoops: ["Sales", "Listings"], platform: "eBay" })).toBeNull();
-    expect(salesNote({ supportedLoops: ["Listings"], platform: "Poshmark" }))
-      .toBe("Poshmark sales are not read from the browser. Import its report for sales.");
+    expect(salesNote({ supportedLoops: ["Listings"], platform: "Depop" }))
+      .toBe("Depop sales are not read from the browser. Import its report for sales.");
   });
 });
 
@@ -93,7 +93,7 @@ describe("what each marketplace syncs", () => {
       .toEqual({ syncs: "Sales and listings", history: "90 days of sales history", off: null });
     expect(platformSummary({ platform: "Vinted", loops: ["Sales", "Listings"], historyDays: 3650, enabled: true }).history)
       .toBe("10 years of sales history");
-    expect(platformSummary({ platform: "Poshmark", loops: ["Listings"], historyDays: 0, enabled: true }))
+    expect(platformSummary({ platform: "Depop", loops: ["Listings"], historyDays: 0, enabled: true }))
       .toEqual({ syncs: "Listings only", history: "No sales history", off: null });
   });
 

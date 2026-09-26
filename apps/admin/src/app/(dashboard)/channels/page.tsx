@@ -80,8 +80,8 @@ export default async function ChannelsPage() {
                 <AlertTriangle className="h-4 w-4" /> Sold, but not on the books ({soldNotRecorded.length})
               </div>
               <p className="text-muted-foreground mt-1 text-xs">
-                A marketplace says these sold and no sale here accounts for the money. Poshmark and Depop do not hand
-                over their sales, so the listing is the only word of one.
+                A marketplace says these sold and no sale here accounts for the money, and no order for them has
+                arrived — on Depop the listing is the only word of a sale.
               </p>
             </div>
             <Link
