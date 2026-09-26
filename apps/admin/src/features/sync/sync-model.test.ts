@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ago, bindableUsernames, cadenceOptions, dueIn, formatCode, healthBadge, loopSummary, photoSyncSummary, requestStatus } from "./sync-model";
+import { ago, bindableUsernames, cadenceOptions, dueIn, formatCode, healthBadge, loopSummary, photoSyncSummary, platformSummary, requestStatus, salesNote, scannableLoops } from "./sync-model";
 
 const now = new Date("2026-09-18T20:00:00Z");
 const minutesAgo = (minutes: number) => new Date(now.getTime() - minutes * 60_000).toISOString();
@@ -68,5 +68,39 @@ describe("sync model", () => {
 
   it("groups a pairing code for reading", () => {
     expect(formatCode("7kq2mx9d")).toBe("7KQ2-MX9D");
+  });
+});
+
+describe("what a marketplace can be asked for", () => {
+  it("offers only the scans its adapter reads", () => {
+    expect(scannableLoops({ supportedLoops: ["Sales", "Listings"] })).toEqual(["Sales", "Listings"]);
+    // Poshmark reads listings only; a sales button there would always come back skipped.
+    expect(scannableLoops({ supportedLoops: ["Listings"] })).toEqual(["Listings"]);
+    expect(scannableLoops({ supportedLoops: [] })).toEqual([]);
+    expect(scannableLoops({})).toEqual([]);
+  });
+
+  it("says where a marketplace's sales come from instead, when the browser cannot read them", () => {
+    expect(salesNote({ supportedLoops: ["Sales", "Listings"], platform: "eBay" })).toBeNull();
+    expect(salesNote({ supportedLoops: ["Listings"], platform: "Poshmark" }))
+      .toBe("Poshmark sales are not read from the browser. Import its report for sales.");
+  });
+});
+
+describe("what each marketplace syncs", () => {
+  it("says what it reads and how far back", () => {
+    expect(platformSummary({ platform: "eBay", loops: ["Sales", "Listings"], historyDays: 90, enabled: true }))
+      .toEqual({ syncs: "Sales and listings", history: "90 days of sales history", off: null });
+    expect(platformSummary({ platform: "Vinted", loops: ["Sales", "Listings"], historyDays: 3650, enabled: true }).history)
+      .toBe("10 years of sales history");
+    expect(platformSummary({ platform: "Poshmark", loops: ["Listings"], historyDays: 0, enabled: true }))
+      .toEqual({ syncs: "Listings only", history: "No sales history", off: null });
+  });
+
+  it("says plainly when a marketplace has been switched off, and why", () => {
+    expect(platformSummary({ platform: "eBay", loops: ["Sales"], historyDays: 90, enabled: false, disabledReason: "eBay changed its orders page." }).off)
+      .toBe("eBay changed its orders page.");
+    expect(platformSummary({ platform: "eBay", loops: ["Sales"], historyDays: 90, enabled: false }).off)
+      .toBe("Switched off for now");
   });
 });

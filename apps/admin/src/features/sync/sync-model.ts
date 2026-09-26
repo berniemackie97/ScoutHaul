@@ -149,6 +149,41 @@ export function requestStatus(
   }
 }
 
+/**
+ * The scans an account can actually be asked for. A marketplace whose adapter reads only listings must not be
+ * offered a sales scan: the server refuses it, and a button that always reports "skipped" is a button that lies.
+ */
+export function scannableLoops(account: Pick<SyncAccount, "supportedLoops">): LoopKind[] {
+  const loops = (account.supportedLoops ?? []) as LoopKind[];
+  return (["Sales", "Listings"] as const).filter((loop) => loops.includes(loop));
+}
+
+/** What to say about a marketplace this browser cannot read sales from, or null when it can. */
+export function salesNote(account: Pick<SyncAccount, "supportedLoops" | "platform">): string | null {
+  return scannableLoops(account).includes("Sales")
+    ? null
+    : `${account.platform ?? "This marketplace"} sales are not read from the browser. Import its report for sales.`;
+}
+
+/** What a marketplace syncs and how far back, said in one line. */
+export function platformSummary(settings: SyncPlatformSettings): { syncs: string; history: string; off: string | null } {
+  const loops = (settings.loops ?? []) as LoopKind[];
+  const syncs = loops.includes("Sales") && loops.includes("Listings")
+    ? "Sales and listings"
+    : loops.includes("Sales")
+      ? "Sales only"
+      : loops.includes("Listings")
+        ? "Listings only"
+        : "Nothing yet";
+  const days = settings.historyDays ?? 0;
+  const history = days === 0
+    ? "No sales history"
+    : days >= 365
+      ? `${Math.round(days / 365)} years of sales history`
+      : `${days} days of sales history`;
+  return { syncs, history, off: settings.enabled === false ? settings.disabledReason ?? "Switched off for now" : null };
+}
+
 /** Where photo sync stands, in a line. */
 export function photoSyncSummary(photos: SyncPhotoSync | undefined): { text: string; tone: Tone } {
   if (!photos?.enabled) {
