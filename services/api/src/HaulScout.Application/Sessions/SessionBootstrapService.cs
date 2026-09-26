@@ -9,7 +9,7 @@ namespace HaulScout.Application.Sessions;
 /// Builds the payload a client needs on sign-in: who the user is, the organizations they belong to, the active one,
 /// and the org-scoped record counts a mobile client reconciles its local store against.
 /// </summary>
-public sealed class SessionBootstrapService(ISessionBootstrapStore sessions, ICurrentUserContext currentUser)
+public sealed class SessionBootstrapService(ISessionBootstrapStore sessions, ICurrentUserContext currentUser, IOrganizationAuthorizer access)
 {
     public async Task<SessionBootstrapDto> BuildAsync(CancellationToken cancellationToken)
     {
@@ -24,12 +24,14 @@ public sealed class SessionBootstrapService(ISessionBootstrapStore sessions, ICu
                        ?? throw new InvalidOperationException("User must be resolved before bootstrapping a session.");
         IReadOnlyList<OrganizationDto> organizations = await sessions.ListOrganizationsAsync(userId, cancellationToken);
         SessionRemoteCountsDto counts = await sessions.GetRemoteCountsAsync(organizationId, cancellationToken);
+        IReadOnlyList<string> permissions = organizationId is Guid organization ? await access.ListPermissions(organization, cancellationToken) : [];
 
         return new SessionBootstrapDto(
             new SessionUserDto(user.Id, user.Email, user.DisplayName),
             organizations,
             organizationId,
             counts,
-            DateTimeOffset.UtcNow);
+            DateTimeOffset.UtcNow,
+            permissions);
     }
 }

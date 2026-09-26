@@ -1,5 +1,6 @@
 import type { components } from "@overhaul/api-client";
-import { navGroups } from "@/components/layout/navigation";
+import { navGroups, pageAt } from "@/components/layout/navigation";
+import { allows, type Granted } from "@/lib/permissions";
 
 export type SearchResults = components["schemas"]["SearchResultsDto"];
 export type SearchHit = components["schemas"]["SearchHitDto"];
@@ -48,6 +49,11 @@ export const NAVIGATION: PaletteCommand[] = navGroups.flatMap((group) =>
 );
 
 export const ALL_COMMANDS: PaletteCommand[] = [...ACTIONS, ...NAVIGATION];
+
+/** The commands whose page this person can open; a shortcut to a page that refuses them helps nobody. */
+export function commandsFor(granted: Granted): PaletteCommand[] {
+  return ALL_COMMANDS.filter((command) => allows(granted, pageAt(command.href.split("?")[0]!)?.requires));
+}
 
 /** Below this the server returns nothing; the palette shows commands alone rather than asking. */
 export const MINIMUM_SEARCH_LENGTH = 2;
@@ -142,7 +148,7 @@ export type PaletteEntry =
  * Records lead once there is a query: someone who typed an order number wants the order, not the
  * Orders page. Commands follow, then — with nothing typed yet — commands are all there is.
  */
-export function buildEntries(query: string, results: SearchResults | null): PaletteEntry[] {
+export function buildEntries(query: string, results: SearchResults | null, granted: Granted = null): PaletteEntry[] {
   const entries: PaletteEntry[] = [];
   const typed = query.trim();
 
@@ -160,7 +166,7 @@ export function buildEntries(query: string, results: SearchResults | null): Pale
     }
   }
 
-  for (const command of contiguousBySection(matchCommands(typed))) {
+  for (const command of contiguousBySection(matchCommands(typed, commandsFor(granted)))) {
     entries.push({ key: command.id, type: "command", section: command.section, command });
   }
 

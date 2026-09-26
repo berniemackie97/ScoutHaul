@@ -13,5 +13,8 @@ public interface IOrganizationAuthorizer
     /// </summary>
     Task<bool> HasPermission(Guid organizationId, string permission, CancellationToken cancellationToken);
 
+    /// <summary>Every permission the caller holds here, by the same rule the gates apply; empty for a non-member.</summary>
+    Task<IReadOnlyList<string>> ListPermissions(Guid organizationId, CancellationToken cancellationToken);
+
     Task RequireOwner(Guid organizationId, CancellationToken cancellationToken);
 }

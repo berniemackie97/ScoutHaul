@@ -32,6 +32,9 @@ public sealed class SyncAgentTranslationTests(PostgresFixture postgres)
     {
         public Task RequirePermission(Guid organizationId, string permission, CancellationToken cancellationToken) => Task.CompletedTask;
         public Task<bool> HasPermission(Guid organizationId, string permission, CancellationToken cancellationToken) => Task.FromResult(true);
+        public Task<IReadOnlyList<string>> ListPermissions(Guid organizationId, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<string>>(Application.Security.HaulScoutPermissions.All);
+
         public Task RequireOwner(Guid organizationId, CancellationToken cancellationToken) => Task.CompletedTask;
     }
 

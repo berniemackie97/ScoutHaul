@@ -24,6 +24,7 @@ import {
   type PaletteEntry,
   type SearchResults,
 } from "@/features/search/palette-model";
+import type { Granted } from "@/lib/permissions";
 
 /** Long enough to skip the keystrokes of a word being typed; short enough to feel immediate. */
 const DEBOUNCE_MS = 150;
@@ -52,7 +53,7 @@ const NAV_ICONS = new Map<string, LucideIcon>(navGroups.flatMap((group) => group
  *   searching. The debounce and the round trip are both invisible otherwise, and an empty panel in
  *   that gap reads as "nothing found".
  */
-export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+export function CommandPalette({ open, onOpenChange, granted }: { open: boolean; onOpenChange: (open: boolean) => void; granted: Granted }) {
   const router = useRouter();
   const listId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -96,7 +97,7 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
     };
   }, [open, searching, term]);
 
-  const entries = useMemo(() => buildEntries(query, results), [query, results]);
+  const entries = useMemo(() => buildEntries(query, results, granted), [query, results, granted]);
 
   // Derived from whether the results on hand answer this exact text — not from a loading flag,
   // which only flips after the debounce and so leaves a silent gap at the start of every search.

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Copy, Mail, Pencil, Shield, Trash2, UserPlus, X } from "lucide-react";
 import type { components } from "@overhaul/api-client";
 import { Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Label, formatDate } from "@overhaul/ui";
+import { permissionLabel } from "@/lib/permissions";
 import {
   inviteMember, resendInvite, changeMemberRole, removeMember,
   createRole, updateRole, createInviteCode, deactivateInviteCode, type TeamResult,
@@ -217,7 +218,7 @@ export function TeamAccess({ orgId, members, roles, permissions, codes }: { orgI
                         value={permission}
                         defaultChecked={selectedPermissions.has(permission)}
                       />{" "}
-                      {permission}
+                      {permissionLabel(permission)}
                     </label>
                   ))}
                 </div>
@@ -352,7 +353,7 @@ function RoleCard({ orgId, role, permissions, onDone }: { orgId: string; role: R
         <div className="grid gap-1 sm:grid-cols-2 md:grid-cols-3">
           {permissions.map((permission) => (
             <label key={permission} className="flex items-center gap-2 text-xs">
-              <input type="checkbox" name="permissions" value={permission} defaultChecked={rolePerms.has(permission)} /> {permission}
+              <input type="checkbox" name="permissions" value={permission} defaultChecked={rolePerms.has(permission)} /> {permissionLabel(permission)}
             </label>
           ))}
         </div>

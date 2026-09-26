@@ -306,4 +306,38 @@ public class OrganizationSecurityTests
         ProblemAssert.Invalid(result.Result);
         Assert.False(await db.OrganizationInviteCodes.AnyAsync());
     }
+
+    [Fact]
+    public async Task The_permissions_a_member_is_told_about_are_exactly_the_ones_the_gates_let_through()
+    {
+        (HaulScoutDbContext db, Guid org, Guid user) = NewContext(nameof(The_permissions_a_member_is_told_about_are_exactly_the_ones_the_gates_let_through));
+        await using HaulScoutDbContext _ = db;
+        OrganizationRoleDefinition picker = new() { OrganizationId = org, Name = "Picker" };
+        picker.Permissions.Add(new OrganizationRolePermission { Permission = HaulScoutPermissions.ManageInventory });
+        picker.Permissions.Add(new OrganizationRolePermission { Permission = HaulScoutPermissions.ManageOrders });
+        db.Add(picker);
+        db.OrganizationMembers.Add(new OrganizationMember { OrganizationId = org, UserId = user, Role = OrganizationRole.Member, RoleId = picker.Id });
+        await db.SaveChangesAsync();
+        EfOrganizationAuthorizer access = new(db, new StubCurrentUser(org, user));
+
+        IReadOnlyList<string> listed = await access.ListPermissions(org, CancellationToken.None);
+
+        Assert.Equal([HaulScoutPermissions.ManageInventory, HaulScoutPermissions.ManageOrders], listed);
+        foreach (string permission in HaulScoutPermissions.All)
+        {
+            Assert.Equal(await access.HasPermission(org, permission, CancellationToken.None), listed.Contains(permission));
+        }
+    }
+
+    [Fact]
+    public async Task An_owner_holds_every_permission_and_a_stranger_none()
+    {
+        (HaulScoutDbContext db, Guid org, Guid user) = NewContext(nameof(An_owner_holds_every_permission_and_a_stranger_none));
+        await using HaulScoutDbContext _ = db;
+        db.OrganizationMembers.Add(new OrganizationMember { OrganizationId = org, UserId = user, Role = OrganizationRole.Owner });
+        await db.SaveChangesAsync();
+
+        Assert.Equal(HaulScoutPermissions.All, await new EfOrganizationAuthorizer(db, new StubCurrentUser(org, user)).ListPermissions(org, CancellationToken.None));
+        Assert.Empty(await new EfOrganizationAuthorizer(db, new StubCurrentUser(org, Guid.NewGuid())).ListPermissions(org, CancellationToken.None));
+    }
 }

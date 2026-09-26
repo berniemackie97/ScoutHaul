@@ -1,13 +1,16 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Menu, Package2 } from "lucide-react";
 import { Button } from "@overhaul/ui";
+import { NoAccess } from "@/components/feedback/no-access";
 import { CommandPalette } from "@/components/search/command-palette";
+import { allows } from "@/lib/permissions";
 import type { Operator } from "@/lib/session";
 import { CommandPaletteTrigger } from "@/components/search/command-palette-trigger";
+import { pageAt } from "./navigation";
 import { Sidebar } from "./sidebar";
 import { SessionKeepAlive } from "./session-keep-alive";
 
@@ -22,8 +25,20 @@ function isEditable(target: EventTarget | null): boolean {
  * bar. Owns the drawer's open state (shared with the top-bar trigger), closes it on navigation, and locks body
  * scroll while it is open.
  */
-export function DashboardShell({ children, operator }: { children: ReactNode; operator: Operator | null }) {
+export function DashboardShell({
+  children,
+  operator,
+  permissions,
+}: {
+  children: ReactNode;
+  operator: Operator | null;
+  /** Null when the session could not be read. */
+  permissions: string[] | null;
+}) {
   const pathname = usePathname();
+  const granted = useMemo(() => (permissions === null ? null : new Set(permissions)), [permissions]);
+  const page = pageAt(pathname);
+  const refused = page?.requires && !allows(granted, page.requires) ? { name: page.name, requires: page.requires } : null;
   const [mobileOpen, setMobileOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
 
@@ -61,9 +76,10 @@ export function DashboardShell({ children, operator }: { children: ReactNode; op
   return (
     <div className="flex h-screen overflow-hidden">
       <SessionKeepAlive />
-      <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
+      <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} granted={granted} />
       <Sidebar
         operator={operator}
+        granted={granted}
         mobileOpen={mobileOpen}
         onClose={() => setMobileOpen(false)}
         onOpenSearch={() => {
@@ -93,7 +109,9 @@ export function DashboardShell({ children, operator }: { children: ReactNode; op
           <CommandPaletteTrigger compact onOpen={() => setPaletteOpen(true)} className="ml-auto" />
         </header>
         <main className="flex-1 overflow-y-auto">
-          <div className="p-4 pb-[calc(1rem_+_env(safe-area-inset-bottom))] sm:p-6 lg:p-8">{children}</div>
+          <div className="p-4 pb-[calc(1rem_+_env(safe-area-inset-bottom))] sm:p-6 lg:p-8">
+            {refused ? <NoAccess page={refused.name} requires={refused.requires} granted={granted} /> : children}
+          </div>
         </main>
       </div>
     </div>
