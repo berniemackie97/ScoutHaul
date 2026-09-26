@@ -141,7 +141,7 @@ export function profileJson(username: string | null): string {
  * `data-zoom-src`, and — deliberately — a seller avatar and a recommended listing's picture, neither of which
  * belongs to this listing.
  */
-export function itemPage(photoIds: string[], specifics: Record<string, string> = {}): string {
+export function itemPage(photoIds: string[], specifics: Record<string, string> = {}, descriptionUrl: string | null = null): string {
   const buttons = photoIds
     .map((id, index) => `<button class=ux-image-grid-item data-idx=${index} data-zoom-src=https://i.ebayimg.com/images/g/${id}/s-l1600.jpg><img src=https://i.ebayimg.com/images/g/${id}/s-l140.webp></button>`)
     .join("");
@@ -155,5 +155,7 @@ export function itemPage(photoIds: string[], specifics: Record<string, string> =
     additionalProperty: Object.entries(specifics).map(([name, value]) => ({ "@type": "PropertyValue", name, value })),
   });
   const structured = `<script type="application/ld+json">{"@type":"ItemPage"}</script><script type="application/ld+json">${product}</script>`;
-  return `<html><body>${structured}<div class=ux-image-carousel>${buttons}</div>${avatar}${recommended}</body></html>`;
+  // eBay keeps the description in a document of its own, linked from the page by an iframe.
+  const described = descriptionUrl === null ? "" : `<iframe id=desc_ifr src=${descriptionUrl}></iframe>`;
+  return `<html><body>${structured}<div class=ux-image-carousel>${buttons}</div>${described}${avatar}${recommended}</body></html>`;
 }

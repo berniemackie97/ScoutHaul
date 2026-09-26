@@ -16,6 +16,7 @@ export interface VintedWardrobeItem {
   status?: string | null;
   brand?: string | null;
   size?: string | null;
+  description?: string | null;
   view_count?: number | null;
   favourite_count?: number | null;
   photos?: { url?: string | null; full_size_url?: string | null; is_main?: boolean | null }[] | null;
@@ -61,6 +62,8 @@ export function toIngestListing(item: VintedWardrobeItem): IngestListing | null 
     condition: item.status ?? null,
     brand: item.brand ?? null,
     size: item.size ?? null,
+    // Read defensively: the wardrobe response carries it when the listing has one, and nothing when it does not.
+    description: item.description?.trim() || undefined,
     url: item.url ?? null,
     primaryImageUrl: photos[0] ?? null,
     photoUrls: photos,

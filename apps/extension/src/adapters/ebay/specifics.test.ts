@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { itemPage } from "../../test/ebay-fixtures";
-import { readSpecifics } from "./specifics";
+import { descriptionUrl, readDescription, readSpecifics } from "./specifics";
 
 describe("what an eBay listing says the thing is", () => {
   it("reads brand, colour and size from the item's structured data", () => {
@@ -26,5 +26,34 @@ describe("what an eBay listing says the thing is", () => {
     const page = `<script type="application/ld+json">{"@type":"BreadcrumbList","additionalProperty":[{"name":"Brand","value":"Wrong"}]}</script>`;
 
     expect(readSpecifics(page).brand).toBeNull();
+  });
+});
+
+describe("an eBay listing's description", () => {
+  it("finds the document the item page links to", () => {
+    const page = itemPage(["AAA111"], {}, "https://vi.vipr.ebaydesc.com/itmdesc?item=377296454991&amp;t=0");
+
+    expect(descriptionUrl(page)).toBe("https://vi.vipr.ebaydesc.com/itmdesc?item=377296454991&t=0");
+    expect(descriptionUrl(itemPage(["AAA111"]))).toBeNull();
+  });
+
+  it("keeps the words and drops the markup", () => {
+    const document = `<html><head><style>.x{color:red}</style></head><body>
+      <script>trackView()</script>
+      <div><h2>Reshiram &amp; Zekrom GX</h2><p>Near mint.<br>Sleeved &amp; shipped in a top loader.</p></div>
+      <ul><li>Set: Cosmic Eclipse</li><li>Card&nbsp;number: 157/236</li></ul>
+    </body></html>`;
+
+    expect(readDescription(document)).toBe(
+      "Reshiram & Zekrom GX\nNear mint.\nSleeved & shipped in a top loader.\nSet: Cosmic Eclipse\nCard number: 157/236"
+    );
+  });
+
+  it("treats a description of nothing but markup as no description", () => {
+    expect(readDescription("<div><span>   </span><br></div>")).toBeNull();
+  });
+
+  it("keeps a runaway description to a sane length", () => {
+    expect(readDescription(`<p>${"word ".repeat(2000)}</p>`, 100)).toHaveLength(100);
   });
 });

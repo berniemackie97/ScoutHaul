@@ -277,6 +277,64 @@ describe("the eBay adapter", () => {
     expect(eBay.requested.filter((url) => url.includes("/itm/"))).toHaveLength(1);
   });
 
+
+  it("re-reads an item page remembered before specifics were read", async () => {
+    // The regression this guards: galleries remembered by an earlier version short-circuited the page read, so
+    // brand, colour and size never arrived for any listing that already had its photos.
+    const eBay = context({
+      "/sh/lst/active": listingsPage([{ id: "377296454991", title: "Shirt", price: 20 }]),
+      "/itm/377296454991": itemPage(["AAA111"], { Brand: "Gucci" }),
+    });
+    await eBay.memory.set("gallery:377296454991", {
+      at: now.getTime(),
+      primary: "https://i.ebayimg.com/images/g/377296454991/s-l1600.jpg",
+      photos: ["https://i.ebayimg.com/images/g/AAA111/s-l1600.jpg"],
+    });
+
+    const snapshot = await ebayAdapter.snapshotListings(eBay, seller);
+
+    expect(eBay.requested.filter((url) => url.includes("/itm/"))).toHaveLength(1);
+    expect(snapshot.listings[0]!.brand).toBe("Gucci");
+  });
+
+  it("reads a listing's description from the document its page links to", async () => {
+    const eBay = context({
+      "/sh/lst/active": listingsPage([{ id: "377296454991", title: "Shirt", price: 20 }]),
+      "/itm/377296454991": itemPage(["AAA111"], { Brand: "Gucci" }, "https://vi.vipr.ebaydesc.com/itmdesc?item=377296454991"),
+      "/itmdesc": "<html><body><p>Worn twice. No flaws.</p></body></html>",
+    });
+
+    const snapshot = await ebayAdapter.snapshotListings(eBay, seller);
+
+    expect(snapshot.listings[0]!.description).toBe("Worn twice. No flaws.");
+  });
+
+  it("says nothing about a description rather than erasing one, when the page links to none", async () => {
+    const eBay = context({
+      "/sh/lst/active": listingsPage([{ id: "377296454991", title: "Shirt", price: 20 }]),
+      "/itm/377296454991": itemPage(["AAA111"], { Brand: "Gucci" }),
+    });
+
+    const snapshot = await ebayAdapter.snapshotListings(eBay, seller);
+
+    expect(snapshot.listings[0]!.description).toBeUndefined();
+  });
+
+  it("remembers what a page said, so a second scan asks for neither the page nor its description", async () => {
+    const eBay = context({
+      "/sh/lst/active": listingsPage([{ id: "377296454991", title: "Shirt", price: 20 }]),
+      "/itm/377296454991": itemPage(["AAA111"], { Brand: "Gucci" }, "https://vi.vipr.ebaydesc.com/itmdesc?item=377296454991"),
+      "/itmdesc": "<html><body><p>Worn twice. No flaws.</p></body></html>",
+    });
+    await ebayAdapter.snapshotListings(eBay, seller);
+    const asked = eBay.requested.length;
+
+    const second = await ebayAdapter.snapshotListings(eBay, seller);
+
+    expect(eBay.requested.length).toBe(asked + 1); // the listings page only
+    expect(second.listings[0]).toMatchObject({ brand: "Gucci", description: "Worn twice. No flaws." });
+  });
+
   it("knows who the browser is signed in as, and when it is not", async () => {
     expect(await ebayAdapter.detectSession(context({ "/gh/user_profile": profileJson("overhaultradingcompany") })))
       .toEqual({ signedIn: true, username: "overhaultradingcompany", marketplaceUserId: null });

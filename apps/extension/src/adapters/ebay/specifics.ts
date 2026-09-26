@@ -13,6 +13,49 @@ export interface ListingSpecifics {
   size: string | null;
 }
 
+/**
+ * eBay keeps a listing's description in a document of its own, linked from the item page. The page carries no
+ * description itself, so this is the only way to read one — and it is read from the page already in hand.
+ */
+export function descriptionUrl(html: string): string | null {
+  const match = /<iframe[^>]*\bid=["']?desc_ifr["']?[^>]*\bsrc=["']?(https:\/\/[^"'\s>]+)/i.exec(html)
+    ?? /\bsrc=["']?(https:\/\/[^"'\s>]*ebaydesc\.com\/[^"'\s>]+)/i.exec(html);
+  return match?.[1]?.replace(/&amp;/g, "&") ?? null;
+}
+
+/** The description's own words, with its markup and scripts stripped out. */
+export function readDescription(html: string, limit = 4000): string | null {
+  const body = html
+    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, " ")
+    .replace(/<br\s*\/?>(?=\s*\S)/gi, "\n")
+    .replace(/<\/(p|div|li|tr|h\d)>/gi, "\n")
+    .replace(/<[^>]+>/g, " ");
+  const text = decode(body)
+    .split("\n")
+    .map((line) => line.replace(/[ \t\u00a0]+/g, " ").trim())
+    .filter((line) => line.length > 0)
+    .join("\n")
+    .trim();
+  return text.length === 0 ? null : text.slice(0, limit);
+}
+
+const entities: Record<string, string> = {
+  amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " ", "#39": "'", "#x27": "'",
+};
+
+function decode(text: string): string {
+  return text.replace(/&(#x?[0-9a-f]+|[a-z]+);/gi, (whole, name: string) => {
+    const known = entities[name.toLowerCase()];
+    if (known !== undefined) {
+      return known;
+    }
+
+    const numeric = /^#x/i.test(name) ? Number.parseInt(name.slice(2), 16) : /^#/.test(name) ? Number(name.slice(1)) : Number.NaN;
+    return Number.isFinite(numeric) ? String.fromCodePoint(numeric) : whole;
+  });
+}
+
 const blank: ListingSpecifics = { brand: null, color: null, size: null };
 
 export function readSpecifics(html: string): ListingSpecifics {

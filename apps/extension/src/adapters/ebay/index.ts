@@ -5,7 +5,7 @@ import { AdapterError, type ListingsSnapshot, type MarketplaceAdapter, type Mark
 import { readLedgerPage, type LedgerOrder } from "./ledger";
 import { readGallery } from "./gallery";
 import { readListingsPage } from "./listings";
-import { readSpecifics } from "./specifics";
+import { descriptionUrl, readDescription, readSpecifics, type ListingSpecifics } from "./specifics";
 import { readOrdersPage, toIngestOrder, type EbayOrderRow } from "./orders";
 import { assertReadable, siteChanged, unreadable } from "./pages";
 import { isoDay, saleTime } from "./text";
@@ -27,8 +27,14 @@ const pageSize = 200;
  */
 const galleriesPerScan = 25;
 
-/** A gallery is read again only when the listing's own picture changed, or after this long. */
+/** An item page is read again only when the listing's own picture changed, or after this long. */
 const galleryStaleDays = 30;
+
+/**
+ * How many descriptions one scan fetches. eBay keeps them in a separate document, so each is a request of its own —
+ * fewer than the pages themselves, because a description matters less than a photo and changes less often.
+ */
+const descriptionsPerScan = 10;
 
 /** The first day a sales scan reads from. */
 export function salesFrom(window: SalesWindow, now: Date): Date {
@@ -208,11 +214,14 @@ export const ebayAdapter: MarketplaceAdapter = {
   },
 };
 
-/** What this browser has already read for one listing's pictures. */
-interface GalleryMemory {
+/** What this browser has already read from one listing's item page. */
+interface ItemPageMemory {
   at: number;
   primary: string | null;
   photos: string[];
+  /** Absent in anything remembered before specifics were read, which is what makes those entries stale. */
+  specifics?: ListingSpecifics;
+  description?: string | null;
 }
 
 /**
@@ -225,6 +234,7 @@ interface GalleryMemory {
 async function readGalleries(context: MarketplaceContext, listings: IngestListing[], issues: RunIssue[]): Promise<void> {
   const stale = context.now().getTime() - galleryStaleDays * day;
   let budget = galleriesPerScan;
+  let descriptions = descriptionsPerScan;
 
   for (const listing of listings) {
     if (budget === 0) {
@@ -236,10 +246,11 @@ async function readGalleries(context: MarketplaceContext, listings: IngestListin
       continue;
     }
 
-    const known = await context.memory.get<GalleryMemory>(`gallery:${id}`);
-    if (known && known.at > stale && known.primary === listing.primaryImageUrl) {
-      // Nothing about the listing's pictures has changed, so its gallery is still the one already held.
+    const known = await context.memory.get<ItemPageMemory>(`gallery:${id}`);
+    if (known?.specifics && known.at > stale && known.primary === listing.primaryImageUrl) {
+      // Nothing on the page has changed, so what was read from it last time still stands.
       listing.photoUrls = known.photos;
+      apply(listing, known.specifics, known.description ?? null);
       continue;
     }
 
@@ -264,9 +275,12 @@ async function readGalleries(context: MarketplaceContext, listings: IngestListin
 
     // The same page says what the thing is, so it is read while it is in hand.
     const specifics = readSpecifics(body);
-    listing.brand = specifics.brand;
-    listing.color = specifics.color;
-    listing.size = specifics.size;
+    const description = descriptions > 0 ? await readDescriptionFor(context, body) : null;
+    if (description !== null) {
+      descriptions--;
+    }
+
+    apply(listing, specifics, description);
 
     if (photos.length === 0) {
       issues.push({ message: "This listing's pictures could not be read from its page.", externalReference: id, rejected: false });
@@ -274,7 +288,37 @@ async function readGalleries(context: MarketplaceContext, listings: IngestListin
     }
 
     listing.photoUrls = photos;
-    await context.memory.set<GalleryMemory>(`gallery:${id}`, { at: context.now().getTime(), primary: listing.primaryImageUrl ?? null, photos });
+    await context.memory.set<ItemPageMemory>(`gallery:${id}`, {
+      at: context.now().getTime(),
+      primary: listing.primaryImageUrl ?? null,
+      photos,
+      specifics,
+      description,
+    });
+  }
+}
+
+function apply(listing: IngestListing, specifics: ListingSpecifics, description: string | null): void {
+  listing.brand = specifics.brand;
+  listing.color = specifics.color;
+  listing.size = specifics.size;
+  // Undefined rather than null when there is none: a source that did not read a description must not erase one.
+  listing.description = description ?? undefined;
+}
+
+/** The listing's description, from the document its page links to. Null when the page does not link to one. */
+async function readDescriptionFor(context: MarketplaceContext, page: string): Promise<string | null> {
+  const address = descriptionUrl(page);
+  if (address === null) {
+    return null;
+  }
+
+  try {
+    const response = await context.request(address);
+    return response.status === 200 ? readDescription(response.body) : null;
+  } catch {
+    // A description is the least of what this scan is for; losing one costs the listing nothing.
+    return null;
   }
 }
 
