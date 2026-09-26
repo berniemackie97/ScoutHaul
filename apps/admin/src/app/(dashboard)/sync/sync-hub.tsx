@@ -17,6 +17,9 @@ import {
   loopSummary,
   openRequestFor,
   photoSyncSummary,
+  platformSummary,
+  salesNote,
+  scannableLoops,
   requestStatus,
   type LoopKind,
   type ScanScope,
@@ -99,6 +102,8 @@ export function SyncHub({ overview }: { overview: SyncOverview }) {
 
   const scan = (scope: ScanScope, accountId: string | null, from: string | null = null) => run(() => requestScan(scope, accountId, from), true);
   const syncable = accounts.some((account) => account.health !== "Unsupported" && account.boundUsername);
+  // Only offer "scan all sales" when some marketplace here actually has sales to scan.
+  const anySales = accounts.some((account) => account.boundUsername && scannableLoops(account).includes("Sales"));
 
   return (
     <div className="space-y-8">
@@ -123,12 +128,16 @@ export function SyncHub({ overview }: { overview: SyncOverview }) {
 
       <PhotoSync photos={overview.photos} pending={pending} onRun={run} />
 
+      <Marketplaces platforms={overview.platforms ?? []} />
+
       <section aria-labelledby="accounts-heading" className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 id="accounts-heading" className="text-sm font-semibold">Accounts</h2>
           {syncable ? (
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" disabled={pending} onClick={() => scan("Sales", null)}>Scan all sales</Button>
+              {anySales ? (
+                <Button variant="outline" size="sm" disabled={pending} onClick={() => scan("Sales", null)}>Scan all sales</Button>
+              ) : null}
               <Button variant="outline" size="sm" disabled={pending} onClick={() => scan("Everything", null)}>Scan everything</Button>
             </div>
           ) : null}
@@ -277,10 +286,22 @@ function AccountCard(props: {
             })}
           </div>
 
+          {salesNote(account) ? (
+            <p className="text-muted-foreground text-xs">{salesNote(account)}</p>
+          ) : null}
+
           {account.boundUsername ? (
             <div className="flex flex-wrap items-end gap-2">
-              <ScanButton loop="Sales" open={openRequestFor(requests, id, "Sales")} pending={pending} primary onScan={() => onScan("Sales", id)} />
-              <ScanButton loop="Listings" open={openRequestFor(requests, id, "Listings")} pending={pending} onScan={() => onScan("Listings", id)} />
+              {scannableLoops(account).map((loop) => (
+                <ScanButton
+                  key={loop}
+                  loop={loop}
+                  open={openRequestFor(requests, id, loop)}
+                  pending={pending}
+                  primary={loop === "Sales"}
+                  onScan={() => onScan(loop, id)}
+                />
+              ))}
               {account.supportsHistory ? (
                 <form
                   className="flex items-end gap-2"
@@ -308,6 +329,33 @@ function AccountCard(props: {
         </>
       ) : null}
     </Card>
+  );
+}
+
+/** What each marketplace this build can read actually syncs, so the answer is known before an account is connected. */
+function Marketplaces({ platforms }: { platforms: SyncOverview["platforms"] }) {
+  if (!platforms || platforms.length === 0) {
+    return null;
+  }
+
+  return (
+    <section aria-labelledby="marketplaces-heading" className="space-y-2">
+      <h2 id="marketplaces-heading" className="text-sm font-semibold">What each marketplace syncs</h2>
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+        {platforms.map((platform) => {
+          const summary = platformSummary(platform);
+          return (
+            <Card key={platform.platform} className="p-3 text-sm">
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-medium">{platform.platform}</span>
+                <Badge variant={summary.off ? "warning" : "secondary"}>{summary.off ? "Paused" : summary.syncs}</Badge>
+              </div>
+              <p className="text-muted-foreground mt-1 text-xs">{summary.off ?? summary.history}</p>
+            </Card>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 
