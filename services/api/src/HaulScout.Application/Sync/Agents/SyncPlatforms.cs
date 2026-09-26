@@ -67,7 +67,25 @@ public static class SyncPlatforms
         MaxRequestsPerMinute: 10,
         MaxRequestsPerDay: 800);
 
-    public static readonly IReadOnlyList<SyncPlatform> All = [Ebay, Vinted];
+    /// <summary>
+    /// Poshmark. A closet page is served with its listings already in it — brand, colour, size, condition,
+    /// category and description included — so listings cost one page per forty-eight and no API call at all.
+    /// Sales are not read yet: they live behind the seller's own order pages, which this adapter does not know.
+    /// </summary>
+    public static readonly SyncPlatform Poshmark = new(
+        "Poshmark",
+        [SyncLoopKind.Listings],
+        HistoryDays: 0,
+        SuggestedSalesMinutes: 0,
+        MinSalesMinutes: 0,
+        SuggestedListingsMinutes: 240,
+        MinListingsMinutes: 120,
+        MinSecondsBetweenRequests: 4,
+        MaxRequestsPerMinute: 10,
+        MaxRequestsPerDay: 600,
+        OlderSalesHint: "Poshmark sales come from its inventory report for now.");
+
+    public static readonly IReadOnlyList<SyncPlatform> All = [Ebay, Vinted, Poshmark];
 
     public static SyncPlatform? Find(string? platform) =>
         All.FirstOrDefault(candidate => string.Equals(candidate.Platform, platform?.Trim(), StringComparison.OrdinalIgnoreCase));

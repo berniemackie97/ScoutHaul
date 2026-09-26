@@ -92,10 +92,12 @@ describe("checking in", () => {
     await agentWith(calls).agent.checkIn();
 
     expect(calls.heartbeat).toHaveBeenCalledWith(expect.objectContaining({
-      marketplaces: [
+      // Every marketplace this build knows, so a new adapter shows up here without a test pretending otherwise.
+      marketplaces: expect.arrayContaining([
         expect.objectContaining({ platform: "eBay", accessGranted: false }),
         expect.objectContaining({ platform: "Vinted", accessGranted: false }),
-      ],
+        expect.objectContaining({ platform: "Poshmark", accessGranted: false }),
+      ]),
     }));
     expect(await pairingItem.getValue()).toMatchObject({ token: "hsa_new", agentName: "Office mini-PC" });
     expect((await heartbeatItem.getValue())?.newToken).toBeNull();
