@@ -62,7 +62,8 @@ public sealed class SyncAgentTests
         public required SyncAgentOptions Options { get; init; }
         public required HashSet<string> Granted { get; init; }
         public required ChannelAccount Ebay { get; init; }
-        public required ChannelAccount Depop { get; init; }
+        /// <summary>A marketplace with no adapter, so the hub has something to call unsupported.</summary>
+        public required ChannelAccount Unsupported { get; init; }
         public required SyncHubService Hub { get; init; }
 
         public SyncAgentService As(Guid agentId, bool usedPreviousToken = false)
@@ -138,8 +139,8 @@ public sealed class SyncAgentTests
         db.Users.Add(new AppUser { Id = user, Email = "op@x.com", DisplayName = "Operator" });
         db.OrganizationMembers.Add(new OrganizationMember { OrganizationId = org, UserId = user, Role = OrganizationRole.Owner });
         ChannelAccount ebay = new() { OrganizationId = org, Channel = "eBay", DisplayName = "Overhaul eBay" };
-        ChannelAccount depop = new() { OrganizationId = org, Channel = "Depop", DisplayName = "Overhaul Depop" };
-        db.ChannelAccounts.AddRange(ebay, depop);
+        ChannelAccount unsupported = new() { OrganizationId = org, Channel = "Facebook Marketplace", DisplayName = "Overhaul Facebook" };
+        db.ChannelAccounts.AddRange(ebay, unsupported);
         db.SaveChanges();
 
         FakeTimeProvider clock = new(new DateTimeOffset(2026, 9, 18, 20, 0, 0, TimeSpan.Zero));
@@ -154,7 +155,7 @@ public sealed class SyncAgentTests
             Options = syncOptions,
             Granted = grantedSet,
             Ebay = ebay,
-            Depop = depop,
+            Unsupported = unsupported,
             Hub = new SyncHubService(new EfSyncAgentStore(db), new EfInventoryPhotoSyncStore(db), new EfOrganizationMemberStore(db), new StubCurrentUser(org, user), new StubAuthorizer(grantedSet), clock, Microsoft.Extensions.Options.Options.Create(syncOptions)),
         };
     }
@@ -308,7 +309,7 @@ public sealed class SyncAgentTests
         SyncAccountDto ebay = before.Accounts.Single(account => account.ChannelAccountId == harness.Ebay.Id);
         Assert.Equal(SyncAccountHealth.NotBound, ebay.Health);
         Assert.Contains(Seller, ebay.HealthMessage);
-        Assert.Equal(SyncAccountHealth.Unsupported, before.Accounts.Single(account => account.ChannelAccountId == harness.Depop.Id).Health);
+        Assert.Equal(SyncAccountHealth.Unsupported, before.Accounts.Single(account => account.ChannelAccountId == harness.Unsupported.Id).Health);
 
         await harness.Hub.BindAsync(harness.Ebay.Id, new BindSyncAccountRequest(Seller), CancellationToken.None);
         Assert.Equal(SyncAccountHealth.Ready, (await harness.Hub.OverviewAsync(CancellationToken.None)).Accounts.Single(account => account.ChannelAccountId == harness.Ebay.Id).Health);
@@ -369,7 +370,7 @@ public sealed class SyncAgentTests
 
         Assert.Equal(AppResultStatus.Validation, (await harness.Hub.UpdateScheduleAsync(harness.Ebay.Id, new UpdateSyncScheduleRequest(2, null), CancellationToken.None)).Status);
         Assert.Equal(AppResultStatus.Validation, (await harness.Hub.UpdateScheduleAsync(harness.Ebay.Id, new UpdateSyncScheduleRequest(null, 30), CancellationToken.None)).Status);
-        Assert.Equal(AppResultStatus.Validation, (await harness.Hub.UpdateScheduleAsync(harness.Depop.Id, new UpdateSyncScheduleRequest(10, null), CancellationToken.None)).Status);
+        Assert.Equal(AppResultStatus.Validation, (await harness.Hub.UpdateScheduleAsync(harness.Unsupported.Id, new UpdateSyncScheduleRequest(10, null), CancellationToken.None)).Status);
 
         Assert.Equal(AppResultStatus.Ok, (await harness.Hub.UpdateScheduleAsync(harness.Ebay.Id, new UpdateSyncScheduleRequest(5, 60), CancellationToken.None)).Status);
         Assert.Equal(AppResultStatus.Ok, (await harness.Hub.UpdateScheduleAsync(harness.Ebay.Id, new UpdateSyncScheduleRequest(null, null), CancellationToken.None)).Status);
@@ -405,8 +406,8 @@ public sealed class SyncAgentTests
         RequestScanResultDto first = (await harness.Hub.RequestScanAsync(new RequestScanRequest(SyncScanScope.Everything), CancellationToken.None)).Value!;
         Assert.Equal([SyncLoopKind.Sales, SyncLoopKind.Listings], first.Requests.Select(request => request.Loop).ToArray());
         SkippedScanDto skipped = Assert.Single(first.Skipped);
-        Assert.Equal(harness.Depop.Id, skipped.ChannelAccountId);
-        Assert.Contains("Depop", skipped.Reason);
+        Assert.Equal(harness.Unsupported.Id, skipped.ChannelAccountId);
+        Assert.Contains("Facebook Marketplace", skipped.Reason);
 
         RequestScanResultDto second = (await harness.Hub.RequestScanAsync(new RequestScanRequest(SyncScanScope.Sales, harness.Ebay.Id), CancellationToken.None)).Value!;
         Assert.Equal(first.Requests[0].Id, Assert.Single(second.Requests).Id);

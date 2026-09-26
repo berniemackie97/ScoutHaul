@@ -85,7 +85,26 @@ public static class SyncPlatforms
         MaxRequestsPerDay: 600,
         OlderSalesHint: "Poshmark sales come from its inventory report for now.");
 
-    public static readonly IReadOnlyList<SyncPlatform> All = [Ebay, Vinted, Poshmark];
+    /// <summary>
+    /// Depop. A shop page names its listings but describes none of them, so each listing is read from its own page,
+    /// where Depop publishes the whole of it — title, description, every photo, brand, size, condition and whether
+    /// it sold. A few are read per scan, and what was read is kept, so a shop that is not changing costs one page.
+    /// Sales are not read yet: they are behind the seller's own pages.
+    /// </summary>
+    public static readonly SyncPlatform Depop = new(
+        "Depop",
+        [SyncLoopKind.Listings],
+        HistoryDays: 0,
+        SuggestedSalesMinutes: 0,
+        MinSalesMinutes: 0,
+        SuggestedListingsMinutes: 360,
+        MinListingsMinutes: 120,
+        MinSecondsBetweenRequests: 5,
+        MaxRequestsPerMinute: 8,
+        MaxRequestsPerDay: 400,
+        OlderSalesHint: "Depop sales come from its sales report for now.");
+
+    public static readonly IReadOnlyList<SyncPlatform> All = [Ebay, Vinted, Poshmark, Depop];
 
     public static SyncPlatform? Find(string? platform) =>
         All.FirstOrDefault(candidate => string.Equals(candidate.Platform, platform?.Trim(), StringComparison.OrdinalIgnoreCase));
