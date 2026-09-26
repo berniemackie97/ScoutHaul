@@ -4,6 +4,7 @@ import { useActionState, useMemo, useState } from "react";
 import { useFormStatus } from "react-dom";
 import type { components } from "@overhaul/api-client";
 import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Label, Textarea, formatCurrency } from "@overhaul/ui";
+import { ItemSearch } from "@/components/inventory/item-search";
 import { recordBundledSale, type BundledResult } from "./actions";
 
 type Candidate = components["schemas"]["SaleCandidateDto"];
@@ -28,9 +29,9 @@ function Money({ label, name, value, onChange }: { label: string; name: string; 
   );
 }
 
-export function BundledSaleCreator({ candidates, channels }: { candidates: Candidate[]; channels: Channel[] }) {
+export function BundledSaleCreator({ channels }: { channels: Channel[] }) {
   const [state, action] = useActionState(recordBundledSale, initial);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [chosen, setChosen] = useState<Candidate[]>([]);
   const [manual, setManual] = useState<Record<string, string>>({});
   const [channel, setChannel] = useState("");
   const [total, setTotal] = useState("");
@@ -47,7 +48,7 @@ export function BundledSaleCreator({ candidates, channels }: { candidates: Candi
     return map;
   }, [channels]);
 
-  const chosen = candidates.filter((c) => c.inventoryItemId && selected.has(c.inventoryItemId));
+  const chosenIds = useMemo(() => new Set(chosen.map((c) => c.inventoryItemId ?? "")), [chosen]);
   const cogs = chosen.reduce((sum, c) => sum + (c.costOfGoods ?? 0), 0);
   const feesTotal = [platformFees, paymentFees, shippingCost].reduce((sum, v) => sum + (Number(v) || 0), 0);
   const revenue = (Number(total) || 0) + (Number(shippingCharged) || 0);
@@ -58,13 +59,9 @@ export function BundledSaleCreator({ candidates, channels }: { candidates: Candi
     chosen.map((c) => ({ inventoryItemId: c.inventoryItemId, manualPrice: manual[c.inventoryItemId!] ? Number(manual[c.inventoryItemId!]) : null }))
   );
 
-  function toggle(id: string) {
-    setSelected((cur) => {
-      const next = new Set(cur);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+  function remove(id: string) {
+    setChosen((current) => current.filter((c) => c.inventoryItemId !== id));
+    setManual(({ [id]: _, ...rest }) => rest);
   }
 
   return (
@@ -76,35 +73,46 @@ export function BundledSaleCreator({ candidates, channels }: { candidates: Candi
             <CardTitle className="text-lg">Items in this order</CardTitle>
             <CardDescription>Pick every item that shipped together as one package. Leave per-item price blank to split the total by expected value, or set exact amounts.</CardDescription>
           </CardHeader>
-          <CardContent className="p-0">
-            <div className="max-h-[420px] overflow-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-muted/40 text-muted-foreground border-y sticky top-0 text-left text-xs uppercase tracking-wide">
-                  <tr><th className="px-3 py-2 font-medium">Item</th><th className="px-3 py-2 text-right font-medium">COGS</th><th className="px-3 py-2 font-medium">Price (optional)</th></tr>
-                </thead>
-                <tbody className="divide-y">
-                  {candidates.map((c) => {
-                    if (!c.inventoryItemId) return null;
-                    const id = c.inventoryItemId;
-                    const checked = selected.has(id);
-                    return (
-                      <tr key={id} className={checked ? "bg-brand-50/40" : undefined}>
-                        <td className="px-3 py-2">
-                          <label className="flex items-start gap-2">
-                            <input type="checkbox" checked={checked} onChange={() => toggle(id)} className="mt-1" />
-                            <span><span className="font-medium">{c.title}</span><span className="text-muted-foreground block text-xs">{c.status}</span></span>
-                          </label>
-                        </td>
-                        <td className="px-3 py-2 text-right tabular-nums">{currency(c.costOfGoods ?? 0)}</td>
-                        <td className="px-3 py-2">
-                          <Input type="number" step="0.01" min="0" disabled={!checked} value={manual[id] ?? ""} onChange={(e) => setManual((m) => ({ ...m, [id]: e.target.value }))} placeholder="auto" className="h-8" />
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+          <CardContent className="space-y-3">
+            <ItemSearch<Candidate>
+              label="Search for an item in this order"
+              source={(query) => `/api/sales/candidates?q=${encodeURIComponent(query)}`}
+              idOf={(c) => c.inventoryItemId ?? ""}
+              exclude={chosenIds}
+              onPick={(c) => setChosen((current) => [...current, c])}
+              render={(c) => (
+                <span className="block">
+                  <span className="block truncate font-medium">{c.title}</span>
+                  <span className="text-muted-foreground block text-xs">{c.status} · COGS {currency(c.costOfGoods ?? 0)}</span>
+                </span>
+              )}
+            />
+            {chosen.length === 0 ? (
+              <p className="text-muted-foreground rounded-lg border border-dashed p-6 text-center text-sm">Search above to add each item that shipped in this order.</p>
+            ) : (
+              <div className="overflow-auto rounded-lg border">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/40 text-muted-foreground border-b text-left text-xs uppercase tracking-wide">
+                    <tr><th className="px-3 py-2 font-medium">Item</th><th className="px-3 py-2 text-right font-medium">COGS</th><th className="px-3 py-2 font-medium">Price (optional)</th><th className="px-3 py-2" /></tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {chosen.map((c) => {
+                      const id = c.inventoryItemId!;
+                      return (
+                        <tr key={id}>
+                          <td className="px-3 py-2"><span className="font-medium">{c.title}</span><span className="text-muted-foreground block text-xs">{c.status}</span></td>
+                          <td className="px-3 py-2 text-right tabular-nums">{currency(c.costOfGoods ?? 0)}</td>
+                          <td className="px-3 py-2">
+                            <Input type="number" step="0.01" min="0" value={manual[id] ?? ""} onChange={(e) => setManual((m) => ({ ...m, [id]: e.target.value }))} placeholder="auto" className="h-8" />
+                          </td>
+                          <td className="px-3 py-2 text-right"><Button type="button" variant="ghost" size="sm" onClick={() => remove(id)}>Remove</Button></td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </CardContent>
         </Card>
 

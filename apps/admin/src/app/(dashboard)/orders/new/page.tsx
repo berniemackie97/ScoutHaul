@@ -11,10 +11,7 @@ export default async function NewSalePage() {
   if (refused) return refused;
 
   const api = await getApiClient();
-  const [{ data: candidates }, { data: reference }] = await Promise.all([
-    api.GET("/api/sales/candidates"),
-    api.GET("/api/sales/reference-data"),
-  ]);
+  const { data: reference } = await api.GET("/api/sales/reference-data");
 
   return (
     <div className="space-y-6">
@@ -27,7 +24,7 @@ export default async function NewSalePage() {
           Create a current or historical sale from canonical inventory, channel, tax, fee, and cost data.
         </p>
       </header>
-      <SaleCreator candidates={candidates ?? []} channels={reference?.channels ?? []} />
+      <SaleCreator channels={reference?.channels ?? []} />
     </div>
   );
 }

@@ -19,12 +19,10 @@ const MODES: { id: Mode; label: string; hint: string; icon: typeof Box }[] = [
 
 export function AddInventory({
   referenceData,
-  lotCandidates,
   bundleCandidates,
   initialMode = "single",
 }: {
   referenceData: ReferenceData;
-  lotCandidates: InventoryItem[];
   bundleCandidates: InventoryItem[];
   initialMode?: Mode;
 }) {
@@ -55,7 +53,7 @@ export function AddInventory({
       </div>
 
       {mode === "single" && <ItemCreator referenceData={referenceData} />}
-      {mode === "lot" && <PurchaseLotCreator candidates={lotCandidates} />}
+      {mode === "lot" && <PurchaseLotCreator />}
       {mode === "bundle" && <BundleCreator candidates={bundleCandidates} />}
     </div>
   );

@@ -3,7 +3,8 @@
 import { useActionState, useEffect, useMemo, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Label, Textarea, formatCurrency } from "@overhaul/ui";
-import type { InventoryItem } from "@/features/inventory/inventory-operations";
+import type { PickerItem } from "@/app/api/inventory/picker/route";
+import { ItemSearch } from "@/components/inventory/item-search";
 import { createPurchaseLot, type PurchaseActionResult } from "./actions";
 
 type AllocationMethod = "Equal" | "WeightedByExpectedValue" | "Manual";
@@ -48,14 +49,14 @@ function NumberField({
   );
 }
 
-export function PurchaseLotCreator({ candidates }: { candidates: InventoryItem[] }) {
+export function PurchaseLotCreator() {
   const [state, action] = useActionState(createPurchaseLot, initial);
   const values = state.values ?? {};
   const fieldErrors = state.fieldErrors ?? {};
   const formKey = state.formKey ?? "initial";
   const valueFor = (name: string, fallback = "") => values[name] ?? fallback;
   const [purchaseKind, setPurchaseKind] = useState<PurchaseKind>("Single");
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [chosen, setChosen] = useState<PickerItem[]>([]);
   const [allocationMethod, setAllocationMethod] = useState<AllocationMethod>("Equal");
   const [purchaseSubtotal, setPurchaseSubtotal] = useState("");
   const [shippingCost, setShippingCost] = useState("");
@@ -63,12 +64,9 @@ export function PurchaseLotCreator({ candidates }: { candidates: InventoryItem[]
   const [feeCost, setFeeCost] = useState("");
   const [otherCost, setOtherCost] = useState("");
 
-  const selectedItems = useMemo(
-    () => candidates.filter((item) => item.id && selected.has(item.id)),
-    [candidates, selected],
-  );
+  const chosenIds = useMemo(() => new Set(chosen.map((item) => item.id)), [chosen]);
   const landedCost = [purchaseSubtotal, shippingCost, taxCost, feeCost, otherCost].reduce((sum, value) => sum + (Number(value) || 0), 0);
-  const equalAllocation = selectedItems.length > 0 ? landedCost / selectedItems.length : 0;
+  const equalAllocation = chosen.length > 0 ? landedCost / chosen.length : 0;
 
   useEffect(() => {
     if (!state.values) return;
@@ -79,25 +77,15 @@ export function PurchaseLotCreator({ candidates }: { candidates: InventoryItem[]
     setTaxCost(state.values.taxCost ?? "");
     setFeeCost(state.values.feeCost ?? "");
     setOtherCost(state.values.otherCost ?? "");
-    setSelected(new Set((state.values.selectedInventoryItemIds ?? "").split("|").filter(Boolean)));
   }, [state.formKey, state.values]);
 
-  useEffect(() => {
-    if (purchaseKind !== "Single" || selected.size <= 1) return;
-    const first = [...selected][0];
-    setSelected(first ? new Set([first]) : new Set());
-  }, [purchaseKind, selected]);
+  function choosePurchaseKind(kind: PurchaseKind) {
+    setPurchaseKind(kind);
+    if (kind === "Single") setChosen((current) => current.slice(0, 1));
+  }
 
-  function toggle(id: string) {
-    setSelected((current) => {
-      if (purchaseKind === "Single") {
-        return current.has(id) ? new Set() : new Set([id]);
-      }
-      const next = new Set(current);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+  function add(item: PickerItem) {
+    setChosen((current) => (purchaseKind === "Single" ? [item] : [...current, item]));
   }
 
   return (
@@ -115,7 +103,7 @@ export function PurchaseLotCreator({ candidates }: { candidates: InventoryItem[]
               <select
                 id="purchaseKind"
                 value={purchaseKind}
-                onChange={(event) => setPurchaseKind(event.target.value as PurchaseKind)}
+                onChange={(event) => choosePurchaseKind(event.target.value as PurchaseKind)}
                 className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm"
               >
                 <option value="Single">Single item purchase</option>
@@ -202,37 +190,48 @@ export function PurchaseLotCreator({ candidates }: { candidates: InventoryItem[]
           </CardHeader>
           <CardContent>
             {fieldErrors.inventoryItemId && <p className="text-destructive mb-3 text-sm">{fieldErrors.inventoryItemId}</p>}
-            {candidates.length === 0 ? (
-              <p className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">No unassigned active inventory candidates found.</p>
+            <div className="mb-3">
+              <ItemSearch<PickerItem>
+                label={purchaseKind === "Single" ? "Search for the item this purchase created" : "Search for items to allocate this lot to"}
+                source={(query) => `/api/inventory/picker?for=lot&q=${encodeURIComponent(query)}`}
+                idOf={(item) => item.id}
+                exclude={chosenIds}
+                onPick={add}
+                render={(item) => (
+                  <span className="block">
+                    <span className="block truncate font-medium">{item.title}</span>
+                    <span className="block text-xs text-muted-foreground">{[item.status, item.category, item.location].filter(Boolean).join(" · ")}</span>
+                  </span>
+                )}
+              />
+            </div>
+            {chosen.length === 0 ? (
+              <p className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
+                {purchaseKind === "Single" ? "Search above for the item this purchase created." : "Search above to add items, or save the lot and itemize new pieces on its page."}
+              </p>
             ) : (
-              <div className="max-h-[520px] overflow-auto rounded-lg border">
+              <div className="overflow-auto rounded-lg border">
                 <table className="w-full text-sm">
-                  <thead className="sticky top-0 border-b bg-muted/80 text-left text-xs uppercase tracking-wide text-muted-foreground backdrop-blur">
+                  <thead className="border-b bg-muted/80 text-left text-xs uppercase tracking-wide text-muted-foreground">
                     <tr>
                       <th className="px-3 py-2 font-medium">Item</th>
                       <th className="px-3 py-2 text-right font-medium">Current cost</th>
                       <th className="px-3 py-2 text-right font-medium">Expected</th>
                       <th className="px-3 py-2 font-medium">Manual cost</th>
                       <th className="px-3 py-2 font-medium">Weight</th>
+                      <th className="px-3 py-2" />
                     </tr>
                   </thead>
                   <tbody className="divide-y">
-                    {candidates.map((item) => {
-                      if (!item.id) return null;
-                      const checked = selected.has(item.id);
-                      return (
-                        <tr key={item.id} className={checked ? "bg-brand-50/40" : undefined}>
+                    {chosen.map((item) => (
+                        <tr key={item.id}>
                           <td className="px-3 py-2">
-                            <label className="flex items-start gap-2">
-                              <input type={purchaseKind === "Single" ? "radio" : "checkbox"} name="inventoryItemId" value={item.id} checked={checked} onChange={() => toggle(item.id!)} className="mt-1" />
-                              <span>
-                                <span className="font-medium">{item.title}</span>
-                                <span className="block text-xs text-muted-foreground">{[item.status, item.category, item.storageLocation].filter(Boolean).join(" · ")}</span>
-                              </span>
-                            </label>
+                            <input type="hidden" name="inventoryItemId" value={item.id} />
+                            <span className="font-medium">{item.title}</span>
+                            <span className="block text-xs text-muted-foreground">{[item.status, item.category, item.location].filter(Boolean).join(" · ")}</span>
                           </td>
-                          <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(item.purchasePrice)}</td>
-                          <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(item.estimatedSalePrice)}</td>
+                          <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(item.cost)}</td>
+                          <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(item.expected)}</td>
                           <td className="px-3 py-2">
                             <Input
                               key={`manualCost:${item.id}:${formKey}`}
@@ -240,7 +239,7 @@ export function PurchaseLotCreator({ candidates }: { candidates: InventoryItem[]
                               type="number"
                               step="0.01"
                               min="0"
-                              disabled={!checked || purchaseKind === "Single" || allocationMethod !== "Manual"}
+                              disabled={purchaseKind === "Single" || allocationMethod !== "Manual"}
                               placeholder={allocationMethod === "Equal" ? formatCurrency(equalAllocation) : ""}
                               defaultValue={valueFor(`manualCost:${item.id}`)}
                               aria-invalid={fieldErrors[`manualCost:${item.id}`] ? "true" : undefined}
@@ -254,16 +253,20 @@ export function PurchaseLotCreator({ candidates }: { candidates: InventoryItem[]
                               type="number"
                               step="0.01"
                               min="0"
-                              disabled={!checked || purchaseKind === "Single" || allocationMethod !== "WeightedByExpectedValue"}
-                              placeholder={item.estimatedSalePrice != null ? String(item.estimatedSalePrice) : ""}
+                              disabled={purchaseKind === "Single" || allocationMethod !== "WeightedByExpectedValue"}
+                              placeholder={item.expected != null ? String(item.expected) : ""}
                               defaultValue={valueFor(`weight:${item.id}`)}
                               aria-invalid={fieldErrors[`weight:${item.id}`] ? "true" : undefined}
                             />
                             {fieldErrors[`weight:${item.id}`] && <p className="text-destructive mt-1 text-xs">{fieldErrors[`weight:${item.id}`]}</p>}
                           </td>
+                          <td className="px-3 py-2 text-right">
+                            <Button type="button" variant="ghost" size="sm" onClick={() => setChosen((current) => current.filter((other) => other.id !== item.id))}>
+                              Remove
+                            </Button>
+                          </td>
                         </tr>
-                      );
-                    })}
+                    ))}
                   </tbody>
                 </table>
               </div>
@@ -282,8 +285,8 @@ export function PurchaseLotCreator({ candidates }: { candidates: InventoryItem[]
           <p className="text-sm text-muted-foreground">Total landed cost</p>
           <p className="mt-2 text-4xl font-semibold tabular-nums">{formatCurrency(landedCost)}</p>
           <div className="mt-5 space-y-2 border-t pt-4 text-sm">
-            <div className="flex justify-between"><span className="text-muted-foreground">Selected items</span><span>{selectedItems.length}</span></div>
-            <div className="flex justify-between"><span className="text-muted-foreground">Equal cost each</span><span>{selectedItems.length ? formatCurrency(equalAllocation) : "—"}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Selected items</span><span>{chosen.length}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Equal cost each</span><span>{chosen.length ? formatCurrency(equalAllocation) : "—"}</span></div>
             <div className="flex justify-between"><span className="text-muted-foreground">Method</span><span>{purchaseKind === "Single" ? "Single item" : allocationMethod}</span></div>
           </div>
         </Card>

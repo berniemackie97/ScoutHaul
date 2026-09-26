@@ -2322,6 +2322,14 @@
               "type": "boolean",
               "default": false
             }
+          },
+          {
+            "name": "lotCandidates",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
           }
         ],
         "responses": {
@@ -6303,6 +6311,23 @@
       "get": {
         "tags": [
           "Sales"
+        ],
+        "parameters": [
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "take",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
         ],
         "responses": {
           "200": {

@@ -170,7 +170,7 @@ public sealed class OperatorConsoleTests
         OperatorConsoleDto console = await harness.Console.BuildAsync(CancellationToken.None);
         InventoryListDto list = await harness.Inventory.BrowseAsync(
             listFilter.Status, listFilter.Lifecycle, listFilter.IncludeArchived, listFilter.Search, listFilter.Attention,
-            sort: null, desc: true, page: 1, pageSize: 25, listFilter.Ownership, listFilter.NeedsBenchWork, CancellationToken.None);
+            sort: null, desc: true, page: 1, pageSize: 25, listFilter.Ownership, listFilter.NeedsBenchWork, listFilter.LotCandidates, CancellationToken.None);
 
         Assert.Equal(list.Total, Queue(console, key).Count);
     }
@@ -369,7 +369,7 @@ public sealed class OperatorConsoleTests
 
         DashboardSummaryDto summary = await harness.Console.LegacySummaryAsync(CancellationToken.None);
         InventoryListDto list = await harness.Inventory.BrowseAsync(
-            null, null, false, null, InventoryAttention.Unlisted, null, true, 1, 25, null, false, CancellationToken.None);
+            null, null, false, null, InventoryAttention.Unlisted, null, true, 1, 25, null, false, false, CancellationToken.None);
 
         Assert.Equal(list.Total, summary.UnlistedInventoryCount);
         Assert.Contains(list.Items, item => item.Status == InventoryStatus.NeedsRepair);

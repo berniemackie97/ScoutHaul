@@ -11,10 +11,7 @@ export default async function BundledSalePage() {
   if (refused) return refused;
 
   const api = await getApiClient();
-  const [{ data: candidates }, { data: reference }] = await Promise.all([
-    api.GET("/api/sales/candidates"),
-    api.GET("/api/sales/reference-data"),
-  ]);
+  const { data: reference } = await api.GET("/api/sales/reference-data");
 
   return (
     <div className="space-y-6">
@@ -25,7 +22,7 @@ export default async function BundledSalePage() {
         <h1 className="mt-2 text-2xl font-semibold tracking-tight">Record bundled sale</h1>
         <p className="text-muted-foreground mt-1 text-sm">One order, several items, one package/tracking — the total and fees split across items, each keeping its own profit.</p>
       </div>
-      <BundledSaleCreator candidates={candidates ?? []} channels={reference?.channels ?? []} />
+      <BundledSaleCreator channels={reference?.channels ?? []} />
     </div>
   );
 }

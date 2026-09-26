@@ -298,16 +298,14 @@ public sealed class EfInventoryStore(HaulScoutDbContext db) : IInventoryStore
                 || blocking.Contains(item.FunctionalStatus));
         }
 
+        if (filter.LotCandidates)
+        {
+            query = query.Where(item => !item.AcquisitionLotItems.Any() && item.Status != InventoryStatus.Bundled);
+        }
+
         if (filter.Search is not null)
         {
-            string term = filter.Search.ToLower();
-            query = query.Where(item =>
-                item.Title.ToLower().Contains(term)
-                || (item.Brand != null && item.Brand.ToLower().Contains(term))
-                || (item.Model != null && item.Model.ToLower().Contains(term))
-                || (item.Category != null && item.Category.ToLower().Contains(term))
-                || (item.Barcode != null && item.Barcode.ToLower().Contains(term))
-                || (item.StorageLocation != null && item.StorageLocation.ToLower().Contains(term)));
+            query = query.Where(InventorySearch.Matching(filter.Search));
         }
 
         return query;

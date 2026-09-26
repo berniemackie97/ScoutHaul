@@ -1939,6 +1939,7 @@ export interface paths {
                     pageSize?: number;
                     ownership?: components["schemas"]["InventoryOwnershipType"];
                     needsBenchWork?: boolean;
+                    lotCandidates?: boolean;
                 };
                 header?: never;
                 path?: never;
@@ -5136,7 +5137,10 @@ export interface paths {
         };
         get: {
             parameters: {
-                query?: never;
+                query?: {
+                    search?: string;
+                    take?: number;
+                };
                 header?: never;
                 path?: never;
                 cookie?: never;

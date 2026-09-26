@@ -49,8 +49,17 @@ public sealed class SalesChannelWorkflowService(ISalesChannelStore salesChannels
         return AppResult<ChannelFeeEstimateDto>.Ok(ChannelFeeCalculator.Estimate(channel, profile, request.SoldPrice));
     }
 
-    public async Task<IReadOnlyList<SaleCandidateDto>> CandidatesAsync(CancellationToken cancellationToken) =>
-        await salesChannels.ListSaleCandidatesAsync(cancellationToken);
+    private const int MostCandidates = 500;
+
+    /// <summary>
+    /// Items a sale can be recorded against, most recently touched first. A search reaches every one of them; without
+    /// it the list stops at <paramref name="take"/>, so a picker must search rather than scroll.
+    /// </summary>
+    public async Task<IReadOnlyList<SaleCandidateDto>> CandidatesAsync(string? search, int? take, CancellationToken cancellationToken) =>
+        await salesChannels.ListSaleCandidatesAsync(
+            string.IsNullOrWhiteSpace(search) ? null : search.Trim(),
+            Math.Clamp(take ?? MostCandidates, 1, MostCandidates),
+            cancellationToken);
 
     public async Task<List<string>> ExistingChannelsAsync(CancellationToken cancellationToken)
     {
