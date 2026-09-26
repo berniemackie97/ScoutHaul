@@ -765,6 +765,121 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/channel-listings/pending-delist": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["PendingDelistDto"][];
+                        "application/json": components["schemas"]["PendingDelistDto"][];
+                        "text/json": components["schemas"]["PendingDelistDto"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/channel-listings/{channelListingId}/delisted": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    channelListingId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["PendingDelistDto"];
+                        "application/json": components["schemas"]["PendingDelistDto"];
+                        "text/json": components["schemas"]["PendingDelistDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/channel-listings/{channelListingId}/keep-listed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    channelListingId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["PendingDelistDto"];
+                        "application/json": components["schemas"]["PendingDelistDto"];
+                        "text/json": components["schemas"]["PendingDelistDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/channel-listings": {
         parameters: {
             query?: never;
@@ -10479,6 +10594,22 @@ export interface components {
         };
         /** @enum {string} */
         PaymentStatus: "Pending" | "Paid" | "PartiallyRefunded" | "Refunded" | "Failed";
+        PendingDelistDto: {
+            /** Format: uuid */
+            channelListingId?: string;
+            /** Format: uuid */
+            inventoryItemId?: string;
+            itemTitle?: string | null;
+            channel?: string | null;
+            accountName?: string | null;
+            externalListingId?: string | null;
+            externalUrl?: string | null;
+            /** Format: double */
+            listedPrice?: number | null;
+            soldOnChannel?: string | null;
+            /** Format: date-time */
+            soldAt?: string | null;
+        };
         PermissionCatalogDto: {
             permissions?: string[] | null;
         };

@@ -9,6 +9,10 @@ using HaulScout.Domain;
 using HaulScout.Domain.Entities;
 using HaulScout.Infrastructure.Persistence;
 
+using HaulScout.Application.Channels;
+
+using HaulScout.Infrastructure.Channels;
+
 namespace HaulScout.Tests;
 
 public class ChannelListingTests
@@ -19,6 +23,15 @@ public class ChannelListingTests
         public Guid? ActiveOrganizationId => organizationId;
         public Guid UserId => userId;
         public Task ResolveAsync() => Task.CompletedTask;
+    }
+
+    private static ChannelListingsController NewController(HaulScoutDbContext db, Guid org)
+    {
+        StubCurrentUser currentUser = new(org, Guid.NewGuid());
+        return new ChannelListingsController(
+            db,
+            currentUser,
+            new ChannelDelistService(new EfChannelDelistStore(db), currentUser, TimeProvider.System));
     }
 
     private static (HaulScoutDbContext Db, ChannelListingsController Controller, Guid Org, Guid Item, Guid Account) Setup([System.Runtime.CompilerServices.CallerMemberName] string store = "")
@@ -34,7 +47,7 @@ public class ChannelListingTests
         db.InventoryItems.Add(item);
         db.ChannelAccounts.Add(account);
         db.SaveChanges();
-        return (db, new ChannelListingsController(db, new StubCurrentUser(org, Guid.NewGuid())), org, item.Id, account.Id);
+        return (db, NewController(db, org), org, item.Id, account.Id);
     }
 
     private static UpsertChannelListingRequest Req(Guid account, ChannelListingStatus status, decimal? price = null, string? url = null) =>

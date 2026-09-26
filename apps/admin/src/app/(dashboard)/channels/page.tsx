@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Card } from "@overhaul/ui";
-import { Radio, Store, Globe, AlertTriangle, ExternalLink } from "lucide-react";
+import { Radio, Store, Globe, AlertTriangle } from "lucide-react";
 import { getApiClient } from "@/lib/api";
 import { ChannelManager } from "./channel-manager";
 
@@ -51,26 +51,21 @@ export default async function ChannelsPage() {
 
       {pendingDelist.length > 0 && (
         <Card className="border-amber-300 p-5">
-          <div className="flex items-center gap-2 text-sm font-semibold text-amber-700">
-            <AlertTriangle className="h-4 w-4" /> Manual channel action needed ({pendingDelist.length})
-          </div>
-          <p className="text-muted-foreground mt-1 text-xs">Sold on another channel — review and remove these listings manually where they&rsquo;re still live.</p>
-          <div className="mt-3 divide-y">
-            {pendingDelist.map((listing) => (
-              <div key={listing.id} className="flex items-center justify-between gap-3 py-2 text-sm">
-                <Link href={`/inventory/${listing.inventoryItemId}`} className="font-medium hover:underline">
-                  {listing.inventoryItemTitle}
-                </Link>
-                <div className="flex items-center gap-2">
-                  <span className="text-muted-foreground text-xs">{listing.channelAccountName}</span>
-                  {listing.externalUrl && (
-                    <a href={listing.externalUrl} target="_blank" rel="noreferrer" className="text-brand-700" title="Open listing">
-                      <ExternalLink className="h-4 w-4" />
-                    </a>
-                  )}
-                </div>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-2 text-sm font-semibold text-amber-700">
+                <AlertTriangle className="h-4 w-4" /> Still for sale after selling ({pendingDelist.length})
               </div>
-            ))}
+              <p className="text-muted-foreground mt-1 text-xs">
+                Sold on one marketplace and still live on another, where they can be bought again.
+              </p>
+            </div>
+            <Link
+              href="/channels/delist"
+              className="hover:bg-muted inline-flex h-9 shrink-0 items-center rounded-md border px-3 text-sm font-medium"
+            >
+              Work through them
+            </Link>
           </div>
         </Card>
       )}

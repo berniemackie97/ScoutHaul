@@ -3,6 +3,7 @@ using Amazon.S3;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using HaulScout.Application.Channels;
 using HaulScout.Application.Common;
 using HaulScout.Application.Inventory;
 using HaulScout.Application.Search;
@@ -77,6 +78,7 @@ public static class DependencyInjection
         services.AddScoped<IPlatformOrderImportStore>(services => services.GetRequiredService<EfPlatformOrderStore>());
         services.AddScoped<IPlatformOrderFeeEnrichmentStore>(services => services.GetRequiredService<EfPlatformOrderStore>());
         services.AddScoped<IMarketplaceRefundImportStore>(services => services.GetRequiredService<EfPlatformOrderStore>());
+        services.AddScoped<IChannelDelistStore, EfChannelDelistStore>();
         services.AddScoped<IInventoryPhotoBackfillStore, EfInventoryPhotoBackfillStore>();
         services.AddScoped<IPlatformOrderSuggestionStore, EfPlatformOrderSuggestionStore>();
         services.AddScoped<IReferenceOverrideStore, EfReferenceOverrideStore>();

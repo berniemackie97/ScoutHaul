@@ -15,6 +15,10 @@ using HaulScout.Infrastructure.Storefront;
 using HaulScout.Infrastructure.PlatformOrders;
 using HaulScout.Infrastructure.Persistence;
 
+using HaulScout.Application.Channels;
+
+using HaulScout.Infrastructure.Channels;
+
 namespace HaulScout.Tests;
 
 /// <summary>
@@ -236,6 +240,7 @@ public sealed class OperationsQueryTranslationTests(PostgresFixture postgres)
             inventory,
             new EfStorefrontOfferStore(db),
             new EfPlatformOrderStore(db, assembler),
+            new ChannelDelistService(new EfChannelDelistStore(db), currentUser, TimeProvider.System),
             new BusinessReportService(db, currentUser),
             TimeProvider.System);
 
