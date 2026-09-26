@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dayKey, initialGovernorState, nextSlot, recordOutcome, recordRequest, resume, type GovernorPolicy } from "./governor";
+import { afterUpdate, dayKey, initialGovernorState, nextSlot, recordOutcome, recordRequest, resume, type GovernorPolicy } from "./governor";
 
 const policy: GovernorPolicy = { minSecondsBetweenRequests: 3, maxRequestsPerMinute: 4, maxRequestsPerDay: 10 };
 const start = new Date(2026, 8, 18, 12, 0, 0).getTime();
@@ -61,5 +61,14 @@ describe("the safety governor", () => {
     expect(state.pausedUntil).toBeNull();
     state = recordOutcome(state, "failed", start, "eBay");
     expect(state.pausedUntil).toBe(start + 30 * 60_000);
+  });
+
+  it("lifts a changed-site pause when a new build is installed, and no other", () => {
+    const now = Date.parse("2026-09-26T20:00:00Z");
+    const changed = recordOutcome(initialGovernorState(), "site-changed", now, "Poshmark");
+    const challenged = recordOutcome(initialGovernorState(), "challenge", now, "Depop");
+
+    expect(afterUpdate(changed).pausedUntil).toBeNull();
+    expect(afterUpdate(challenged)).toEqual(challenged);
   });
 });

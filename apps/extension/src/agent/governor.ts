@@ -131,6 +131,11 @@ export function resume(state: GovernorState): GovernorState {
   return { ...state, pausedUntil: null, pauseReason: null, pausedFor: null, strikes: 0 };
 }
 
+/** A new build is the update a changed-site pause waits for; every other pause stands. */
+export function afterUpdate(state: GovernorState): GovernorState {
+  return state.pausedFor === "site-changed" ? resume(state) : state;
+}
+
 /** The pause in force, if any. */
 export function pauseOf(state: GovernorState | undefined, now: number): { until: number; reason: string; kind: Exclude<Outcome, "ok"> | null } | null {
   return state?.pausedUntil !== null && state?.pausedUntil !== undefined && state.pausedUntil > now
