@@ -68,3 +68,14 @@ public sealed record PendingDelistDto(
     decimal? ListedPrice,
     string? SoldOnChannel,
     DateTimeOffset? SoldAt);
+
+/// <summary>A listing that sold while the books show its item unsold, with what a scan knows about the sale.</summary>
+public sealed record SoldNotRecordedDto(
+    Guid PlatformListingId,
+    Guid InventoryItemId,
+    string ItemTitle,
+    string Platform,
+    string? ExternalListingId,
+    string? ListingUrl,
+    decimal ListedPrice,
+    DateTimeOffset? MarkedSoldAt);

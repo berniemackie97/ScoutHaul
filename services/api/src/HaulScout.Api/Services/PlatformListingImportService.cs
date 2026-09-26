@@ -294,6 +294,18 @@ public sealed class PlatformListingImportService(HaulScoutDbContext db, ICurrent
         listing.Quantity = input.Quantity <= 0 ? 1 : input.Quantity;
         listing.QuantitySold = input.QuantitySold;
         listing.Currency = string.IsNullOrWhiteSpace(input.Currency) ? "USD" : input.Currency.Trim().ToUpperInvariant();
+        // A listing going sold is the only sale signal some marketplaces give, so the moment it happens is kept.
+        if (input.Status == PlatformListingStatus.Sold && listing.Status != PlatformListingStatus.Sold)
+        {
+            listing.MarkedSoldAt ??= DateTimeOffset.UtcNow;
+        }
+        else if (input.Status == PlatformListingStatus.Active && listing.Status != PlatformListingStatus.Active)
+        {
+            // Back on sale: whatever it was, it was not a sale anyone still needs to answer for.
+            listing.MarkedSoldAt = null;
+            listing.SoldAcknowledgedAt = null;
+        }
+
         listing.Status = input.Status;
         listing.Format = TrimToNull(input.Format);
         listing.Sku = TrimToNull(input.Sku);

@@ -92,6 +92,7 @@ public sealed class OperatorConsoleTests
             new EfStorefrontOfferStore(db),
             new EfPlatformOrderStore(db, assembler),
             new ChannelDelistService(new EfChannelDelistStore(db), currentUser, TimeProvider.System),
+            new SoldListingService(new EfSoldListingStore(db), currentUser, TimeProvider.System),
             new BusinessReportService(db, currentUser),
             new FakeTimeProvider(Now));
 

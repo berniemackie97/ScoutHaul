@@ -37,6 +37,12 @@ public sealed class PlatformListing : EntityBase, IOrganizationScoped
     public string? CategoryName { get; set; }
     public string? Condition { get; set; }
 
+    /// <summary>When a scan first saw it sold — the only sale date a listings-only marketplace gives.</summary>
+    public DateTimeOffset? MarkedSoldAt { get; set; }
+
+    /// <summary>When someone settled what that sale meant: recorded it, or said it was not one.</summary>
+    public DateTimeOffset? SoldAcknowledgedAt { get; set; }
+
     /// <summary>What the listing says about the thing itself. Null means the source did not carry it.</summary>
     public string? Description { get; set; }
     public string? Brand { get; set; }

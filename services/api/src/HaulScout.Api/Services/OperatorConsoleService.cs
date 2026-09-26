@@ -31,6 +31,7 @@ public sealed class OperatorConsoleService(
     IStorefrontOfferStore offers,
     IPlatformOrderStore platformOrders,
     ChannelDelistService delisting,
+    SoldListingService soldListings,
     BusinessReportService reports,
     TimeProvider clock)
 {
@@ -87,6 +88,8 @@ public sealed class OperatorConsoleService(
             // builds from the key. That is the whole contract of this method.
             // Sold here, still for sale there: the one queue where waiting costs a sale that has to be refunded.
             queues.Add(new("listings.pendingDelist", Attention, await delisting.CountAsync(cancellationToken)));
+            // A marketplace says it sold and the books do not know: missing money, and stock that is not there.
+            queues.Add(new("listings.soldNotRecorded", Attention, await soldListings.CountAsync(cancellationToken)));
             queues.Add(new("inventory.readyToList", Work, await inventory.CountAsync(new InventoryFilter(Status: InventoryStatus.ReadyToList), cancellationToken)));
             queues.Add(new("inventory.benchWork", Work, await inventory.CountAsync(new InventoryFilter(NeedsBenchWork: true), cancellationToken)));
             queues.Add(new("inventory.missingCost", Hygiene, await inventory.CountAsync(new InventoryFilter(Attention: InventoryAttention.MissingCost), cancellationToken)));

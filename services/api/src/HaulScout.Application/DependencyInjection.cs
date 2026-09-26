@@ -53,6 +53,7 @@ public static class DependencyInjection
         services.AddScoped<PlatformOrderIngestionService>();
         services.AddScoped<PlatformOrderCancellationService>();
         services.AddScoped<ChannelDelistService>();
+        services.AddScoped<SoldListingService>();
         services.AddScoped<PlatformOrderWorkflowService>();
         services.AddScoped<PlatformOrderAutoMatchService>();
         services.AddScoped<ReferenceOverrideWorkflowService>();

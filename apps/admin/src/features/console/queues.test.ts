@@ -25,6 +25,7 @@ const EXPECTED_LINKS: Record<string, string> = {
   "orders.readyForPickup": "/orders?stage=ReadyForPickup",
   "orders.awaitingPayment": "/orders?stage=AwaitingPayment",
   "listings.pendingDelist": "/channels/delist",
+  "listings.soldNotRecorded": "/channels/sold",
   "inventory.readyToList": "/inventory?status=ReadyToList",
   "inventory.benchWork": "/repairs",
   "inventory.missingCost": "/inventory?attention=MissingCost",

@@ -59,6 +59,11 @@ export const QUEUES: Record<string, QueuePresentation> = {
     why: "Sold on one marketplace and still live on another, where it can be bought again.",
     href: "/channels/delist",
   },
+  "listings.soldNotRecorded": {
+    label: "Sold, but not on the books",
+    why: "A marketplace says it sold and no sale here accounts for the money.",
+    href: "/channels/sold",
+  },
   "inventory.readyToList": {
     label: "Ready to list",
     why: "Prepared — only the listing is missing.",
