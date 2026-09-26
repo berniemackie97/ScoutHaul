@@ -59,7 +59,7 @@ function decode(text: string): string {
 const blank: ListingSpecifics = { brand: null, color: null, size: null };
 
 export function readSpecifics(html: string): ListingSpecifics {
-  for (const block of html.matchAll(/<script type="application\/ld\+json">(.*?)<\/script>/gs)) {
+  for (const block of html.matchAll(/<script\b[^>]*type=["']application\/ld\+json["'][^>]*>(.*?)<\/script>/gis)) {
     let data: unknown;
     try {
       data = JSON.parse(block[1]!);
