@@ -1,5 +1,6 @@
 import type { IngestListing } from "../../agent/types";
 import { dig } from "../embedded-json";
+import type { PageResponse } from "../types";
 import { readState } from "./state";
 
 /** One page of a closet, and how to ask for the next. */
@@ -17,8 +18,8 @@ export interface ClosetPage {
  * category, description, prices and how many are left — so one page read carries what other marketplaces make you
  * open each listing for.
  */
-export function readClosetPage(html: string): ClosetPage {
-  const state = readState(html, "closet");
+export function readClosetPage(response: PageResponse): ClosetPage {
+  const state = readState(response, "closet");
   const posts = dig(state, "$_closet", "listingsPostData");
   const data = dig(posts, "data");
   if (!Array.isArray(data)) {

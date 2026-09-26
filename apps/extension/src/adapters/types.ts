@@ -6,6 +6,8 @@ export interface PageResponse {
   url: string;
   contentType: string | null;
   body: string;
+  /** The page global asked for, as JSON from the page's own world; null when the page has none. */
+  global?: string | null;
 }
 
 /**
@@ -18,7 +20,8 @@ export interface PageResponse {
  * *requested* from the page.
  */
 export interface MarketplaceContext {
-  page(url: string): Promise<PageResponse>;
+  /** `global` names a variable the page builds for itself, read as the page sees it, not from the HTML. */
+  page(url: string, global?: string): Promise<PageResponse>;
   request(url: string): Promise<PageResponse>;
   now(): Date;
   /** What the adapter keeps between scans in this browser, so work already done is not asked for again. */

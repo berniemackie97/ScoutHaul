@@ -6,7 +6,7 @@ import { syncTabsItem } from "./storage";
 /** A marketplace tab the agent reads through. */
 export interface MarketplaceTab {
   /** Navigates the tab to a page, as a person's click would, and reads it once loaded. */
-  page(url: string): Promise<PageResponse>;
+  page(url: string, global?: string): Promise<PageResponse>;
   /** A request made from the marketplace's own page, for the JSON endpoints its pages call. */
   request(url: string): Promise<PageResponse>;
 }
@@ -44,6 +44,19 @@ function readLoadedPage(): PageResponse {
     contentType: document.contentType,
     body: document.documentElement.outerHTML,
   };
+}
+
+/**
+ * A variable the page built for itself, as JSON. Runs in the page's own world, since the extension's cannot see it;
+ * a server-rendered page often deletes the script that wrote it once it has run, so it is not in the HTML to read.
+ */
+function readGlobal(name: string): { json: string | null } {
+  try {
+    const value = (window as unknown as Record<string, unknown>)[name];
+    return { json: value === undefined ? null : JSON.stringify(value) };
+  } catch {
+    return { json: null };
+  }
 }
 
 /** One look at a tab: how far it has loaded, and where it is. */
@@ -351,12 +364,22 @@ export class SyncTabs {
         browser.tabs.onUpdated.removeListener(listener);
       }
     };
-    const read = () => inTab<PageResponse>(tabId, adapter, this.clock, () => browser.scripting.executeScript({ target: { tabId }, func: readLoadedPage }));
+    const readPage = () => inTab<PageResponse>(tabId, adapter, this.clock, () => browser.scripting.executeScript({ target: { tabId }, func: readLoadedPage }));
+    const read = async (global: string | undefined): Promise<PageResponse> => {
+      const loaded = await readPage();
+      if (global === undefined) {
+        return loaded;
+      }
+
+      const captured = await inTab<{ json: string | null }>(tabId, adapter, this.clock, () =>
+        browser.scripting.executeScript({ target: { tabId }, world: "MAIN", func: readGlobal, args: [global] }));
+      return { ...loaded, global: captured.json };
+    };
 
     return {
-      page: async (url: string) => {
+      page: async (url: string, global?: string) => {
         const before = await navigate(url);
-        const loaded = await read();
+        const loaded = await read(global);
         if (before === undefined || loaded.url !== before || url === before) {
           return loaded;
         }
@@ -364,7 +387,7 @@ export class SyncTabs {
         // Still the page it was leaving: the browser said the new one had loaded before it had
         // replaced the old. Wait for the address to move on, then read again.
         await waitForPage(() => lookAt(tabId), { ...this.clock, readable: adapter.readable, begun: (seen) => seen.url !== before, timeoutMs: pageLoadTimeoutMs });
-        return read();
+        return read(global);
       },
       request: async (url: string) => {
         // A request is the site's own only from a page on the site's own origin.
