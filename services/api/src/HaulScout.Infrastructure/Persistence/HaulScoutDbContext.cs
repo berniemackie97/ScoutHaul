@@ -886,6 +886,7 @@ public sealed class HaulScoutDbContext(
             entity.Property(item => item.FeeBreakdownJson).HasColumnType("jsonb");
             entity.Property(item => item.RawJson).HasColumnType("jsonb");
             entity.HasIndex(item => item.PlatformOrderId);
+            entity.HasIndex(item => new { item.OrganizationId, item.ExternalItemId });
             entity.HasOne(item => item.PlatformOrder).WithMany(item => item.Lines).HasForeignKey(item => item.PlatformOrderId).OnDelete(DeleteBehavior.Cascade);
             entity.HasOne(item => item.InventoryItem).WithMany().HasForeignKey(item => item.InventoryItemId).OnDelete(DeleteBehavior.SetNull);
         });

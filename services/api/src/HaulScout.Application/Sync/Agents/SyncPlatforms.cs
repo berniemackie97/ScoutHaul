@@ -68,22 +68,21 @@ public static class SyncPlatforms
         MaxRequestsPerDay: 800);
 
     /// <summary>
-    /// Poshmark. A closet page is served with its listings already in it — brand, colour, size, condition,
-    /// category and description included — so listings cost one page per forty-eight and no API call at all.
-    /// Sales are not read yet: they live behind the seller's own order pages, which this adapter does not know.
+    /// Poshmark. A closet page is served with its listings already in it, and Seller Hub's sales page with every sale's
+    /// total, Poshmark's cut, buyer and ship-to — so both loops are page reads and no API call. The sales list reaches
+    /// back through the whole history.
     /// </summary>
     public static readonly SyncPlatform Poshmark = new(
         "Poshmark",
-        [SyncLoopKind.Listings],
-        HistoryDays: 0,
-        SuggestedSalesMinutes: 0,
-        MinSalesMinutes: 0,
+        [SyncLoopKind.Sales, SyncLoopKind.Listings],
+        HistoryDays: 3650,
+        SuggestedSalesMinutes: 30,
+        MinSalesMinutes: 15,
         SuggestedListingsMinutes: 240,
         MinListingsMinutes: 120,
         MinSecondsBetweenRequests: 4,
         MaxRequestsPerMinute: 10,
-        MaxRequestsPerDay: 600,
-        OlderSalesHint: "Poshmark sales come from its inventory report for now.");
+        MaxRequestsPerDay: 600);
 
     /// <summary>
     /// Depop. A shop page names its listings but describes none of them, so each listing is read from its own page,

@@ -179,4 +179,69 @@ public sealed class SoldNotRecordedTests
 
         Assert.Empty(await harness.Sold.ListAsync(CancellationToken.None));
     }
+
+    private static PlatformOrder OrderFor(Harness harness, string platform, string listingId)
+    {
+        PlatformOrder order = new()
+        {
+            OrganizationId = harness.Org,
+            Platform = platform,
+            ExternalOrderId = "68f1a2b3c4d5e6f708192a3b",
+            OrderedAt = DateTimeOffset.UtcNow.AddHours(-2),
+            ItemsSubtotal = 15m,
+        };
+        order.Lines.Add(new PlatformOrderLine
+        {
+            OrganizationId = harness.Org,
+            PlatformOrderId = order.Id,
+            Title = "Ripple Junction Graphic Tee",
+            UnitPrice = 15m,
+            ExternalItemId = listingId,
+        });
+        harness.Db.PlatformOrders.Add(order);
+        return order;
+    }
+
+    [Fact]
+    public async Task A_sale_the_marketplace_handed_over_is_asked_about_in_the_orders_queue_instead()
+    {
+        // The order carries the real fees; asking here as well invites recording the one sale twice.
+        Harness harness = NewHarness(nameof(A_sale_the_marketplace_handed_over_is_asked_about_in_the_orders_queue_instead));
+        await using HaulScoutDbContext _ = harness.Db;
+        OrderFor(harness, "Poshmark", harness.Listing.ExternalListingId);
+        await harness.Db.SaveChangesAsync();
+
+        Assert.Empty(await harness.Sold.ListAsync(CancellationToken.None));
+        Assert.Equal(0, await harness.Sold.CountAsync(CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task An_order_set_aside_or_cancelled_on_the_marketplace_does_not_answer_for_it()
+    {
+        Harness harness = NewHarness(nameof(An_order_set_aside_or_cancelled_on_the_marketplace_does_not_answer_for_it));
+        await using HaulScoutDbContext _ = harness.Db;
+        PlatformOrder order = OrderFor(harness, "Poshmark", harness.Listing.ExternalListingId);
+        order.Status = PlatformOrderStatus.Ignored;
+        await harness.Db.SaveChangesAsync();
+
+        Assert.Single(await harness.Sold.ListAsync(CancellationToken.None));
+
+        order.Status = PlatformOrderStatus.Reconciled;
+        order.CancelledOnPlatformAt = DateTimeOffset.UtcNow;
+        await harness.Db.SaveChangesAsync();
+
+        Assert.Single(await harness.Sold.ListAsync(CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task The_same_number_on_another_marketplace_does_not_answer_for_it()
+    {
+        Harness harness = NewHarness(nameof(The_same_number_on_another_marketplace_does_not_answer_for_it));
+        await using HaulScoutDbContext _ = harness.Db;
+        OrderFor(harness, "Depop", harness.Listing.ExternalListingId);
+        await harness.Db.SaveChangesAsync();
+
+        Assert.Single(await harness.Sold.ListAsync(CancellationToken.None));
+        Assert.Equal(1, await harness.Sold.CountAsync(CancellationToken.None));
+    }
 }

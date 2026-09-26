@@ -2656,6 +2656,8 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("PlatformOrderId");
 
+                    b.HasIndex("OrganizationId", "ExternalItemId");
+
                     b.ToTable("PlatformOrderLines", (string)null);
                 });
 

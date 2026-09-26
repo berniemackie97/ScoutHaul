@@ -6,8 +6,8 @@ using HaulScout.Domain.Entities;
 namespace HaulScout.Application.Channels;
 
 /// <summary>
-/// Sales the books have not heard about. Poshmark and Depop hand over no sales, so a listing turning sold is the
-/// whole of the news from them. Recording it stays the operator's call — only they know the fees.
+/// Sales the books have not heard about. Depop hands over no sales, and a Poshmark bundle may not say what it held, so
+/// a listing turning sold can be the whole of the news. Recording it stays the operator's call — only they know the fees.
 /// </summary>
 public sealed class SoldListingService(ISoldListingStore store, ICurrentUserContext currentUser, TimeProvider clock)
 {
