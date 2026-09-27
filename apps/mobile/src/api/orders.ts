@@ -1,4 +1,4 @@
-import { apiRequest } from './client';
+import { apiRequest, type CallOptions } from './client';
 import type {
   IssueReturnLabelRequest,
   MergeOrdersRequest,
@@ -38,7 +38,9 @@ export const ordersApi = {
   remove: (id: string) => apiRequest<void>(`/api/orders/${id}`, { method: 'DELETE' }),
 
   // ── Sale (record + reference) ───────────────────────────────────────────────
-  candidates: () => apiRequest<SaleCandidate[]>('/api/sales/candidates'),
+  // Asks for a page of matches: the unsearched list stops at the most recent items, a search reaches all of them.
+  candidates: (search = '', options: CallOptions = {}) =>
+    apiRequest<SaleCandidate[]>(`/api/sales/candidates${query({ search, take: '20' })}`, options),
   recordSale: (body: RecordSaleRequest, idempotencyKey?: string) =>
     apiRequest<SaleFinancials>('/api/sales', { method: 'POST', body, idempotencyKey }),
   referenceData: () => apiRequest<SalesReferenceData>('/api/sales/reference-data'),
