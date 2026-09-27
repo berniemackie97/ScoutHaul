@@ -8,6 +8,8 @@ export interface PageResponse {
   body: string;
   /** The page global asked for, as JSON from the page's own world; null when the page has none. */
   global?: string | null;
+  /** Which document was read (its time origin), so a navigation can tell the new page from the one it left. */
+  document?: number;
 }
 
 /**
@@ -93,6 +95,13 @@ export interface MarketplaceAdapter {
   readable(url: string): boolean;
   pageKind(url: string): PageKind;
   detectSession(context: MarketplaceContext): Promise<Session>;
+  /**
+   * Who is signed in, as any of the marketplace's own pages shows it, or null when that page cannot tell — so a
+   * sign-in check can read a tab the operator already has open instead of loading one. `sessionGlobal` is the page
+   * global it reads, when it reads one.
+   */
+  sessionFrom?(page: PageResponse): Session | null;
+  readonly sessionGlobal?: string;
   /** `session` is who the scan runs as, as just detected. */
   scanSales(context: MarketplaceContext, window: SalesWindow, session: Session): Promise<SalesScan>;
   snapshotListings(context: MarketplaceContext, session: Session): Promise<ListingsSnapshot>;

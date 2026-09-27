@@ -194,3 +194,16 @@ describe("a Depop scan", () => {
     await expect(depopAdapter.scanSales(depop(() => ""), { from: null, cursor: null }, seller)).rejects.toThrow(AdapterError);
   });
 });
+
+describe("the Depop sign-in, read from a page the operator has open", () => {
+  const page = (body: string): PageResponse => ({ status: 200, url: "https://www.depop.com/", contentType: "text/html", body });
+
+  it("is read from the header's own Likes link", () => {
+    expect(depopAdapter.sessionFrom!(page(homePage("overhaultrading")))).toMatchObject({ signedIn: true, username: "overhaultrading" });
+  });
+
+  it("cannot say someone is signed out from a page without the header, so the check loads one instead", () => {
+    expect(depopAdapter.sessionFrom!(page(homePage(null)))).toBeNull();
+  });
+});
+

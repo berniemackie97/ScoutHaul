@@ -2,6 +2,18 @@ import type { MarketplaceAdapter } from "../adapters/types";
 import { pauseOf, type GovernorState } from "../agent/governor";
 import type { LastRun, RunningWork, StoredSession } from "../agent/storage";
 import type { AgentAccount, LoopKind, PlatformPolicy } from "../agent/types";
+import { aliveBeatMs } from "../agent/config";
+
+/**
+ * The work in progress, if the background is still alive to do it. A background the browser stopped mid-task never
+ * clears its label, so a label with no recent beat is not shown as running.
+ */
+export function liveRunning(running: RunningWork | null | undefined, aliveAt: string | null | undefined, now: number): RunningWork | null {
+  if (!running || !aliveAt) return null;
+  // A beat from the future means the clock moved back since; it proves nothing about the background now.
+  const age = now - Date.parse(aliveAt);
+  return age >= 0 && age <= 3 * aliveBeatMs ? running : null;
+}
 
 /**
  * What the popup shows, worked out from what the agent keeps — pure, so every state the popup can be

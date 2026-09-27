@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fakeBrowser } from "wxt/testing/fake-browser";
 import { ledgerPage, listingsPage, ordersPage, profileJson } from "../test/ebay-fixtures";
+import { homePage as poshmarkHome } from "../test/poshmark-fixtures";
 import { fakeTabs, servedTab } from "../test/tabs";
 import { Agent } from "./agent";
 import { ApiError, type AgentApi } from "./api";
@@ -14,6 +15,7 @@ import {
   lastRunsItem,
   pairingItem,
   queuedItem,
+  runningItem,
   sessionsItem,
 } from "./storage";
 import type { Heartbeat } from "./types";
@@ -248,6 +250,21 @@ describe("noticing the operator sign in, or clear a security check", () => {
     expect(tabs.acquire).not.toHaveBeenCalled();
     await vi.waitFor(() => expect(calls.heartbeat).toHaveBeenCalled());
     expect((await activityItem.getValue())[0]?.message).toBe("Signed in to eBay as seller.");
+  });
+
+  it("reads the Poshmark sign-in from a tab the operator has open, and opens none of its own", async () => {
+    fakeBrowser.permissions.contains = vi.fn(async () => true) as typeof fakeBrowser.permissions.contains;
+    const operator = { page: vi.fn(), request: vi.fn(), current: vi.fn(async () => poshmarkHome("overhaultrading")) };
+    const tabs = fakeTabs(servedTab(ebay()), operator);
+    const { agent } = agentWith(api(), tabs);
+
+    await agent.checkSessions({ platform: "Poshmark", force: true });
+
+    expect((await sessionsItem.getValue()).Poshmark).toMatchObject({ signedIn: true, username: "overhaultrading" });
+    expect(operator.current).toHaveBeenCalledWith("__INITIAL_STATE__");
+    expect(operator.page).not.toHaveBeenCalled();
+    expect(tabs.acquire).not.toHaveBeenCalledWith(expect.objectContaining({ platform: "Poshmark" }));
+    expect(await runningItem.getValue()).toBeNull();
   });
 
   it("leaves the operator alone on the sign-in form and on the security check itself", async () => {

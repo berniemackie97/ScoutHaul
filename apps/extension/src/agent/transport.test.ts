@@ -28,6 +28,13 @@ describe("judging a tab that should be loading a marketplace page", () => {
     expect(judgeTab({ status: "complete", url: robots }, readable, false)).toBe("wait");
   });
 
+  it("takes a page that is still loading once what will be read from it is there, but never before its navigation begins", () => {
+    // Poshmark and Depop keep loading ads and trackers long after their data is in, and may never say they are done.
+    expect(judgeTab({ status: "loading", url: robots, settled: true }, readable, true)).toBe("ready");
+    expect(judgeTab({ status: "loading", url: robots, settled: true }, readable, false)).toBe("wait");
+    expect(judgeTab({ status: "loading", url: robots, settled: false }, readable, true)).toBe("wait");
+  });
+
   it("knows a page that finished somewhere other than the marketplace", () => {
     expect(judgeTab({ status: "complete", url: "https://example.com/" }, readable, true)).toBe("elsewhere");
     expect(judgeTab({ status: "complete", url: "https://signin.ebay.com/ws/eBayISAPI.dll" }, readable, true)).toBe("ready");
@@ -175,10 +182,78 @@ describe("the sync tab", () => {
     const execute = vi.fn(async () => [{ frameId: 0, result: { status: 200, url: "https://www.ebay.com/gh/user_profile", contentType: "application/json", body: "{}" } }]);
     fakeBrowser.scripting.executeScript = execute as unknown as typeof fakeBrowser.scripting.executeScript;
 
+    const update = vi.fn();
+    fakeBrowser.tabs.update = update as unknown as typeof fakeBrowser.tabs.update;
+
     const borrowed = await new SyncTabs(fakeClock()).borrow(ebayAdapter);
     await borrowed!.request("https://www.ebay.com/gh/user_profile");
+    await borrowed!.current();
 
     expect(execute).toHaveBeenCalledWith(expect.objectContaining({ target: { tabId: 6 }, world: "MAIN" }));
-    await expect(borrowed!.page("https://www.ebay.com/sh/ord/")).rejects.toThrow("never navigated");
+    // The operator's tab is read as it stands, and never taken somewhere else.
+    await expect(borrowed!.page("https://www.ebay.com/sh/lst/active")).rejects.toThrow("never navigated");
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it("reads a page that has settled without waiting for a load that may never finish, and never waits for the page to idle", async () => {
+    const orders = "https://www.ebay.com/sh/ord/?offset=0";
+    fakeBrowser.tabs.create = vi.fn(async () => ({ id: 9 })) as unknown as typeof fakeBrowser.tabs.create;
+    let at = robots;
+    let status = "complete";
+    fakeBrowser.tabs.get = vi.fn(async () => ({ id: 9, status, url: at })) as unknown as typeof fakeBrowser.tabs.get;
+    fakeBrowser.tabs.update = vi.fn(async () => {
+      at = orders;
+      status = "loading";
+      return { id: 9 };
+    }) as unknown as typeof fakeBrowser.tabs.update;
+    const answers: Record<string, unknown> = {
+      documentOrigin: 1,
+      pageSettled: { settled: true, document: 2 },
+      readLoadedPage: { status: 200, url: orders, contentType: "text/html", body: "<html></html>", document: 2 },
+    };
+    const execute = vi.fn(async (injection: { func: { name: string } }) => [{ frameId: 0, result: answers[injection.func.name] }]);
+    fakeBrowser.scripting.executeScript = execute as unknown as typeof fakeBrowser.scripting.executeScript;
+    const clock = fakeClock();
+
+    const tab = await new SyncTabs(clock).acquire(ebayAdapter);
+    const page = await tab.page(orders, "__INITIAL_STATE__");
+
+    expect(page.url).toBe(orders);
+    expect(clock.elapsed()).toBeLessThan(1000);
+    expect(execute).toHaveBeenCalledWith(expect.objectContaining({ world: "MAIN", args: ["__INITIAL_STATE__"], injectImmediately: true }));
+    for (const [injection] of execute.mock.calls) {
+      expect(injection).toMatchObject({ injectImmediately: true });
+    }
+  });
+
+  it("never takes the page a reload is leaving for the new one, however settled it looks", async () => {
+    // Reloading the same address leaves the old document up until the new one commits.
+    const orders = "https://www.ebay.com/sh/ord/?offset=0";
+    fakeBrowser.tabs.create = vi.fn(async () => ({ id: 9 })) as unknown as typeof fakeBrowser.tabs.create;
+    let status = "complete";
+    fakeBrowser.tabs.get = vi.fn(async () => ({ id: 9, status, url: orders })) as unknown as typeof fakeBrowser.tabs.get;
+    fakeBrowser.tabs.update = vi.fn(async () => {
+      status = "loading";
+      // The same address, so only the browser's own event says the reload began.
+      await fakeBrowser.tabs.onUpdated.trigger(9, { status: "loading" }, { id: 9, status: "loading", url: orders } as never);
+      return { id: 9 };
+    }) as unknown as typeof fakeBrowser.tabs.update;
+    const probes = [{ settled: true, document: 1 }, { settled: true, document: 1 }, { settled: true, document: 2 }];
+    const reads = [1, 2];
+    const execute = vi.fn(async (injection: { func: { name: string } }) => {
+      const name = injection.func.name;
+      const result = name === "documentOrigin" ? 1
+        : name === "pageSettled" ? probes.shift() ?? { settled: true, document: 2 }
+          : { status: 200, url: orders, contentType: "text/html", body: "<html></html>", document: reads.shift() ?? 2 };
+      return [{ frameId: 0, result }];
+    });
+    fakeBrowser.scripting.executeScript = execute as unknown as typeof fakeBrowser.scripting.executeScript;
+
+    const tab = await new SyncTabs(fakeClock()).acquire(ebayAdapter);
+    const page = await tab.page(orders);
+
+    expect(page.document).toBe(2);
+    expect(probes).toEqual([]);
+    expect(reads).toEqual([]);
   });
 });

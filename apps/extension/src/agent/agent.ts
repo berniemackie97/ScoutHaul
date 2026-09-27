@@ -3,10 +3,10 @@ import { adapterFor, adapters } from "../adapters/registry";
 import type { MarketplaceAdapter } from "../adapters/types";
 import { logActivity } from "./activity";
 import { ApiError, createAgentApi, type AgentApi } from "./api";
-import { recheckMs, signedInFreshMs } from "./config";
+import { aliveBeatMs, recheckMs, signedInFreshMs } from "./config";
 import { describeBrowser } from "./environment";
 import { describeFailure, waitsForAPerson } from "./failures";
-import { pauseOf, resume } from "./governor";
+import { pauseOf, resume, type GovernorPolicy } from "./governor";
 import { forgetAdapterMemory } from "./memory";
 import {
   checkSession,
@@ -19,12 +19,14 @@ import {
   limitsFor,
   notStarted,
   preflight,
+  rememberSession,
   runWork,
   type RunnerDeps,
   type RunResult,
 } from "./runner";
 import {
   activityItem,
+  aliveItem,
   authProblemItem,
   connectionItem,
   governorItem,
@@ -38,7 +40,7 @@ import {
   workKey,
   type StoredPairing,
 } from "./storage";
-import { SyncTabs, type MarketplaceTab } from "./transport";
+import { SyncTabs, type BorrowedTab, type MarketplaceTab } from "./transport";
 import type { Heartbeat, LoopKind, MarketplaceReport, Work } from "./types";
 
 const version = () => browser.runtime.getManifest().version;
@@ -47,7 +49,7 @@ const version = () => browser.runtime.getManifest().version;
 export interface TabSource {
   acquire(adapter: MarketplaceAdapter): Promise<MarketplaceTab>;
   release(adapter: MarketplaceAdapter): void;
-  borrow(adapter: MarketplaceAdapter, tabId?: number): Promise<MarketplaceTab | null>;
+  borrow(adapter: MarketplaceAdapter, tabId?: number): Promise<BorrowedTab | null>;
   owns(tabId: number): boolean;
 }
 
@@ -393,14 +395,15 @@ export class Agent {
   private async checkSignIn(adapter: MarketplaceAdapter, tabId?: number): Promise<void> {
     this.lastChecked.set(adapter.platform, this.deps.now().getTime());
     const limits = limitsFor(await heartbeatItem.getValue(), adapter.platform);
-    await this.running(`Checking the ${adapter.platform} sign-in`, null);
     const stop = keepAlive();
     try {
+      await this.running(`Checking the ${adapter.platform} sign-in`, null);
       const borrowed = await this.deps.tabs.borrow(adapter, tabId);
       if (borrowed) {
         try {
-          await checkSession(adapter, governedContext(borrowed, adapter.platform, limits, this.deps));
-          return;
+          if (await this.signInFrom(adapter, borrowed, limits)) {
+            return;
+          }
         } catch {
           // Their tab moved on mid-check; the sync tab answers instead.
         }
@@ -419,6 +422,25 @@ export class Agent {
       stop();
       await runningItem.setValue(null);
     }
+  }
+
+  /**
+   * The sign-in as the operator's own tab shows it: read where it stands when the page tells, or asked of the
+   * marketplace from it. False when the page cannot tell, so the sync tab answers.
+   */
+  private async signInFrom(adapter: MarketplaceAdapter, borrowed: BorrowedTab, limits: GovernorPolicy): Promise<boolean> {
+    if (!adapter.sessionFrom) {
+      await checkSession(adapter, governedContext(borrowed, adapter.platform, limits, this.deps));
+      return true;
+    }
+
+    const session = adapter.sessionFrom(await borrowed.current(adapter.sessionGlobal));
+    if (!session) {
+      return false;
+    }
+
+    await rememberSession(adapter, session, this.deps.now());
+    return true;
   }
 
   private async running(label: string, key: string | null): Promise<void> {
@@ -508,12 +530,15 @@ export class Agent {
  * scan from being cut off part-way.
  */
 function keepAlive(): () => void {
+  const beat = () => void aliveItem.setValue(new Date().toISOString());
+  beat();
   const timer = setInterval(() => {
+    beat();
     try {
       void browser.runtime.getPlatformInfo().catch(() => undefined);
     } catch {
       // Nothing to keep alive where there is no such call.
     }
-  }, 20_000);
+  }, aliveBeatMs);
   return () => clearInterval(timer);
 }

@@ -15,6 +15,7 @@ import {
   pairingItem,
   portalItem,
   queuedItem,
+  aliveItem,
   runningItem,
   sessionsItem,
   workKey,
@@ -24,7 +25,7 @@ import {
 } from "../agent/storage";
 import type { AgentAccount, LoopKind } from "../agent/types";
 import { ask, useAccess, useNow, useStored } from "./hooks";
-import { ago, clock, headline, loopRow, marketplaceStatus, scanBlocker, type Headline, type MarketplaceStatus } from "./model";
+import { ago, clock, headline, liveRunning, loopRow, marketplaceStatus, scanBlocker, type Headline, type MarketplaceStatus } from "./model";
 
 type Send = (request: PopupRequest) => Promise<void>;
 
@@ -118,13 +119,15 @@ function Connected({ pairing, home }: { pairing: StoredPairing; home: string | n
   const heartbeat = useStored(heartbeatItem);
   const sessions = useStored(sessionsItem);
   const governors = useStored(governorItem);
-  const running = useStored(runningItem);
+  const storedRunning = useStored(runningItem);
+  const alive = useStored(aliveItem);
   const queued = useStored(queuedItem);
   const lastRuns = useStored(lastRunsItem);
   const connection = useStored(connectionItem);
   const activity = useStored(activityItem);
   const access = useAccess();
   const now = useNow();
+  const running = liveRunning(storedRunning, alive, now.getTime());
   const [error, setError] = useState<string | null>(null);
 
   // Opening the popup is a good moment to look again at a sign-in that has aged or shows a problem;

@@ -361,3 +361,18 @@ describe("Poshmark sales", () => {
     await expect(poshmarkAdapter.scanSales(context, first, seller)).rejects.toMatchObject({ kind: "SignedOut" });
   });
 });
+
+describe("the Poshmark sign-in, read from a page the operator has open", () => {
+  it("is read from any Poshmark page's state, without loading one", () => {
+    expect(poshmarkAdapter.sessionFrom!(closetPage([]))).toMatchObject({ signedIn: true, username: "overhaultrading" });
+    expect(poshmarkAdapter.sessionFrom!(homePage(null))).toEqual({ signedIn: false, username: null, marketplaceUserId: null });
+    expect(poshmarkAdapter.sessionGlobal).toBe("__INITIAL_STATE__");
+  });
+
+  it("cannot tell from a page without its state, so the check loads one instead", () => {
+    const bare = { status: 200, url: "https://poshmark.com/", contentType: "text/html", body: "<html></html>" };
+    expect(poshmarkAdapter.sessionFrom!(bare)).toBeNull();
+    expect(poshmarkAdapter.sessionFrom!({ ...bare, global: JSON.stringify({ somethingElse: true }) })).toBeNull();
+  });
+});
+
