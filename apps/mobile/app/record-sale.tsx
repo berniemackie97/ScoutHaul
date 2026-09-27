@@ -5,6 +5,7 @@ import { Button } from '../src/components/Button';
 import { ErrorBanner } from '../src/components/ErrorBanner';
 import { ExpandableSection } from '../src/components/ExpandableSection';
 import { Screen } from '../src/components/Screen';
+import { SearchPickerField } from '../src/components/SearchPickerField';
 import { SelectField, type SelectOption } from '../src/components/SelectField';
 import { StatusPill } from '../src/components/StatusPill';
 import { Text } from '../src/components/Text';
@@ -50,6 +51,33 @@ function estimateRule(rule: ChannelFeeRule, salePrice: number): number {
   return round2(fee);
 }
 
+type LaunchParams = {
+  inventoryItemId?: string;
+  listingId?: string;
+  title?: string;
+  platform?: string;
+  listPrice?: string;
+  purchaseCost?: string;
+};
+
+/** The item this screen was opened for, from the item's own screen — or null when opened from anywhere else. */
+function launchedCandidate(params: LaunchParams): SaleCandidate | null {
+  if (!params.inventoryItemId) return null;
+  return {
+    inventoryItemId: params.inventoryItemId,
+    title: params.title ?? 'Selected inventory item',
+    status: 'Selected',
+    costOfGoods: parseOptionalNumber(params.purchaseCost ?? '') ?? 0,
+    expectedSalePrice: parseOptionalNumber(params.listPrice ?? ''),
+    listingId: params.listingId ?? null,
+    listingPlatform: params.platform ?? null,
+    listingPrice: parseOptionalNumber(params.listPrice ?? ''),
+  };
+}
+
+const describeCandidate = (candidate: SaleCandidate) =>
+  `${candidate.status} · COGS ${formatMoney(candidate.costOfGoods)}${candidate.listingPlatform ? ` · ${candidate.listingPlatform}` : ''}`;
+
 function estimateRules(rules: ChannelFeeRule[] | null | undefined, salePrice: number): number {
   return round2((rules ?? []).reduce((sum, rule) => sum + estimateRule(rule, salePrice), 0));
 }
@@ -57,18 +85,12 @@ function estimateRules(rules: ChannelFeeRule[] | null | undefined, salePrice: nu
 export default function RecordSaleScreen() {
   const { colors: c, shadows: s } = useAppTheme();
   const haptics = useHaptics();
-  const params = useLocalSearchParams<{
-    inventoryItemId?: string;
-    listingId?: string;
-    title?: string;
-    platform?: string;
-    listPrice?: string;
-    purchaseCost?: string;
-  }>();
+  const params = useLocalSearchParams<LaunchParams>();
 
-  const [candidates, setCandidates] = useState<SaleCandidate[]>([]);
   const [channels, setChannels] = useState<SaleChannelOption[]>([]);
-  const [candidateId, setCandidateId] = useState(params.inventoryItemId ?? '');
+  // Held whole, so cost and listing prefill work for an item no list on this screen ever loaded. Route params are
+  // there on the first render, so this is not seeded from anything that arrives later.
+  const [selected, setSelected] = useState<SaleCandidate | null>(() => launchedCandidate(params));
   const [listingId, setListingId] = useState(params.listingId ?? '');
   const [platform, setPlatform] = useState(params.platform ?? '');
   const [feeProfileId, setFeeProfileId] = useState('');
@@ -95,10 +117,9 @@ export default function RecordSaleScreen() {
 
   useEffect(() => {
     let active = true;
-    void Promise.all([ordersApi.candidates(), ordersApi.referenceData()])
-      .then(([nextCandidates, reference]) => {
+    void ordersApi.referenceData()
+      .then((reference) => {
         if (!active) return;
-        setCandidates(nextCandidates);
         setChannels(reference.channels.filter((channel) => !channel.isLegacy));
       })
       .catch((e) => {
@@ -109,26 +130,6 @@ export default function RecordSaleScreen() {
     };
   }, []);
 
-  const mergedCandidates = useMemo(() => {
-    if (!params.inventoryItemId || candidates.some((candidate) => candidate.inventoryItemId === params.inventoryItemId)) {
-      return candidates;
-    }
-
-    const launched: SaleCandidate = {
-      inventoryItemId: params.inventoryItemId,
-      title: params.title ?? 'Selected inventory item',
-      status: 'Selected',
-      costOfGoods: parseOptionalNumber(params.purchaseCost ?? '') ?? 0,
-      expectedSalePrice: parseOptionalNumber(params.listPrice ?? ''),
-      listingId: params.listingId ?? null,
-      listingPlatform: params.platform ?? null,
-      listingPrice: parseOptionalNumber(params.listPrice ?? ''),
-    };
-
-    return [launched, ...candidates];
-  }, [candidates, params.inventoryItemId, params.listingId, params.listPrice, params.platform, params.purchaseCost, params.title]);
-
-  const selectedCandidate = mergedCandidates.find((candidate) => candidate.inventoryItemId === candidateId);
   const selectedChannel = channels.find((channel) => channel.value === platform);
   const feeProfiles = selectedChannel?.feeProfiles ?? [];
   const selectedFeeProfile =
@@ -140,18 +141,6 @@ export default function RecordSaleScreen() {
     if (!platform || feeProfileId || !selectedFeeProfile) return;
     setFeeProfileId(selectedFeeProfile.id);
   }, [feeProfileId, platform, selectedFeeProfile]);
-
-  useEffect(() => {
-    if (!selectedCandidate || soldPrice.trim()) return;
-    setSoldPrice(String(selectedCandidate.listingPrice ?? selectedCandidate.expectedSalePrice ?? ''));
-  }, [selectedCandidate, soldPrice]);
-
-  const candidateOptions: SelectOption[] = useMemo(() => mergedCandidates.map((candidate) => ({
-    value: candidate.inventoryItemId,
-    label: candidate.title,
-    description: `${candidate.status} · COGS ${formatMoney(candidate.costOfGoods)}${candidate.listingPlatform ? ` · ${candidate.listingPlatform}` : ''}`,
-    group: candidate.listingPlatform ? 'Listed / ready' : 'Inventory',
-  })), [mergedCandidates]);
 
   const channelOptions: SelectOption[] = useMemo(() => channels.map((channel) => ({
     value: channel.value,
@@ -168,7 +157,7 @@ export default function RecordSaleScreen() {
   const sold = parseOptionalNumber(soldPrice) ?? 0;
   const shipping = parseOptionalNumber(shippingCharged) ?? 0;
   const revenue = sold + shipping;
-  const costOfGoods = selectedCandidate?.costOfGoods ?? 0;
+  const costOfGoods = selected?.costOfGoods ?? 0;
   const totalFees =
     (parseOptionalNumber(platformFees) ?? 0) +
     (parseOptionalNumber(paymentFees) ?? 0) +
@@ -191,9 +180,8 @@ export default function RecordSaleScreen() {
     setFeeProfileId(defaultProfile?.id ?? '');
   }, [channels]);
 
-  function chooseCandidate(value: string) {
-    setCandidateId(value);
-    const item = mergedCandidates.find((candidate) => candidate.inventoryItemId === value);
+  function chooseCandidate(item: SaleCandidate | null) {
+    setSelected(item);
     if (!item) {
       setListingId('');
       return;
@@ -211,7 +199,7 @@ export default function RecordSaleScreen() {
 
   function validate() {
     const errors: Record<string, string> = {};
-    if (!candidateId) errors.inventoryItemId = 'Select the inventory item that sold.';
+    if (!selected) errors.inventoryItemId = 'Select the inventory item that sold.';
     if (!platform) errors.platform = 'Select the sales channel.';
 
     const parsedSoldPrice = moneyValue(soldPrice, 'soldPrice', errors);
@@ -244,14 +232,14 @@ export default function RecordSaleScreen() {
 
   async function save() {
     const validation = validate();
-    if (!validation.ok) {
+    if (!validation.ok || !selected) {
       haptics.error();
       setError('Fix the highlighted fields.');
       return;
     }
 
     const body = {
-      inventoryItemId: candidateId,
+      inventoryItemId: selected.inventoryItemId,
       listingId: listingId || null,
       platform,
       soldPrice: validation.soldPrice,
@@ -304,7 +292,7 @@ export default function RecordSaleScreen() {
 
       <View style={[styles.heroCard, { backgroundColor: c.surface, borderColor: c.borderLight, ...s.md }]}>
         <Text variant="caption" numberOfLines={1}>
-          {selectedCandidate?.title ?? 'No inventory item selected'}
+          {selected?.title ?? 'No inventory item selected'}
         </Text>
         <Text variant="hero" color={trueNet >= 0 ? c.success : c.danger}>
           {revenue > 0 ? formatMoney(trueNet) : '$—'}
@@ -317,14 +305,17 @@ export default function RecordSaleScreen() {
       </View>
 
       <ExpandableSection title="Sale identity" icon="cash-outline" defaultExpanded>
-        <SelectField
+        <SearchPickerField
           label="Inventory item"
-          value={candidateId}
-          options={candidateOptions}
+          value={selected}
           onChange={chooseCandidate}
-          placeholder="Select sold item..."
+          search={ordersApi.candidates}
+          idOf={(candidate) => candidate.inventoryItemId}
+          titleOf={(candidate) => candidate.title}
+          describe={describeCandidate}
+          noun="unsold item"
+          placeholder="Search for the sold item..."
           error={fieldErrors.inventoryItemId}
-          searchable
           required
         />
         <SelectField
