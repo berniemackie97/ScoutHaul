@@ -5,6 +5,7 @@ import {
   type MarketplaceAdapter,
   type MarketplaceContext,
   type PageKind,
+  type PageResponse,
   type SalesScan,
   type Session,
 } from "../types";
@@ -39,6 +40,15 @@ interface ListingMemory {
  *
  * Sales are not read: they are behind the seller's own pages, which this adapter has never seen.
  */
+/**
+ * The header's own Likes link is the signed-in seller's, and it is the only handle on a page that is certainly theirs:
+ * a page can show any number of other people's, and an order page shows the buyer's.
+ */
+function sessionOnPage(body: string): Session | null {
+  const handle = /href="\/([A-Za-z0-9_.-]{2,40})\/likes\/"/.exec(body);
+  return handle ? { signedIn: true, username: handle[1]!, marketplaceUserId: null } : null;
+}
+
 export const depopAdapter: MarketplaceAdapter = {
   platform: "Depop",
   origins: ["https://*.depop.com/*"],
@@ -64,13 +74,11 @@ export const depopAdapter: MarketplaceAdapter = {
   async detectSession(context: MarketplaceContext): Promise<Session> {
     const response = await context.page(origin);
     assertReadable(response);
-    // The header's own Likes link is the signed-in seller's, and it is the only handle on the page that is
-    // certainly theirs: a page can show any number of other people's, and an order page shows the buyer's.
-    const handle = /href="\/([A-Za-z0-9_.-]{2,40})\/likes\/"/.exec(response.body);
-    return handle
-      ? { signedIn: true, username: handle[1]!, marketplaceUserId: null }
-      : { signedIn: false, username: null, marketplaceUserId: null };
+    return sessionOnPage(response.body) ?? { signedIn: false, username: null, marketplaceUserId: null };
   },
+
+  // Any Depop page with the header shows who is signed in. One without it cannot say they are signed out.
+  sessionFrom: (page: PageResponse) => sessionOnPage(page.body),
 
   scanSales(): Promise<SalesScan> {
     // Registered as a listings-only marketplace, so the server never asks. Saying so beats inventing sales.

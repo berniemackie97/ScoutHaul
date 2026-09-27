@@ -10,7 +10,9 @@ import { aliveBeatMs } from "../agent/config";
  */
 export function liveRunning(running: RunningWork | null | undefined, aliveAt: string | null | undefined, now: number): RunningWork | null {
   if (!running || !aliveAt) return null;
-  return now - Date.parse(aliveAt) <= 3 * aliveBeatMs ? running : null;
+  // A beat from the future means the clock moved back since; it proves nothing about the background now.
+  const age = now - Date.parse(aliveAt);
+  return age >= 0 && age <= 3 * aliveBeatMs ? running : null;
 }
 
 /**

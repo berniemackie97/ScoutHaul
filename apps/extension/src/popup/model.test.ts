@@ -103,3 +103,10 @@ describe("what the popup shows as running", () => {
     expect(liveRunning(running, null, at)).toBeNull();
   });
 });
+
+describe("a beat from the future", () => {
+  it("proves nothing about the background now, so no running label is shown", () => {
+    const running = { label: "Checking the Depop sign-in", key: null, startedAt: "2026-09-27T10:00:00Z", pages: 0 };
+    expect(liveRunning(running, "2026-09-27T10:05:00Z", Date.parse("2026-09-27T10:01:00Z"))).toBeNull();
+  });
+});

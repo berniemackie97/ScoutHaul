@@ -6,6 +6,7 @@ import {
   type MarketplaceAdapter,
   type MarketplaceContext,
   type PageKind,
+  type PageResponse,
   type SalesScan,
   type SalesWindow,
   type Session,
@@ -69,6 +70,27 @@ function readCursor(cursor: string | null): SalesCursor | null {
   }
 }
 
+/** Who every Poshmark page's state says is signed in, or null when it carries no sign-in at all. */
+function sessionIn(state: Record<string, unknown>): Session | null {
+  const auth = dig(state, "auth");
+  if (auth === undefined) {
+    return null;
+  }
+
+  if (dig(auth, "isUserLoggedIn") !== true) {
+    return { signedIn: false, username: null, marketplaceUserId: null };
+  }
+
+  // Poshmark abbreviates the signed-in user's own details; `dh` is the handle their closet lives at.
+  const handle = dig(state, "userCookies", "userInfo", "dh");
+  const identity = dig(auth, "identity");
+  return {
+    signedIn: true,
+    username: typeof handle === "string" && handle.length > 0 ? handle : null,
+    marketplaceUserId: typeof identity === "string" ? identity : null,
+  };
+}
+
 /**
  * Poshmark, read the way its own pages are served: a closet page carries its listings whole, and Seller Hub's sales
  * page carries every sale with its money, buyer and ship-to, in the state Poshmark writes into the HTML. No API is
@@ -99,20 +121,17 @@ export const poshmarkAdapter: MarketplaceAdapter = {
   async detectSession(context: MarketplaceContext): Promise<Session> {
     const response = await context.page(origin, stateGlobal);
     assertReadable(response);
-    const state = readState(response, "home");
-    const auth = dig(state, "auth");
-    if (dig(auth, "isUserLoggedIn") !== true) {
-      return { signedIn: false, username: null, marketplaceUserId: null };
-    }
+    return sessionIn(readState(response, "home")) ?? { signedIn: false, username: null, marketplaceUserId: null };
+  },
 
-    // Poshmark abbreviates the signed-in user's own details; `dh` is the handle their closet lives at.
-    const handle = dig(state, "userCookies", "userInfo", "dh");
-    const identity = dig(auth, "identity");
-    return {
-      signedIn: true,
-      username: typeof handle === "string" && handle.length > 0 ? handle : null,
-      marketplaceUserId: typeof identity === "string" ? identity : null,
-    };
+  sessionGlobal: stateGlobal,
+
+  sessionFrom(page: PageResponse): Session | null {
+    try {
+      return sessionIn(readState(page, "page"));
+    } catch {
+      return null;
+    }
   },
 
   async scanSales(context: MarketplaceContext, window: SalesWindow): Promise<SalesScan> {
