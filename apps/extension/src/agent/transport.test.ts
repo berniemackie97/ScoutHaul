@@ -1,8 +1,9 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fakeBrowser } from "wxt/testing/fake-browser";
 import { ebayAdapter } from "../adapters/ebay";
+import { poshmarkAdapter } from "../adapters/poshmark";
 import { AdapterError } from "../adapters/types";
-import { judgeTab, SyncTabs, waitForPage, type Clock, type TabLook } from "./transport";
+import { judgeTab, pageSettled, SyncTabs, waitForPage, type Clock, type TabLook } from "./transport";
 
 const robots = "https://www.ebay.com/robots.txt";
 const readable = ebayAdapter.readable;
@@ -208,7 +209,7 @@ describe("the sync tab", () => {
     }) as unknown as typeof fakeBrowser.tabs.update;
     const answers: Record<string, unknown> = {
       documentOrigin: 1,
-      pageSettled: { settled: true, document: 2 },
+      pageSettled: { parsed: true, found: true, document: 2 },
       readLoadedPage: { status: 200, url: orders, contentType: "text/html", body: "<html></html>", document: 2 },
     };
     const execute = vi.fn(async (injection: { func: { name: string } }) => [{ frameId: 0, result: answers[injection.func.name] }]);
@@ -216,14 +217,94 @@ describe("the sync tab", () => {
     const clock = fakeClock();
 
     const tab = await new SyncTabs(clock).acquire(ebayAdapter);
-    const page = await tab.page(orders, "__INITIAL_STATE__");
+    const page = await tab.page(orders, { global: "__INITIAL_STATE__" });
 
     expect(page.url).toBe(orders);
     expect(clock.elapsed()).toBeLessThan(1000);
-    expect(execute).toHaveBeenCalledWith(expect.objectContaining({ world: "MAIN", args: ["__INITIAL_STATE__"], injectImmediately: true }));
+    expect(execute).toHaveBeenCalledWith(expect.objectContaining({ world: "MAIN", args: ["__INITIAL_STATE__", null, null], injectImmediately: true }));
     for (const [injection] of execute.mock.calls) {
       expect(injection).toMatchObject({ injectImmediately: true });
     }
+  });
+
+  it("waits past a finished load for what the page draws in afterwards", async () => {
+    const sold = "https://www.ebay.com/sh/ord/?offset=0";
+    fakeBrowser.tabs.create = vi.fn(async () => ({ id: 9 })) as unknown as typeof fakeBrowser.tabs.create;
+    let at = robots;
+    fakeBrowser.tabs.get = vi.fn(async () => ({ id: 9, status: "complete", url: at })) as unknown as typeof fakeBrowser.tabs.get;
+    fakeBrowser.tabs.update = vi.fn(async () => {
+      at = sold;
+      return { id: 9 };
+    }) as unknown as typeof fakeBrowser.tabs.update;
+    const probes = [{ parsed: true, found: false, document: 2 }, { parsed: true, found: false, document: 2 }, { parsed: true, found: true, document: 2 }];
+    fakeBrowser.scripting.executeScript = vi.fn(async (injection: { func: { name: string } }) => {
+      const name = injection.func.name;
+      const result = name === "documentOrigin" ? 1
+        : name === "pageSettled" ? probes.shift() ?? { parsed: true, found: true, document: 2 }
+          : { status: 200, url: sold, contentType: "text/html", body: "<ul><li>row</li></ul>", document: 2 };
+      return [{ frameId: 0, result }];
+    }) as unknown as typeof fakeBrowser.scripting.executeScript;
+
+    const tab = await new SyncTabs(fakeClock()).acquire(ebayAdapter);
+    await tab.page(sold, { until: "ul li" });
+
+    expect(probes).toEqual([]);
+  });
+
+  it("waits for the data a page's state holds, not only for the state, before reading it", async () => {
+    const sales = "https://poshmark.com/seller-hub/sales";
+    fakeBrowser.tabs.create = vi.fn(async () => ({ id: 9 })) as unknown as typeof fakeBrowser.tabs.create;
+    let at = poshmarkAdapter.workerUrl;
+    fakeBrowser.tabs.get = vi.fn(async () => ({ id: 9, status: "complete", url: at })) as unknown as typeof fakeBrowser.tabs.get;
+    fakeBrowser.tabs.update = vi.fn(async () => {
+      at = sales;
+      return { id: 9 };
+    }) as unknown as typeof fakeBrowser.tabs.update;
+    const probes = [{ parsed: true, found: false, document: 2 }, { parsed: true, found: true, document: 2 }];
+    const asked: unknown[] = [];
+    fakeBrowser.scripting.executeScript = vi.fn(async (injection: { func: { name: string }; args?: unknown[] }) => {
+      const name = injection.func.name;
+      if (name === "pageSettled") {
+        asked.push(injection.args);
+      }
+
+      const result = name === "documentOrigin" ? 1
+        : name === "pageSettled" ? probes.shift() ?? { parsed: true, found: true, document: 2 }
+          : { status: 200, url: sales, contentType: "text/html", body: "<div></div>", global: "{}", document: 2 };
+      return [{ frameId: 0, result }];
+    }) as unknown as typeof fakeBrowser.scripting.executeScript;
+
+    const tab = await new SyncTabs(fakeClock()).acquire(poshmarkAdapter);
+    await tab.page(sales, { global: "__INITIAL_STATE__", holds: ["$_order_list", "userSales", "data", "sales_summary"] });
+
+    expect(probes).toEqual([]);
+    expect(asked[0]).toEqual(["__INITIAL_STATE__", null, ["$_order_list", "userSales", "data", "sales_summary"]]);
+  });
+
+  it("reads an empty page after a while, since what it waits for may never be drawn", async () => {
+    const sold = "https://www.ebay.com/sh/ord/?offset=0";
+    fakeBrowser.tabs.create = vi.fn(async () => ({ id: 9 })) as unknown as typeof fakeBrowser.tabs.create;
+    let at = robots;
+    fakeBrowser.tabs.get = vi.fn(async () => ({ id: 9, status: "complete", url: at })) as unknown as typeof fakeBrowser.tabs.get;
+    fakeBrowser.tabs.update = vi.fn(async () => {
+      at = sold;
+      return { id: 9 };
+    }) as unknown as typeof fakeBrowser.tabs.update;
+    fakeBrowser.scripting.executeScript = vi.fn(async (injection: { func: { name: string } }) => {
+      const name = injection.func.name;
+      const result = name === "documentOrigin" ? 1
+        : name === "pageSettled" ? { parsed: true, found: false, document: 2 }
+          : { status: 200, url: sold, contentType: "text/html", body: "<p>Nothing sold yet</p>", document: 2 };
+      return [{ frameId: 0, result }];
+    }) as unknown as typeof fakeBrowser.scripting.executeScript;
+    const clock = fakeClock();
+
+    const tab = await new SyncTabs(clock).acquire(ebayAdapter);
+    const page = await tab.page(sold, { until: "ul li" });
+
+    expect(page.body).toContain("Nothing sold yet");
+    expect(clock.elapsed()).toBeGreaterThanOrEqual(12_000);
+    expect(clock.elapsed()).toBeLessThan(45_000);
   });
 
   it("never takes the page a reload is leaving for the new one, however settled it looks", async () => {
@@ -238,12 +319,12 @@ describe("the sync tab", () => {
       await fakeBrowser.tabs.onUpdated.trigger(9, { status: "loading" }, { id: 9, status: "loading", url: orders } as never);
       return { id: 9 };
     }) as unknown as typeof fakeBrowser.tabs.update;
-    const probes = [{ settled: true, document: 1 }, { settled: true, document: 1 }, { settled: true, document: 2 }];
+    const probes = [{ parsed: true, found: true, document: 1 }, { parsed: true, found: true, document: 1 }, { parsed: true, found: true, document: 2 }];
     const reads = [1, 2];
     const execute = vi.fn(async (injection: { func: { name: string } }) => {
       const name = injection.func.name;
       const result = name === "documentOrigin" ? 1
-        : name === "pageSettled" ? probes.shift() ?? { settled: true, document: 2 }
+        : name === "pageSettled" ? probes.shift() ?? { parsed: true, found: true, document: 2 }
           : { status: 200, url: orders, contentType: "text/html", body: "<html></html>", document: reads.shift() ?? 2 };
       return [{ frameId: 0, result }];
     });
@@ -255,5 +336,38 @@ describe("the sync tab", () => {
     expect(page.document).toBe(2);
     expect(probes).toEqual([]);
     expect(reads).toEqual([]);
+  });
+});
+
+describe("whether a page holds what will be read", () => {
+  function onPage(state: unknown, readyState = "complete") {
+    vi.stubGlobal("document", { readyState, querySelector: () => null });
+    vi.stubGlobal("window", { __INITIAL_STATE__: state });
+    vi.stubGlobal("performance", { timeOrigin: 2 });
+  }
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const sales = ["$_order_list", "userSales", "data", "sales_summary"];
+
+  it("takes a page as parsed once its state is defined, but not as holding its data until the data is in it", () => {
+    onPage({ $_order_list: { userSales: {} } });
+    expect(pageSettled("__INITIAL_STATE__", null, sales)).toEqual({ parsed: true, found: false, document: 2 });
+
+    onPage({ $_order_list: { userSales: { data: { sales_summary: [] } } } });
+    expect(pageSettled("__INITIAL_STATE__", null, sales)).toEqual({ parsed: true, found: true, document: 2 });
+  });
+
+  it("is not parsed while the state is not yet defined", () => {
+    onPage(undefined);
+    expect(pageSettled("__INITIAL_STATE__", null, sales)).toMatchObject({ parsed: false, found: false });
+  });
+
+  it("asks nothing of the state when no data path is given", () => {
+    onPage({});
+    expect(pageSettled("__INITIAL_STATE__", null, null)).toMatchObject({ parsed: true, found: true });
+    expect(pageSettled(null, null, null)).toMatchObject({ parsed: true, found: true });
   });
 });

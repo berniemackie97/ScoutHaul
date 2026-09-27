@@ -2479,6 +2479,9 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                         .HasPrecision(12, 2)
                         .HasColumnType("numeric(12,2)");
 
+                    b.Property<bool>("KeysAreDerived")
+                        .HasColumnType("boolean");
+
                     b.Property<DateTimeOffset>("OrderedAt")
                         .HasColumnType("timestamp with time zone");
 

@@ -1,5 +1,6 @@
 import type { IngestListing } from "../../agent/types";
 import { siteChanged } from "./pages";
+import { decodeEntities } from "../html";
 
 /**
  * A listing, from its own page. Depop publishes the whole of it as structured data — title, description, every
@@ -28,7 +29,7 @@ export function readProduct(slug: string, html: string): IngestListing {
     size: size(html),
     condition: condition(offers.itemCondition, html),
     description: typeof product.description === "string" && product.description.trim().length > 0
-      ? decode(product.description).trim()
+      ? decodeEntities(product.description).trim()
       : undefined,
     url: `https://www.depop.com/products/${slug}/`,
     primaryImageUrl: images[0] ?? null,
@@ -82,16 +83,3 @@ function name(value: unknown): string | null {
   return typeof brand === "string" && brand.trim().length > 0 ? brand.trim() : null;
 }
 
-const entities: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " ", "#39": "'" };
-
-function decode(text: string): string {
-  return text.replace(/&(#\d+|[a-z]+);/gi, (whole, code: string) => {
-    const known = entities[code.toLowerCase()];
-    if (known !== undefined) {
-      return known;
-    }
-
-    const numeric = code.startsWith("#") ? Number(code.slice(1)) : Number.NaN;
-    return Number.isFinite(numeric) ? String.fromCodePoint(numeric) : whole;
-  });
-}

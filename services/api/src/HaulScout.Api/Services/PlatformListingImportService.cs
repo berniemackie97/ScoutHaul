@@ -66,6 +66,10 @@ public sealed class PlatformListingImportService(HaulScoutDbContext db, ICurrent
             {
                 return AppResult<IngestPlatformListingsResultDto>.Validation($"Listing {externalId} has no recognized sales channel.");
             }
+            if (Oversized(input) is string oversized)
+            {
+                return AppResult<IngestPlatformListingsResultDto>.Validation($"Listing {Text.Clip(externalId, 40)} has {oversized}.");
+            }
             if (input.Price < 0 || input.Quantity < 0)
             {
                 return AppResult<IngestPlatformListingsResultDto>.Validation($"Listing {externalId} has negative price or quantity.");
@@ -91,7 +95,7 @@ public sealed class PlatformListingImportService(HaulScoutDbContext db, ICurrent
                     OrganizationId = currentUser.OrganizationId,
                     Platform = channel,
                     ExternalListingId = externalId,
-                    Title = input.Title.Trim(),
+                    Title = Text.Fit(input.Title, PlatformListing.Limits.Title)!,
                     ChannelAccountId = channelAccountId,
                 };
                 db.PlatformListings.Add(listing);
@@ -289,7 +293,7 @@ public sealed class PlatformListingImportService(HaulScoutDbContext db, ICurrent
         {
             listing.ChannelAccountId = channelAccountId;
         }
-        listing.Title = input.Title.Trim();
+        listing.Title = Text.Fit(input.Title, PlatformListing.Limits.Title)!;
         listing.Price = input.Price;
         listing.Quantity = input.Quantity <= 0 ? 1 : input.Quantity;
         listing.QuantitySold = input.QuantitySold;
@@ -308,25 +312,35 @@ public sealed class PlatformListingImportService(HaulScoutDbContext db, ICurrent
         }
 
         listing.Status = input.Status;
-        listing.Format = TrimToNull(input.Format);
+        listing.Format = Text.Fit(input.Format, PlatformListing.Limits.Format);
         listing.Sku = TrimToNull(input.Sku);
-        listing.CategoryName = TrimToNull(input.CategoryName);
-        listing.Condition = TrimToNull(input.Condition);
+        listing.CategoryName = Text.Fit(input.CategoryName, PlatformListing.Limits.CategoryName);
+        listing.Condition = Text.Fit(input.Condition, PlatformListing.Limits.Condition);
 
         // A source that does not carry a detail sends null, which leaves what is known alone; only a source that
         // reads it may change it.
-        listing.Description = TrimToNull(input.Description) ?? listing.Description;
-        listing.Brand = TrimToNull(input.Brand) ?? listing.Brand;
-        listing.Color = TrimToNull(input.Color) ?? listing.Color;
-        listing.Size = TrimToNull(input.Size) ?? listing.Size;
-        listing.Url = TrimToNull(input.Url);
-        listing.PrimaryImageUrl = TrimToNull(input.PrimaryImageUrl);
+        listing.Description = Text.Fit(input.Description, PlatformListing.Limits.Description) ?? listing.Description;
+        listing.Brand = Text.Fit(input.Brand, PlatformListing.Limits.Brand) ?? listing.Brand;
+        listing.Color = Text.Fit(input.Color, PlatformListing.Limits.Color) ?? listing.Color;
+        listing.Size = Text.Fit(input.Size, PlatformListing.Limits.Size) ?? listing.Size;
+        listing.Url = Link(input.Url);
+        listing.PrimaryImageUrl = Link(input.PrimaryImageUrl);
         listing.ListedAt = input.ListedAt;
         listing.EndsAt = input.EndsAt;
         listing.RawJson = TrimToNull(input.RawJson);
         listing.ScrapedAt = DateTimeOffset.UtcNow;
         ApplyPhotoUrls(listing, input.PhotoUrls);
     }
+
+    /// <summary>A link cut short leads nowhere, so one too long to keep is not kept.</summary>
+    private static string? Link(string? url) => TrimToNull(url) is string link && link.Length <= PlatformListing.Limits.Url ? link : null;
+
+    /// <summary>An identifier too long for its column, named — or null. Identifiers are matched on, so one is never cut to fit.</summary>
+    private static string? Oversized(IngestPlatformListingInput input) =>
+        (input.ExternalListingId ?? string.Empty).Trim().Length > PlatformListing.Limits.ExternalListingId ? $"an id longer than {PlatformListing.Limits.ExternalListingId} characters"
+        : TrimToNull(input.Sku)?.Length > PlatformListing.Limits.Sku ? $"a SKU longer than {PlatformListing.Limits.Sku} characters"
+        : TrimToNull(input.Currency)?.Length > 3 ? "a currency code longer than 3 characters"
+        : null;
 
     /// <summary>
     /// The listing's photos, as the source showed them. A source that does not carry photos at all sends null,

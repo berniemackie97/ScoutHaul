@@ -33,12 +33,18 @@ public sealed record IngestPlatformOrderLineInput(
 /// The marketplace has not posted the fees yet — a scan saw the sale before they reached the ledger.
 /// Only meaningful with a null <paramref name="FeeTotal"/>, and never turns known fees back into unknown.
 /// </param>
+/// <param name="TaxCollected">Null when this source does not show the tax, which then keeps what another source recorded.</param>
+/// <param name="OrderedOnDayOnly">This source knows only the day of the sale, so it never moves an order already placed within it.</param>
+/// <param name="KeysAreDerived">
+/// The order and line keys were made up from the sale's details because the source has no ids of its own. Such an order
+/// is the same sale as one that arrives with the marketplace's real id, and gives way to it.
+/// </param>
 public sealed record IngestPlatformOrderInput(
     string ExternalOrderId,
     DateTimeOffset OrderedAt,
     decimal ItemsSubtotal,
     decimal ShippingCharged,
-    decimal TaxCollected,
+    decimal? TaxCollected,
     decimal? FeeTotal,
     IReadOnlyList<IngestPlatformOrderLineInput> Lines,
     string? Platform = null,
@@ -67,7 +73,9 @@ public sealed record IngestPlatformOrderInput(
     string? FulfillmentDetail = null,
     string? FeeBreakdownJson = null,
     string? RawJson = null,
-    bool FeesPending = false);
+    bool FeesPending = false,
+    bool OrderedOnDayOnly = false,
+    bool KeysAreDerived = false);
 
 /// <summary>A batch of imported orders. <see cref="Platform"/> is the default channel for
 /// orders that do not carry their own.</summary>

@@ -1,5 +1,5 @@
 import type { FulfillmentStage, IngestOrder, IngestOrderLine, RunIssue } from "../../agent/types";
-import { cents } from "../amounts";
+import { allocate, cents } from "../amounts";
 
 /** Money as Vinted's API writes it: `{ amount: "8.5", currency_code: "USD" }`. */
 export interface VintedMoney {
@@ -97,21 +97,6 @@ export function amount(value: VintedMoney | string | number | null | undefined):
   return Number.isFinite(number) && number >= 0 ? cents(number) : null;
 }
 
-/**
- * Splits what the buyer paid for a bundle across its items, in proportion to their listed prices —
- * evenly when those are unknown — to the cent, the last item taking the rounding.
- */
-export function allocate(total: number, listed: (number | null)[]): number[] {
-  if (listed.length === 0) {
-    return [];
-  }
-
-  const weights = listed.map((price) => (price !== null && price > 0 ? price : 0));
-  const sum = weights.reduce((running, weight) => running + weight, 0);
-  const shares = weights.map((weight) => cents(sum > 0 ? (total * weight) / sum : total / listed.length));
-  shares[shares.length - 1] = cents(total - shares.slice(0, -1).reduce((running, share) => running + share, 0));
-  return shares;
-}
 
 /**
  * One Vinted sale, as HaulScout records it. On Vinted the buyer pays the fee — Buyer Protection —

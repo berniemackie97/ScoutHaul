@@ -47,7 +47,12 @@ public sealed class PlatformOrderIngestionService(
                 return (null, $"Order {externalOrderId} has no line items.");
             }
 
-            if (new[] { input.ItemsSubtotal, input.ShippingCharged, input.TaxCollected, input.FeeTotal ?? 0 }.Any(value => value < 0)
+            if (Oversized(input) is string oversized)
+            {
+                return (null, $"Order {Text.Clip(externalOrderId, 40)} has {oversized}.");
+            }
+
+            if (new[] { input.ItemsSubtotal, input.ShippingCharged, input.TaxCollected ?? 0, input.FeeTotal ?? 0 }.Any(value => value < 0)
                 || (input.ShippingCost.HasValue && input.ShippingCost.Value < 0)
                 || (input.PayoutAmount.HasValue && input.PayoutAmount.Value < 0)
                 || input.Lines.Any(line => line.UnitPrice < 0 || line.Quantity <= 0))
@@ -63,6 +68,8 @@ public sealed class PlatformOrderIngestionService(
             currentUser.OrganizationId,
             keys,
             cancellationToken)).ToList();
+        List<PlatformOrder> adoptable = await AdoptionCandidatesAsync(normalized.Select(entry => entry.Input), existing, cancellationToken);
+        TimeZoneInfo zone = Organization.ZoneOf(await store.FindTimeZoneIdAsync(currentUser.OrganizationId, cancellationToken));
 
         int created = 0, updated = 0, skipped = 0, unchanged = 0;
         List<Guid> touched = [];
@@ -70,10 +77,23 @@ public sealed class PlatformOrderIngestionService(
         // re-synced after the save so corrected fees land without re-queuing them for a person.
         List<Guid> resyncOrderIds = [];
 
-        foreach ((IngestPlatformOrderInput input, string channel, string externalOrderId) in normalized)
+        foreach ((IngestPlatformOrderInput incoming, string channel, string externalOrderId) in normalized)
         {
+            IngestPlatformOrderInput input = incoming;
             PlatformOrder? order = existing.SingleOrDefault(candidate =>
                 candidate.Platform == channel && candidate.ExternalOrderId == externalOrderId);
+            if (order is null && Adopt(adoptable, input, channel, zone) is PlatformOrder same)
+            {
+                string before = same.ExternalOrderId;
+                order = same;
+                input = SameSale(order, input, externalOrderId);
+                if (order.ExternalOrderId != before)
+                {
+                    await store.RekeySalesOrderAsync(currentUser.OrganizationId, channel, before, order.ExternalOrderId, cancellationToken);
+                }
+
+                existing.Add(order);
+            }
 
             if (order is null)
             {
@@ -83,10 +103,11 @@ public sealed class PlatformOrderIngestionService(
                     Platform = channel,
                     ExternalOrderId = externalOrderId,
                     ChannelAccountId = channelAccountId,
+                    KeysAreDerived = input.KeysAreDerived,
                 };
                 store.AddPlatformOrder(order);
                 existing.Add(order);
-                ApplyImportedFields(order, input, channelAccountId, isNew: true);
+                ApplyImportedFields(order, input, channelAccountId, isNew: true, zone);
                 ReplaceLines(order, MergeLines(input.Lines, []), preserveExistingMappings: false);
                 created++;
             }
@@ -98,7 +119,7 @@ public sealed class PlatformOrderIngestionService(
                 string factsBefore = OrderFingerprint(order);
                 string linesBefore = LinesFingerprint(order.Lines.Select(Facts));
                 List<LineFacts> merged = MergeLines(input.Lines, order.Lines);
-                ApplyImportedFields(order, input, channelAccountId, isNew: false);
+                ApplyImportedFields(order, input, channelAccountId, isNew: false, zone);
 
                 if (OrderFingerprint(order) == factsBefore && LinesFingerprint(merged) == linesBefore)
                 {
@@ -207,7 +228,7 @@ public sealed class PlatformOrderIngestionService(
             string? externalItemId = Text.TrimToNull(line.ExternalItemId);
             PlatformOrderLine? was = externalItemId is not null ? recordedByItem.GetValueOrDefault(externalItemId) : null;
             return new LineFacts(
-                string.IsNullOrWhiteSpace(line.Title) ? "Untitled item" : line.Title.Trim(),
+                Text.Fit(line.Title, PlatformOrderLine.Limits.Title) ?? "Untitled item",
                 line.UnitPrice,
                 line.Quantity <= 0 ? 1 : line.Quantity,
                 externalItemId,
@@ -243,25 +264,31 @@ public sealed class PlatformOrderIngestionService(
     /// Writes what this source says about the order. The figures every source carries — when, items,
     /// shipping, tax — are replaced; anything the source leaves out keeps what another source recorded.
     /// </summary>
-    private static void ApplyImportedFields(PlatformOrder order, IngestPlatformOrderInput input, Guid? channelAccountId, bool isNew)
+    private static void ApplyImportedFields(PlatformOrder order, IngestPlatformOrderInput input, Guid? channelAccountId, bool isNew, TimeZoneInfo zone)
     {
         if (channelAccountId.HasValue)
         {
             order.ChannelAccountId = channelAccountId;
         }
-        order.BuyerName = Text.TrimToNull(input.BuyerName) ?? order.BuyerName;
-        order.BuyerReference = Text.TrimToNull(input.BuyerReference) ?? order.BuyerReference;
+        order.BuyerName = Text.Fit(input.BuyerName, PlatformOrder.Limits.BuyerName) ?? order.BuyerName;
+        order.BuyerReference = Text.Fit(input.BuyerReference, PlatformOrder.Limits.BuyerReference) ?? order.BuyerReference;
         order.BuyerEmail = Text.TrimToNull(input.BuyerEmail) ?? order.BuyerEmail;
-        order.BuyerNote = Text.TrimToNull(input.BuyerNote) ?? order.BuyerNote;
-        order.ShipToName = Text.TrimToNull(input.ShipToName) ?? order.ShipToName;
-        order.ShipToPhone = Text.TrimToNull(input.ShipToPhone) ?? order.ShipToPhone;
-        order.ShipToLine1 = Text.TrimToNull(input.ShipToLine1) ?? order.ShipToLine1;
-        order.ShipToLine2 = Text.TrimToNull(input.ShipToLine2) ?? order.ShipToLine2;
-        order.ShipToCity = Text.TrimToNull(input.ShipToCity) ?? order.ShipToCity;
-        order.ShipToRegion = Text.TrimToNull(input.ShipToRegion) ?? order.ShipToRegion;
-        order.ShipToPostalCode = Text.TrimToNull(input.ShipToPostalCode) ?? order.ShipToPostalCode;
-        order.ShipToCountry = Text.TrimToNull(input.ShipToCountry) ?? order.ShipToCountry;
-        order.OrderedAt = input.OrderedAt;
+        order.BuyerNote = Text.Fit(input.BuyerNote, PlatformOrder.Limits.BuyerNote) ?? order.BuyerNote;
+        order.ShipToName = Text.Fit(input.ShipToName, PlatformOrder.Limits.ShipToName) ?? order.ShipToName;
+        order.ShipToPhone = Text.Fit(input.ShipToPhone, PlatformOrder.Limits.ShipToPhone) ?? order.ShipToPhone;
+        order.ShipToLine1 = Text.Fit(input.ShipToLine1, PlatformOrder.Limits.ShipToLine) ?? order.ShipToLine1;
+        order.ShipToLine2 = Text.Fit(input.ShipToLine2, PlatformOrder.Limits.ShipToLine) ?? order.ShipToLine2;
+        order.ShipToCity = Text.Fit(input.ShipToCity, PlatformOrder.Limits.ShipToCity) ?? order.ShipToCity;
+        order.ShipToRegion = Text.Fit(input.ShipToRegion, PlatformOrder.Limits.ShipToRegion) ?? order.ShipToRegion;
+        order.ShipToPostalCode = Text.Fit(input.ShipToPostalCode, PlatformOrder.Limits.ShipToPostalCode) ?? order.ShipToPostalCode;
+        order.ShipToCountry = Text.Fit(input.ShipToCountry, PlatformOrder.Limits.ShipToCountry) ?? order.ShipToCountry;
+
+        // A source that knows only the day never moves an order another source placed within that day.
+        if (isNew || !input.OrderedOnDayOnly || DayOf(order.OrderedAt, zone) != DayOf(input.OrderedAt, zone))
+        {
+            order.OrderedAt = input.OrderedAt;
+        }
+
         order.PaidAt = input.PaidAt ?? order.PaidAt;
         order.ShippedAt = input.ShippedAt ?? order.ShippedAt;
         order.DeliveredAt = input.DeliveredAt ?? order.DeliveredAt;
@@ -272,10 +299,10 @@ public sealed class PlatformOrderIngestionService(
             order.FulfillmentStage = input.FulfillmentStage;
         }
 
-        order.FulfillmentDetail = Text.TrimToNull(input.FulfillmentDetail) ?? order.FulfillmentDetail;
+        order.FulfillmentDetail = Text.Fit(input.FulfillmentDetail, PlatformOrder.Limits.FulfillmentDetail) ?? order.FulfillmentDetail;
         order.ItemsSubtotal = input.ItemsSubtotal;
         order.ShippingCharged = input.ShippingCharged;
-        order.TaxCollected = input.TaxCollected;
+        order.TaxCollected = input.TaxCollected ?? (isNew ? 0 : order.TaxCollected);
 
         if (input.FeeTotal is decimal fees)
         {
@@ -293,7 +320,7 @@ public sealed class PlatformOrderIngestionService(
         order.Currency = string.IsNullOrWhiteSpace(input.Currency) ? "USD" : input.Currency.Trim().ToUpperInvariant();
         order.TaxRemittedByPlatform = input.TaxRemittedByPlatform;
         order.FeeBreakdownJson = Text.TrimToNull(input.FeeBreakdownJson) ?? order.FeeBreakdownJson;
-        order.Carrier = Text.TrimToNull(input.Carrier) ?? order.Carrier;
+        order.Carrier = Text.Fit(input.Carrier, PlatformOrder.Limits.Carrier) ?? order.Carrier;
         order.TrackingNumber = Text.TrimToNull(input.TrackingNumber) ?? order.TrackingNumber;
         order.RawJson = Text.TrimToNull(input.RawJson) ?? order.RawJson;
         order.ScrapedAt = DateTimeOffset.UtcNow;
@@ -382,6 +409,104 @@ public sealed class PlatformOrderIngestionService(
         }
 
         return new PlatformOrderCancellations(setAside, stillRecorded);
+    }
+
+    /// <summary>
+    /// An identifier too long for its column, named — or null. Identifiers are matched on, so one is never cut to fit;
+    /// free text is, where it is written.
+    /// </summary>
+    private static string? Oversized(IngestPlatformOrderInput input)
+    {
+        (string? Value, int Limit, string Name)[] identifiers =
+        [
+            (input.ExternalOrderId?.Trim(), PlatformOrder.Limits.ExternalOrderId, "an order id"),
+            (Text.TrimToNull(input.TrackingNumber), PlatformOrder.Limits.TrackingNumber, "a tracking number"),
+            (Text.TrimToNull(input.BuyerEmail), PlatformOrder.Limits.BuyerEmail, "a buyer email"),
+            (Text.TrimToNull(input.Currency), 3, "a currency code"),
+            .. input.Lines.SelectMany(line => new[]
+            {
+                (Text.TrimToNull(line.ExternalItemId), PlatformOrderLine.Limits.ExternalItemId, "an item id"),
+                (Text.TrimToNull(line.Sku), PlatformOrderLine.Limits.Sku, "a SKU"),
+            }),
+        ];
+        return identifiers.FirstOrDefault(entry => entry.Value is not null && entry.Value.Length > entry.Limit) is { Name: not null } found
+            ? $"{found.Name} longer than {found.Limit} characters"
+            : null;
+    }
+
+    /// <summary>The calendar day an instant falls on where the business keeps its days: what "the same day" means for a sale.</summary>
+    private static DateOnly DayOf(DateTimeOffset instant, TimeZoneInfo zone) => DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(instant, zone).DateTime);
+
+    /// <summary>
+    /// Orders that may be an incoming sale under the other kind of key: one source made its keys up from the sale's
+    /// details, the other carries the marketplace's own.
+    /// </summary>
+    private async Task<List<PlatformOrder>> AdoptionCandidatesAsync(
+        IEnumerable<IngestPlatformOrderInput> inputs,
+        IReadOnlyCollection<PlatformOrder> alreadyFound,
+        CancellationToken cancellationToken)
+    {
+        string[] buyers = inputs
+            .Select(input => Text.TrimToNull(input.BuyerReference))
+            .OfType<string>()
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        if (buyers.Length == 0)
+        {
+            return [];
+        }
+
+        HashSet<Guid> found = alreadyFound.Select(order => order.Id).ToHashSet();
+        return (await store.ListOrdersByBuyersAsync(currentUser.OrganizationId, buyers, cancellationToken))
+            .Where(order => !found.Contains(order.Id))
+            .ToList();
+    }
+
+    /// <summary>The one order that is this sale under the other kind of key: same channel and buyer, same day, same items price.</summary>
+    private static PlatformOrder? Adopt(List<PlatformOrder> adoptable, IngestPlatformOrderInput input, string channel, TimeZoneInfo zone)
+    {
+        string? buyer = Text.TrimToNull(input.BuyerReference);
+        List<PlatformOrder> matches = adoptable
+            .Where(order => order.Platform == channel
+                && order.KeysAreDerived != input.KeysAreDerived
+                && order.ItemsSubtotal == input.ItemsSubtotal
+                && string.Equals(order.BuyerReference, buyer, StringComparison.OrdinalIgnoreCase)
+                && DayOf(order.OrderedAt, zone) == DayOf(input.OrderedAt, zone))
+            .ToList();
+
+        // Two candidates is ambiguity, and guessing between them could merge two real sales into one.
+        if (matches.Count != 1)
+        {
+            return null;
+        }
+
+        adoptable.Remove(matches[0]);
+        return matches[0];
+    }
+
+    /// <summary>
+    /// Makes an adopted order and the incoming sale agree on keys, the real ones winning. A one-line order keeps its
+    /// line under one key, so the inventory match filed under it survives.
+    /// </summary>
+    private static IngestPlatformOrderInput SameSale(PlatformOrder order, IngestPlatformOrderInput input, string externalOrderId)
+    {
+        PlatformOrderLine? onlyLine = order.Lines.Count == 1 ? order.Lines.First() : null;
+        bool oneLineEach = onlyLine is not null && input.Lines.Count == 1;
+        if (!input.KeysAreDerived)
+        {
+            order.ExternalOrderId = externalOrderId;
+            order.KeysAreDerived = false;
+            if (oneLineEach)
+            {
+                onlyLine!.ExternalItemId = Text.TrimToNull(input.Lines[0].ExternalItemId);
+            }
+
+            return input;
+        }
+
+        return oneLineEach
+            ? input with { KeysAreDerived = false, Lines = [input.Lines[0] with { ExternalItemId = onlyLine!.ExternalItemId }] }
+            : input with { KeysAreDerived = false };
     }
 
     private async Task<List<string>> ExistingChannels(CancellationToken cancellationToken)

@@ -68,6 +68,9 @@ public sealed class PlatformOrder : EntityBase, IOrganizationScoped
     public decimal? PayoutAmount { get; set; }
     public string Currency { get; set; } = "USD";
 
+    /// <summary>The keys were made up from the sale's details, by a source with no ids of its own; a real id replaces them.</summary>
+    public bool KeysAreDerived { get; set; }
+
     /// <summary>Whether the marketplace remitted the collected tax (pass-through) vs the seller owing it.</summary>
     public bool TaxRemittedByPlatform { get; set; } = true;
 
@@ -93,6 +96,26 @@ public sealed class PlatformOrder : EntityBase, IOrganizationScoped
     public string? CancellationNote { get; set; }
 
     public const int CancellationNoteLimit = 500;
+
+    /// <summary>Column widths: the schema's, and what ingest fits text to.</summary>
+    public static class Limits
+    {
+        public const int ExternalOrderId = 120;
+        public const int BuyerName = 200;
+        public const int BuyerReference = 200;
+        public const int BuyerEmail = 320;
+        public const int BuyerNote = 2000;
+        public const int ShipToName = 160;
+        public const int ShipToPhone = 40;
+        public const int ShipToLine = 240;
+        public const int ShipToCity = 120;
+        public const int ShipToRegion = 120;
+        public const int ShipToPostalCode = 32;
+        public const int ShipToCountry = 80;
+        public const int Carrier = 60;
+        public const int TrackingNumber = 120;
+        public const int FulfillmentDetail = 200;
+    }
 
     /// <summary>A cancelled sale nobody has ruled on yet: the books still say it happened.</summary>
     public bool AwaitingCancellationDecision =>
@@ -136,4 +159,11 @@ public sealed class PlatformOrderLine : EntityBase, IOrganizationScoped
     /// <summary>The ScoutHaul inventory item this line maps to (null until matched during reconcile).</summary>
     public Guid? InventoryItemId { get; set; }
     public InventoryItem? InventoryItem { get; set; }
+
+    public static class Limits
+    {
+        public const int Title = 400;
+        public const int ExternalItemId = 120;
+        public const int Sku = 120;
+    }
 }

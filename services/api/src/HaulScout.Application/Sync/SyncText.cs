@@ -20,8 +20,4 @@ public static class SyncText
     }
 
     public static string Plural(int count) => count == 1 ? string.Empty : "s";
-
-    /// <summary>Cut to fit a column, marking the cut.</summary>
-    public static string? Clip(string? value, int max) =>
-        value is null ? null : value.Length <= max ? value : value[..(max - 1)] + "…";
 }

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { closetPage, closetPageWithoutListings, homePage, salePage, salesPage } from "../../test/poshmark-fixtures";
 import { memoryInMap } from "../../test/memory";
 import { AdapterError, type MarketplaceContext, type PageResponse, type Session } from "../types";
@@ -174,6 +174,15 @@ describe("a Poshmark scan", () => {
 describe("Poshmark sales", () => {
   const first = { from: null, cursor: null };
   const routine = { from: null, cursor: "2026-07-18T00:00:00.000Z" };
+
+  it("waits for Seller Hub to fill in its sales before reading them, so a page still filling is never taken for a changed one", async () => {
+    const context = poshmark(() => salesPage([{ id: "s1" }]));
+    const page = vi.spyOn(context, "page");
+
+    await poshmarkAdapter.scanSales(context, first, seller);
+
+    expect(page).toHaveBeenCalledWith("https://poshmark.com/seller-hub/sales", { global: "__INITIAL_STATE__", holds: ["$_order_list", "userSales", "data", "sales_summary"] });
+  });
 
   it("records a sale with Poshmark's cut, the buyer and where it ships", async () => {
     const scan = await poshmarkAdapter.scanSales(poshmark(() => salesPage([{ id: "68f1a2b3c4d5e6f708192a3b" }])), first, seller);

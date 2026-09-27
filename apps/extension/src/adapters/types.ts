@@ -1,5 +1,18 @@
 import type { FailureKind, IngestListing, IngestOrder, RunIssue } from "../agent/types";
 
+/** How to know a page is ready to read. */
+export interface PageRead {
+  /** A variable the page builds for itself, read as the page sees it rather than from the HTML. */
+  global?: string;
+  /**
+   * Where in that variable the page's data lives. A page can define the variable before it has filled it in, so the
+   * read waits a while for the data to be there too, then reads what is there — as it does for `until`.
+   */
+  holds?: readonly string[];
+  /** A selector for something the page draws in after it loads. The read waits a while for it, then reads what is there. */
+  until?: string;
+}
+
 /** What came back from a request made inside a marketplace tab. */
 export interface PageResponse {
   status: number;
@@ -22,8 +35,7 @@ export interface PageResponse {
  * *requested* from the page.
  */
 export interface MarketplaceContext {
-  /** `global` names a variable the page builds for itself, read as the page sees it, not from the HTML. */
-  page(url: string, global?: string): Promise<PageResponse>;
+  page(url: string, read?: PageRead): Promise<PageResponse>;
   request(url: string): Promise<PageResponse>;
   now(): Date;
   /** What the adapter keeps between scans in this browser, so work already done is not asked for again. */
