@@ -90,4 +90,20 @@ public sealed class PlatformListing : EntityBase, IOrganizationScoped
 
     /// <summary>Full imported/captured payload for audit and re-processing if mapping logic improves later.</summary>
     public string? RawJson { get; set; }
+
+    /// <summary>Column widths: the schema's, and what ingest fits text to.</summary>
+    public static class Limits
+    {
+        public const int ExternalListingId = 120;
+        public const int Title = 400;
+        public const int Format = 24;
+        public const int Sku = 120;
+        public const int CategoryName = 200;
+        public const int Condition = 80;
+        public const int Description = 8000;
+        public const int Brand = 160;
+        public const int Color = 80;
+        public const int Size = 80;
+        public const int Url = 500;
+    }
 }

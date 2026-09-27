@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fakeBrowser } from "wxt/testing/fake-browser";
 import { ledgerPage, listingsPage, ordersPage, profileJson, type FixtureListing } from "../test/ebay-fixtures";
-import { AdapterError, type PageResponse } from "../adapters/types";
+import { AdapterError, type MarketplaceContext, type PageResponse } from "../adapters/types";
 import { ApiError, type AgentApi } from "./api";
 import { initialGovernorState } from "./governor";
-import { preflight, runWork, type RunnerDeps } from "./runner";
+import { keepingLease, preflight, runWork, type RunnerDeps } from "./runner";
 import { activityItem, governorItem, sessionsItem } from "./storage";
 import type { MarketplaceTab } from "./transport";
 import { servedTab, type Route } from "../test/tabs";
@@ -220,5 +220,61 @@ describe("what stops work before a tab is opened", () => {
 
     fakeBrowser.permissions.contains = vi.fn(async () => false) as typeof fakeBrowser.permissions.contains;
     expect(await preflight(sales, heartbeat, now)).toMatchObject({ status: "failed", kind: "NoAccess" });
+  });
+});
+
+describe("a run's lease, while it reads", () => {
+  const leaseMs = 5 * 60 * 1000;
+
+  function reading() {
+    let at = now.getTime();
+    const addBatch = vi.fn(async (_runId: string, _batch: object) => ({ created: 0, updated: 0, unchanged: 0 }));
+    const deps: RunnerDeps = { api: { addBatch } as unknown as AgentApi, now: () => new Date(at), sleep: async () => undefined };
+    const inner: MarketplaceContext = {
+      now: () => new Date(at),
+      page: vi.fn(async (url: string) => page("<p>ok</p>", url)),
+      request: vi.fn(async (url: string) => page("{}", url)),
+      memory: { get: async () => null, set: async () => undefined } as unknown as MarketplaceContext["memory"],
+    };
+    const context = keepingLease(inner, "run-1", new Date(now.getTime() + leaseMs).toISOString(), deps);
+    return { addBatch, context, inner, pass: (ms: number) => void (at += ms) };
+  }
+
+  it("is renewed with an empty batch once half of it has gone, and not before", async () => {
+    const { addBatch, context, pass } = reading();
+
+    pass(leaseMs / 2 - 1000);
+    await context.page("https://www.depop.com/sellinghub/sold-items/1/");
+    expect(addBatch).not.toHaveBeenCalled();
+
+    pass(1000);
+    await context.page("https://www.depop.com/sellinghub/sold-items/2/");
+    await context.request("https://www.depop.com/api/");
+    expect(addBatch.mock.calls).toEqual([["run-1", {}]]);
+
+    pass(leaseMs / 2);
+    await context.page("https://www.depop.com/sellinghub/sold-items/3/");
+    expect(addBatch).toHaveBeenCalledTimes(2);
+  });
+
+  it("carries on reading when HaulScout does not answer, and tries again on the next page", async () => {
+    const { addBatch, context, inner, pass } = reading();
+    addBatch.mockRejectedValueOnce(new ApiError(0, "network", "HaulScout could not be reached."));
+
+    pass(leaseMs / 2);
+    await context.page("https://www.depop.com/sellinghub/sold-items/1/");
+    await context.page("https://www.depop.com/sellinghub/sold-items/2/");
+
+    expect(inner.page).toHaveBeenCalledTimes(2);
+    expect(addBatch).toHaveBeenCalledTimes(2);
+  });
+
+  it("stops the read when the lease has gone to another browser", async () => {
+    const { addBatch, context, inner, pass } = reading();
+    addBatch.mockRejectedValueOnce(new ApiError(409, "sync_lease_lost", "Another browser took this over."));
+
+    pass(leaseMs / 2);
+    await expect(context.page("https://www.depop.com/sellinghub/sold-items/1/")).rejects.toMatchObject({ code: "sync_lease_lost" });
+    expect(inner.page).not.toHaveBeenCalled();
   });
 });

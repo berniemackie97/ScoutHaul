@@ -65,12 +65,20 @@ function readLoadedPage(global: string | null): PageResponse {
 
 /**
  * A page still loading whose document is parsed and already holds what will be read. Marketplace pages keep loading
- * ads and trackers long after that, and some never tell the browser they are done. Self-contained, like pageFetch.
+ * ads and trackers long after that, and some never tell the browser they are done. A page's own variable can be there
+ * before its data is — Poshmark defines its state, then fills it in — so `holds` is looked for inside it, and until it
+ * is found the page is not taken for one that changed. Self-contained, like pageFetch.
  */
-function pageSettled(global: string | null, until: string | null): Settling {
+export function pageSettled(global: string | null, until: string | null, holds: readonly string[] | null): Settling {
+  const value = global === null ? null : (window as unknown as Record<string, unknown>)[global];
+  let held: unknown = value;
+  for (const key of holds ?? []) {
+    held = held !== null && typeof held === "object" ? (held as Record<string, unknown>)[key] : undefined;
+  }
+
   return {
-    parsed: document.readyState !== "loading" && (global === null || (window as unknown as Record<string, unknown>)[global] !== undefined),
-    found: until === null || document.querySelector(until) !== null,
+    parsed: document.readyState !== "loading" && value !== undefined,
+    found: (until === null || document.querySelector(until) !== null) && (holds === null || (held !== undefined && held !== null)),
     document: performance.timeOrigin,
   };
 }
@@ -83,7 +91,7 @@ interface Settling {
 
 /** How far the new page has got — never the document the navigation left, which can linger until the new one commits. */
 async function settlingIn(tabId: number, read: PageRead, leaving: number | null): Promise<Settling | null> {
-  const args: [string | null, string | null] = [read.global ?? null, read.until ?? null];
+  const args: [string | null, string | null, readonly string[] | null] = [read.global ?? null, read.until ?? null, read.holds ?? null];
   try {
     const [first] = await browser.scripting.executeScript(read.global === undefined
       ? { target: { tabId }, func: pageSettled, args, injectImmediately: true }

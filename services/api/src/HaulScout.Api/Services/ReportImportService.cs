@@ -268,8 +268,8 @@ public sealed class ReportImportService(
                 SyncRunId = run.Id,
                 Severity = issue.Rejected ? SyncIssueSeverity.Error : SyncIssueSeverity.Warning,
                 RowNumber = issue.RowNumber > 0 ? issue.RowNumber : null,
-                ExternalReference = SyncText.Clip(issue.Reference, 200),
-                Message = SyncText.Clip(issue.Message, 1000)!,
+                ExternalReference = Text.Clip(issue.Reference, 200),
+                Message = Text.Clip(issue.Message, 1000)!,
             }));
             await runs.SaveChangesAsync(cancellationToken);
             return new ImportFileOutcomeDto(file.FileName, ToDto(run, artifact.FileName, issues.Count), outcome.Failed ? outcome.Summary : null);
@@ -399,7 +399,7 @@ public sealed class ReportImportService(
         SyncArtifact artifact = new()
         {
             OrganizationId = organizationId,
-            FileName = SyncText.Clip(Path.GetFileName(file.FileName), 260) ?? "export",
+            FileName = Text.Clip(Path.GetFileName(file.FileName), 260) ?? "export",
             ContentType = file.LooksLikeWorkbook
                 ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 : "text/csv",

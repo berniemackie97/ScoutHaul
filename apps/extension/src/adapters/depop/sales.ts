@@ -192,7 +192,7 @@ export function toIngestOrder(row: SoldRow, receipt: Receipt): { order: IngestOr
   const itemsPrice = receipt.itemsPrice ?? receipt.products.reduce((sum, product) => sum + (product.price ?? 0), 0);
   const shares = allocate(itemsPrice, receipt.products.map((product) => product.price));
   const lines: IngestOrderLine[] = receipt.products.map((product, index) => ({
-    title: product.title,
+    title: titleOf(product.title),
     unitPrice: shares[index]!,
     quantity: 1,
     externalItemId: product.slug,
@@ -241,6 +241,27 @@ export function toIngestOrder(row: SoldRow, receipt: Receipt): { order: IngestOr
     issues,
   };
 }
+
+/** Depop listings have no title, only a description: its opening words, without the hashtags, name the item. */
+export function titleOf(description: string): string {
+  const words = (description.split(/\r?\n/).find((line) => line.trim().length > 0) ?? "")
+    .split(/\s+/)
+    .filter((word) => word.length > 0 && !word.startsWith("#"))
+    .join(" ");
+  if (words.length === 0) {
+    return "Untitled Depop item";
+  }
+
+  if (words.length <= titleLength) {
+    return words;
+  }
+
+  const cut = words.slice(0, titleLength - 1);
+  const space = cut.lastIndexOf(" ");
+  return `${(space > titleLength / 2 ? cut.slice(0, space) : cut).replace(/[\s,.;:!-]+$/, "")}…`;
+}
+
+const titleLength = 80;
 
 function shipTo(chunk: string): ShipTo {
   const parts = [...chunk.matchAll(/<span\b[^>]*class="[^"]*locationDetails[^"]*"[^>]*>([^<]*)<\/span>/gi)]

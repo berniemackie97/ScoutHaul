@@ -4,6 +4,11 @@ import type { FailureKind, IngestListing, IngestOrder, RunIssue } from "../agent
 export interface PageRead {
   /** A variable the page builds for itself, read as the page sees it rather than from the HTML. */
   global?: string;
+  /**
+   * Where in that variable the page's data lives. A page can define the variable before it has filled it in, so the
+   * read waits a while for the data to be there too, then reads what is there — as it does for `until`.
+   */
+  holds?: readonly string[];
   /** A selector for something the page draws in after it loads. The read waits a while for it, then reads what is there. */
   until?: string;
 }

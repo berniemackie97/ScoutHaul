@@ -13,6 +13,9 @@ export interface ClosetPage {
   found: boolean;
 }
 
+/** Where a closet page's state keeps its listings: the read waits for them to be there. */
+export const closetPath = ["$_closet", "listingsPostData"] as const;
+
 /**
  * A closet page as Poshmark serves it. Every listing on it arrives whole — title, brand, colours, size, condition,
  * category, description, prices and how many are left — so one page read carries what other marketplaces make you
@@ -20,7 +23,7 @@ export interface ClosetPage {
  */
 export function readClosetPage(response: PageResponse): ClosetPage {
   const state = readState(response, "closet");
-  const posts = dig(state, "$_closet", "listingsPostData");
+  const posts = dig(state, ...closetPath);
   const data = dig(posts, "data");
   if (!Array.isArray(data)) {
     return { listings: [], more: false, nextMaxId: null, found: false };

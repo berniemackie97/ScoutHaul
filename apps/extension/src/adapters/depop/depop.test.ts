@@ -4,7 +4,7 @@ import { memoryInMap } from "../../test/memory";
 import { AdapterError, type MarketplaceContext, type PageRead, type PageResponse, type Session } from "../types";
 import { depopAdapter, readShop } from ".";
 import { readProduct } from "./product";
-import { readReceipt, readSoldList, toIngestOrder } from "./sales";
+import { readReceipt, readSoldList, titleOf, toIngestOrder } from "./sales";
 
 const now = new Date("2026-09-26T12:00:00Z");
 const seller: Session = { signedIn: true, username: "overhaultrading", marketplaceUserId: null };
@@ -262,6 +262,23 @@ describe("a Depop receipt", () => {
   });
 });
 
+describe("a Depop sale's line title", () => {
+  it("is the description's opening words, without its hashtags", () => {
+    expect(titleOf("Old Navy floral shirt #floral #buttonup\nSize M, worn twice")).toBe("Old Navy floral shirt");
+  });
+
+  it("stops short at a word, however long the description runs", () => {
+    const title = titleOf(`${"Vintage 90s denim trucker jacket in faded blue ".repeat(10)}#vintage`);
+
+    expect(title.length).toBeLessThanOrEqual(80);
+    expect(title).toMatch(/jacket…$|blue…$|faded…$|in…$|denim…$|trucker…$|90s…$|Vintage…$/);
+  });
+
+  it("names an item whose description is only hashtags", () => {
+    expect(titleOf("#y2k #vintage")).toBe("Untitled Depop item");
+  });
+});
+
 describe("a Depop sale, as the sales report would describe it", () => {
   const row = readSoldList(soldListPage([{ id: "475700000001", buyer: "floralfan" }]))![0]!;
 
@@ -284,7 +301,7 @@ describe("a Depop sale, as the sales report would describe it", () => {
       carrier: "USPS",
       trackingNumber: "9400100000000000000001",
       fulfillmentStage: "Delivered",
-      lines: [{ title: "Old Navy floral shirt #floral #buttonup", unitPrice: 10, quantity: 1, externalItemId: "overhaultrading-old-navy-floral-5db8" }],
+      lines: [{ title: "Old Navy floral shirt", unitPrice: 10, quantity: 1, externalItemId: "overhaultrading-old-navy-floral-5db8" }],
     });
     expect(new Date(order!.orderedAt!).getDate()).toBe(20);
   });
@@ -393,6 +410,34 @@ describe("a Depop sales scan", () => {
 
     expect(scan.orders).toHaveLength(1);
     expect(scan.issues[0]).toMatchObject({ externalReference: "1", rejected: true });
+  });
+
+  it("leaves a receipt that is slow to load for the next scan, and carries on", async () => {
+    const context = depop((url) => {
+      if (url.pathname === "/sellinghub/sold-items/1/") {
+        throw new AdapterError("Network", "The page took too long to load.");
+      }
+
+      return url.pathname === "/sellinghub/sold-items/" ? soldListPage([{ id: "1" }, { id: "2" }]) : receiptPage({});
+    });
+
+    const scan = await depopAdapter.scanSales(context, first, seller);
+
+    expect(scan.orders.map((order) => order.externalOrderId)).toEqual(["2"]);
+    expect(scan.issues).toEqual([expect.objectContaining({ externalReference: "1", rejected: false })]);
+  });
+
+  it("stops when receipts keep failing to load, rather than wait out every one", async () => {
+    const context = depop((url) => {
+      if (url.pathname !== "/sellinghub/sold-items/") {
+        throw new AdapterError("Network", "The page took too long to load.");
+      }
+
+      return soldListPage([{ id: "1" }, { id: "2" }, { id: "3" }]);
+    });
+
+    await expect(depopAdapter.scanSales(context, first, seller)).rejects.toMatchObject({ kind: "Network" });
+    expect(context.read).toHaveLength(3);
   });
 
   it("says the site changed when the sold page carries no list at all", async () => {

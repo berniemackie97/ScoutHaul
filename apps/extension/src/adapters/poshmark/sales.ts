@@ -11,8 +11,11 @@ export interface SalesPage {
   found: boolean;
 }
 
+/** Where Seller Hub's state keeps its sales. The page defines its state before it fills this in, so the read waits for it. */
+export const salesPath = ["$_order_list", "userSales", "data"] as const;
+
 export function readSalesPage(response: PageResponse): SalesPage {
-  const data = dig(readState(response, "sales"), "$_order_list", "userSales", "data");
+  const data = dig(readState(response, "sales"), ...salesPath);
   const sales = dig(data, "sales_summary");
   if (!Array.isArray(sales)) {
     return { sales: [], nextMaxId: null, found: false };

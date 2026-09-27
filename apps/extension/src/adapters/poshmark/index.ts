@@ -11,9 +11,9 @@ import {
   type SalesWindow,
   type Session,
 } from "../types";
-import { readClosetPage } from "./listings";
+import { closetPath, readClosetPage } from "./listings";
 import { assertReadable, siteChanged } from "./pages";
-import { bookedAt, bundleSize, listingIds, readSalesPage, saleId, saleStamp, saleState, toIngestOrder } from "./sales";
+import { bookedAt, bundleSize, listingIds, readSalesPage, saleId, saleStamp, saleState, salesPath, toIngestOrder } from "./sales";
 import { readState, stateGlobal } from "./state";
 
 const origin = "https://poshmark.com";
@@ -154,7 +154,7 @@ export const poshmarkAdapter: MarketplaceAdapter = {
       let cursor = start;
       while (budget > 0) {
         budget--;
-        const response = await context.page(cursor === null ? salesPage : `${salesPage}?max_id=${encodeURIComponent(cursor)}`, { global: stateGlobal });
+        const response = await context.page(cursor === null ? salesPage : `${salesPage}?max_id=${encodeURIComponent(cursor)}`, { global: stateGlobal, holds: [...salesPath, "sales_summary"] });
         assertReadable(response);
         const read = readSalesPage(response);
         if (!read.found) {
@@ -266,7 +266,7 @@ export const poshmarkAdapter: MarketplaceAdapter = {
           availability === null ? null : `availability=${availability}`,
         ].filter((part) => part !== null);
         const address = `${origin}/closet/${encodeURIComponent(closet)}${query.length === 0 ? "" : `?${query.join("&")}`}`;
-        const response = await context.page(address, { global: stateGlobal });
+        const response = await context.page(address, { global: stateGlobal, holds: [...closetPath, "data"] });
         assertReadable(response);
         const read = readClosetPage(response);
         if (!read.found) {

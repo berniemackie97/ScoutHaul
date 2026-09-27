@@ -27,6 +27,9 @@ export type RunResult =
 const ordersPerBatch = 200;
 const listingsPerBatch = 500;
 
+/** How often a run renews its lease when HaulScout has not said how long the lease lasts. */
+const fallbackRenewMs = 2 * 60 * 1000;
+
 /** Whether this browser has been allowed to reach the marketplace. */
 export async function hasAccess(adapter: MarketplaceAdapter): Promise<boolean> {
   return browser.permissions.contains({ origins: adapter.origins });
@@ -221,6 +224,44 @@ function withDetail(text: string, detail: string | null): string {
   return detail ? `${text} ${detail}` : text;
 }
 
+/**
+ * Keeps a run's lease while it reads. Only a batch renews a lease, and a scan delivers nothing until it has read
+ * everything — which, a page at a time at a person's pace, can outlast the lease, and the run is then closed as
+ * abandoned under a browser still working on it. So, before each page once half the lease has gone, an empty batch
+ * renews it. HaulScout not answering is left for the next page to try again; a lease lost stops the run.
+ */
+export function keepingLease(context: MarketplaceContext, runId: string, leaseExpiresAt: string | null | undefined, deps: RunnerDeps): MarketplaceContext {
+  const lease = Date.parse(leaseExpiresAt ?? "") - deps.now().getTime();
+  const renewEvery = Number.isFinite(lease) && lease > 0 ? lease / 2 : fallbackRenewMs;
+  let renewed = deps.now().getTime();
+  const renew = async () => {
+    if (deps.now().getTime() - renewed < renewEvery) {
+      return;
+    }
+
+    try {
+      await deps.api.addBatch(runId, {});
+      renewed = deps.now().getTime();
+    } catch (error) {
+      if (!(error instanceof ApiError && error.status === 0)) {
+        throw error;
+      }
+    }
+  };
+
+  return {
+    ...context,
+    page: async (url: string, read?: PageRead) => {
+      await renew();
+      return context.page(url, read);
+    },
+    request: async (url: string) => {
+      await renew();
+      return context.request(url);
+    },
+  };
+}
+
 function chunks<T>(items: T[], size: number): T[][] {
   const result: T[][] = [];
   for (let index = 0; index < items.length; index += size) {
@@ -265,6 +306,7 @@ export async function runWork(work: Work, heartbeat: Heartbeat, tab: Marketplace
   }
 
   let runId: string;
+  let leaseExpiresAt: string | null = null;
   let cursor: string | null = null;
   let from: string | null = work.from ?? null;
   try {
@@ -277,6 +319,7 @@ export async function runWork(work: Work, heartbeat: Heartbeat, tab: Marketplace
       marketplaceUserId: session.marketplaceUserId,
     });
     runId = started.runId!;
+    leaseExpiresAt = started.leaseExpiresAt ?? null;
     cursor = started.cursor ?? null;
     from = started.from ?? from;
   } catch (error) {
@@ -289,10 +332,11 @@ export async function runWork(work: Work, heartbeat: Heartbeat, tab: Marketplace
     return { status: "failed", kind, text: kind === "Network" ? describeFailure(kind, adapter.platform) : detailOf(error) ?? describeFailure(kind, adapter.platform) };
   }
 
+  const reading = keepingLease(context, runId, leaseExpiresAt, deps);
   try {
     let done;
     if (work.loop === "Sales") {
-      const run = await adapter.scanSales(context, { from: from ? new Date(from) : null, cursor }, session);
+      const run = await adapter.scanSales(reading, { from: from ? new Date(from) : null, cursor }, session);
       const orders = chunks(run.orders, ordersPerBatch);
       const cancelled = chunks(run.cancelledOrderIds, ordersPerBatch);
       for (let index = 0; index < Math.max(orders.length, cancelled.length); index++) {
@@ -301,7 +345,7 @@ export async function runWork(work: Work, heartbeat: Heartbeat, tab: Marketplace
 
       done = await deps.api.complete(runId, { cursor: run.cursor, coversFrom: run.coversFrom, coversTo: run.coversTo });
     } else {
-      const snapshot = await adapter.snapshotListings(context, session);
+      const snapshot = await adapter.snapshotListings(reading, session);
       let first = true;
       for (const listings of chunks(snapshot.listings, listingsPerBatch)) {
         await deps.api.addBatch(runId, { listings, issues: first ? snapshot.issues : [] });

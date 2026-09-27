@@ -53,7 +53,7 @@ public sealed class SyncAgentService(
         }
 
         string browser = Required(request.Browser, 40) ?? "Browser";
-        string? operatingSystem = SyncText.Clip(Text.TrimToNull(request.OperatingSystem), 40);
+        string? operatingSystem = Text.Fit(request.OperatingSystem, 40);
         string token = SyncSecrets.NewToken();
         SyncAgent created = new()
         {
@@ -94,7 +94,7 @@ public sealed class SyncAgentService(
         self.LastSeenAt = now;
         self.ExtensionVersion = Required(request.ExtensionVersion, 24) ?? self.ExtensionVersion;
         self.Browser = Required(request.Browser, 40) ?? self.Browser;
-        self.OperatingSystem = SyncText.Clip(Text.TrimToNull(request.OperatingSystem), 40) ?? self.OperatingSystem;
+        self.OperatingSystem = Text.Fit(request.OperatingSystem, 40) ?? self.OperatingSystem;
         RecordMarketplaces(self, request.Marketplaces ?? [], now);
         string? newToken = Rotate(self, now);
 
@@ -164,7 +164,7 @@ public sealed class SyncAgentService(
             return AppResult.Ok();
         }
 
-        string summary = SyncText.Clip(FailureSummary(account.Channel, request.Kind, request.Message), 500)!;
+        string summary = Text.Clip(FailureSummary(account.Channel, request.Kind, request.Message), 500)!;
         SyncLoop? loop = await store.FindLoopAsync(organizationId, account.Id, request.Loop, cancellationToken);
         if (loop is null)
         {
@@ -405,8 +405,8 @@ public sealed class SyncAgentService(
             OrganizationId = organizationId,
             SyncRunId = run.Id,
             Severity = issue.Rejected ? SyncIssueSeverity.Error : SyncIssueSeverity.Warning,
-            ExternalReference = SyncText.Clip(Text.TrimToNull(issue.ExternalReference), 200),
-            Message = SyncText.Clip(Text.TrimToNull(issue.Message), 1000) ?? "No detail given.",
+            ExternalReference = Text.Fit(issue.ExternalReference, 200),
+            Message = Text.Fit(issue.Message, 1000) ?? "No detail given.",
         }));
         await store.SaveChangesAsync(cancellationToken);
 
@@ -432,7 +432,7 @@ public sealed class SyncAgentService(
         run.Summary = Summary(run);
         run.FinishedAt = now;
 
-        loop!.Cursor = SyncText.Clip(Text.TrimToNull(request.Cursor), 400) ?? loop.Cursor;
+        loop!.Cursor = Text.Fit(request.Cursor, 400) ?? loop.Cursor;
         loop.LastFinishedAt = now;
         loop.LastSucceededAt = now;
         loop.LastRunId = run.Id;
@@ -456,7 +456,7 @@ public sealed class SyncAgentService(
             return AppResult<SyncRunDto>.Refused(problem);
         }
 
-        string summary = SyncText.Clip(FailureSummary(run!.Platform, request.Kind, request.Message), 500)!;
+        string summary = Text.Clip(FailureSummary(run!.Platform, request.Kind, request.Message), 500)!;
         run.Status = SyncRunStatus.Failed;
         run.Summary = summary;
         run.FinishedAt = now;
@@ -557,10 +557,10 @@ public sealed class SyncAgentService(
 
             marketplace.AccessGranted = report.AccessGranted;
             marketplace.SignedIn = report.AccessGranted ? report.SignedIn : null;
-            marketplace.Username = report.AccessGranted && report.SignedIn == true ? SyncText.Clip(Text.TrimToNull(report.Username), 120) : null;
-            marketplace.MarketplaceUserId = marketplace.Username is null ? null : SyncText.Clip(Text.TrimToNull(report.MarketplaceUserId), 120);
+            marketplace.Username = report.AccessGranted && report.SignedIn == true ? Text.Fit(report.Username, 120) : null;
+            marketplace.MarketplaceUserId = marketplace.Username is null ? null : Text.Fit(report.MarketplaceUserId, 120);
             marketplace.PausedUntil = report.PausedUntil > now ? report.PausedUntil?.ToUniversalTime() : null;
-            marketplace.PauseReason = marketplace.PausedUntil is null ? null : SyncText.Clip(Text.TrimToNull(report.PauseReason), 300);
+            marketplace.PauseReason = marketplace.PausedUntil is null ? null : Text.Fit(report.PauseReason, 300);
             marketplace.ObservedAt = now;
         }
     }
@@ -636,5 +636,5 @@ public sealed class SyncAgentService(
     public static string FormatKey(string platform, SyncLoopKind loop) =>
         $"agent.{platform.ToLowerInvariant()}.{loop.ToString().ToLowerInvariant()}";
 
-    private static string? Required(string? value, int max) => SyncText.Clip(Text.TrimToNull(value), max);
+    private static string? Required(string? value, int max) => Text.Fit(value, max);
 }

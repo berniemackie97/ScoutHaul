@@ -26,6 +26,7 @@ const soldPage = `${origin}/sellinghub/sold-items/`;
 
 /** How many receipts one scan reads. Each is a page of its own; the rest are read on the scans after. */
 const receiptsPerScan = 15;
+const stallsToStop = 2;
 
 /** A shop's own listings, drawn in after the page loads. */
 const shopGridSelector = 'ol li a[href^="/products/"]';
@@ -128,6 +129,7 @@ export const depopAdapter: MarketplaceAdapter = {
     let oldest = now.getTime();
     let budget = receiptsPerScan;
     let waiting = 0;
+    let stalled = 0;
 
     for (const row of rows) {
       const at = dayOf(row.soldOn)?.getTime() ?? Number.NaN;
@@ -165,6 +167,12 @@ export const depopAdapter: MarketplaceAdapter = {
 
       budget--;
       const sold = await readSale(context, row);
+      // One slow receipt waits for the next scan; several in a row is Depop, or the connection, and not this sale.
+      stalled = sold.stalled ? stalled + 1 : 0;
+      if (stalled >= stallsToStop) {
+        throw new AdapterError("Network", "Depop's receipts stopped loading.");
+      }
+
       issues.push(...sold.issues);
       if (sold.order) {
         orders.push(sold.order);
@@ -253,7 +261,7 @@ export function readShop(html: string): string[] {
 }
 
 /** One sale's receipt, read in full. Trouble with this one sale only skips it; trouble with the site stops the scan. */
-async function readSale(context: MarketplaceContext, row: SoldRow): Promise<{ order: IngestOrder | null; issues: RunIssue[] }> {
+async function readSale(context: MarketplaceContext, row: SoldRow): Promise<{ order: IngestOrder | null; issues: RunIssue[]; stalled?: boolean }> {
   const skip = (message: string) => ({ order: null, issues: [{ message, externalReference: row.id, rejected: true }] });
   try {
     const page = await context.page(`${origin}/sellinghub/sold-items/${encodeURIComponent(row.id)}/`, { until: receiptSelector });
@@ -263,6 +271,10 @@ async function readSale(context: MarketplaceContext, row: SoldRow): Promise<{ or
   } catch (error) {
     if (error instanceof AdapterError && (error.kind === "Error" || error.kind === "SiteChanged")) {
       return skip(`This sale's receipt could not be read. ${error.message}`);
+    }
+
+    if (error instanceof AdapterError && error.kind === "Network") {
+      return { order: null, issues: [{ message: "This sale's receipt did not load in time; the next scan reads it.", externalReference: row.id, rejected: false }], stalled: true };
     }
 
     throw error;

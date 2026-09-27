@@ -1,8 +1,9 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fakeBrowser } from "wxt/testing/fake-browser";
 import { ebayAdapter } from "../adapters/ebay";
+import { poshmarkAdapter } from "../adapters/poshmark";
 import { AdapterError } from "../adapters/types";
-import { judgeTab, SyncTabs, waitForPage, type Clock, type TabLook } from "./transport";
+import { judgeTab, pageSettled, SyncTabs, waitForPage, type Clock, type TabLook } from "./transport";
 
 const robots = "https://www.ebay.com/robots.txt";
 const readable = ebayAdapter.readable;
@@ -220,7 +221,7 @@ describe("the sync tab", () => {
 
     expect(page.url).toBe(orders);
     expect(clock.elapsed()).toBeLessThan(1000);
-    expect(execute).toHaveBeenCalledWith(expect.objectContaining({ world: "MAIN", args: ["__INITIAL_STATE__", null], injectImmediately: true }));
+    expect(execute).toHaveBeenCalledWith(expect.objectContaining({ world: "MAIN", args: ["__INITIAL_STATE__", null, null], injectImmediately: true }));
     for (const [injection] of execute.mock.calls) {
       expect(injection).toMatchObject({ injectImmediately: true });
     }
@@ -248,6 +249,36 @@ describe("the sync tab", () => {
     await tab.page(sold, { until: "ul li" });
 
     expect(probes).toEqual([]);
+  });
+
+  it("waits for the data a page's state holds, not only for the state, before reading it", async () => {
+    const sales = "https://poshmark.com/seller-hub/sales";
+    fakeBrowser.tabs.create = vi.fn(async () => ({ id: 9 })) as unknown as typeof fakeBrowser.tabs.create;
+    let at = poshmarkAdapter.workerUrl;
+    fakeBrowser.tabs.get = vi.fn(async () => ({ id: 9, status: "complete", url: at })) as unknown as typeof fakeBrowser.tabs.get;
+    fakeBrowser.tabs.update = vi.fn(async () => {
+      at = sales;
+      return { id: 9 };
+    }) as unknown as typeof fakeBrowser.tabs.update;
+    const probes = [{ parsed: true, found: false, document: 2 }, { parsed: true, found: true, document: 2 }];
+    const asked: unknown[] = [];
+    fakeBrowser.scripting.executeScript = vi.fn(async (injection: { func: { name: string }; args?: unknown[] }) => {
+      const name = injection.func.name;
+      if (name === "pageSettled") {
+        asked.push(injection.args);
+      }
+
+      const result = name === "documentOrigin" ? 1
+        : name === "pageSettled" ? probes.shift() ?? { parsed: true, found: true, document: 2 }
+          : { status: 200, url: sales, contentType: "text/html", body: "<div></div>", global: "{}", document: 2 };
+      return [{ frameId: 0, result }];
+    }) as unknown as typeof fakeBrowser.scripting.executeScript;
+
+    const tab = await new SyncTabs(fakeClock()).acquire(poshmarkAdapter);
+    await tab.page(sales, { global: "__INITIAL_STATE__", holds: ["$_order_list", "userSales", "data", "sales_summary"] });
+
+    expect(probes).toEqual([]);
+    expect(asked[0]).toEqual(["__INITIAL_STATE__", null, ["$_order_list", "userSales", "data", "sales_summary"]]);
   });
 
   it("reads an empty page after a while, since what it waits for may never be drawn", async () => {
@@ -305,5 +336,38 @@ describe("the sync tab", () => {
     expect(page.document).toBe(2);
     expect(probes).toEqual([]);
     expect(reads).toEqual([]);
+  });
+});
+
+describe("whether a page holds what will be read", () => {
+  function onPage(state: unknown, readyState = "complete") {
+    vi.stubGlobal("document", { readyState, querySelector: () => null });
+    vi.stubGlobal("window", { __INITIAL_STATE__: state });
+    vi.stubGlobal("performance", { timeOrigin: 2 });
+  }
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const sales = ["$_order_list", "userSales", "data", "sales_summary"];
+
+  it("takes a page as parsed once its state is defined, but not as holding its data until the data is in it", () => {
+    onPage({ $_order_list: { userSales: {} } });
+    expect(pageSettled("__INITIAL_STATE__", null, sales)).toEqual({ parsed: true, found: false, document: 2 });
+
+    onPage({ $_order_list: { userSales: { data: { sales_summary: [] } } } });
+    expect(pageSettled("__INITIAL_STATE__", null, sales)).toEqual({ parsed: true, found: true, document: 2 });
+  });
+
+  it("is not parsed while the state is not yet defined", () => {
+    onPage(undefined);
+    expect(pageSettled("__INITIAL_STATE__", null, sales)).toMatchObject({ parsed: false, found: false });
+  });
+
+  it("asks nothing of the state when no data path is given", () => {
+    onPage({});
+    expect(pageSettled("__INITIAL_STATE__", null, null)).toMatchObject({ parsed: true, found: true });
+    expect(pageSettled(null, null, null)).toMatchObject({ parsed: true, found: true });
   });
 });
