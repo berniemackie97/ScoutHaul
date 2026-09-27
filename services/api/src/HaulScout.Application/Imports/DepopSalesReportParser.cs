@@ -203,7 +203,9 @@ public static class DepopSalesReportParser
                 ShipToCountry: table.Meaningful(row, Country),
                 PaidAt: soldAt,
                 FeeBreakdownJson: feeBreakdown,
-                RawJson: rawJson));
+                RawJson: rawJson,
+                // The report has no order ids, so these keys give way to Depop's own when a scan reads the same sale.
+                KeysAreDerived: true));
         }
 
         DateTimeOffset? from = orders.Count == 0 ? null : orders.Min(order => order.OrderedAt);

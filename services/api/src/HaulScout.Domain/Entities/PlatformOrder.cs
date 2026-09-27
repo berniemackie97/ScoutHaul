@@ -68,6 +68,9 @@ public sealed class PlatformOrder : EntityBase, IOrganizationScoped
     public decimal? PayoutAmount { get; set; }
     public string Currency { get; set; } = "USD";
 
+    /// <summary>The keys were made up from the sale's details, by a source with no ids of its own; a real id replaces them.</summary>
+    public bool KeysAreDerived { get; set; }
+
     /// <summary>Whether the marketplace remitted the collected tax (pass-through) vs the seller owing it.</summary>
     public bool TaxRemittedByPlatform { get; set; } = true;
 

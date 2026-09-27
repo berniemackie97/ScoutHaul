@@ -9930,7 +9930,7 @@ export interface components {
             /** Format: double */
             shippingCharged?: number;
             /** Format: double */
-            taxCollected?: number;
+            taxCollected?: number | null;
             /** Format: double */
             feeTotal?: number | null;
             lines?: components["schemas"]["IngestPlatformOrderLineInput"][] | null;
@@ -9966,6 +9966,8 @@ export interface components {
             feeBreakdownJson?: string | null;
             rawJson?: string | null;
             feesPending?: boolean;
+            orderedOnDayOnly?: boolean;
+            keysAreDerived?: boolean;
         };
         IngestPlatformOrderLineInput: {
             title?: string | null;

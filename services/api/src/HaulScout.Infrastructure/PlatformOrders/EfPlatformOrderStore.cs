@@ -76,6 +76,20 @@ public sealed class EfPlatformOrderStore(
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<PlatformOrder>> ListOrdersByBuyersAsync(
+        Guid organizationId,
+        IReadOnlyCollection<string> buyerReferences,
+        CancellationToken cancellationToken)
+    {
+        string[] buyers = buyerReferences.Select(buyer => buyer.ToLower()).Distinct().ToArray();
+        return await db.PlatformOrders
+            .Include(order => order.Lines)
+            .Where(order => order.OrganizationId == organizationId
+                && order.BuyerReference != null
+                && buyers.Contains(order.BuyerReference.ToLower()))
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<IReadOnlyList<PlatformOrder>> ListImportedOrdersForDisplayAsync(
         Guid organizationId,
         IReadOnlyCollection<Guid> orderIds,

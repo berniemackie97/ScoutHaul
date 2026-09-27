@@ -4,7 +4,8 @@ import { orderList, orderRow, transaction, vintedPage, wardrobe, wardrobeItem } 
 import type { MarketplaceContext, PageResponse, Session } from "../types";
 import { vintedAdapter } from ".";
 import { toIngestListing } from "./listings";
-import { allocate, toIngestOrder } from "./orders";
+import { allocate } from "../amounts";
+import { toIngestOrder } from "./orders";
 
 const now = new Date("2026-09-19T12:00:00Z");
 const seller: Session = { signedIn: true, username: "test_seller", marketplaceUserId: "5550001" };

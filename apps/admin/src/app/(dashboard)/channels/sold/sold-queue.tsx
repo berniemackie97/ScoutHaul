@@ -15,8 +15,8 @@ export function SoldQueue({ listings }: { listings: Sold[] }) {
   if (listings.length === 0) {
     return (
       <Card className="text-muted-foreground p-6 text-sm">
-        Every sold listing has a sale behind it. This fills up when a marketplace shows a listing as sold before the
-        sale reaches the books — which on Depop is the only word of a sale there is.
+        Every sold listing has a sale behind it. This fills up when a marketplace shows a listing as sold before its
+        sale reaches the books.
       </Card>
     );
   }

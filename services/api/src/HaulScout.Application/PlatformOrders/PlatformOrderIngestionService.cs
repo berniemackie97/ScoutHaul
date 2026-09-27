@@ -47,7 +47,7 @@ public sealed class PlatformOrderIngestionService(
                 return (null, $"Order {externalOrderId} has no line items.");
             }
 
-            if (new[] { input.ItemsSubtotal, input.ShippingCharged, input.TaxCollected, input.FeeTotal ?? 0 }.Any(value => value < 0)
+            if (new[] { input.ItemsSubtotal, input.ShippingCharged, input.TaxCollected ?? 0, input.FeeTotal ?? 0 }.Any(value => value < 0)
                 || (input.ShippingCost.HasValue && input.ShippingCost.Value < 0)
                 || (input.PayoutAmount.HasValue && input.PayoutAmount.Value < 0)
                 || input.Lines.Any(line => line.UnitPrice < 0 || line.Quantity <= 0))
@@ -63,6 +63,7 @@ public sealed class PlatformOrderIngestionService(
             currentUser.OrganizationId,
             keys,
             cancellationToken)).ToList();
+        List<PlatformOrder> adoptable = await AdoptionCandidatesAsync(normalized.Select(entry => entry.Input), existing, cancellationToken);
 
         int created = 0, updated = 0, skipped = 0, unchanged = 0;
         List<Guid> touched = [];
@@ -70,10 +71,17 @@ public sealed class PlatformOrderIngestionService(
         // re-synced after the save so corrected fees land without re-queuing them for a person.
         List<Guid> resyncOrderIds = [];
 
-        foreach ((IngestPlatformOrderInput input, string channel, string externalOrderId) in normalized)
+        foreach ((IngestPlatformOrderInput incoming, string channel, string externalOrderId) in normalized)
         {
+            IngestPlatformOrderInput input = incoming;
             PlatformOrder? order = existing.SingleOrDefault(candidate =>
                 candidate.Platform == channel && candidate.ExternalOrderId == externalOrderId);
+            if (order is null && Adopt(adoptable, input, channel) is PlatformOrder same)
+            {
+                order = same;
+                input = SameSale(order, input, externalOrderId);
+                existing.Add(order);
+            }
 
             if (order is null)
             {
@@ -83,6 +91,7 @@ public sealed class PlatformOrderIngestionService(
                     Platform = channel,
                     ExternalOrderId = externalOrderId,
                     ChannelAccountId = channelAccountId,
+                    KeysAreDerived = input.KeysAreDerived,
                 };
                 store.AddPlatformOrder(order);
                 existing.Add(order);
@@ -261,7 +270,13 @@ public sealed class PlatformOrderIngestionService(
         order.ShipToRegion = Text.TrimToNull(input.ShipToRegion) ?? order.ShipToRegion;
         order.ShipToPostalCode = Text.TrimToNull(input.ShipToPostalCode) ?? order.ShipToPostalCode;
         order.ShipToCountry = Text.TrimToNull(input.ShipToCountry) ?? order.ShipToCountry;
-        order.OrderedAt = input.OrderedAt;
+
+        // A source that knows only the day never moves an order another source placed within that day.
+        if (isNew || !input.OrderedOnDayOnly || (order.OrderedAt - input.OrderedAt).Duration() >= SameDay)
+        {
+            order.OrderedAt = input.OrderedAt;
+        }
+
         order.PaidAt = input.PaidAt ?? order.PaidAt;
         order.ShippedAt = input.ShippedAt ?? order.ShippedAt;
         order.DeliveredAt = input.DeliveredAt ?? order.DeliveredAt;
@@ -275,7 +290,7 @@ public sealed class PlatformOrderIngestionService(
         order.FulfillmentDetail = Text.TrimToNull(input.FulfillmentDetail) ?? order.FulfillmentDetail;
         order.ItemsSubtotal = input.ItemsSubtotal;
         order.ShippingCharged = input.ShippingCharged;
-        order.TaxCollected = input.TaxCollected;
+        order.TaxCollected = input.TaxCollected ?? (isNew ? 0 : order.TaxCollected);
 
         if (input.FeeTotal is decimal fees)
         {
@@ -382,6 +397,80 @@ public sealed class PlatformOrderIngestionService(
         }
 
         return new PlatformOrderCancellations(setAside, stillRecorded);
+    }
+
+    private static readonly TimeSpan SameDay = TimeSpan.FromHours(24);
+
+    /// <summary>
+    /// Orders that may be an incoming sale under the other kind of key: one source made its keys up from the sale's
+    /// details, the other carries the marketplace's own.
+    /// </summary>
+    private async Task<List<PlatformOrder>> AdoptionCandidatesAsync(
+        IEnumerable<IngestPlatformOrderInput> inputs,
+        IReadOnlyCollection<PlatformOrder> alreadyFound,
+        CancellationToken cancellationToken)
+    {
+        string[] buyers = inputs
+            .Select(input => Text.TrimToNull(input.BuyerReference))
+            .OfType<string>()
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        if (buyers.Length == 0)
+        {
+            return [];
+        }
+
+        HashSet<Guid> found = alreadyFound.Select(order => order.Id).ToHashSet();
+        return (await store.ListOrdersByBuyersAsync(currentUser.OrganizationId, buyers, cancellationToken))
+            .Where(order => !found.Contains(order.Id))
+            .ToList();
+    }
+
+    /// <summary>The one order that is this sale under the other kind of key: same channel and buyer, same day, same items price.</summary>
+    private static PlatformOrder? Adopt(List<PlatformOrder> adoptable, IngestPlatformOrderInput input, string channel)
+    {
+        string? buyer = Text.TrimToNull(input.BuyerReference);
+        List<PlatformOrder> matches = adoptable
+            .Where(order => order.Platform == channel
+                && order.KeysAreDerived != input.KeysAreDerived
+                && order.ItemsSubtotal == input.ItemsSubtotal
+                && string.Equals(order.BuyerReference, buyer, StringComparison.OrdinalIgnoreCase)
+                && (order.OrderedAt - input.OrderedAt).Duration() < SameDay)
+            .ToList();
+
+        // Two candidates is ambiguity, and guessing between them could merge two real sales into one.
+        if (matches.Count != 1)
+        {
+            return null;
+        }
+
+        adoptable.Remove(matches[0]);
+        return matches[0];
+    }
+
+    /// <summary>
+    /// Makes an adopted order and the incoming sale agree on keys, the real ones winning. A one-line order keeps its
+    /// line under one key, so the inventory match filed under it survives.
+    /// </summary>
+    private static IngestPlatformOrderInput SameSale(PlatformOrder order, IngestPlatformOrderInput input, string externalOrderId)
+    {
+        PlatformOrderLine? onlyLine = order.Lines.Count == 1 ? order.Lines.First() : null;
+        bool oneLineEach = onlyLine is not null && input.Lines.Count == 1;
+        if (!input.KeysAreDerived)
+        {
+            order.ExternalOrderId = externalOrderId;
+            order.KeysAreDerived = false;
+            if (oneLineEach)
+            {
+                onlyLine!.ExternalItemId = Text.TrimToNull(input.Lines[0].ExternalItemId);
+            }
+
+            return input;
+        }
+
+        return oneLineEach
+            ? input with { KeysAreDerived = false, Lines = [input.Lines[0] with { ExternalItemId = onlyLine!.ExternalItemId }] }
+            : input with { KeysAreDerived = false };
     }
 
     private async Task<List<string>> ExistingChannels(CancellationToken cancellationToken)

@@ -15,6 +15,12 @@ public interface IPlatformOrderImportStore
         IReadOnlyCollection<string> externalOrderIds,
         CancellationToken cancellationToken);
 
+    /// <summary>Orders placed by any of these buyers, with their lines.</summary>
+    Task<IReadOnlyList<PlatformOrder>> ListOrdersByBuyersAsync(
+        Guid organizationId,
+        IReadOnlyCollection<string> buyerReferences,
+        CancellationToken cancellationToken);
+
     Task<IReadOnlyList<PlatformOrder>> ListImportedOrdersForDisplayAsync(
         Guid organizationId,
         IReadOnlyCollection<Guid> orderIds,

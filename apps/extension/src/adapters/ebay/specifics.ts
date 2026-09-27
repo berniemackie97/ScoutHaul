@@ -1,3 +1,5 @@
+import { decodeEntities } from "../html";
+
 /**
  * What a listing says the thing is — brand, colour, size — from the item page's structured data, where eBay
  * publishes its item specifics as `additionalProperty`.
@@ -31,7 +33,7 @@ export function readDescription(html: string, limit = 4000): string | null {
     .replace(/<br\s*\/?>(?=\s*\S)/gi, "\n")
     .replace(/<\/(p|div|li|tr|h\d)>/gi, "\n")
     .replace(/<[^>]+>/g, " ");
-  const text = decode(body)
+  const text = decodeEntities(body)
     .split("\n")
     .map((line) => line.replace(/[ \t\u00a0]+/g, " ").trim())
     .filter((line) => line.length > 0)
@@ -40,21 +42,6 @@ export function readDescription(html: string, limit = 4000): string | null {
   return text.length === 0 ? null : text.slice(0, limit);
 }
 
-const entities: Record<string, string> = {
-  amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " ", "#39": "'", "#x27": "'",
-};
-
-function decode(text: string): string {
-  return text.replace(/&(#x?[0-9a-f]+|[a-z]+);/gi, (whole, name: string) => {
-    const known = entities[name.toLowerCase()];
-    if (known !== undefined) {
-      return known;
-    }
-
-    const numeric = /^#x/i.test(name) ? Number.parseInt(name.slice(2), 16) : /^#/.test(name) ? Number(name.slice(1)) : Number.NaN;
-    return Number.isFinite(numeric) ? String.fromCodePoint(numeric) : whole;
-  });
-}
 
 const blank: ListingSpecifics = { brand: null, color: null, size: null };
 

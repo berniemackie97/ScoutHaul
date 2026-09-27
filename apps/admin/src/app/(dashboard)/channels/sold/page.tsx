@@ -24,8 +24,8 @@ export default async function SoldNotRecordedPage() {
           <h1 className="mt-1 text-2xl font-semibold tracking-tight">Sold on a marketplace, not on the books</h1>
           <p className="text-muted-foreground mt-1 max-w-3xl text-sm">
             A marketplace shows these listings as sold, and no sale here accounts for them — so the money is missing
-            and the items still count as stock. Depop does not hand over its sales, and a Poshmark bundle may not say
-            which listings it held, so a listing turning sold can be the whole of the news. A sale the marketplace did
+            and the items still count as stock. Usually that is a sale the next scan has not read yet, or a bundle that
+            did not say which listings it held, so the listing turning sold is the whole of the news. A sale the marketplace did
             hand over waits in{" "}
             <Link href="/imports/orders" className="text-brand-600 underline">
               Orders to match
