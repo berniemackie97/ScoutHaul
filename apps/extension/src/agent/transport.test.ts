@@ -208,7 +208,7 @@ describe("the sync tab", () => {
     }) as unknown as typeof fakeBrowser.tabs.update;
     const answers: Record<string, unknown> = {
       documentOrigin: 1,
-      pageSettled: { settled: true, document: 2 },
+      pageSettled: { parsed: true, found: true, document: 2 },
       readLoadedPage: { status: 200, url: orders, contentType: "text/html", body: "<html></html>", document: 2 },
     };
     const execute = vi.fn(async (injection: { func: { name: string } }) => [{ frameId: 0, result: answers[injection.func.name] }]);
@@ -216,14 +216,64 @@ describe("the sync tab", () => {
     const clock = fakeClock();
 
     const tab = await new SyncTabs(clock).acquire(ebayAdapter);
-    const page = await tab.page(orders, "__INITIAL_STATE__");
+    const page = await tab.page(orders, { global: "__INITIAL_STATE__" });
 
     expect(page.url).toBe(orders);
     expect(clock.elapsed()).toBeLessThan(1000);
-    expect(execute).toHaveBeenCalledWith(expect.objectContaining({ world: "MAIN", args: ["__INITIAL_STATE__"], injectImmediately: true }));
+    expect(execute).toHaveBeenCalledWith(expect.objectContaining({ world: "MAIN", args: ["__INITIAL_STATE__", null], injectImmediately: true }));
     for (const [injection] of execute.mock.calls) {
       expect(injection).toMatchObject({ injectImmediately: true });
     }
+  });
+
+  it("waits past a finished load for what the page draws in afterwards", async () => {
+    const sold = "https://www.ebay.com/sh/ord/?offset=0";
+    fakeBrowser.tabs.create = vi.fn(async () => ({ id: 9 })) as unknown as typeof fakeBrowser.tabs.create;
+    let at = robots;
+    fakeBrowser.tabs.get = vi.fn(async () => ({ id: 9, status: "complete", url: at })) as unknown as typeof fakeBrowser.tabs.get;
+    fakeBrowser.tabs.update = vi.fn(async () => {
+      at = sold;
+      return { id: 9 };
+    }) as unknown as typeof fakeBrowser.tabs.update;
+    const probes = [{ parsed: true, found: false, document: 2 }, { parsed: true, found: false, document: 2 }, { parsed: true, found: true, document: 2 }];
+    fakeBrowser.scripting.executeScript = vi.fn(async (injection: { func: { name: string } }) => {
+      const name = injection.func.name;
+      const result = name === "documentOrigin" ? 1
+        : name === "pageSettled" ? probes.shift() ?? { parsed: true, found: true, document: 2 }
+          : { status: 200, url: sold, contentType: "text/html", body: "<ul><li>row</li></ul>", document: 2 };
+      return [{ frameId: 0, result }];
+    }) as unknown as typeof fakeBrowser.scripting.executeScript;
+
+    const tab = await new SyncTabs(fakeClock()).acquire(ebayAdapter);
+    await tab.page(sold, { until: "ul li" });
+
+    expect(probes).toEqual([]);
+  });
+
+  it("reads an empty page after a while, since what it waits for may never be drawn", async () => {
+    const sold = "https://www.ebay.com/sh/ord/?offset=0";
+    fakeBrowser.tabs.create = vi.fn(async () => ({ id: 9 })) as unknown as typeof fakeBrowser.tabs.create;
+    let at = robots;
+    fakeBrowser.tabs.get = vi.fn(async () => ({ id: 9, status: "complete", url: at })) as unknown as typeof fakeBrowser.tabs.get;
+    fakeBrowser.tabs.update = vi.fn(async () => {
+      at = sold;
+      return { id: 9 };
+    }) as unknown as typeof fakeBrowser.tabs.update;
+    fakeBrowser.scripting.executeScript = vi.fn(async (injection: { func: { name: string } }) => {
+      const name = injection.func.name;
+      const result = name === "documentOrigin" ? 1
+        : name === "pageSettled" ? { parsed: true, found: false, document: 2 }
+          : { status: 200, url: sold, contentType: "text/html", body: "<p>Nothing sold yet</p>", document: 2 };
+      return [{ frameId: 0, result }];
+    }) as unknown as typeof fakeBrowser.scripting.executeScript;
+    const clock = fakeClock();
+
+    const tab = await new SyncTabs(clock).acquire(ebayAdapter);
+    const page = await tab.page(sold, { until: "ul li" });
+
+    expect(page.body).toContain("Nothing sold yet");
+    expect(clock.elapsed()).toBeGreaterThanOrEqual(12_000);
+    expect(clock.elapsed()).toBeLessThan(45_000);
   });
 
   it("never takes the page a reload is leaving for the new one, however settled it looks", async () => {
@@ -238,12 +288,12 @@ describe("the sync tab", () => {
       await fakeBrowser.tabs.onUpdated.trigger(9, { status: "loading" }, { id: 9, status: "loading", url: orders } as never);
       return { id: 9 };
     }) as unknown as typeof fakeBrowser.tabs.update;
-    const probes = [{ settled: true, document: 1 }, { settled: true, document: 1 }, { settled: true, document: 2 }];
+    const probes = [{ parsed: true, found: true, document: 1 }, { parsed: true, found: true, document: 1 }, { parsed: true, found: true, document: 2 }];
     const reads = [1, 2];
     const execute = vi.fn(async (injection: { func: { name: string } }) => {
       const name = injection.func.name;
       const result = name === "documentOrigin" ? 1
-        : name === "pageSettled" ? probes.shift() ?? { settled: true, document: 2 }
+        : name === "pageSettled" ? probes.shift() ?? { parsed: true, found: true, document: 2 }
           : { status: 200, url: orders, contentType: "text/html", body: "<html></html>", document: reads.shift() ?? 2 };
       return [{ frameId: 0, result }];
     });

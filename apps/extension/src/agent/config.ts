@@ -16,6 +16,9 @@ export const signedInFreshMs = 30 * 60 * 1000;
 /** How often working shows it is still alive. The popup stops showing work after three missed beats. */
 export const aliveBeatMs = 20 * 1000;
 
+/** How long a page read waits for something the page draws in after it loads, before reading what is there. */
+export const untilWaitMs = 12 * 1000;
+
 /** The least time between two checks of a sign-in that is not known to be good. */
 export const recheckMs = 20 * 1000;
 

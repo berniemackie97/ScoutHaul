@@ -1,17 +1,20 @@
 import { describe, expect, it } from "vitest";
-import { challengePage, homePage, productPage, shopPage } from "../../test/depop-fixtures";
+import { challengePage, homePage, productPage, receiptPage, shopPage, soldListPage, soldListShell } from "../../test/depop-fixtures";
 import { memoryInMap } from "../../test/memory";
-import { AdapterError, type MarketplaceContext, type PageResponse, type Session } from "../types";
+import { AdapterError, type MarketplaceContext, type PageRead, type PageResponse, type Session } from "../types";
 import { depopAdapter, readShop } from ".";
 import { readProduct } from "./product";
+import { readReceipt, readSoldList, toIngestOrder } from "./sales";
 
 const now = new Date("2026-09-26T12:00:00Z");
 const seller: Session = { signedIn: true, username: "overhaultrading", marketplaceUserId: null };
 
-function depop(answer: (url: URL) => string | PageResponse | undefined, memory = memoryInMap()): MarketplaceContext & { read: string[] } {
+function depop(answer: (url: URL) => string | PageResponse | undefined, memory = memoryInMap()): MarketplaceContext & { read: string[]; waits: (PageRead | undefined)[] } {
   const read: string[] = [];
-  const serve = async (url: string): Promise<PageResponse> => {
+  const waits: (PageRead | undefined)[] = [];
+  const serve = async (url: string, wait?: PageRead): Promise<PageResponse> => {
     read.push(url);
+    waits.push(wait);
     const reply = answer(new URL(url));
     if (reply === undefined) {
       return { status: 404, url, contentType: "text/html", body: "" };
@@ -19,7 +22,7 @@ function depop(answer: (url: URL) => string | PageResponse | undefined, memory =
 
     return typeof reply === "string" ? { status: 200, url, contentType: "text/html", body: reply } : reply;
   };
-  return { read, now: () => now, memory, page: serve, request: serve };
+  return { read, waits, now: () => now, memory, page: serve, request: serve };
 }
 
 describe("a Depop listing", () => {
@@ -71,6 +74,7 @@ describe("a Depop listing", () => {
   });
 
   it("names every listing a shop page shows, once each", () => {
+    // The header's Sell button links under /products/ too, and is not a listing.
     expect(readShop(shopPage(["a-1", "b-2", "a-1"]))).toEqual(["a-1", "b-2"]);
     expect(readShop("<html><body>no listings</body></html>")).toEqual([]);
   });
@@ -190,8 +194,209 @@ describe("a Depop scan", () => {
     expect(snapshot.listings[0]!.title).toBe("Tee");
   });
 
-  it("does not pretend to read sales", async () => {
-    await expect(depopAdapter.scanSales(depop(() => ""), { from: null, cursor: null }, seller)).rejects.toThrow(AdapterError);
+  it("waits for the shop's grid, which Depop draws in after the page loads", async () => {
+    const context = depop(shop(["a-1"]));
+
+    await depopAdapter.snapshotListings(context, seller);
+
+    expect(context.waits[0]).toEqual({ until: 'ol li a[href^="/products/"]' });
+  });
+});
+
+describe("Depop's sold list", () => {
+  it("reads each sale from its row: order, buyer, day, parcel, status, total and ship-to", () => {
+    const rows = readSoldList(soldListPage([{ id: "475700000001", buyer: "floralfan", soldOn: "09/20/2026", status: "Shipped", total: "US$9.15" }]));
+
+    expect(rows).toEqual([{
+      id: "475700000001",
+      buyer: "floralfan",
+      items: 1,
+      soldOn: "09/20/2026",
+      method: "Depop shipping",
+      carrier: "USPS",
+      status: "Shipped",
+      total: 9.15,
+      shipTo: { line1: "12 Elm St", city: "Springfield", region: "IL", postalCode: "62701-1234", country: "US" },
+    }]);
+  });
+
+  it("reads a sale shipped without a carrier named", () => {
+    const [row] = readSoldList(soldListPage([{ id: "1", method: "Own shipping", carrier: null, status: "To ship" }]))!;
+
+    expect(row).toMatchObject({ method: "Own shipping", carrier: null, status: "To ship" });
+  });
+
+  it("tells a seller with nothing sold apart from a page that lost its list", () => {
+    expect(readSoldList(soldListPage([]))).toEqual([]);
+    expect(readSoldList(soldListShell())).toBeNull();
+  });
+});
+
+describe("a Depop receipt", () => {
+  it("reads the money, the parcel and what was sold", () => {
+    const receipt = readReceipt(receiptPage({}))!;
+
+    expect(receipt).toMatchObject({
+      buyerName: "Jordan Rivera",
+      status: "Delivered",
+      deliveredOn: "09/24/2026",
+      carrier: "USPS",
+      tracking: "9400100000000000000001",
+      itemsPrice: 10,
+      fees: { "Depop fee": 0, "Payment fee": 0.85 },
+      total: 9.15,
+      paidOut: true,
+      buyerShipping: 1.99,
+      products: [{ slug: "overhaultrading-old-navy-floral-5db8", title: "Old Navy floral shirt #floral #buttonup", price: 10 }],
+    });
+  });
+
+  it("takes no initials for a name, and no payout that has not been sent", () => {
+    const receipt = readReceipt(receiptPage({ buyerName: null, paidOut: false, deliveredOn: null }))!;
+
+    expect(receipt).toMatchObject({ buyerName: null, paidOut: false, deliveredOn: null, tracking: null });
+  });
+
+  it("finds no receipt on a page that has none", () => {
+    expect(readReceipt(soldListPage([]))).toBeNull();
+  });
+});
+
+describe("a Depop sale, as the sales report would describe it", () => {
+  const row = readSoldList(soldListPage([{ id: "475700000001", buyer: "floralfan" }]))![0]!;
+
+  it("records the items price, Depop's fees, the payout and a label paid for by the buyer", () => {
+    const { order } = toIngestOrder(row, readReceipt(receiptPage({}))!);
+
+    expect(order).toMatchObject({
+      externalOrderId: "475700000001",
+      orderedOnDayOnly: true,
+      itemsSubtotal: 10,
+      shippingCharged: 1.99,
+      shippingCost: 1.99,
+      taxCollected: null,
+      feeTotal: 0.85,
+      payoutAmount: 9.15,
+      buyerReference: "floralfan",
+      buyerName: "Jordan Rivera",
+      shipToLine1: "12 Elm St",
+      shipToPostalCode: "62701-1234",
+      carrier: "USPS",
+      trackingNumber: "9400100000000000000001",
+      fulfillmentStage: "Delivered",
+      lines: [{ title: "Old Navy floral shirt #floral #buttonup", unitPrice: 10, quantity: 1, externalItemId: "overhaultrading-old-navy-floral-5db8" }],
+    });
+    expect(new Date(order!.orderedAt!).getDate()).toBe(20);
+  });
+
+  it("splits a bundle across its listings by their prices", () => {
+    const receipt = readReceipt(receiptPage({
+      itemsPrice: "US$30.00",
+      products: [
+        { slug: "a-1", title: "Shirt", price: "$10.00" },
+        { slug: "b-2", title: "Jeans", price: "$20.00" },
+      ],
+    }))!;
+
+    expect(toIngestOrder({ ...row, items: 2 }, receipt).order!.lines!.map((line) => [line.externalItemId, line.unitPrice])).toEqual([["a-1", 10], ["b-2", 20]]);
+  });
+
+  it("leaves the payout open until Depop has sent it", () => {
+    expect(toIngestOrder(row, readReceipt(receiptPage({ paidOut: false }))!).order!.payoutAmount).toBeNull();
+  });
+
+  it("refuses a receipt that names no listing, rather than record a sale of nothing", () => {
+    const { order, issues } = toIngestOrder(row, readReceipt(receiptPage({ products: [] }))!);
+
+    expect(order).toBeNull();
+    expect(issues[0]).toMatchObject({ externalReference: "475700000001", rejected: true });
+  });
+});
+
+describe("a Depop sales scan", () => {
+  const first = { from: null, cursor: null };
+  const answer = (sales: Parameters<typeof soldListPage>[0]) => (url: URL) =>
+    url.pathname === "/sellinghub/sold-items/" ? soldListPage(sales) : url.pathname.startsWith("/sellinghub/sold-items/") ? receiptPage({}) : undefined;
+
+  it("reads the list, then each new sale's receipt, waiting for what Depop draws in", async () => {
+    const context = depop(answer([{ id: "475700000001" }]));
+
+    const scan = await depopAdapter.scanSales(context, first, seller);
+
+    expect(scan.orders.map((order) => order.externalOrderId)).toEqual(["475700000001"]);
+    expect(context.read).toEqual(["https://www.depop.com/sellinghub/sold-items/", "https://www.depop.com/sellinghub/sold-items/475700000001/"]);
+    expect(context.waits).toEqual([{ until: 'a[aria-label^="View receipt"]' }, { until: 'aside[role="dialog"] table' }]);
+  });
+
+  it("reports a refunded or cancelled sale as one, and reads no receipt for it", async () => {
+    const context = depop(answer([{ id: "1", status: "Payment refunded" }, { id: "2", status: "Canceled" }]));
+
+    const scan = await depopAdapter.scanSales(context, first, seller);
+
+    expect(scan.cancelledOrderIds).toEqual(["1", "2"]);
+    expect(scan.orders).toEqual([]);
+    expect(context.read).toHaveLength(1);
+  });
+
+  it("reads an unchanged sale's receipt only once", async () => {
+    const memory = memoryInMap();
+    await depopAdapter.scanSales(depop(answer([{ id: "475700000001" }]), memory), first, seller);
+    const context = depop(answer([{ id: "475700000001" }]), memory);
+
+    const scan = await depopAdapter.scanSales(context, first, seller);
+
+    expect(scan.orders).toHaveLength(1);
+    expect(context.read).toHaveLength(1);
+  });
+
+  it("reads an open sale's receipt again after a while, since its payout and parcel change without its row", async () => {
+    const memory = memoryInMap();
+    const pending = (url: URL) => url.pathname === "/sellinghub/sold-items/" ? soldListPage([{ id: "475700000001" }]) : receiptPage({ paidOut: false });
+    await depopAdapter.scanSales(depop(pending, memory), first, seller);
+    const soon = depop(pending, memory);
+    const later = { ...depop(answer([{ id: "475700000001" }]), memory), now: () => new Date(now.getTime() + 7 * 60 * 60 * 1000) };
+
+    await depopAdapter.scanSales(soon, first, seller);
+    const scan = await depopAdapter.scanSales(later, first, seller);
+
+    expect(soon.read).toHaveLength(1);
+    expect(later.read).toHaveLength(2);
+    expect(scan.orders[0]!.payoutAmount).toBe(9.15);
+  });
+
+  it("never reads a settled sale's receipt again while its row is unchanged", async () => {
+    const memory = memoryInMap();
+    await depopAdapter.scanSales(depop(answer([{ id: "475700000001" }]), memory), first, seller);
+    const muchLater = { ...depop(answer([{ id: "475700000001" }]), memory), now: () => new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000) };
+
+    await depopAdapter.scanSales(muchLater, first, seller);
+
+    expect(muchLater.read).toHaveLength(1);
+  });
+
+  it("reads a few receipts per scan and says the rest come next", async () => {
+    const sales = Array.from({ length: 17 }, (_, index) => ({ id: String(475700000100 + index) }));
+    const context = depop(answer(sales));
+
+    const scan = await depopAdapter.scanSales(context, first, seller);
+
+    expect(scan.orders).toHaveLength(15);
+    expect(scan.issues).toEqual([expect.objectContaining({ message: "2 more Depop sales are read on the next scan.", rejected: false })]);
+  });
+
+  it("keeps going past a receipt it cannot read, and says which", async () => {
+    const context = depop((url) =>
+      url.pathname === "/sellinghub/sold-items/" ? soldListPage([{ id: "1" }, { id: "2" }])
+        : url.pathname === "/sellinghub/sold-items/1/" ? soldListPage([]) : receiptPage({}));
+
+    const scan = await depopAdapter.scanSales(context, first, seller);
+
+    expect(scan.orders).toHaveLength(1);
+    expect(scan.issues[0]).toMatchObject({ externalReference: "1", rejected: true });
+  });
+
+  it("says the site changed when the sold page carries no list at all", async () => {
+    await expect(depopAdapter.scanSales(depop(() => soldListShell()), first, seller)).rejects.toMatchObject({ kind: "SiteChanged" });
   });
 });
 

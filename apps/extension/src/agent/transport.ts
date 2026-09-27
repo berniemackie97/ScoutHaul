@@ -1,12 +1,12 @@
 import { browser } from "wxt/browser";
-import { AdapterError, type MarketplaceAdapter, type PageResponse } from "../adapters/types";
-import { pageLoadTimeoutMs, syncTabIdleMs } from "./config";
+import { AdapterError, type MarketplaceAdapter, type PageRead, type PageResponse } from "../adapters/types";
+import { pageLoadTimeoutMs, syncTabIdleMs, untilWaitMs } from "./config";
 import { syncTabsItem } from "./storage";
 
 /** A marketplace tab the agent reads through. */
 export interface MarketplaceTab {
   /** Navigates the tab to a page, as a person's click would, and reads it once loaded. */
-  page(url: string, global?: string): Promise<PageResponse>;
+  page(url: string, read?: PageRead): Promise<PageResponse>;
   /** A request made from the marketplace's own page, for the JSON endpoints its pages call. */
   request(url: string): Promise<PageResponse>;
 }
@@ -67,23 +67,31 @@ function readLoadedPage(global: string | null): PageResponse {
  * A page still loading whose document is parsed and already holds what will be read. Marketplace pages keep loading
  * ads and trackers long after that, and some never tell the browser they are done. Self-contained, like pageFetch.
  */
-function pageSettled(global: string | null): { settled: boolean; document: number } {
+function pageSettled(global: string | null, until: string | null): Settling {
   return {
-    settled: document.readyState !== "loading" && (global === null || (window as unknown as Record<string, unknown>)[global] !== undefined),
+    parsed: document.readyState !== "loading" && (global === null || (window as unknown as Record<string, unknown>)[global] !== undefined),
+    found: until === null || document.querySelector(until) !== null,
     document: performance.timeOrigin,
   };
 }
 
-/** Settled, and a different document from the one the navigation left — which can linger until the new one commits. */
-async function settledIn(tabId: number, global: string | undefined, leaving: number | null): Promise<boolean> {
+interface Settling {
+  parsed: boolean;
+  found: boolean;
+  document: number;
+}
+
+/** How far the new page has got — never the document the navigation left, which can linger until the new one commits. */
+async function settlingIn(tabId: number, read: PageRead, leaving: number | null): Promise<Settling | null> {
+  const args: [string | null, string | null] = [read.global ?? null, read.until ?? null];
   try {
-    const [first] = await browser.scripting.executeScript(global === undefined
-      ? { target: { tabId }, func: pageSettled, args: [null], injectImmediately: true }
-      : { target: { tabId }, world: "MAIN", func: pageSettled, args: [global], injectImmediately: true });
-    const probe = first?.result as { settled?: boolean; document?: number } | undefined;
-    return probe?.settled === true && probe.document !== leaving;
+    const [first] = await browser.scripting.executeScript(read.global === undefined
+      ? { target: { tabId }, func: pageSettled, args, injectImmediately: true }
+      : { target: { tabId }, world: "MAIN", func: pageSettled, args, injectImmediately: true });
+    const probe = first?.result as Settling | undefined;
+    return probe && probe.document !== leaving ? probe : null;
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -105,7 +113,7 @@ async function documentIn(tabId: number): Promise<number | null> {
 export interface TabLook {
   status?: string;
   url?: string;
-  /** The page is still loading, but what will be read from it is there. */
+  /** Whether what will be read from the page is there, whatever the browser says of its loading. */
   settled?: boolean;
 }
 
@@ -122,7 +130,8 @@ export type TabVerdict = "wait" | "ready" | "elsewhere";
  */
 export function judgeTab(look: TabLook, readable: (url: string) => boolean, begun: boolean): TabVerdict {
   const url = look.url ?? "";
-  if (!begun || (look.status !== "complete" && !look.settled) || url === "" || url.startsWith("about:")) {
+  const loaded = look.settled ?? look.status === "complete";
+  if (!begun || !loaded || url === "" || url.startsWith("about:")) {
     return "wait";
   }
 
@@ -390,7 +399,7 @@ export class SyncTabs {
 
   private reader(adapter: MarketplaceAdapter, tabId: number): MarketplaceTab {
     /** Navigates the tab and waits for the new page. Returns the address it left. */
-    const navigate = async (url: string, global: string | undefined, leaving: number | null): Promise<string | undefined> => {
+    const navigate = async (url: string, read: PageRead, leaving: number | null): Promise<string | undefined> => {
       const before = (await lookAt(tabId))?.url;
       let started = false;
       const listener = (updatedId: number, change: { status?: string; url?: string }) => {
@@ -406,13 +415,22 @@ export class SyncTabs {
         }
 
         const begun = (seen: TabLook) => started || (seen.url !== undefined && seen.url !== before);
+        let parsedAt: number | null = null;
         const look = async (): Promise<TabLook | null> => {
           const seen = await lookAt(tabId);
-          if (!seen || seen.status === "complete" || !seen.url || !adapter.readable(seen.url) || !begun(seen)) {
+          const waitsForMore = read.until !== undefined || read.global !== undefined;
+          if (!seen || !seen.url || !adapter.readable(seen.url) || !begun(seen) || (seen.status === "complete" && !waitsForMore)) {
             return seen;
           }
 
-          return { ...seen, settled: await settledIn(tabId, global, leaving) };
+          const probe = await settlingIn(tabId, read, leaving);
+          if (!probe?.parsed) {
+            return { ...seen, settled: false };
+          }
+
+          // Something drawn in after load may never come — an empty list draws nothing — so it is waited for a while.
+          parsedAt ??= this.clock.now();
+          return { ...seen, settled: probe.found || this.clock.now() - parsedAt >= untilWaitMs };
         };
         await waitForPage(look, { ...this.clock, readable: adapter.readable, begun, timeoutMs: pageLoadTimeoutMs });
         return before;
@@ -423,12 +441,12 @@ export class SyncTabs {
     const read = (global: string | undefined) => readTab(tabId, adapter, this.clock, global);
 
     return {
-      page: async (url: string, global?: string) => {
+      page: async (url: string, pageRead: PageRead = {}) => {
         const leaving = await documentIn(tabId);
-        const before = await navigate(url, global, leaving);
+        const before = await navigate(url, pageRead, leaving);
         const deadline = this.clock.now() + pageLoadTimeoutMs;
         for (;;) {
-          const loaded = await read(global);
+          const loaded = await read(pageRead.global);
           // Still the page it was leaving: the browser said the new one had loaded before it had replaced the old.
           const stale = leaving !== null && loaded.document !== undefined
             ? loaded.document === leaving
@@ -448,7 +466,7 @@ export class SyncTabs {
         // A request is the site's own only from a page on the site's own origin.
         const current = (await lookAt(tabId))?.url;
         if (!current?.startsWith(`${adapter.home}/`)) {
-          await navigate(adapter.workerUrl, undefined, await documentIn(tabId));
+          await navigate(adapter.workerUrl, {}, await documentIn(tabId));
         }
 
         return inTab<PageResponse>(tabId, adapter, this.clock, fetchIn(tabId, url));

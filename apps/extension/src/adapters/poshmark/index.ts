@@ -33,7 +33,7 @@ async function bundleListings(context: MarketplaceContext, id: string, size: num
   }
 
   try {
-    const response = await context.page(`${origin}/order/sales/${encodeURIComponent(id)}`, stateGlobal);
+    const response = await context.page(`${origin}/order/sales/${encodeURIComponent(id)}`, { global: stateGlobal });
     assertReadable(response);
     const ids = listingIds(JSON.stringify(readState(response, "sale")));
     if (ids.length !== size) {
@@ -119,7 +119,7 @@ export const poshmarkAdapter: MarketplaceAdapter = {
   },
 
   async detectSession(context: MarketplaceContext): Promise<Session> {
-    const response = await context.page(origin, stateGlobal);
+    const response = await context.page(origin, { global: stateGlobal });
     assertReadable(response);
     return sessionIn(readState(response, "home")) ?? { signedIn: false, username: null, marketplaceUserId: null };
   },
@@ -154,7 +154,7 @@ export const poshmarkAdapter: MarketplaceAdapter = {
       let cursor = start;
       while (budget > 0) {
         budget--;
-        const response = await context.page(cursor === null ? salesPage : `${salesPage}?max_id=${encodeURIComponent(cursor)}`, stateGlobal);
+        const response = await context.page(cursor === null ? salesPage : `${salesPage}?max_id=${encodeURIComponent(cursor)}`, { global: stateGlobal });
         assertReadable(response);
         const read = readSalesPage(response);
         if (!read.found) {
@@ -266,7 +266,7 @@ export const poshmarkAdapter: MarketplaceAdapter = {
           availability === null ? null : `availability=${availability}`,
         ].filter((part) => part !== null);
         const address = `${origin}/closet/${encodeURIComponent(closet)}${query.length === 0 ? "" : `?${query.join("&")}`}`;
-        const response = await context.page(address, stateGlobal);
+        const response = await context.page(address, { global: stateGlobal });
         assertReadable(response);
         const read = readClosetPage(response);
         if (!read.found) {

@@ -1266,4 +1266,127 @@ Brass Lamp,377251318593,1,$0.00,$0.00,$0.00,$0.00,$0.00,$12.34,$0.00,$0.00,$16.9
         Assert.Equal(400, Assert.IsType<ObjectResult>(partial.Result).StatusCode);
         Assert.Empty(await db.InventoryItems.ToListAsync());
     }
+
+    private static readonly DateTimeOffset ReportedAt = new(2026, 9, 20, 14, 58, 0, TimeSpan.Zero);
+
+    private static IngestPlatformOrderInput DepopReport(string key = "depop-3f2a9c", decimal itemsPrice = 10m, string title = "Old Navy floral shirt #floral") => new(
+        ExternalOrderId: key,
+        OrderedAt: ReportedAt,
+        ItemsSubtotal: itemsPrice,
+        ShippingCharged: 1.99m,
+        TaxCollected: 0.8m,
+        FeeTotal: 0.85m,
+        Lines: [new IngestPlatformOrderLineInput(title, itemsPrice, ExternalItemId: "depop-line-" + key)],
+        Platform: "Depop",
+        ShippingCost: 1.99m,
+        BuyerReference: "floralfan",
+        KeysAreDerived: true);
+
+    private static IngestPlatformOrderInput DepopScan(decimal itemsPrice = 10m) => new(
+        ExternalOrderId: "475700000001",
+        // The receipt knows only the day; the scan sends midday of it.
+        OrderedAt: new DateTimeOffset(2026, 9, 20, 12, 0, 0, TimeSpan.Zero),
+        ItemsSubtotal: itemsPrice,
+        ShippingCharged: 1.99m,
+        TaxCollected: null,
+        FeeTotal: 0.85m,
+        Lines: [new IngestPlatformOrderLineInput("Old Navy floral shirt #floral", itemsPrice, ExternalItemId: "overhaul-old-navy-floral-5db8")],
+        Platform: "Depop",
+        ShippingCost: 1.99m,
+        PayoutAmount: 9.15m,
+        BuyerReference: "FloralFan",
+        TrackingNumber: "9400100000000000000001",
+        FulfillmentStage: PlatformFulfillmentStage.Delivered,
+        OrderedOnDayOnly: true);
+
+    [Fact]
+    public async Task A_scanned_depop_sale_takes_over_the_order_its_report_made_and_keeps_the_match()
+    {
+        var (db, org, user) = NewContext(nameof(A_scanned_depop_sale_takes_over_the_order_its_report_made_and_keeps_the_match));
+        await using var _ = db;
+        var controller = NewController(db, org, user);
+        InventoryItem item = SeedItem(db, org, "Old Navy floral shirt", 3m);
+        await controller.Ingest(new IngestPlatformOrdersRequest("Depop", [DepopReport()]), CancellationToken.None);
+        PlatformOrder reported = await db.PlatformOrders.Include(o => o.Lines).SingleAsync();
+        await controller.Reconcile(reported.Id, new ReconcilePlatformOrderRequest([new ReconcilePlatformOrderLineMap(reported.Lines.Single().Id, item.Id)]), CancellationToken.None);
+        Guid salesOrder = (await db.Orders.SingleAsync()).Id;
+
+        await controller.Ingest(new IngestPlatformOrdersRequest("Depop", [DepopScan()]), CancellationToken.None);
+
+        PlatformOrder order = await db.PlatformOrders.Include(o => o.Lines).SingleAsync();
+        Assert.Equal("475700000001", order.ExternalOrderId);
+        Assert.False(order.KeysAreDerived);
+        Assert.Equal(PlatformOrderStatus.Reconciled, order.Status);
+        Assert.Equal("overhaul-old-navy-floral-5db8", order.Lines.Single().ExternalItemId);
+        Assert.Equal(item.Id, order.Lines.Single().InventoryItemId);
+        // What only the report knows stays; what only the receipt knows arrives.
+        Assert.Equal(0.8m, order.TaxCollected);
+        Assert.Equal(ReportedAt, order.OrderedAt);
+        Assert.Equal(9.15m, order.PayoutAmount);
+        Assert.Equal("9400100000000000000001", order.TrackingNumber);
+        Assert.Single(await db.Sales.Where(sale => sale.InventoryItemId == item.Id).ToListAsync());
+        // The sales order the report's key filed it under carries Depop's id now — the same order, not a replacement.
+        Order kept = await db.Orders.SingleAsync();
+        Assert.Equal(salesOrder, kept.Id);
+        Assert.Equal("475700000001", kept.ExternalOrderId);
+    }
+
+    [Fact]
+    public async Task A_depop_report_imported_after_the_scan_updates_the_scanned_order_instead_of_adding_one()
+    {
+        var (db, org, user) = NewContext(nameof(A_depop_report_imported_after_the_scan_updates_the_scanned_order_instead_of_adding_one));
+        await using var _ = db;
+        var controller = NewController(db, org, user);
+
+        await controller.Ingest(new IngestPlatformOrdersRequest("Depop", [DepopScan()]), CancellationToken.None);
+        await controller.Ingest(new IngestPlatformOrdersRequest("Depop", [DepopReport()]), CancellationToken.None);
+
+        PlatformOrder order = await db.PlatformOrders.Include(o => o.Lines).SingleAsync();
+        Assert.Equal("475700000001", order.ExternalOrderId);
+        Assert.False(order.KeysAreDerived);
+        Assert.Equal("overhaul-old-navy-floral-5db8", order.Lines.Single().ExternalItemId);
+        Assert.Equal(0.8m, order.TaxCollected);
+    }
+
+    [Fact]
+    public async Task Two_lookalike_depop_orders_are_never_guessed_between()
+    {
+        var (db, org, user) = NewContext(nameof(Two_lookalike_depop_orders_are_never_guessed_between));
+        await using var _ = db;
+        var controller = NewController(db, org, user);
+        await controller.Ingest(new IngestPlatformOrdersRequest("Depop", [DepopReport("depop-aaa", title: "Floral shirt"), DepopReport("depop-bbb", title: "Striped shirt")]), CancellationToken.None);
+
+        await controller.Ingest(new IngestPlatformOrdersRequest("Depop", [DepopScan()]), CancellationToken.None);
+
+        Assert.Equal(3, await db.PlatformOrders.CountAsync());
+    }
+
+    [Fact]
+    public async Task A_depop_sale_the_next_local_day_is_a_different_sale_however_close_in_hours()
+    {
+        var (db, org, user) = NewContext(nameof(A_depop_sale_the_next_local_day_is_a_different_sale_however_close_in_hours));
+        await using var _ = db;
+        var controller = NewController(db, org, user);
+        // 23:30 on the 20th where the business keeps its days (US Pacific); the scan's sale is the 21st, 12.5 hours on.
+        IngestPlatformOrderInput lateReport = DepopReport() with { OrderedAt = new DateTimeOffset(2026, 9, 20, 23, 30, 0, TimeSpan.FromHours(-7)) };
+        IngestPlatformOrderInput nextDay = DepopScan() with { OrderedAt = new DateTimeOffset(2026, 9, 21, 12, 0, 0, TimeSpan.FromHours(-7)) };
+        await controller.Ingest(new IngestPlatformOrdersRequest("Depop", [lateReport]), CancellationToken.None);
+
+        await controller.Ingest(new IngestPlatformOrdersRequest("Depop", [nextDay]), CancellationToken.None);
+
+        Assert.Equal(2, await db.PlatformOrders.CountAsync());
+    }
+
+    [Fact]
+    public async Task A_different_items_price_is_a_different_depop_sale()
+    {
+        var (db, org, user) = NewContext(nameof(A_different_items_price_is_a_different_depop_sale));
+        await using var _ = db;
+        var controller = NewController(db, org, user);
+        await controller.Ingest(new IngestPlatformOrdersRequest("Depop", [DepopReport()]), CancellationToken.None);
+
+        await controller.Ingest(new IngestPlatformOrdersRequest("Depop", [DepopScan(itemsPrice: 12m)]), CancellationToken.None);
+
+        Assert.Equal(2, await db.PlatformOrders.CountAsync());
+    }
 }

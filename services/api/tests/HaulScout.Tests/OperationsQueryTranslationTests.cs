@@ -165,6 +165,22 @@ public sealed class OperationsQueryTranslationTests(PostgresFixture postgres)
     }
 
     [Fact]
+    public async Task Finding_orders_by_buyer_translates_to_sql_and_ignores_case()
+    {
+        (HaulScoutDbContext db, Guid org, Guid user) = await postgres.NewOrganizationAsync();
+        await using HaulScoutDbContext _ = db;
+        db.PlatformOrders.AddRange(
+            new PlatformOrder { OrganizationId = org, Platform = "Depop", ExternalOrderId = "depop-aaa", BuyerReference = "FloralFan", KeysAreDerived = true },
+            new PlatformOrder { OrganizationId = org, Platform = "Depop", ExternalOrderId = "depop-bbb", BuyerReference = "someone-else" });
+        await db.SaveChangesAsync();
+
+        IReadOnlyList<PlatformOrder> found = await new EfPlatformOrderStore(db, new OrderAssembler(db, new StubCurrentUser(org, user)))
+            .ListOrdersByBuyersAsync(org, ["floralfan"], CancellationToken.None);
+
+        Assert.Equal("depop-aaa", Assert.Single(found).ExternalOrderId);
+    }
+
+    [Fact]
     public async Task Order_browse_translates_to_sql()
     {
         (HaulScoutDbContext db, Guid org, Guid user) = await postgres.NewOrganizationAsync();

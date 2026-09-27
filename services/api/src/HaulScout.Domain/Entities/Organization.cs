@@ -22,6 +22,12 @@ public sealed class Organization : EntityBase
 
     public const string DefaultTimeZoneId = "America/Los_Angeles";
 
+    /// <summary>The zone an organization keeps its days in; an unknown id falls back to the default rather than failing.</summary>
+    public static TimeZoneInfo ZoneOf(string? timeZoneId) =>
+        TimeZoneInfo.TryFindSystemTimeZoneById(timeZoneId ?? DefaultTimeZoneId, out TimeZoneInfo? zone)
+            ? zone
+            : TimeZoneInfo.FindSystemTimeZoneById(DefaultTimeZoneId);
+
     /// <summary>Whether marketplace listings keep this organization's item photos up to date.</summary>
     public bool MarketplacePhotoSyncEnabled { get; set; }
 

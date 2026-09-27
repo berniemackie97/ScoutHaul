@@ -13471,7 +13471,8 @@
           },
           "taxCollected": {
             "type": "number",
-            "format": "double"
+            "format": "double",
+            "nullable": true
           },
           "feeTotal": {
             "type": "number",
@@ -13593,6 +13594,12 @@
             "nullable": true
           },
           "feesPending": {
+            "type": "boolean"
+          },
+          "orderedOnDayOnly": {
+            "type": "boolean"
+          },
+          "keysAreDerived": {
             "type": "boolean"
           }
         },

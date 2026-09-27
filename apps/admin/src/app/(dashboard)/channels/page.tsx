@@ -85,7 +85,7 @@ export default async function ChannelsPage() {
               </div>
               <p className="text-muted-foreground mt-1 text-xs">
                 A marketplace says these sold and no sale here accounts for the money, and no order for them has
-                arrived — on Depop the listing is the only word of a sale.
+                arrived yet.
               </p>
             </div>
             <Link

@@ -85,23 +85,21 @@ public static class SyncPlatforms
         MaxRequestsPerDay: 600);
 
     /// <summary>
-    /// Depop. A shop page names its listings but describes none of them, so each listing is read from its own page,
-    /// where Depop publishes the whole of it — title, description, every photo, brand, size, condition and whether
-    /// it sold. A few are read per scan, and what was read is kept, so a shop that is not changing costs one page.
-    /// Sales are not read yet: they are behind the seller's own pages.
+    /// Depop. A shop page names its listings, and each listing's own page describes it whole. Sales come from Seller
+    /// Hub's sold list, with each new or changed sale's receipt read for its money, parcel and tracking. Both lists are
+    /// drawn in after the page loads.
     /// </summary>
     public static readonly SyncPlatform Depop = new(
         "Depop",
-        [SyncLoopKind.Listings],
-        HistoryDays: 0,
-        SuggestedSalesMinutes: 0,
-        MinSalesMinutes: 0,
+        [SyncLoopKind.Sales, SyncLoopKind.Listings],
+        HistoryDays: 3650,
+        SuggestedSalesMinutes: 30,
+        MinSalesMinutes: 15,
         SuggestedListingsMinutes: 360,
         MinListingsMinutes: 120,
         MinSecondsBetweenRequests: 5,
         MaxRequestsPerMinute: 8,
-        MaxRequestsPerDay: 400,
-        OlderSalesHint: "Depop sales come from its sales report for now.");
+        MaxRequestsPerDay: 400);
 
     public static readonly IReadOnlyList<SyncPlatform> All = [Ebay, Vinted, Poshmark, Depop];
 

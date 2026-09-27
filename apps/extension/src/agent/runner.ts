@@ -1,6 +1,6 @@
 import { browser } from "wxt/browser";
 import { adapterFor } from "../adapters/registry";
-import { AdapterError, type MarketplaceAdapter, type MarketplaceContext, type Session } from "../adapters/types";
+import { AdapterError, type MarketplaceAdapter, type MarketplaceContext, type PageRead, type Session } from "../adapters/types";
 import { logActivity } from "./activity";
 import { ApiError, type AgentApi } from "./api";
 import { describeFailure, waitsForAPerson } from "./failures";
@@ -80,7 +80,7 @@ export function governedContext(tab: MarketplaceTab, platform: string, policy: G
 
   return {
     now: () => deps.now(),
-    page: (url: string, global?: string) => paced(() => tab.page(url, global)),
+    page: (url: string, read?: PageRead) => paced(() => tab.page(url, read)),
     request: (url: string) => paced(() => tab.request(url)),
     memory: adapterMemory(platform),
   };
