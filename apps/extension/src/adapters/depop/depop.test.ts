@@ -349,6 +349,31 @@ describe("a Depop sales scan", () => {
     expect(context.read).toHaveLength(1);
   });
 
+  it("reads an open sale's receipt again after a while, since its payout and parcel change without its row", async () => {
+    const memory = memoryInMap();
+    const pending = (url: URL) => url.pathname === "/sellinghub/sold-items/" ? soldListPage([{ id: "475700000001" }]) : receiptPage({ paidOut: false });
+    await depopAdapter.scanSales(depop(pending, memory), first, seller);
+    const soon = depop(pending, memory);
+    const later = { ...depop(answer([{ id: "475700000001" }]), memory), now: () => new Date(now.getTime() + 7 * 60 * 60 * 1000) };
+
+    await depopAdapter.scanSales(soon, first, seller);
+    const scan = await depopAdapter.scanSales(later, first, seller);
+
+    expect(soon.read).toHaveLength(1);
+    expect(later.read).toHaveLength(2);
+    expect(scan.orders[0]!.payoutAmount).toBe(9.15);
+  });
+
+  it("never reads a settled sale's receipt again while its row is unchanged", async () => {
+    const memory = memoryInMap();
+    await depopAdapter.scanSales(depop(answer([{ id: "475700000001" }]), memory), first, seller);
+    const muchLater = { ...depop(answer([{ id: "475700000001" }]), memory), now: () => new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000) };
+
+    await depopAdapter.scanSales(muchLater, first, seller);
+
+    expect(muchLater.read).toHaveLength(1);
+  });
+
   it("reads a few receipts per scan and says the rest come next", async () => {
     const sales = Array.from({ length: 17 }, (_, index) => ({ id: String(475700000100 + index) }));
     const context = depop(answer(sales));

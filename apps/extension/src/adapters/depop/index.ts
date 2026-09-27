@@ -30,10 +30,24 @@ const receiptsPerScan = 15;
 /** A shop's own listings, drawn in after the page loads. */
 const shopGridSelector = 'ol li a[href^="/products/"]';
 
-/** A sale as remembered between scans: its receipt read once, and again only when the list shows it changed. */
+/** A receipt whose sale is still open is read again after this long: its payout and parcel change without its row. */
+const openReceiptRefreshMs = 6 * 60 * 60 * 1000;
+
+/** A sale as remembered between scans: its receipt, when it was read, and how its row looked then. */
 interface RememberedSale {
   stamp: string;
   order: IngestOrder;
+  readAt: number;
+}
+
+/** Whether a remembered receipt still says all there is: the row unchanged, and the sale either settled or read lately. */
+function current(known: RememberedSale, row: SoldRow, now: number): boolean {
+  if (known.stamp !== saleStamp(row)) {
+    return false;
+  }
+
+  const settled = known.order.payoutAmount != null && known.order.fulfillmentStage === "Delivered";
+  return settled || now - known.readAt < openReceiptRefreshMs;
 }
 
 /** What this browser already read for one listing, so an unchanged shop costs one request. */
@@ -133,13 +147,19 @@ export const depopAdapter: MarketplaceAdapter = {
 
       const key = `sale:${row.id}`;
       const known = await context.memory.get<RememberedSale>(key);
-      if (known?.stamp === saleStamp(row)) {
+      if (known && current(known, row, now.getTime())) {
         orders.push(known.order);
         continue;
       }
 
       if (budget === 0) {
-        waiting++;
+        // A receipt due a refresh still sends what it last said; one never read waits its turn.
+        if (known) {
+          orders.push(known.order);
+        } else {
+          waiting++;
+        }
+
         continue;
       }
 
@@ -148,7 +168,9 @@ export const depopAdapter: MarketplaceAdapter = {
       issues.push(...sold.issues);
       if (sold.order) {
         orders.push(sold.order);
-        await context.memory.set<RememberedSale>(key, { stamp: saleStamp(row), order: sold.order });
+        await context.memory.set<RememberedSale>(key, { stamp: saleStamp(row), order: sold.order, readAt: now.getTime() });
+      } else if (known) {
+        orders.push(known.order);
       }
     }
 

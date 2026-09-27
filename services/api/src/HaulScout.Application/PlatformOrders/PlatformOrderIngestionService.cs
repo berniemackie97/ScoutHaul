@@ -64,6 +64,7 @@ public sealed class PlatformOrderIngestionService(
             keys,
             cancellationToken)).ToList();
         List<PlatformOrder> adoptable = await AdoptionCandidatesAsync(normalized.Select(entry => entry.Input), existing, cancellationToken);
+        TimeZoneInfo zone = Organization.ZoneOf(await store.FindTimeZoneIdAsync(currentUser.OrganizationId, cancellationToken));
 
         int created = 0, updated = 0, skipped = 0, unchanged = 0;
         List<Guid> touched = [];
@@ -76,10 +77,16 @@ public sealed class PlatformOrderIngestionService(
             IngestPlatformOrderInput input = incoming;
             PlatformOrder? order = existing.SingleOrDefault(candidate =>
                 candidate.Platform == channel && candidate.ExternalOrderId == externalOrderId);
-            if (order is null && Adopt(adoptable, input, channel) is PlatformOrder same)
+            if (order is null && Adopt(adoptable, input, channel, zone) is PlatformOrder same)
             {
+                string before = same.ExternalOrderId;
                 order = same;
                 input = SameSale(order, input, externalOrderId);
+                if (order.ExternalOrderId != before)
+                {
+                    await store.RekeySalesOrderAsync(currentUser.OrganizationId, channel, before, order.ExternalOrderId, cancellationToken);
+                }
+
                 existing.Add(order);
             }
 
@@ -95,7 +102,7 @@ public sealed class PlatformOrderIngestionService(
                 };
                 store.AddPlatformOrder(order);
                 existing.Add(order);
-                ApplyImportedFields(order, input, channelAccountId, isNew: true);
+                ApplyImportedFields(order, input, channelAccountId, isNew: true, zone);
                 ReplaceLines(order, MergeLines(input.Lines, []), preserveExistingMappings: false);
                 created++;
             }
@@ -107,7 +114,7 @@ public sealed class PlatformOrderIngestionService(
                 string factsBefore = OrderFingerprint(order);
                 string linesBefore = LinesFingerprint(order.Lines.Select(Facts));
                 List<LineFacts> merged = MergeLines(input.Lines, order.Lines);
-                ApplyImportedFields(order, input, channelAccountId, isNew: false);
+                ApplyImportedFields(order, input, channelAccountId, isNew: false, zone);
 
                 if (OrderFingerprint(order) == factsBefore && LinesFingerprint(merged) == linesBefore)
                 {
@@ -252,7 +259,7 @@ public sealed class PlatformOrderIngestionService(
     /// Writes what this source says about the order. The figures every source carries — when, items,
     /// shipping, tax — are replaced; anything the source leaves out keeps what another source recorded.
     /// </summary>
-    private static void ApplyImportedFields(PlatformOrder order, IngestPlatformOrderInput input, Guid? channelAccountId, bool isNew)
+    private static void ApplyImportedFields(PlatformOrder order, IngestPlatformOrderInput input, Guid? channelAccountId, bool isNew, TimeZoneInfo zone)
     {
         if (channelAccountId.HasValue)
         {
@@ -272,7 +279,7 @@ public sealed class PlatformOrderIngestionService(
         order.ShipToCountry = Text.TrimToNull(input.ShipToCountry) ?? order.ShipToCountry;
 
         // A source that knows only the day never moves an order another source placed within that day.
-        if (isNew || !input.OrderedOnDayOnly || (order.OrderedAt - input.OrderedAt).Duration() >= SameDay)
+        if (isNew || !input.OrderedOnDayOnly || DayOf(order.OrderedAt, zone) != DayOf(input.OrderedAt, zone))
         {
             order.OrderedAt = input.OrderedAt;
         }
@@ -399,7 +406,8 @@ public sealed class PlatformOrderIngestionService(
         return new PlatformOrderCancellations(setAside, stillRecorded);
     }
 
-    private static readonly TimeSpan SameDay = TimeSpan.FromHours(24);
+    /// <summary>The calendar day an instant falls on where the business keeps its days: what "the same day" means for a sale.</summary>
+    private static DateOnly DayOf(DateTimeOffset instant, TimeZoneInfo zone) => DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(instant, zone).DateTime);
 
     /// <summary>
     /// Orders that may be an incoming sale under the other kind of key: one source made its keys up from the sale's
@@ -427,7 +435,7 @@ public sealed class PlatformOrderIngestionService(
     }
 
     /// <summary>The one order that is this sale under the other kind of key: same channel and buyer, same day, same items price.</summary>
-    private static PlatformOrder? Adopt(List<PlatformOrder> adoptable, IngestPlatformOrderInput input, string channel)
+    private static PlatformOrder? Adopt(List<PlatformOrder> adoptable, IngestPlatformOrderInput input, string channel, TimeZoneInfo zone)
     {
         string? buyer = Text.TrimToNull(input.BuyerReference);
         List<PlatformOrder> matches = adoptable
@@ -435,7 +443,7 @@ public sealed class PlatformOrderIngestionService(
                 && order.KeysAreDerived != input.KeysAreDerived
                 && order.ItemsSubtotal == input.ItemsSubtotal
                 && string.Equals(order.BuyerReference, buyer, StringComparison.OrdinalIgnoreCase)
-                && (order.OrderedAt - input.OrderedAt).Duration() < SameDay)
+                && DayOf(order.OrderedAt, zone) == DayOf(input.OrderedAt, zone))
             .ToList();
 
         // Two candidates is ambiguity, and guessing between them could merge two real sales into one.

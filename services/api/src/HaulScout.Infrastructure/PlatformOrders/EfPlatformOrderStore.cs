@@ -76,6 +76,20 @@ public sealed class EfPlatformOrderStore(
             .ToListAsync(cancellationToken);
     }
 
+    public Task<string?> FindTimeZoneIdAsync(Guid organizationId, CancellationToken cancellationToken) =>
+        db.Organizations.Where(organization => organization.Id == organizationId).Select(organization => (string?)organization.TimeZoneId).SingleOrDefaultAsync(cancellationToken);
+
+    public async Task RekeySalesOrderAsync(Guid organizationId, string channel, string fromExternalOrderId, string toExternalOrderId, CancellationToken cancellationToken)
+    {
+        Order? order = await db.Orders.SingleOrDefaultAsync(
+            candidate => candidate.OrganizationId == organizationId && candidate.Channel == channel && candidate.ExternalOrderId == fromExternalOrderId,
+            cancellationToken);
+        if (order is not null)
+        {
+            order.ExternalOrderId = toExternalOrderId;
+        }
+    }
+
     public async Task<IReadOnlyList<PlatformOrder>> ListOrdersByBuyersAsync(
         Guid organizationId,
         IReadOnlyCollection<string> buyerReferences,

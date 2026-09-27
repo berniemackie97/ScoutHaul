@@ -1309,6 +1309,7 @@ Brass Lamp,377251318593,1,$0.00,$0.00,$0.00,$0.00,$0.00,$12.34,$0.00,$0.00,$16.9
         await controller.Ingest(new IngestPlatformOrdersRequest("Depop", [DepopReport()]), CancellationToken.None);
         PlatformOrder reported = await db.PlatformOrders.Include(o => o.Lines).SingleAsync();
         await controller.Reconcile(reported.Id, new ReconcilePlatformOrderRequest([new ReconcilePlatformOrderLineMap(reported.Lines.Single().Id, item.Id)]), CancellationToken.None);
+        Guid salesOrder = (await db.Orders.SingleAsync()).Id;
 
         await controller.Ingest(new IngestPlatformOrdersRequest("Depop", [DepopScan()]), CancellationToken.None);
 
@@ -1324,6 +1325,10 @@ Brass Lamp,377251318593,1,$0.00,$0.00,$0.00,$0.00,$0.00,$12.34,$0.00,$0.00,$16.9
         Assert.Equal(9.15m, order.PayoutAmount);
         Assert.Equal("9400100000000000000001", order.TrackingNumber);
         Assert.Single(await db.Sales.Where(sale => sale.InventoryItemId == item.Id).ToListAsync());
+        // The sales order the report's key filed it under carries Depop's id now — the same order, not a replacement.
+        Order kept = await db.Orders.SingleAsync();
+        Assert.Equal(salesOrder, kept.Id);
+        Assert.Equal("475700000001", kept.ExternalOrderId);
     }
 
     [Fact]
@@ -1354,6 +1359,22 @@ Brass Lamp,377251318593,1,$0.00,$0.00,$0.00,$0.00,$0.00,$12.34,$0.00,$0.00,$16.9
         await controller.Ingest(new IngestPlatformOrdersRequest("Depop", [DepopScan()]), CancellationToken.None);
 
         Assert.Equal(3, await db.PlatformOrders.CountAsync());
+    }
+
+    [Fact]
+    public async Task A_depop_sale_the_next_local_day_is_a_different_sale_however_close_in_hours()
+    {
+        var (db, org, user) = NewContext(nameof(A_depop_sale_the_next_local_day_is_a_different_sale_however_close_in_hours));
+        await using var _ = db;
+        var controller = NewController(db, org, user);
+        // 23:30 on the 20th where the business keeps its days (US Pacific); the scan's sale is the 21st, 12.5 hours on.
+        IngestPlatformOrderInput lateReport = DepopReport() with { OrderedAt = new DateTimeOffset(2026, 9, 20, 23, 30, 0, TimeSpan.FromHours(-7)) };
+        IngestPlatformOrderInput nextDay = DepopScan() with { OrderedAt = new DateTimeOffset(2026, 9, 21, 12, 0, 0, TimeSpan.FromHours(-7)) };
+        await controller.Ingest(new IngestPlatformOrdersRequest("Depop", [lateReport]), CancellationToken.None);
+
+        await controller.Ingest(new IngestPlatformOrdersRequest("Depop", [nextDay]), CancellationToken.None);
+
+        Assert.Equal(2, await db.PlatformOrders.CountAsync());
     }
 
     [Fact]

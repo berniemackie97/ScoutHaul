@@ -386,13 +386,8 @@ public sealed class ReportImportService(
         return result.Imported > 0 ? $" {result.Imported} refund{SyncText.Plural(result.Imported)} applied." : string.Empty;
     }
 
-    private async Task<TimeZoneInfo> ZoneAsync(Guid organizationId, CancellationToken cancellationToken)
-    {
-        string id = (await organizations.FindAsync(organizationId, cancellationToken))?.TimeZoneId ?? Organization.DefaultTimeZoneId;
-        return TimeZoneInfo.TryFindSystemTimeZoneById(id, out TimeZoneInfo? zone)
-            ? zone
-            : TimeZoneInfo.FindSystemTimeZoneById(Organization.DefaultTimeZoneId);
-    }
+    private async Task<TimeZoneInfo> ZoneAsync(Guid organizationId, CancellationToken cancellationToken) =>
+        Organization.ZoneOf((await organizations.FindAsync(organizationId, cancellationToken))?.TimeZoneId);
 
     private static string? Refusal(ReportFile file) =>
         file.Content.Length == 0 ? "The file is empty."
