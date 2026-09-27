@@ -57,10 +57,31 @@ function readLoadedPage(global: string | null): PageResponse {
   }
 }
 
+/**
+ * A page still loading whose document is parsed and already holds what will be read. Marketplace pages keep loading
+ * ads and trackers long after that, and some never tell the browser they are done. Self-contained, like pageFetch.
+ */
+function pageSettled(global: string | null): boolean {
+  return document.readyState !== "loading" && (global === null || (window as unknown as Record<string, unknown>)[global] !== undefined);
+}
+
+async function settledIn(tabId: number, global: string | undefined): Promise<boolean> {
+  try {
+    const [first] = await browser.scripting.executeScript(global === undefined
+      ? { target: { tabId }, func: pageSettled, args: [null], injectImmediately: true }
+      : { target: { tabId }, world: "MAIN", func: pageSettled, args: [global], injectImmediately: true });
+    return first?.result === true;
+  } catch {
+    return false;
+  }
+}
+
 /** One look at a tab: how far it has loaded, and where it is. */
 export interface TabLook {
   status?: string;
   url?: string;
+  /** The page is still loading, but what will be read from it is there. */
+  settled?: boolean;
 }
 
 export type TabVerdict = "wait" | "ready" | "elsewhere";
@@ -76,7 +97,7 @@ export type TabVerdict = "wait" | "ready" | "elsewhere";
  */
 export function judgeTab(look: TabLook, readable: (url: string) => boolean, begun: boolean): TabVerdict {
   const url = look.url ?? "";
-  if (!begun || look.status !== "complete" || url === "" || url.startsWith("about:")) {
+  if (!begun || (look.status !== "complete" && !look.settled) || url === "" || url.startsWith("about:")) {
     return "wait";
   }
 
@@ -179,8 +200,15 @@ async function explain(error: unknown, tabId: number, adapter: MarketplaceAdapte
   return new AdapterError("Network", `${adapter.platform}'s page did not load properly.`);
 }
 
+function readTab(tabId: number, adapter: MarketplaceAdapter, clock: Clock, global: string | undefined): Promise<PageResponse> {
+  return inTab<PageResponse>(tabId, adapter, clock, () =>
+    global === undefined
+      ? browser.scripting.executeScript({ target: { tabId }, func: readLoadedPage, args: [null], injectImmediately: true })
+      : browser.scripting.executeScript({ target: { tabId }, world: "MAIN", func: readLoadedPage, args: [global], injectImmediately: true }));
+}
+
 function fetchIn(tabId: number, url: string): Injection {
-  return () => browser.scripting.executeScript({ target: { tabId }, world: "MAIN", func: pageFetch, args: [url] });
+  return () => browser.scripting.executeScript({ target: { tabId }, world: "MAIN", func: pageFetch, args: [url], injectImmediately: true });
 }
 
 /**
@@ -263,9 +291,8 @@ export class SyncTabs {
 
     const borrowed = tab.id;
     return {
-      page: async () => {
-        throw new Error("A borrowed tab is never navigated.");
-      },
+      // The operator's own tab: read as it stands, never navigated away from what they are looking at.
+      page: (_url: string, global?: string) => readTab(borrowed, adapter, this.clock, global),
       request: (url: string) => inTab<PageResponse>(borrowed, adapter, this.clock, fetchIn(borrowed, url)),
     };
   }
@@ -336,7 +363,7 @@ export class SyncTabs {
 
   private reader(adapter: MarketplaceAdapter, tabId: number): MarketplaceTab {
     /** Navigates the tab and waits for the new page. Returns the address it left. */
-    const navigate = async (url: string): Promise<string | undefined> => {
+    const navigate = async (url: string, global: string | undefined): Promise<string | undefined> => {
       const before = (await lookAt(tabId))?.url;
       let started = false;
       const listener = (updatedId: number, change: { status?: string; url?: string }) => {
@@ -351,26 +378,26 @@ export class SyncTabs {
           throw new AdapterError("Interrupted", "The sync tab was closed.");
         }
 
-        await waitForPage(() => lookAt(tabId), {
-          ...this.clock,
-          readable: adapter.readable,
-          begun: (seen) => started || (seen.url !== undefined && seen.url !== before),
-          timeoutMs: pageLoadTimeoutMs,
-        });
+        const begun = (seen: TabLook) => started || (seen.url !== undefined && seen.url !== before);
+        const look = async (): Promise<TabLook | null> => {
+          const seen = await lookAt(tabId);
+          if (!seen || seen.status === "complete" || !seen.url || !adapter.readable(seen.url) || !begun(seen)) {
+            return seen;
+          }
+
+          return { ...seen, settled: await settledIn(tabId, global) };
+        };
+        await waitForPage(look, { ...this.clock, readable: adapter.readable, begun, timeoutMs: pageLoadTimeoutMs });
         return before;
       } finally {
         browser.tabs.onUpdated.removeListener(listener);
       }
     };
-    const read = (global: string | undefined) =>
-      inTab<PageResponse>(tabId, adapter, this.clock, () =>
-        global === undefined
-          ? browser.scripting.executeScript({ target: { tabId }, func: readLoadedPage, args: [null] })
-          : browser.scripting.executeScript({ target: { tabId }, world: "MAIN", func: readLoadedPage, args: [global] }));
+    const read = (global: string | undefined) => readTab(tabId, adapter, this.clock, global);
 
     return {
       page: async (url: string, global?: string) => {
-        const before = await navigate(url);
+        const before = await navigate(url, global);
         const loaded = await read(global);
         if (before === undefined || loaded.url !== before || url === before) {
           return loaded;
@@ -385,7 +412,7 @@ export class SyncTabs {
         // A request is the site's own only from a page on the site's own origin.
         const current = (await lookAt(tabId))?.url;
         if (!current?.startsWith(`${adapter.home}/`)) {
-          await navigate(adapter.workerUrl);
+          await navigate(adapter.workerUrl, undefined);
         }
 
         return inTab<PageResponse>(tabId, adapter, this.clock, fetchIn(tabId, url));

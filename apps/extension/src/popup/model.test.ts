@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { ebayAdapter } from "../adapters/ebay";
 import { initialGovernorState } from "../agent/governor";
 import type { AgentAccount } from "../agent/types";
-import { dueIn, headline, loopRow, marketplaceStatus, scanBlocker, type MarketplaceStatus } from "./model";
+import { dueIn, headline, liveRunning, loopRow, marketplaceStatus, scanBlocker, type MarketplaceStatus } from "./model";
 
 const now = new Date("2026-09-19T12:00:00Z");
 const session = { signedIn: true, username: "overhaultradingcompany", marketplaceUserId: null, checkedAt: now.toISOString() };
@@ -87,5 +87,19 @@ describe("relative times", () => {
     expect(dueIn("2026-09-19T12:00:30Z", now)).toBe("now");
     expect(dueIn("2026-09-19T12:12:00Z", now)).toBe("in 12 min");
     expect(dueIn("2026-09-19T15:55:00Z", now)).toBe("in 4 h");
+  });
+});
+
+describe("what the popup shows as running", () => {
+  const running = { label: "Checking the Poshmark sign-in", key: null, startedAt: "2026-09-27T10:00:00Z", pages: 0 };
+  const at = Date.parse("2026-09-27T10:01:00Z");
+
+  it("shows work while the background keeps saying it is alive", () => {
+    expect(liveRunning(running, "2026-09-27T10:00:45Z", at)).toBe(running);
+  });
+
+  it("drops a label a stopped background left behind, instead of checking forever", () => {
+    expect(liveRunning(running, "2026-09-27T09:58:00Z", at)).toBeNull();
+    expect(liveRunning(running, null, at)).toBeNull();
   });
 });

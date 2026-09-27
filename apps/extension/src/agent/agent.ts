@@ -3,7 +3,7 @@ import { adapterFor, adapters } from "../adapters/registry";
 import type { MarketplaceAdapter } from "../adapters/types";
 import { logActivity } from "./activity";
 import { ApiError, createAgentApi, type AgentApi } from "./api";
-import { recheckMs, signedInFreshMs } from "./config";
+import { aliveBeatMs, recheckMs, signedInFreshMs } from "./config";
 import { describeBrowser } from "./environment";
 import { describeFailure, waitsForAPerson } from "./failures";
 import { pauseOf, resume } from "./governor";
@@ -25,6 +25,7 @@ import {
 } from "./runner";
 import {
   activityItem,
+  aliveItem,
   authProblemItem,
   connectionItem,
   governorItem,
@@ -393,8 +394,8 @@ export class Agent {
   private async checkSignIn(adapter: MarketplaceAdapter, tabId?: number): Promise<void> {
     this.lastChecked.set(adapter.platform, this.deps.now().getTime());
     const limits = limitsFor(await heartbeatItem.getValue(), adapter.platform);
-    await this.running(`Checking the ${adapter.platform} sign-in`, null);
     const stop = keepAlive();
+    await this.running(`Checking the ${adapter.platform} sign-in`, null);
     try {
       const borrowed = await this.deps.tabs.borrow(adapter, tabId);
       if (borrowed) {
@@ -508,12 +509,15 @@ export class Agent {
  * scan from being cut off part-way.
  */
 function keepAlive(): () => void {
+  const beat = () => void aliveItem.setValue(new Date().toISOString());
+  beat();
   const timer = setInterval(() => {
+    beat();
     try {
       void browser.runtime.getPlatformInfo().catch(() => undefined);
     } catch {
       // Nothing to keep alive where there is no such call.
     }
-  }, 20_000);
+  }, aliveBeatMs);
   return () => clearInterval(timer);
 }

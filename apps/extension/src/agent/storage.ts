@@ -93,6 +93,9 @@ export const connectionItem = storage.defineItem<Connection | null>("local:conne
 
 export const runningItem = storage.defineItem<RunningWork | null>("local:running", { fallback: null });
 
+/** When the background last showed it was working. A running label older than this was left by a stopped background. */
+export const aliveItem = storage.defineItem<string | null>("local:alive", { fallback: null });
+
 /** Scans asked for in this browser that are waiting their turn, as `accountId:loop`. */
 export const queuedItem = storage.defineItem<string[]>("local:queued", { fallback: [] });
 
