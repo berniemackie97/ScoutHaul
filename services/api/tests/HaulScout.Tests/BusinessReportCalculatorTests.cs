@@ -123,6 +123,23 @@ public sealed class BusinessReportCalculatorTests
         Assert.Equal("America/Los_Angeles", report.TimeZone);
     }
 
+    [Theory]
+    [InlineData("7d", "2026-09-28")]
+    [InlineData("30d", "2026-09-05")]
+    [InlineData("ytd", "2026-01-01")]
+    [InlineData("12m", "2025-10-05")]
+    public void Presets_end_today_in_the_business_zone(string preset, string expectedStart)
+    {
+        // 02:00 UTC on Oct 5 is still Oct 4 in Los Angeles.
+        TimeZoneInfo la = TimeZoneInfo.FindSystemTimeZoneById("America/Los_Angeles");
+        DateTimeOffset now = new(2026, 10, 5, 2, 0, 0, TimeSpan.Zero);
+
+        Assert.True(BusinessReportService.TryResolveRange(null, null, preset, la, now, out ReportRange range, out _));
+        Assert.Equal(DateOnly.Parse(expectedStart), range.FromInclusive);
+        Assert.Equal(new DateOnly(2026, 10, 4), range.ToInclusive);
+        Assert.False(BusinessReportService.TryResolveRange(null, null, "forever", la, now, out _, out _));
+    }
+
     [Fact]
     public void The_cost_breakdown_reconciles_gross_sales_to_net_profit()
     {

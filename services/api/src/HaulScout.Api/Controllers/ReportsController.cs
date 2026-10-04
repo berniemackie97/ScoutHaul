@@ -17,9 +17,11 @@ public sealed class ReportsController(BusinessReportService reports) : HaulScout
     public async Task<ActionResult<BusinessReportDto>> Overview(
         [FromQuery] DateOnly? from,
         [FromQuery] DateOnly? to,
+        [FromQuery] string? preset,
         CancellationToken cancellationToken)
     {
-        if (!BusinessReportService.TryResolveRange(from, to, await reports.ZoneAsync(cancellationToken), out ReportRange range, out string? error))
+        TimeZoneInfo zone = await reports.ZoneAsync(cancellationToken);
+        if (!BusinessReportService.TryResolveRange(from, to, preset, zone, DateTimeOffset.UtcNow, out ReportRange range, out string? error))
         {
             return Invalid(error ?? "The report could not be produced.");
         }
@@ -31,9 +33,11 @@ public sealed class ReportsController(BusinessReportService reports) : HaulScout
     public async Task<IActionResult> OverviewCsv(
         [FromQuery] DateOnly? from,
         [FromQuery] DateOnly? to,
+        [FromQuery] string? preset,
         CancellationToken cancellationToken)
     {
-        if (!BusinessReportService.TryResolveRange(from, to, await reports.ZoneAsync(cancellationToken), out ReportRange range, out string? error))
+        TimeZoneInfo zone = await reports.ZoneAsync(cancellationToken);
+        if (!BusinessReportService.TryResolveRange(from, to, preset, zone, DateTimeOffset.UtcNow, out ReportRange range, out string? error))
         {
             return Invalid(error ?? "The report could not be produced.");
         }

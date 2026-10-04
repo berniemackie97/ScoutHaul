@@ -82,9 +82,42 @@ public sealed class BusinessReportService(HaulScoutDbContext db, ICurrentUserCon
     public static DateOnly Today(TimeZoneInfo zone, DateTimeOffset now) =>
         DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(now, zone).DateTime);
 
-    public static bool TryResolveRange(DateOnly? from, DateOnly? to, TimeZoneInfo zone, out ReportRange range, out string? error)
+    public static bool TryResolveRange(DateOnly? from, DateOnly? to, TimeZoneInfo zone, out ReportRange range, out string? error) =>
+        TryResolveRange(from, to, null, zone, DateTimeOffset.UtcNow, out range, out error);
+
+    /// <param name="preset">7d, 30d, 90d, 12m or ytd, ending today in the business's zone; wins over explicit dates.</param>
+    public static bool TryResolveRange(
+        DateOnly? from,
+        DateOnly? to,
+        string? preset,
+        TimeZoneInfo zone,
+        DateTimeOffset now,
+        out ReportRange range,
+        out string? error)
     {
-        DateOnly today = Today(zone, DateTimeOffset.UtcNow);
+        DateOnly today = Today(zone, now);
+        if (!string.IsNullOrWhiteSpace(preset))
+        {
+            DateOnly? presetStart = preset.Trim().ToLowerInvariant() switch
+            {
+                "7d" => today.AddDays(-6),
+                "30d" => today.AddDays(-29),
+                "90d" => today.AddDays(-89),
+                "12m" => today.AddYears(-1).AddDays(1),
+                "ytd" => new DateOnly(today.Year, 1, 1),
+                _ => null,
+            };
+            if (presetStart is null)
+            {
+                range = default;
+                error = "Unknown report range. Use 7d, 30d, 90d, 12m or ytd.";
+                return false;
+            }
+
+            from = presetStart;
+            to = today;
+        }
+
         DateOnly end = to ?? today;
         DateOnly start = from ?? end.AddDays(1 - DefaultRangeDays);
         int days = end.DayNumber - start.DayNumber + 1;

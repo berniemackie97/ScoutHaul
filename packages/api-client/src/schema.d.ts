@@ -4984,6 +4984,7 @@ export interface paths {
                 query?: {
                     from?: string;
                     to?: string;
+                    preset?: string;
                 };
                 header?: never;
                 path?: never;
@@ -5024,6 +5025,7 @@ export interface paths {
                 query?: {
                     from?: string;
                     to?: string;
+                    preset?: string;
                 };
                 header?: never;
                 path?: never;
