@@ -1,3 +1,4 @@
+using HaulScout.Api.Services;
 using HaulScout.Application.Contracts;
 using HaulScout.Application.Services;
 using HaulScout.Domain;
@@ -96,6 +97,70 @@ public sealed class BusinessReportCalculatorTests
         Assert.Equal(15, report.Kpis.SalesTaxOwed);            // only the storefront sale is seller-owed
         Assert.Equal(128, report.Kpis.RealizedNetProfit);      // 42 + 86, tax excluded from both
         Assert.Equal(98, report.Kpis.NetIncomeAfterExpenses);  // 128 realized profit − 30 operating expenses
+    }
+
+    [Fact]
+    public void Days_are_the_business_days_in_its_own_time_zone()
+    {
+        // 8pm in Los Angeles on June 1 is 3am UTC on June 2. It is June 1's sale.
+        TimeZoneInfo la = TimeZoneInfo.FindSystemTimeZoneById("America/Los_Angeles");
+        ReportRange range = ReportRange.Between(new DateOnly(2026, 6, 1), new DateOnly(2026, 6, 3), la);
+        Assert.Equal(new DateTimeOffset(2026, 6, 1, 7, 0, 0, TimeSpan.Zero), range.From);
+        Assert.Equal(TimeSpan.Zero, range.From.Offset);
+
+        BusinessReportDto report = BusinessReportCalculator.Build(
+            range.From,
+            range.ToExclusive,
+            [Sale("Lamp", "eBay", 50, 10, 5, 0, 0, 0, 0, 35, SaleStatus.Delivered, new DateTimeOffset(2026, 6, 2, 3, 0, 0, TimeSpan.Zero))],
+            [], [], [], [],
+            range.ToExclusive,
+            la);
+
+        Assert.Equal(3, report.Series.Count);
+        Assert.Equal("Jun 1", report.Series[0].Label);
+        Assert.Equal(50, report.Series[0].GrossSales);
+        Assert.Equal(new DateOnly(2026, 6, 3), DateOnly.FromDateTime(report.To.DateTime));
+        Assert.Equal("America/Los_Angeles", report.TimeZone);
+    }
+
+    [Fact]
+    public void The_cost_breakdown_reconciles_gross_sales_to_net_profit()
+    {
+        // The partly refunded sale's net is $20 lower than its costs explain; the residual is the refund.
+        BusinessReportDto report = BusinessReportCalculator.Build(
+            From,
+            ToExclusive,
+            [
+                Sale("Camera", "eBay", 200, 80, 26, 0, 12, 3, 1, 88, SaleStatus.Delivered, From.AddHours(5), shippingCharged: 10),
+                Sale("Lens", "Depop", 60, 20, 6, 2, 0, 0, 0, 12, SaleStatus.PartiallyRefunded, From.AddHours(6)),
+            ],
+            [], [], [], [], ToExclusive);
+
+        ReportKpiDto kpis = report.Kpis;
+        Assert.Equal(260, kpis.ItemSales);
+        Assert.Equal(10, kpis.BuyerShipping);
+        Assert.Equal(kpis.GrossSales, kpis.ItemSales + kpis.BuyerShipping);
+        Assert.Equal(20, kpis.RefundsAndAdjustments);
+        Assert.Equal(
+            kpis.RealizedNetProfit,
+            kpis.GrossSales - kpis.CostOfGoods - kpis.PlatformFees - kpis.PaymentFees - kpis.ShippingCosts - kpis.SuppliesAndOther - kpis.RefundsAndAdjustments);
+        Assert.NotNull(report.PreviousKpis);
+    }
+
+    [Fact]
+    public void Sales_that_lost_money_are_listed_worst_first()
+    {
+        BusinessReportDto report = BusinessReportCalculator.Build(
+            From,
+            ToExclusive,
+            [
+                Sale("Small loss", "eBay", 10, 12, 1, 0, 0, 0, 0, -3, SaleStatus.Delivered, From.AddHours(1)),
+                Sale("Big loss", "eBay", 10, 25, 1, 0, 0, 0, 0, -16, SaleStatus.Delivered, From.AddHours(2)),
+                Sale("Winner", "eBay", 90, 10, 9, 0, 0, 0, 0, 71, SaleStatus.Delivered, From.AddHours(3)),
+            ],
+            [], [], [], [], ToExclusive);
+
+        Assert.Equal(["Big loss", "Small loss"], report.LosingSales!.Select(sale => sale.Title));
     }
 
     private static ReportSaleInput Sale(

@@ -9490,6 +9490,9 @@ export interface components {
             inventoryStatuses?: components["schemas"]["ReportDimensionDto"][] | null;
             aging?: components["schemas"]["ReportAgingBucketDto"][] | null;
             topSales?: components["schemas"]["ReportSaleRowDto"][] | null;
+            previousKpis?: components["schemas"]["ReportKpiDto"];
+            losingSales?: components["schemas"]["ReportSaleRowDto"][] | null;
+            timeZone?: string | null;
         };
         ChangeInventoryStatusRequest: {
             status?: components["schemas"]["InventoryStatus"];
@@ -11274,6 +11277,20 @@ export interface components {
             salesTaxOwed?: number;
             /** Format: double */
             netIncomeAfterExpenses?: number;
+            /** Format: double */
+            itemSales?: number;
+            /** Format: double */
+            buyerShipping?: number;
+            /** Format: double */
+            platformFees?: number;
+            /** Format: double */
+            paymentFees?: number;
+            /** Format: double */
+            shippingCosts?: number;
+            /** Format: double */
+            suppliesAndOther?: number;
+            /** Format: double */
+            refundsAndAdjustments?: number;
         };
         ReportSaleRowDto: {
             /** Format: uuid */
@@ -11292,6 +11309,8 @@ export interface components {
             marginPercent?: number;
             /** Format: date-time */
             soldAt?: string;
+            /** Format: uuid */
+            orderId?: string | null;
         };
         ReportSeriesPointDto: {
             /** Format: date-time */

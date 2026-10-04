@@ -3,22 +3,45 @@ using HaulScout.Application.Contracts;
 using HaulScout.Application.Security;
 using HaulScout.Application.Services;
 using HaulScout.Domain;
+using HaulScout.Domain.Entities;
 using HaulScout.Infrastructure.Persistence;
 
 namespace HaulScout.Api.Services;
 
 /// <summary>
-/// A reporting window and the one before it, which every figure is compared against.
+/// A reporting window and the one before it, which every figure is compared against. Days are the
+/// business's own calendar days in <see cref="Zone"/>, not UTC's.
 /// </summary>
 /// <param name="PreviousFrom">Start of the equal-length window immediately before <paramref name="From"/>.</param>
-public readonly record struct ReportRange(DateTimeOffset From, DateTimeOffset ToExclusive, DateTimeOffset PreviousFrom, DateOnly ToInclusive)
+public readonly record struct ReportRange(
+    DateTimeOffset From,
+    DateTimeOffset ToExclusive,
+    DateTimeOffset PreviousFrom,
+    DateOnly ToInclusive,
+    DateOnly FromInclusive,
+    TimeZoneInfo Zone)
 {
     /// <summary>The last <paramref name="days"/> days ending today, inclusive, and the same number before them.</summary>
-    public static ReportRange Trailing(DateOnly today, int days)
+    public static ReportRange Trailing(DateOnly today, int days, TimeZoneInfo? zone = null) =>
+        Between(today.AddDays(1 - days), today, zone ?? TimeZoneInfo.Utc);
+
+    public static ReportRange Between(DateOnly start, DateOnly end, TimeZoneInfo zone)
     {
-        DateTimeOffset from = new(today.AddDays(1 - days).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc));
-        DateTimeOffset toExclusive = new(today.AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc));
-        return new ReportRange(from, toExclusive, from.AddDays(-days), today);
+        int days = end.DayNumber - start.DayNumber + 1;
+        return new ReportRange(
+            Midnight(start, zone),
+            Midnight(end.AddDays(1), zone),
+            Midnight(start.AddDays(-days), zone),
+            end,
+            start,
+            zone);
+    }
+
+    // UTC instants: Npgsql refuses to write any other offset to a timestamptz.
+    private static DateTimeOffset Midnight(DateOnly day, TimeZoneInfo zone)
+    {
+        DateTime local = day.ToDateTime(TimeOnly.MinValue);
+        return new DateTimeOffset(local, zone.GetUtcOffset(local)).ToUniversalTime();
     }
 }
 
@@ -49,9 +72,19 @@ public sealed class BusinessReportService(HaulScoutDbContext db, ICurrentUserCon
         InventoryStatus.Returned,
     ];
 
-    public static bool TryResolveRange(DateOnly? from, DateOnly? to, out ReportRange range, out string? error)
+    /// <summary>The organization's calendar, which every report day is counted in.</summary>
+    public async Task<TimeZoneInfo> ZoneAsync(CancellationToken cancellationToken) =>
+        Organization.ZoneOf(await db.Organizations
+            .Where(organization => organization.Id == currentUser.OrganizationId)
+            .Select(organization => organization.TimeZoneId)
+            .SingleOrDefaultAsync(cancellationToken));
+
+    public static DateOnly Today(TimeZoneInfo zone, DateTimeOffset now) =>
+        DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(now, zone).DateTime);
+
+    public static bool TryResolveRange(DateOnly? from, DateOnly? to, TimeZoneInfo zone, out ReportRange range, out string? error)
     {
-        DateOnly today = DateOnly.FromDateTime(DateTime.UtcNow);
+        DateOnly today = Today(zone, DateTimeOffset.UtcNow);
         DateOnly end = to ?? today;
         DateOnly start = from ?? end.AddDays(1 - DefaultRangeDays);
         int days = end.DayNumber - start.DayNumber + 1;
@@ -68,9 +101,7 @@ public sealed class BusinessReportService(HaulScoutDbContext db, ICurrentUserCon
                 return false;
         }
 
-        DateTimeOffset fromValue = new(start.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc));
-        DateTimeOffset toExclusive = new(end.AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc));
-        range = new ReportRange(fromValue, toExclusive, fromValue.AddDays(-days), end);
+        range = ReportRange.Between(start, end, zone);
         error = null;
         return true;
     }
@@ -99,7 +130,8 @@ public sealed class BusinessReportService(HaulScoutDbContext db, ICurrentUserCon
                 item.Status,
                 item.SoldAt,
                 item.SalesTaxCollected,
-                item.TaxRemittedByPlatform))
+                item.TaxRemittedByPlatform,
+                item.OrderId))
             .ToListAsync(cancellationToken);
 
         List<ReportExpenseInput> expenses = await db.Expenses
@@ -131,6 +163,7 @@ public sealed class BusinessReportService(HaulScoutDbContext db, ICurrentUserCon
             expenses.Where(item => item.OccurredAt >= range.From).ToArray(),
             expenses.Where(item => item.OccurredAt >= range.PreviousFrom && item.OccurredAt < range.From).ToArray(),
             inventory,
-            DateTimeOffset.UtcNow);
+            DateTimeOffset.UtcNow,
+            range.Zone);
     }
 }
