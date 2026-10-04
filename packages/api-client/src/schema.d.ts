@@ -11922,6 +11922,7 @@ export interface components {
             name?: string | null;
             storeDomain?: string | null;
             isLive?: boolean;
+            timeZoneId?: string | null;
         };
         /** @enum {string} */
         StoreShippingPolicy: "StoreDefault" | "Free" | "FixedAmount";
@@ -12495,6 +12496,7 @@ export interface components {
         UpdateStoreSettingsRequest: {
             name?: string | null;
             storeDomain?: string | null;
+            timeZoneId?: string | null;
         };
         UpdateSyncScheduleRequest: {
             /** Format: int32 */

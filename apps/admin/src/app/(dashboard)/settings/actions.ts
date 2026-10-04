@@ -25,12 +25,13 @@ export async function updateStoreSettings(
   formData: FormData,
 ): Promise<SettingsActionResult> {
   const name = textValue(formData, "name");
-  if (!name) return { ok: false, message: "Store name is required." };
+  if (!name) return { ok: false, message: "Business name is required." };
 
   const body: UpdateStoreSettingsRequest = {
     name,
     // Blank disconnects the storefront; the API normalizes + validates the domain.
     storeDomain: textValue(formData, "storeDomain"),
+    timeZoneId: textValue(formData, "timeZoneId"),
   };
 
   const api = await getApiClient();
@@ -43,7 +44,7 @@ export async function updateStoreSettings(
   return {
     ok: true,
     message: result.data.storeDomain
-      ? `Saved. Storefront is live on ${result.data.storeDomain}.`
-      : "Saved. Storefront is disconnected.",
+      ? `Saved. Storefront is live on ${result.data.storeDomain}; days are counted in ${result.data.timeZoneId}.`
+      : `Saved. Days are counted in ${result.data.timeZoneId}; no storefront is connected.`,
   };
 }

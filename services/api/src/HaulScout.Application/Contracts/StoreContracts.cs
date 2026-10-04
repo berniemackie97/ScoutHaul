@@ -1,3 +1,4 @@
+using HaulScout.Domain.Entities;
 using HaulScout.Domain;
 
 namespace HaulScout.Application.Contracts;
@@ -66,14 +67,15 @@ public sealed record UpdateStoreListingCommerceRequest(
 /// The organization's storefront identity. <c>StoreDomain</c> is the public host the
 /// storefront resolves the org by; <c>null</c> means no public storefront is connected.
 /// </summary>
-public sealed record StoreSettingsDto(string Name, string? StoreDomain, bool IsLive);
+public sealed record StoreSettingsDto(string Name, string? StoreDomain, bool IsLive, string TimeZoneId = Organization.DefaultTimeZoneId);
 
 /// <summary>
 /// Sets the organization's storefront identity. The domain is normalized and validated, and
 /// must be globally unique (it is the storefront resolution key). A blank domain disconnects
 /// the storefront.
 /// </summary>
-public sealed record UpdateStoreSettingsRequest(string Name, string? StoreDomain);
+/// <param name="TimeZoneId">IANA zone the business keeps its days in. Null leaves it unchanged.</param>
+public sealed record UpdateStoreSettingsRequest(string Name, string? StoreDomain, string? TimeZoneId = null);
 
 public sealed record StoreCategoryDto(
     Guid Id,

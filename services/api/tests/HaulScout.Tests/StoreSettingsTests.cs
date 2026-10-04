@@ -138,4 +138,36 @@ public class StoreSettingsTests
 
         ProblemAssert.Invalid(result.Result);
     }
+
+    [Fact]
+    public async Task The_business_time_zone_can_be_changed_and_is_kept_when_omitted()
+    {
+        (HaulScoutDbContext db, Guid org) = NewContext(nameof(The_business_time_zone_can_be_changed_and_is_kept_when_omitted));
+        await using HaulScoutDbContext _ = db;
+        StoreSettingsController controller = new(new StoreSettingsWorkflowService(new EfStoreSettingsStore(db), new StubCurrentUser(org)));
+
+        StoreSettingsDto changed = (await controller.Update(
+            new UpdateStoreSettingsRequest("Overhaul Trading Company", null, "America/New_York"), CancellationToken.None)).Value!;
+        StoreSettingsDto kept = (await controller.Update(
+            new UpdateStoreSettingsRequest("Overhaul Trading Company", null), CancellationToken.None)).Value!;
+
+        Assert.Equal("America/New_York", changed.TimeZoneId);
+        Assert.Equal("America/New_York", kept.TimeZoneId);
+    }
+
+    [Theory]
+    [InlineData("Mars/Olympus_Mons")]
+    [InlineData("Eastern Standard Time")]
+    public async Task An_unknown_or_non_IANA_time_zone_is_refused(string zone)
+    {
+        (HaulScoutDbContext db, Guid org) = NewContext($"zone-{zone}");
+        await using HaulScoutDbContext _ = db;
+        StoreSettingsController controller = new(new StoreSettingsWorkflowService(new EfStoreSettingsStore(db), new StubCurrentUser(org)));
+
+        ActionResult<StoreSettingsDto> result = await controller.Update(
+            new UpdateStoreSettingsRequest("Overhaul Trading Company", null, zone), CancellationToken.None);
+
+        Assert.Null(result.Value);
+        Assert.Equal(Organization.DefaultTimeZoneId, (await db.Organizations.SingleAsync()).TimeZoneId);
+    }
 }

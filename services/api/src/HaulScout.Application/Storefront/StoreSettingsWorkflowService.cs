@@ -48,6 +48,12 @@ public sealed class StoreSettingsWorkflowService(IStoreSettingsStore stores, ICu
             }
         }
 
+        string? timeZoneId = TrimToNull(request.TimeZoneId);
+        if (timeZoneId is not null && !IsIanaZone(timeZoneId))
+        {
+            return AppResult<StoreSettingsDto>.Validation("Choose a time zone from the list, like America/New_York.");
+        }
+
         Organization? org = await LoadAsync(cancellationToken);
         if (org is null)
         {
@@ -56,6 +62,7 @@ public sealed class StoreSettingsWorkflowService(IStoreSettingsStore stores, ICu
 
         org.Name = name;
         org.StoreDomain = domain;
+        org.TimeZoneId = timeZoneId ?? org.TimeZoneId;
         await stores.SaveChangesAsync(cancellationToken);
         return AppResult<StoreSettingsDto>.Ok(ToDto(org));
     }
@@ -64,7 +71,13 @@ public sealed class StoreSettingsWorkflowService(IStoreSettingsStore stores, ICu
         stores.FindAsync(currentUser.OrganizationId, cancellationToken);
 
     private static StoreSettingsDto ToDto(Organization org) =>
-        new(org.Name, org.StoreDomain, org.StoreDomain is not null);
+        new(org.Name, org.StoreDomain, org.StoreDomain is not null, org.TimeZoneId);
+
+    // IANA ids only ("Region/City" or UTC): the browser, Postgres and reports all speak them; Windows ids would not round-trip.
+    private static bool IsIanaZone(string id) =>
+        id.Length <= 64
+        && (id == "UTC" || id.Contains('/', StringComparison.Ordinal))
+        && TimeZoneInfo.TryFindSystemTimeZoneById(id, out _);
 
     private static string? TrimToNull(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }
