@@ -152,7 +152,8 @@ public sealed record InventoryItemDto(
     decimal? Height,
     DimensionUnit DimensionUnit,
     decimal? Weight,
-    WeightUnit WeightUnit);
+    WeightUnit WeightUnit,
+    DateTimeOffset? PurchasedAt = null);
 
 /// <summary>Aggregate over a filtered inventory set (whole result, not just the page) for the inventory KPIs.</summary>
 /// <param name="EstimatedResaleValue">What the set is expected to sell for, falling back to the seller's ask.</param>

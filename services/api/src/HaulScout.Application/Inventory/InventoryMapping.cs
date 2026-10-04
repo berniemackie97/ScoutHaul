@@ -91,7 +91,8 @@ public static class InventoryMapping
             item.Height,
             item.DimensionUnit,
             item.Weight,
-            item.WeightUnit);
+            item.WeightUnit,
+            item.PurchasedAt);
 
     public static AcquisitionLotDto ToDto(this AcquisitionLot item) => new(
         item.Id,

@@ -14253,6 +14253,11 @@
           },
           "weightUnit": {
             "$ref": "#/components/schemas/WeightUnit"
+          },
+          "purchasedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
           }
         },
         "additionalProperties": false

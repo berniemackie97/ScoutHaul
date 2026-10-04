@@ -53,7 +53,7 @@ const packagingOptions = [
 
 function SubmitButton() {
   const { pending } = useFormStatus();
-  return <Button type="submit" disabled={pending}>{pending ? "Saving…" : "Save inventory record"}</Button>;
+  return <Button type="submit" disabled={pending}>{pending ? "Saving…" : "Save changes"}</Button>;
 }
 
 function Field({ label, name, defaultValue, type = "text", placeholder, min, max, step, error, formKey }: {
@@ -227,8 +227,20 @@ export function InventoryEditor({ item, referenceData }: { item: InventoryItem; 
   const sizedCategories = new Set(["Clothing", "Shoes", "Handbags", "Baby"]);
   const showSizing = category === "" || sizedCategories.has(category);
 
+  // Leaving with unsaved edits loses them silently; the browser's own prompt is the guard.
+  const [dirty, setDirty] = useState(false);
+  useEffect(() => {
+    if (state.ok) setDirty(false);
+  }, [state]);
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (event: BeforeUnloadEvent) => event.preventDefault();
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [dirty]);
+
   return (
-    <form action={formAction} className="space-y-6">
+    <form action={formAction} onChange={() => setDirty(true)} className="space-y-6">
       <input type="hidden" name="attributesJson" value={item.attributesJson ?? ""} />
       <input type="hidden" name="measurementsJson" value={item.measurementsJson ?? ""} />
 
@@ -319,7 +331,9 @@ export function InventoryEditor({ item, referenceData }: { item: InventoryItem; 
       </Card>
 
       <div className="sticky bottom-4 flex items-center justify-between gap-4 rounded-xl border bg-background/95 p-4 shadow-lg backdrop-blur">
-        <div aria-live="polite" className={`text-sm ${state.message ? (state.ok ? "text-green-700" : "text-destructive") : "text-muted-foreground"}`}>{state.message || "One canonical record updates admin, mobile, storefront, reports, and channel workflows."}</div>
+        <div aria-live="polite" className={`text-sm ${state.message && !dirty ? (state.ok ? "text-green-700" : "text-destructive") : dirty ? "font-medium text-amber-700 dark:text-amber-400" : "text-muted-foreground"}`}>
+          {dirty ? "Unsaved changes" : state.message || "All changes saved."}
+        </div>
         <SubmitButton />
       </div>
     </form>
