@@ -26,13 +26,16 @@ function netFrom(json: string | null | undefined): number | null {
   }
 }
 
-const saleStatusVariant = (status: string | undefined) => {
-  if (status === "Delivered") return "success" as const;
-  if (["Returned", "Refunded", "Cancelled"].includes(status ?? "")) return "destructive" as const;
-  if (["ReturnRequested", "PartiallyRefunded"].includes(status ?? "")) return "warning" as const;
-  if (["Packed", "Shipped"].includes(status ?? "")) return "info" as const;
-  return "secondary" as const;
+// Fulfillment is shown once, on the order. A line only speaks up when its money did something unusual.
+const EXCEPTION_LABELS: Record<string, { label: string; variant: "warning" | "destructive" | "secondary" }> = {
+  ReturnRequested: { label: "Return requested", variant: "warning" },
+  PartiallyRefunded: { label: "Partly refunded", variant: "warning" },
+  Returned: { label: "Returned", variant: "destructive" },
+  Refunded: { label: "Refunded", variant: "destructive" },
+  Cancelled: { label: "Cancelled", variant: "secondary" },
 };
+
+const minus = (value: number) => (value > 0 ? `−${formatCurrency(value)}` : formatCurrency(0));
 
 export function LineItems({
   lines,
@@ -50,21 +53,22 @@ export function LineItems({
   correctionsBySale: Record<string, Correction[]>;
 }) {
   const [openId, setOpenId] = useState<string | null>(null);
+  const anyRefund = lines.some((line) => (line.sale?.totalRefunded ?? 0) > 0);
+  const columns = anyRefund ? 8 : 7;
 
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead className="bg-muted/40 text-muted-foreground border-y text-left text-xs uppercase tracking-wide">
           <tr>
-            <th className="px-4 py-2 font-medium">Item</th>
-            <th className="px-4 py-2 font-medium">Sale</th>
-            <th className="px-4 py-2 text-right font-medium">Item</th>
-            <th className="px-4 py-2 text-right font-medium">Buyer ship</th>
-            <th className="px-4 py-2 text-right font-medium">Fees</th>
-            <th className="px-4 py-2 text-right font-medium">COGS</th>
-            <th className="px-4 py-2 text-right font-medium">Refunded</th>
-            <th className="px-4 py-2 text-right font-medium">Qty</th>
-            <th className="px-4 py-2 text-right font-medium">True net</th>
+            <th className="min-w-[240px] px-4 py-2 font-medium">Item</th>
+            <th className="whitespace-nowrap px-4 py-2 text-right font-medium">Price</th>
+            <th className="whitespace-nowrap px-4 py-2 text-right font-medium">Buyer ship</th>
+            <th className="whitespace-nowrap px-4 py-2 text-right font-medium">Fees</th>
+            <th className="whitespace-nowrap px-4 py-2 text-right font-medium">COGS</th>
+            {anyRefund && <th className="whitespace-nowrap px-4 py-2 text-right font-medium">Refunded</th>}
+            <th className="whitespace-nowrap px-4 py-2 text-right font-medium">Net</th>
+            <th className="w-px px-4 py-2" aria-label="Actions" />
           </tr>
         </thead>
         <tbody className="divide-y">
@@ -72,65 +76,57 @@ export function LineItems({
             const sale = line.sale;
             const fees = (sale?.platformFees ?? 0) + (sale?.paymentFees ?? 0);
             const refunded = sale?.totalRefunded ?? 0;
-            const open = sale?.id && openId === sale.id;
+            const open = Boolean(sale?.id && openId === sale.id);
+            const exception = sale?.status ? EXCEPTION_LABELS[sale.status] : undefined;
             return (
               <Fragment key={line.id}>
                 <tr className={open ? "bg-muted/20" : undefined}>
                   <td className="px-4 py-3">
-                    <Link
-                      href={`/inventory/${line.inventoryItemId}`}
-                      className="font-medium hover:underline"
-                    >
+                    <Link href={`/inventory/${line.inventoryItemId}`} className="font-medium hover:underline">
                       {line.titleSnapshot}
                     </Link>
-                    {line.skuSnapshot && (
-                      <span className="text-muted-foreground block text-xs">SKU {line.skuSnapshot}</span>
-                    )}
+                    <span className="text-muted-foreground mt-0.5 flex flex-wrap items-center gap-2 text-xs">
+                      {(line.quantity ?? 1) > 1 && <span>× {line.quantity}</span>}
+                      {line.skuSnapshot && <span>SKU {line.skuSnapshot}</span>}
+                      {exception && <Badge variant={exception.variant}>{exception.label}</Badge>}
+                      {!sale && <span>No sale recorded for this line</span>}
+                    </span>
                   </td>
-                  <td className="px-4 py-3">
-                    {sale?.id ? (
-                      <div className="space-y-1.5">
-                        <Badge variant={saleStatusVariant(sale.status)}>{sale.status}</Badge>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setOpenId(open ? null : sale.id!)}
-                          className="h-7 gap-1 px-2 text-xs"
-                        >
-                          {open ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-                          Manage
-                        </Button>
-                      </div>
-                    ) : (
-                      <span className="text-muted-foreground text-xs">No sale line</span>
-                    )}
+                  <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums">{formatCurrency(line.unitPrice)}</td>
+                  <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums">{formatCurrency(sale?.shippingCharged)}</td>
+                  <td className="text-muted-foreground whitespace-nowrap px-4 py-3 text-right tabular-nums">{sale ? minus(fees) : "—"}</td>
+                  <td className="text-muted-foreground whitespace-nowrap px-4 py-3 text-right tabular-nums">
+                    {minus(sale?.costOfGoods ?? line.unitCostSnapshot ?? 0)}
                   </td>
-                  <td className="px-4 py-3 text-right tabular-nums">{formatCurrency(line.unitPrice)}</td>
-                  <td className="px-4 py-3 text-right tabular-nums">{formatCurrency(sale?.shippingCharged)}</td>
-                  <td className="px-4 py-3 text-right tabular-nums">
-                    {sale ? (fees > 0 ? `-${formatCurrency(fees)}` : formatCurrency(0)) : "—"}
-                  </td>
-                  <td className="px-4 py-3 text-right tabular-nums">
-                    {formatCurrency(sale?.costOfGoods ?? line.unitCostSnapshot)}
-                  </td>
-                  <td className="px-4 py-3 text-right tabular-nums">
-                    {refunded > 0 ? (
-                      <span className="text-amber-700">-{formatCurrency(refunded)}</span>
-                    ) : (
-                      <span className="text-muted-foreground text-xs">—</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-right tabular-nums">{line.quantity}</td>
+                  {anyRefund && (
+                    <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums">
+                      {refunded > 0 ? <span className="text-amber-700">{minus(refunded)}</span> : <span className="text-muted-foreground">—</span>}
+                    </td>
+                  )}
                   <td
-                    className={`px-4 py-3 text-right font-medium tabular-nums ${(sale?.netProfit ?? 0) < 0 ? "text-destructive" : ""}`}
+                    className={`whitespace-nowrap px-4 py-3 text-right font-semibold tabular-nums ${(sale?.netProfit ?? 0) < 0 ? "text-destructive" : ""}`}
                   >
                     {formatCurrency(sale?.netProfit)}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    {sale?.id && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={open ? "secondary" : "outline"}
+                        onClick={() => setOpenId(open ? null : sale.id!)}
+                        className="h-8 gap-1 whitespace-nowrap px-2.5 text-xs"
+                        aria-expanded={open}
+                      >
+                        {open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                        Manage
+                      </Button>
+                    )}
                   </td>
                 </tr>
                 {open && sale?.id && (
                   <tr className="bg-muted/20">
-                    <td colSpan={9} className="px-4 pb-6 pt-2">
+                    <td colSpan={columns} className="px-4 pb-6 pt-2">
                       <div className="space-y-5">
                         <LineWorkspace
                           saleId={sale.id}
@@ -141,7 +137,7 @@ export function LineItems({
                         />
                         <details className="group">
                           <summary className="text-muted-foreground hover:text-foreground cursor-pointer text-xs">
-                            Correct fees / price &amp; view history
+                            Correct fees or price, and see the history
                           </summary>
                           <div className="mt-3 space-y-4">
                             <SaleEditor sale={sale} channels={channels} />

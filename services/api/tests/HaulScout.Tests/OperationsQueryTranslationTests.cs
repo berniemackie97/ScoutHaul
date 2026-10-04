@@ -1,3 +1,5 @@
+using Microsoft.EntityFrameworkCore;
+using HaulScout.Application.Common;
 using Microsoft.AspNetCore.Mvc;
 using HaulScout.Api.Controllers;
 using HaulScout.Api.Services;
@@ -206,6 +208,68 @@ public sealed class OperationsQueryTranslationTests(PostgresFixture postgres)
         // and the first cut of this did exactly that.
         Assert.Equal(2, searched.Summary.TotalOrders);
         Assert.Equal(100m, searched.Summary.CapturedRevenue);
+    }
+
+    [Fact]
+    public async Task Order_search_by_item_title_and_tracking_translates_to_sql()
+    {
+        (HaulScoutDbContext db, Guid org, Guid user) = await postgres.NewOrganizationAsync();
+        await using HaulScoutDbContext _ = db;
+        InventoryItem item = new() { OrganizationId = org, Title = "Brass Lamp", Status = InventoryStatus.Sold };
+        db.InventoryItems.Add(item);
+        Order order = new()
+        {
+            OrganizationId = org,
+            OrderNumber = "SH-0003",
+            Status = OrderStatus.Shipped,
+            PaymentStatus = PaymentStatus.Paid,
+            TrackingNumber = "9400111",
+            ShippingCarrier = "USPS",
+        };
+        db.Orders.Add(order);
+        db.OrderLines.Add(new OrderLine { OrganizationId = org, Order = order, InventoryItemId = item.Id, TitleSnapshot = "Brass Lamp", Quantity = 1 });
+        db.Orders.Add(new Order { OrganizationId = org, OrderNumber = "SH-0004", Status = OrderStatus.Paid, PaymentStatus = PaymentStatus.Paid });
+        await db.SaveChangesAsync();
+
+        OrdersWorkflowService orders = OrdersServiceFactory.Create(db, new StubCurrentUser(org, user));
+
+        OrderListDto byTitle = await orders.BrowseAsync(null, "brass", null, 1, 25, CancellationToken.None);
+        OrderSummaryDto found = Assert.Single(byTitle.Items);
+        Assert.Equal("Brass Lamp", found.LeadItemTitle);
+        Assert.Equal("SH-0003", Assert.Single((await orders.BrowseAsync(null, "9400", null, 1, 25, CancellationToken.None)).Items).OrderNumber);
+    }
+
+    [Fact]
+    public async Task Cancelling_an_order_reverses_its_sales_inside_one_transaction()
+    {
+        (HaulScoutDbContext db, Guid org, Guid user) = await postgres.NewOrganizationAsync();
+        await using HaulScoutDbContext _ = db;
+        InventoryItem item = new() { OrganizationId = org, Title = "Brass Lamp", PurchasePrice = 40m, Status = InventoryStatus.Sold };
+        db.InventoryItems.Add(item);
+        Order order = new() { OrganizationId = org, OrderNumber = "SH-0005", Status = OrderStatus.Paid, PaymentStatus = PaymentStatus.Paid };
+        db.Orders.Add(order);
+        Sale sale = new()
+        {
+            OrganizationId = org,
+            InventoryItem = item,
+            Order = order,
+            Platform = "Storefront",
+            SoldPrice = 100m,
+            CostOfGoods = 40m,
+            Status = SaleStatus.Recorded,
+            SoldAt = DateTimeOffset.UtcNow.AddDays(-1),
+        };
+        sale.RecomputeNet();
+        db.Sales.Add(sale);
+        await db.SaveChangesAsync();
+
+        OrdersWorkflowService orders = OrdersServiceFactory.Create(db, new StubCurrentUser(org, user));
+        AppResult<OrderDetailDto> result = await orders.UpdateStatusAsync(order.Id, new UpdateOrderStatusRequest(OrderStatus.Cancelled), CancellationToken.None);
+
+        Assert.Equal(AppResultStatus.Ok, result.Status);
+        await using HaulScoutDbContext fresh = postgres.NewContext(org);
+        Assert.Equal(SaleStatus.Cancelled, (await fresh.Sales.SingleAsync(entry => entry.Id == sale.Id)).Status);
+        Assert.Equal(OrderStatus.Cancelled, (await fresh.Orders.SingleAsync(entry => entry.Id == order.Id)).Status);
     }
 
     [Fact]

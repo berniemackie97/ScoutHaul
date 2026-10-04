@@ -384,11 +384,6 @@ public static class DtoMapping
             item.ToWorkflowState(hasOpenReturn));
     }
 
-    /// <summary>
-    /// The order's stage and the actions it allows, answered by the domain rather than re-derived per
-    /// surface. This is what stops one client offering "mark delivered" on an unpaid, unshipped order
-    /// while another refuses it.
-    /// </summary>
     /// <summary>The order's own facts, for a caller that only needs to test a transition.</summary>
     public static OrderWorkflowFacts ToWorkflowFacts(this Order item, bool hasOpenReturn = false) => new(
         item.Status,
@@ -403,34 +398,29 @@ public static class DtoMapping
         hasOpenReturn,
         Order.ChannelHandlesShipping(item.Channel));
 
+    /// <summary>The order's stage and the actions it allows, answered by the domain so every surface agrees.</summary>
     public static OrderWorkflowStateDto ToWorkflowState(this Order item, bool hasOpenReturn)
     {
         OrderWorkflowFacts facts = item.ToWorkflowFacts(hasOpenReturn);
 
         IReadOnlyList<OrderWorkflowAction> available = OrderWorkflow.AvailableActions(facts);
+        OrderWorkflowStage stage = OrderWorkflow.StageFor(facts);
 
-        // Explain only what the operator might reasonably reach for next; listing every refusal for
-        // every action is noise.
-        List<string> blockers = [];
-        foreach (OrderWorkflowAction action in new[]
-                 {
-                     OrderWorkflowAction.MarkPacked,
-                     OrderWorkflowAction.Ship,
-                     OrderWorkflowAction.MarkPickedUp,
-                     OrderWorkflowAction.MarkDelivered,
-                 })
+        // Explain only the step the order is waiting on; every refusal of every action is noise.
+        OrderWorkflowAction? next = stage switch
         {
-            if (available.Contains(action))
-            {
-                continue;
-            }
-
-            OrderTransition transition = OrderWorkflow.Evaluate(facts, action);
-            blockers.AddRange(transition.Blockers);
-        }
+            OrderWorkflowStage.AwaitingPayment or OrderWorkflowStage.ToPack => OrderWorkflowAction.MarkPacked,
+            OrderWorkflowStage.ToShip => OrderWorkflowAction.Ship,
+            OrderWorkflowStage.ReadyForPickup => OrderWorkflowAction.MarkPickedUp,
+            OrderWorkflowStage.InTransit => OrderWorkflowAction.MarkDelivered,
+            _ => null,
+        };
+        IReadOnlyList<string> blockers = next is OrderWorkflowAction action && !available.Contains(action)
+            ? OrderWorkflow.Evaluate(facts, action).Blockers
+            : [];
 
         return new OrderWorkflowStateDto(
-            OrderWorkflow.StageFor(facts).ToString(),
+            stage.ToString(),
             available.Select(action => action.ToString()).ToArray(),
             blockers.Distinct().ToArray());
     }
