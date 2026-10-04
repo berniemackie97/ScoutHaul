@@ -11,6 +11,7 @@ export function DeleteInventoryCard({ id, title }: { id: string; title: string }
   const [confirmTitle, setConfirmTitle] = useState("");
   const [result, setResult] = useState<InventoryDeleteResult | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [open, setOpen] = useState(false);
   const confirmed = confirmTitle.trim() === title.trim();
 
   function run(hard: boolean) {
@@ -29,6 +30,19 @@ export function DeleteInventoryCard({ id, title }: { id: string; title: string }
       }
       if (next.ok) router.refresh();
     });
+  }
+
+  // Rare and destructive, so it stays folded away until asked for.
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="text-muted-foreground hover:text-destructive inline-flex items-center gap-1.5 text-sm"
+      >
+        <TriangleAlert className="h-4 w-4" aria-hidden /> Archive or delete this item…
+      </button>
+    );
   }
 
   return (

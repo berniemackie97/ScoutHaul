@@ -1,13 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Barcode, CalendarDays, MapPin, TrendingUp } from "lucide-react";
-import { Badge, Card, CardContent, CardHeader, CardTitle, formatCurrency, formatDate } from "@overhaul/ui";
-import {
-  getInventoryCost,
-  getProjectedMetrics,
-  inventoryStatusLabel,
-  type InventoryItem,
-} from "@/features/inventory/inventory-operations";
+import { ArrowLeft, ImageIcon } from "lucide-react";
+import { Badge, Card, CardContent, CardHeader, CardTitle, formatCurrency } from "@overhaul/ui";
+import { getInventoryCost, inventoryStatusLabel, type InventoryItem } from "@/features/inventory/inventory-operations";
 import { findStatusConflicts } from "@/features/inventory/status-conflicts";
 import { getApiAssetUrl, getApiClient } from "@/lib/api";
 import { InventoryEditor } from "./inventory-editor";
@@ -20,6 +15,8 @@ import { DeleteInventoryCard } from "./delete-inventory-card";
 import { StorefrontPolicyCard } from "./storefront-policy-card";
 import { StatusConflictNotice } from "./status-conflict-notice";
 import { refusal } from "@/lib/page-access";
+import { When } from "@/components/when";
+import { ItemFacts } from "./item-facts";
 
 export const dynamic = "force-dynamic";
 
@@ -78,37 +75,45 @@ export default async function InventoryDetailPage({
   const statusConflicts = findStatusConflicts(inventoryItem.status, channelListings ?? []);
 
   const cost = getInventoryCost(inventoryItem);
-  const { profit: projectedProfit, roiPercent: projectedRoi } = getProjectedMetrics(inventoryItem);
+  const hero = photos.find((photo) => photo.isHero) ?? photos[0];
 
   return (
     <div className="space-y-6">
       <header className="space-y-4">
-        <Link href="/inventory" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
+        <Link href="/inventory" className="text-muted-foreground hover:text-foreground inline-flex items-center gap-2 text-sm">
           <ArrowLeft className="h-4 w-4" /> Inventory
         </Link>
-        <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
-          <div>
+        <div className="flex items-start gap-4">
+          <div className="bg-muted hidden h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-lg border sm:flex">
+            {hero ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={hero.imageUrl} alt="" className="h-full w-full object-cover" />
+            ) : (
+              <ImageIcon className="text-muted-foreground h-6 w-6" aria-hidden />
+            )}
+          </div>
+          <div className="min-w-0">
             <div className="mb-2 flex flex-wrap items-center gap-2">
               <Badge variant="secondary">{inventoryStatusLabel(inventoryItem.status)}</Badge>
               {inventoryItem.isBundle && <Badge variant="info">Bundle</Badge>}
               {inventoryItem.category && <Badge variant="outline">{inventoryItem.category}</Badge>}
             </div>
             <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{inventoryItem.title}</h1>
-            <p className="mt-1 text-sm text-muted-foreground">Canonical inventory record · updated {formatDate(inventoryItem.updatedAt)}</p>
+            <p className="text-muted-foreground mt-1 text-sm">
+              Added <When value={inventoryItem.createdAt} /> · updated <When value={inventoryItem.updatedAt} />
+            </p>
           </div>
-          <div className="font-mono text-xs text-muted-foreground">{inventoryItem.id}</div>
         </div>
       </header>
 
+      <ItemFacts item={inventoryItem} sale={sale} listings={channelListings ?? []} />
+
       <StatusConflictNotice conflicts={statusConflicts} />
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
         <InventoryEditor item={inventoryItem} referenceData={referenceData} />
 
         <aside className="space-y-6">
-          <PhotoManager id={inventoryItem.id} photos={photos} />
-          <StorefrontPolicyCard itemId={inventoryItem.id} listing={storeListing} />
-          <ListingGenerator item={inventoryItem} />
           <StatusControl item={inventoryItem} sale={sale} />
           {!inventoryItem.isSold && (
             <RecordSaleCard itemId={inventoryItem.id} cost={cost ?? 0} channels={salesReference?.channels ?? []} prefill={prefill} />
@@ -118,32 +123,9 @@ export default async function InventoryDetailPage({
             accounts={(channelAccounts ?? []).filter((account) => account.isActive)}
             listings={channelListings ?? []}
           />
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Financial snapshot</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 text-sm">
-              <div className="flex justify-between gap-4"><span className="text-muted-foreground">Acquisition cost</span><span className="font-medium tabular-nums">{formatCurrency(cost)}</span></div>
-              {inventoryItem.acquisitionLotId && (
-                <>
-                  <div className="flex justify-between gap-4">
-                    <span className="text-muted-foreground">From lot</span>
-                    <Link href={`/purchases/${inventoryItem.acquisitionLotId}`} className="font-medium text-brand-700 hover:underline">{inventoryItem.acquisitionLotName ?? "View lot"}</Link>
-                  </div>
-                  {inventoryItem.acquisitionAllocatedCost != null && (
-                    <div className="flex justify-between gap-4">
-                      <span className="text-muted-foreground">Allocated share</span>
-                      <span className="font-medium tabular-nums">{formatCurrency(inventoryItem.acquisitionAllocatedCost)}</span>
-                    </div>
-                  )}
-                </>
-              )}
-              <div className="flex justify-between gap-4"><span className="text-muted-foreground">Expected sale</span><span className="font-medium tabular-nums">{formatCurrency(inventoryItem.estimatedSalePrice)}</span></div>
-              <div className="flex justify-between gap-4 border-t pt-3"><span className="text-muted-foreground">Projected gross profit</span><span className="font-medium tabular-nums">{formatCurrency(projectedProfit)}</span></div>
-              <div className="flex justify-between gap-4"><span className="inline-flex items-center gap-1 text-muted-foreground"><TrendingUp className="h-3.5 w-3.5" /> Projected ROI</span><span className="font-medium tabular-nums">{projectedRoi == null ? "—" : `${projectedRoi.toFixed(1)}%`}</span></div>
-            </CardContent>
-          </Card>
+          <PhotoManager id={inventoryItem.id} photos={photos} />
+          <StorefrontPolicyCard itemId={inventoryItem.id} listing={storeListing} />
+          <ListingGenerator item={inventoryItem} />
 
           {inventoryItem.isBundle && (inventoryItem.bundleComponents?.length ?? 0) > 0 && (
             <Card>
@@ -157,7 +139,7 @@ export default async function InventoryDetailPage({
                       <Link href={`/inventory/${component.componentInventoryItemId}`} className="font-medium hover:underline">
                         {component.componentTitle}
                       </Link>
-                      <p className="text-xs text-muted-foreground">{inventoryStatusLabel(component.componentStatus)}</p>
+                      <p className="text-muted-foreground text-xs">{inventoryStatusLabel(component.componentStatus)}</p>
                     </div>
                     <span className="tabular-nums">{formatCurrency(component.costSnapshot)}</span>
                   </div>
@@ -165,17 +147,6 @@ export default async function InventoryDetailPage({
               </CardContent>
             </Card>
           )}
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Record metadata</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 text-sm">
-              <div className="flex items-start gap-2"><Barcode className="mt-0.5 h-4 w-4 text-muted-foreground" /><div><p className="text-xs text-muted-foreground">Barcode / SKU</p><p>{inventoryItem.barcode ?? "Not assigned"}</p></div></div>
-              <div className="flex items-start gap-2"><MapPin className="mt-0.5 h-4 w-4 text-muted-foreground" /><div><p className="text-xs text-muted-foreground">Storage</p><p>{inventoryItem.storageLocation ?? "Not assigned"}</p></div></div>
-              <div className="flex items-start gap-2"><CalendarDays className="mt-0.5 h-4 w-4 text-muted-foreground" /><div><p className="text-xs text-muted-foreground">Created</p><p>{formatDate(inventoryItem.createdAt)}</p></div></div>
-            </CardContent>
-          </Card>
 
           <DeleteInventoryCard id={inventoryItem.id} title={inventoryItem.title ?? ""} />
         </aside>

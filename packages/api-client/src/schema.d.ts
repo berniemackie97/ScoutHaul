@@ -10228,6 +10228,8 @@ export interface components {
             /** Format: double */
             weight?: number | null;
             weightUnit?: components["schemas"]["WeightUnit"];
+            /** Format: date-time */
+            purchasedAt?: string | null;
         };
         InventoryLifecycleCountDto: {
             group?: components["schemas"]["InventoryLifecycleGroup"];
