@@ -93,7 +93,22 @@ public sealed record InventoryReferenceDataDto(
     IReadOnlyList<InventoryReferenceOptionDto> SizeSystems,
     IReadOnlyList<InventoryReferenceOptionDto> Sizes,
     IReadOnlyList<InventoryReferenceOptionDto> StorageLocations,
-    IReadOnlyList<InventoryReferenceOptionDto> Countries);
+    IReadOnlyList<InventoryReferenceOptionDto> Countries,
+    // Which fields each kind of item has; editors render from this rather than from their own lists.
+    IReadOnlyList<ItemProfileDto> Profiles);
+
+public sealed record ItemFieldDto(ItemField Field, string Label, ListingReadiness Readiness);
+
+public sealed record ItemAttributeDto(string Key, string Label, IReadOnlyList<string>? Options);
+
+public sealed record ItemProfileDto(
+    string Key,
+    string Label,
+    IReadOnlyList<string> Categories,
+    IReadOnlyList<ItemFieldDto> Fields,
+    IReadOnlyList<ItemAttributeDto> Attributes,
+    IReadOnlyList<string> SizeSystems,
+    string BrandLabel);
 
 public sealed record InventoryItemDto(
     Guid Id,

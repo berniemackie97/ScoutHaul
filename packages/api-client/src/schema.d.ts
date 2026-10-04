@@ -10295,6 +10295,7 @@ export interface components {
             sizes?: components["schemas"]["InventoryReferenceOptionDto"][] | null;
             storageLocations?: components["schemas"]["InventoryReferenceOptionDto"][] | null;
             countries?: components["schemas"]["InventoryReferenceOptionDto"][] | null;
+            profiles?: components["schemas"]["ItemProfileDto"][] | null;
         };
         InventoryReferenceOptionDto: {
             value?: string | null;
@@ -10348,6 +10349,27 @@ export interface components {
             returnShippingCost?: number;
             notes?: string | null;
         };
+        ItemAttributeDto: {
+            key?: string | null;
+            label?: string | null;
+            options?: string[] | null;
+        };
+        /** @enum {string} */
+        ItemField: "Model" | "Color" | "Size" | "FunctionalStatus" | "CompletenessStatus" | "AuthenticityStatus" | "PackagingStatus" | "ManufacturerPartNumber" | "SerialNumber" | "ManufactureYear" | "CountryOfOrigin";
+        ItemFieldDto: {
+            field?: components["schemas"]["ItemField"];
+            label?: string | null;
+            readiness?: components["schemas"]["ListingReadiness"];
+        };
+        ItemProfileDto: {
+            key?: string | null;
+            label?: string | null;
+            categories?: string[] | null;
+            fields?: components["schemas"]["ItemFieldDto"][] | null;
+            attributes?: components["schemas"]["ItemAttributeDto"][] | null;
+            sizeSystems?: string[] | null;
+            brandLabel?: string | null;
+        };
         ListingDto: {
             /** Format: uuid */
             id?: string;
@@ -10368,6 +10390,8 @@ export interface components {
             title?: string | null;
             description?: string | null;
         };
+        /** @enum {string} */
+        ListingReadiness: "Optional" | "Recommended" | "Required";
         /** @enum {string} */
         ListingStatus: "Draft" | "Active" | "Ended" | "Sold" | "Cancelled";
         MarketAnalysisRequest: {

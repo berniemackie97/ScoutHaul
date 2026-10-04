@@ -17,6 +17,7 @@ import { StatusConflictNotice } from "./status-conflict-notice";
 import { refusal } from "@/lib/page-access";
 import { When } from "@/components/when";
 import { ItemFacts } from "./item-facts";
+import { profileFor } from "@/features/inventory/item-profiles";
 
 export const dynamic = "force-dynamic";
 
@@ -114,7 +115,7 @@ export default async function InventoryDetailPage({
         <InventoryEditor item={inventoryItem} referenceData={referenceData} />
 
         <aside className="space-y-6">
-          <StatusControl item={inventoryItem} sale={sale} />
+          <StatusControl item={inventoryItem} sale={sale} profile={profileFor(referenceData.profiles, inventoryItem.category)} />
           {!inventoryItem.isSold && (
             <RecordSaleCard itemId={inventoryItem.id} cost={cost ?? 0} channels={salesReference?.channels ?? []} prefill={prefill} />
           )}

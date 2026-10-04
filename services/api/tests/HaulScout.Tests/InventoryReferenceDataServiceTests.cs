@@ -43,7 +43,11 @@ public sealed class InventoryReferenceDataServiceTests
         Assert.Contains(data.Brands, option => option.Value == "Nintendo");
         Assert.Contains(data.Models, option => option.Value == "Switch OLED" && option.ParentValue == "Nintendo");
         Assert.Contains(data.StorageLocations, option => option.Value == "Warehouse A / Bin 12");
-        Assert.Contains(data.StorageLocations, option => option.Value == "Other");
+        // "Other" is not a place; the only locations offered are ones in use.
+        Assert.DoesNotContain(data.StorageLocations, option => option.Value == "Other");
+        Assert.DoesNotContain(data.Brands, option => option.Value == "Other");
+        Assert.DoesNotContain(data.Colors, option => option.Value == "Other");
+        Assert.Contains(data.Profiles, profile => profile.Key == "apparel" && profile.Categories.Contains("Clothing"));
         Assert.Contains(data.Countries, option => option.Value == "US");
         Assert.DoesNotContain(data.Categories, option => option.IsLegacy);
         Assert.DoesNotContain(data.Brands, option => option.IsLegacy);
@@ -71,6 +75,25 @@ public sealed class InventoryReferenceDataServiceTests
         Assert.Equal("Other", corrected.Values!.Category);
         Assert.Equal("Nintenndo", corrected.Values.Brand);
         Assert.Equal("Switch-ish", corrected.Values.Model);
+    }
+
+    [Fact]
+    public async Task Placeholders_and_unknown_values_are_left_blank_rather_than_saved_as_other()
+    {
+        Guid organizationId = Guid.NewGuid();
+        await using HaulScoutDbContext db = NewContext(organizationId, nameof(Placeholders_and_unknown_values_are_left_blank_rather_than_saved_as_other));
+        InventoryReferenceDataService service = new(new EfInventoryReferenceDataStore(db, new StubCurrentUser(organizationId)));
+
+        (InventoryReferenceDataService.ControlledValues? values, _) = await service.ResolveAsync(
+            Request(category: "Clothing", brand: "Unbranded", model: "Other") with { Color = "Chartreuse-ish", Condition = "Other", SizeValue = "M" },
+            CancellationToken.None);
+
+        Assert.Null(values!.Brand);
+        Assert.Null(values.Model);
+        Assert.Null(values.Color);
+        Assert.Null(values.Condition);
+        // A size means nothing without the system it is measured in.
+        Assert.Null(values.SizeValue);
     }
 
     private static HaulScoutDbContext NewContext(Guid organizationId, string databaseName)

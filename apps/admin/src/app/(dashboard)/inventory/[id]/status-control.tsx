@@ -15,18 +15,19 @@ import {
 } from "@/features/inventory/inventory-operations";
 import { factsFromInventoryItem, readinessBlockers } from "@/features/inventory/lifecycle-readiness";
 import { ReadinessChecklist } from "@/features/inventory/readiness-checklist";
+import type { ItemProfile } from "@/features/inventory/item-profiles";
 import { changeInventoryStatus } from "./actions";
 
 type Sale = components["schemas"]["SaleDto"];
 
-export function StatusControl({ item, sale }: { item: InventoryItem; sale?: Sale }) {
+export function StatusControl({ item, sale, profile }: { item: InventoryItem; sale?: Sale; profile: ItemProfile }) {
   const id = item.id!;
   const status = item.status!;
   const [nextStatus, setNextStatus] = useState<InventoryStatus>(status);
   const [message, setMessage] = useState("");
   const [isPending, startTransition] = useTransition();
   const isCommerceManaged = COMMERCE_MANAGED_STATUSES.includes(status) && status !== "Returned";
-  const readinessFacts = factsFromInventoryItem(item);
+  const readinessFacts = factsFromInventoryItem(item, profile);
   const blockers = readinessBlockers(nextStatus, readinessFacts);
   const blockedReadyToList = nextStatus === "ReadyToList" && blockers.length > 0;
 
