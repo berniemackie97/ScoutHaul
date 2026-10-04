@@ -17,6 +17,12 @@ public interface IInventoryStore
 
     Task<bool> ExistsAsync(Guid organizationId, Guid id, CancellationToken cancellationToken);
 
+    /// <summary>The bare rows, for a bulk change.</summary>
+    Task<IReadOnlyList<InventoryItem>> FindManyAsync(Guid organizationId, IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken);
+
+    /// <summary>Channel presence, the live sale and acquisition date for a page of items.</summary>
+    Task<IReadOnlyList<InventoryRowFacts>> RowFactsAsync(Guid organizationId, IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken);
+
     /// <summary>
     /// Whether a sale still holds this item — i.e. one that has not released it back (returned/refunded/cancelled).
     /// Inventory has to ask because an item under an active sale may only change stage through the sales workflow;

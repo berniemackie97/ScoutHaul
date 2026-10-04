@@ -28,6 +28,51 @@ public sealed class EfInventoryStore(HaulScoutDbContext db) : IInventoryStore
     public Task<bool> ExistsAsync(Guid organizationId, Guid id, CancellationToken cancellationToken) =>
         db.InventoryItems.AnyAsync(item => item.Id == id && item.OrganizationId == organizationId, cancellationToken);
 
+    public async Task<IReadOnlyList<InventoryItem>> FindManyAsync(Guid organizationId, IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken) =>
+        await db.InventoryItems
+            .Where(item => item.OrganizationId == organizationId && ids.Contains(item.Id))
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<InventoryRowFacts>> RowFactsAsync(
+        Guid organizationId,
+        IReadOnlyCollection<Guid> ids,
+        CancellationToken cancellationToken)
+    {
+        var acquired = await db.InventoryItems
+            .Where(item => item.OrganizationId == organizationId && ids.Contains(item.Id))
+            .Select(item => new { item.Id, At = item.PurchasedAt ?? item.CreatedAt })
+            .ToListAsync(cancellationToken);
+        var presence = await db.ChannelListings
+            .Where(listing => listing.OrganizationId == organizationId
+                && ids.Contains(listing.InventoryItemId)
+                && listing.Status != ChannelListingStatus.NotListed
+                && listing.Status != ChannelListingStatus.Delisted)
+            .Select(listing => new { listing.InventoryItemId, Platform = listing.ChannelAccount!.Channel, listing.Status, listing.ListedPrice, listing.ExternalUrl })
+            .ToListAsync(cancellationToken);
+        var sales = await db.Sales
+            .Where(sale => sale.OrganizationId == organizationId
+                && ids.Contains(sale.InventoryItemId)
+                && !SaleWorkflow.InventoryReleaseStatuses.Contains(sale.Status))
+            .Select(sale => new { sale.InventoryItemId, sale.Platform, sale.SoldPrice, sale.NetProfit, sale.SoldAt, sale.OrderId })
+            .ToListAsync(cancellationToken);
+
+        return acquired
+            .Select(item => new InventoryRowFacts(
+                item.Id,
+                item.At,
+                presence
+                    .Where(listing => listing.InventoryItemId == item.Id)
+                    .OrderBy(listing => listing.Platform)
+                    .Select(listing => new InventoryPresence(listing.Platform, listing.Status, listing.ListedPrice, listing.ExternalUrl))
+                    .ToList(),
+                sales
+                    .Where(sale => sale.InventoryItemId == item.Id)
+                    .OrderByDescending(sale => sale.SoldAt)
+                    .Select(sale => new InventorySaleFacts(sale.Platform, sale.SoldPrice, sale.NetProfit, sale.SoldAt, sale.OrderId))
+                    .FirstOrDefault()))
+            .ToList();
+    }
+
     public Task<bool> HasActiveSaleAsync(Guid organizationId, Guid inventoryItemId, CancellationToken cancellationToken) =>
         db.Sales.AnyAsync(
             sale => sale.InventoryItemId == inventoryItemId
@@ -52,7 +97,8 @@ public sealed class EfInventoryStore(HaulScoutDbContext db) : IInventoryStore
         int skip,
         int take,
         CancellationToken cancellationToken) =>
-        await Hydrated(Sorted(Filtered(organizationId, filter), sort))
+        // The id tiebreak keeps equal sort keys in one order, so paging never repeats or skips a row.
+        await Hydrated(Sorted(Filtered(organizationId, filter), sort).ThenBy(item => item.Id))
             .Skip(skip)
             .Take(take)
             .ToListAsync(cancellationToken);
@@ -311,7 +357,7 @@ public sealed class EfInventoryStore(HaulScoutDbContext db) : IInventoryStore
         return query;
     }
 
-    private static IQueryable<InventoryItem> Sorted(IQueryable<InventoryItem> query, InventorySort sort) =>
+    private static IOrderedQueryable<InventoryItem> Sorted(IQueryable<InventoryItem> query, InventorySort sort) =>
         (sort.Field, sort.Descending) switch
         {
             (InventorySortField.Title, false) => query.OrderBy(item => item.Title),
@@ -322,6 +368,8 @@ public sealed class EfInventoryStore(HaulScoutDbContext db) : IInventoryStore
             (InventorySortField.EstimatedSalePrice, true) => query.OrderByDescending(item => item.EstimatedSalePrice),
             (InventorySortField.CreatedAt, false) => query.OrderBy(item => item.CreatedAt),
             (InventorySortField.CreatedAt, true) => query.OrderByDescending(item => item.CreatedAt),
+            (InventorySortField.AcquiredAt, false) => query.OrderBy(item => item.PurchasedAt ?? item.CreatedAt),
+            (InventorySortField.AcquiredAt, true) => query.OrderByDescending(item => item.PurchasedAt ?? item.CreatedAt),
             (_, false) => query.OrderBy(item => item.UpdatedAt),
             (_, true) => query.OrderByDescending(item => item.UpdatedAt),
         };

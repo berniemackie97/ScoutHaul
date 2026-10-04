@@ -35,6 +35,7 @@ public enum InventorySortField
     PurchasePrice,
     EstimatedSalePrice,
     CreatedAt,
+    AcquiredAt,
 }
 
 /// <param name="Descending">Sort direction for <paramref name="Field"/>.</param>
@@ -51,3 +52,12 @@ public sealed record InventoryScalars(
     decimal? SellerAskingPrice,
     InventoryFunctionalStatus FunctionalStatus = InventoryFunctionalStatus.Unknown,
     InventoryOwnershipType OwnershipType = InventoryOwnershipType.Owned);
+
+/// <summary>Where an item is listed: one row per channel it is on, has sold on, or must come down from.</summary>
+public sealed record InventoryPresence(string Platform, ChannelListingStatus Status, decimal? Price, string? Url);
+
+/// <summary>The sale that holds an item, when one does.</summary>
+public sealed record InventorySaleFacts(string Platform, decimal SoldPrice, decimal NetProfit, DateTimeOffset SoldAt, Guid? OrderId);
+
+/// <summary>What a list row shows beyond the item itself, read in one pass for the page.</summary>
+public sealed record InventoryRowFacts(Guid InventoryItemId, DateTimeOffset AcquiredAt, IReadOnlyList<InventoryPresence> Channels, InventorySaleFacts? Sale);

@@ -147,6 +147,9 @@ export function matchesInventorySearch(item: InventoryItem, query: string): bool
   );
 }
 
+/** "ReadyToList" → "Ready to list": sentence case, like every other label in the portal. */
 export function inventoryStatusLabel(value: string | null | undefined): string {
-  return value?.replace(/([a-z])([A-Z])/g, "$1 $2") ?? "—";
+  if (!value) return "—";
+  const spaced = value.replace(/([a-z])([A-Z])/g, "$1 $2");
+  return spaced.charAt(0) + spaced.slice(1).toLowerCase();
 }

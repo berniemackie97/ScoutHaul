@@ -174,7 +174,36 @@ public sealed record InventorySummaryDto(
     int NonFunctional);
 
 /// <summary>A searchable, sortable, paged page of inventory plus the summary over the whole filtered set.</summary>
-public sealed record InventoryListDto(IReadOnlyList<InventoryItemDto> Items, int Total, int Page, int PageSize, int PageCount, InventorySummaryDto Summary);
+public sealed record InventoryListDto(
+    IReadOnlyList<InventoryItemDto> Items,
+    int Total,
+    int Page,
+    int PageSize,
+    int PageCount,
+    InventorySummaryDto Summary,
+    // Per row: where it is listed, what it sold for, how long it has been held.
+    IReadOnlyList<InventoryRowFactsDto>? Facts = null,
+    // How many match the search in each lifecycle group, whichever group is being shown.
+    IReadOnlyList<InventoryLifecycleCountDto>? LifecycleCounts = null);
+
+public sealed record InventoryChannelPresenceDto(string Platform, ChannelListingStatus Status, decimal? Price, string? Url);
+
+public sealed record InventoryRowFactsDto(
+    Guid InventoryItemId,
+    DateTimeOffset AcquiredAt,
+    IReadOnlyList<InventoryChannelPresenceDto> Channels,
+    string? SoldOn = null,
+    decimal? SoldPrice = null,
+    decimal? NetProfit = null,
+    DateTimeOffset? SoldAt = null,
+    Guid? OrderId = null);
+
+public sealed record InventoryLifecycleCountDto(InventoryLifecycleGroup Group, int Count);
+
+/// <summary>Put many items in one place at once — a bin, a shelf, a tote. Null or blank clears it.</summary>
+public sealed record SetInventoryLocationRequest(IReadOnlyList<Guid> InventoryItemIds, string? StorageLocation);
+
+public sealed record BulkInventoryUpdateResultDto(int Updated, int NotFound);
 
 public sealed record AcquisitionLotItemInputDto(
     Guid InventoryItemId,

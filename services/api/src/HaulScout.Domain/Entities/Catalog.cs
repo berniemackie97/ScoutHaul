@@ -78,6 +78,8 @@ public sealed class InventoryItem : EntityBase, IOrganizationScoped
     public WeightUnit WeightUnit { get; set; } = WeightUnit.Ounces;
     public string? AttributesJson { get; set; }
     public string? MeasurementsJson { get; set; }
+    public const int StorageLocationLimit = 160;
+
     public string? StorageLocation { get; set; }
     public string? Accessories { get; set; }
     public string? MissingParts { get; set; }
