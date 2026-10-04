@@ -19179,6 +19179,10 @@
           },
           "isLive": {
             "type": "boolean"
+          },
+          "timeZoneId": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -20891,6 +20895,10 @@
             "nullable": true
           },
           "storeDomain": {
+            "type": "string",
+            "nullable": true
+          },
+          "timeZoneId": {
             "type": "string",
             "nullable": true
           }
