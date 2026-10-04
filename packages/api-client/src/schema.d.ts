@@ -5278,6 +5278,45 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/sales/by-item/{inventoryItemId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    inventoryItemId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SaleDto"][];
+                        "application/json": components["schemas"]["SaleDto"][];
+                        "text/json": components["schemas"]["SaleDto"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/sales/{id}": {
         parameters: {
             query?: never;
@@ -10554,6 +10593,8 @@ export interface components {
             externalOrderId?: string | null;
             buyerReference?: string | null;
             stage?: string | null;
+            leadItemTitle?: string | null;
+            trackingUrl?: string | null;
         };
         OrderWorkflowStateDto: {
             stage?: string | null;

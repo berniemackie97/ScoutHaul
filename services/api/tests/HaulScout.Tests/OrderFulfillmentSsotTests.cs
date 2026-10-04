@@ -55,7 +55,7 @@ public class OrderFulfillmentSsotTests
     }
 
     private static OrdersController NewController(HaulScoutDbContext db, StubCurrentUser currentUser) =>
-        new(new OrdersWorkflowService(db, currentUser, new OrderAssembler(db, currentUser)));
+        new(OrdersServiceFactory.Create(db, currentUser));
 
     [Fact]
     public async Task Marking_the_order_delivered_propagates_to_its_sales()

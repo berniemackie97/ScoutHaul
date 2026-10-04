@@ -117,6 +117,16 @@ public sealed class SaleQueryService(HaulScoutDbContext db, ICurrentUserContext 
             realized.Sum(item => item.Refunds.Sum(refund => refund.ItemAmount + refund.ShippingRefunded)));
     }
 
+    /// <summary>Every sale of one item, newest first — an item can sell, come back, and sell again.</summary>
+    public async Task<IReadOnlyList<SaleDto>> ForItemAsync(Guid inventoryItemId, CancellationToken cancellationToken)
+    {
+        List<Sale> sales = await Scoped()
+            .Where(item => item.InventoryItemId == inventoryItemId)
+            .OrderByDescending(item => item.SoldAt)
+            .ToListAsync(cancellationToken);
+        return sales.Select(item => item.ToDto()).ToList();
+    }
+
     public async Task<AppResult<SaleDto>> GetAsync(Guid id, CancellationToken cancellationToken)
     {
         Sale? sale = await Scoped().SingleOrDefaultAsync(item => item.Id == id, cancellationToken);

@@ -19,6 +19,15 @@ const deferred = {
   // asks for ^1.0.2), so forcing it through `overrides` would change the parser Metro bundles our
   // assets with. It goes when Expo ships a Metro that asks for a patched one.
   'image-size': 'Expo/Metro releasing a build that asks for image-size >= 2.0.3',
+
+  // GHSA-vfj7-8cjw-p6xm — `braces` overflows the stack on deeply nested glob patterns. Reached only
+  // through micromatch in Jest, with patterns written in this repo's config. No release fixes it yet.
+  braces: 'braces publishing a release above 3.0.3',
+
+  // GHSA-86w9-cpqp-85rv — `node-forge` accepts malformed RSA PKCS#1 v1.5 signatures. Used only by the
+  // Expo CLI and expo-updates' Node tooling for code-signing certificates, which this app does not
+  // configure; the shipped app verifies nothing with it. No release fixes it yet.
+  'node-forge': 'node-forge publishing a release above 1.4.0',
 };
 
 const run = promisify(execFile);
@@ -63,8 +72,12 @@ for (let attempt = 1; ; attempt += 1) {
   }
 }
 
+// Only packages that carry an advisory themselves. Everything that merely depends on one is listed
+// by npm too (jest, expo, metro…), restating the same advisory once per package in the chain.
 const found = Object.entries(report.vulnerabilities).filter(
-  ([, advisory]) => advisory.severity === 'high' || advisory.severity === 'critical',
+  ([, advisory]) =>
+    (advisory.severity === 'high' || advisory.severity === 'critical') &&
+    advisory.via.some((source) => typeof source === 'object'),
 );
 
 const undeclared = found.filter(([name]) => !(name in deferred));

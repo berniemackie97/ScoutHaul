@@ -51,6 +51,7 @@ export default async function InventoryDetailPage({
     { data: channelListings },
     { data: salesReference },
     { data: storeListing },
+    { data: itemSales },
   ] = await Promise.all([
     api.GET("/api/inventory/{id}", { params: { path: { id } } }),
     api.GET("/api/inventory/reference-data"),
@@ -58,7 +59,10 @@ export default async function InventoryDetailPage({
     api.GET("/api/inventory/{itemId}/channel-listings", { params: { path: { itemId: id } } }),
     api.GET("/api/sales/reference-data", {}),
     api.GET("/api/store/listings/by-item/{inventoryItemId}", { params: { path: { inventoryItemId: id } } }),
+    api.GET("/api/sales/by-item/{inventoryItemId}", { params: { path: { inventoryItemId: id } } }),
   ]);
+  // The sale that made this item sold — the newest one that still stands.
+  const sale = (itemSales ?? []).find((entry) => entry.status !== "Cancelled");
   const inventoryItem = item as InventoryItem | undefined;
   if (!inventoryItem?.id || !inventoryItem.status) notFound();
   if (!referenceData) throw new Error("Inventory reference data could not be loaded.");
@@ -105,7 +109,7 @@ export default async function InventoryDetailPage({
           <PhotoManager id={inventoryItem.id} photos={photos} />
           <StorefrontPolicyCard itemId={inventoryItem.id} listing={storeListing} />
           <ListingGenerator item={inventoryItem} />
-          <StatusControl item={inventoryItem} />
+          <StatusControl item={inventoryItem} sale={sale} />
           {!inventoryItem.isSold && (
             <RecordSaleCard itemId={inventoryItem.id} cost={cost ?? 0} channels={salesReference?.channels ?? []} prefill={prefill} />
           )}

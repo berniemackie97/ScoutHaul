@@ -310,7 +310,9 @@ public static class DtoMapping
         item.Channel,
         item.ExternalOrderId,
         item.BuyerReference,
-        OrderWorkflow.StageFor(item.ToWorkflowFacts(hasOpenReturn)).ToString());
+        OrderWorkflow.StageFor(item.ToWorkflowFacts(hasOpenReturn)).ToString(),
+        item.Lines.OrderBy(line => line.TitleSnapshot).Select(line => line.TitleSnapshot).FirstOrDefault(),
+        item.TrackingUrl);
 
     public static CustomerChannelIdentityDto ToDto(this CustomerChannelIdentity item) => new(
         item.Id,
@@ -331,7 +333,8 @@ public static class DtoMapping
                 ? sale
                 : null;
 
-        decimal cogs = item.Lines.Sum(line => (line.UnitCostSnapshot ?? 0) * line.Quantity);
+        // The sale's COGS is the live figure; the line snapshot goes stale when a cost is entered after the sale.
+        decimal cogs = item.Lines.Sum(line => SaleFor(line)?.CostOfGoods ?? (line.UnitCostSnapshot ?? 0) * line.Quantity);
         // Refunds live on the sale lines; roll them up so the order shows what the buyer was actually charged net.
         decimal totalRefunded = salesByInventoryItem is null
             ? 0
@@ -381,11 +384,6 @@ public static class DtoMapping
             item.ToWorkflowState(hasOpenReturn));
     }
 
-    /// <summary>
-    /// The order's stage and the actions it allows, answered by the domain rather than re-derived per
-    /// surface. This is what stops one client offering "mark delivered" on an unpaid, unshipped order
-    /// while another refuses it.
-    /// </summary>
     /// <summary>The order's own facts, for a caller that only needs to test a transition.</summary>
     public static OrderWorkflowFacts ToWorkflowFacts(this Order item, bool hasOpenReturn = false) => new(
         item.Status,
@@ -397,46 +395,32 @@ public static class DtoMapping
         HasShippingAddress: !string.IsNullOrWhiteSpace(item.ShipToLine1),
         IsShipped: item.ShippedAt is not null,
         IsDelivered: item.DeliveredAt is not null,
-        hasOpenReturn);
+        hasOpenReturn,
+        Order.ChannelHandlesShipping(item.Channel));
 
+    /// <summary>The order's stage and the actions it allows, answered by the domain so every surface agrees.</summary>
     public static OrderWorkflowStateDto ToWorkflowState(this Order item, bool hasOpenReturn)
     {
-        OrderWorkflowFacts facts = new(
-            item.Status,
-            item.PaymentStatus,
-            item.IsLocalPickup,
-            IsPacked: item.PackedAt is not null,
-            HasCarrier: !string.IsNullOrWhiteSpace(item.ShippingCarrier),
-            HasTrackingNumber: !string.IsNullOrWhiteSpace(item.TrackingNumber),
-            HasShippingAddress: !string.IsNullOrWhiteSpace(item.ShipToLine1),
-            IsShipped: item.ShippedAt is not null,
-            IsDelivered: item.DeliveredAt is not null,
-            hasOpenReturn);
+        OrderWorkflowFacts facts = item.ToWorkflowFacts(hasOpenReturn);
 
         IReadOnlyList<OrderWorkflowAction> available = OrderWorkflow.AvailableActions(facts);
+        OrderWorkflowStage stage = OrderWorkflow.StageFor(facts);
 
-        // Explain only what the operator might reasonably reach for next; listing every refusal for
-        // every action is noise.
-        List<string> blockers = [];
-        foreach (OrderWorkflowAction action in new[]
-                 {
-                     OrderWorkflowAction.MarkPacked,
-                     OrderWorkflowAction.Ship,
-                     OrderWorkflowAction.MarkPickedUp,
-                     OrderWorkflowAction.MarkDelivered,
-                 })
+        // Explain only the step the order is waiting on; every refusal of every action is noise.
+        OrderWorkflowAction? next = stage switch
         {
-            if (available.Contains(action))
-            {
-                continue;
-            }
-
-            OrderTransition transition = OrderWorkflow.Evaluate(facts, action);
-            blockers.AddRange(transition.Blockers);
-        }
+            OrderWorkflowStage.AwaitingPayment or OrderWorkflowStage.ToPack => OrderWorkflowAction.MarkPacked,
+            OrderWorkflowStage.ToShip => OrderWorkflowAction.Ship,
+            OrderWorkflowStage.ReadyForPickup => OrderWorkflowAction.MarkPickedUp,
+            OrderWorkflowStage.InTransit => OrderWorkflowAction.MarkDelivered,
+            _ => null,
+        };
+        IReadOnlyList<string> blockers = next is OrderWorkflowAction action && !available.Contains(action)
+            ? OrderWorkflow.Evaluate(facts, action).Blockers
+            : [];
 
         return new OrderWorkflowStateDto(
-            OrderWorkflow.StageFor(facts).ToString(),
+            stage.ToString(),
             available.Select(action => action.ToString()).ToArray(),
             blockers.Distinct().ToArray());
     }

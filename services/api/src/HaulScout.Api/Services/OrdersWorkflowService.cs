@@ -4,6 +4,7 @@ using static HaulScout.Api.Helpers.StringHelpers;
 using HaulScout.Api.Mapping;
 using HaulScout.Application.Common;
 using HaulScout.Application.Contracts;
+using HaulScout.Application.PlatformOrders;
 using HaulScout.Application.Security;
 using HaulScout.Application.Services;
 using HaulScout.Domain;
@@ -16,7 +17,9 @@ namespace HaulScout.Api.Services;
 public sealed class OrdersWorkflowService(
     HaulScoutDbContext db,
     ICurrentUserContext currentUser,
-    OrderAssembler orderWriter)
+    OrderAssembler orderWriter,
+    ISaleCanceller sales,
+    IUnitOfWork unitOfWork)
 {
     /// <summary>Matches the inventory browse cap, so one page cannot be asked to carry the whole book.</summary>
     private const int MaxPageSize = 200;
@@ -154,7 +157,9 @@ public sealed class OrdersWorkflowService(
                 EF.Functions.ILike(order.OrderNumber, $"%{term}%")
                 || (order.Email != null && EF.Functions.ILike(order.Email, $"%{term}%"))
                 || (order.BuyerReference != null && EF.Functions.ILike(order.BuyerReference, $"%{term}%"))
-                || (order.ExternalOrderId != null && EF.Functions.ILike(order.ExternalOrderId, $"%{term}%")));
+                || (order.ExternalOrderId != null && EF.Functions.ILike(order.ExternalOrderId, $"%{term}%"))
+                || (order.TrackingNumber != null && EF.Functions.ILike(order.TrackingNumber, $"%{term}%"))
+                || order.Lines.Any(line => EF.Functions.ILike(line.TitleSnapshot, $"%{term}%")));
         }
 
         return query;
@@ -179,6 +184,7 @@ public sealed class OrdersWorkflowService(
                 order.ShipToLine1,
                 order.ShippedAt,
                 order.DeliveredAt,
+                order.Channel,
             })
             .ToListAsync(cancellationToken);
 
@@ -194,7 +200,8 @@ public sealed class OrdersWorkflowService(
                 HasShippingAddress: !string.IsNullOrWhiteSpace(row.ShipToLine1),
                 IsShipped: row.ShippedAt is not null,
                 IsDelivered: row.DeliveredAt is not null,
-                HasOpenReturn: openReturns.Contains(row.Id))));
+                HasOpenReturn: openReturns.Contains(row.Id),
+                ChannelHandlesShipping: Order.ChannelHandlesShipping(row.Channel))));
     }
 
     /// <summary>What each paid order brought in. Unpaid orders are absent rather than zero.</summary>
@@ -257,6 +264,10 @@ public sealed class OrdersWorkflowService(
         return AppResult<OrderDetailDto>.Ok(order.ToDetailDto(salesByInventoryItem, await HasOpenReturnAsync(order.Id, cancellationToken)));
     }
 
+    /// <summary>
+    /// Payment and cancellation only. Shipping and delivery are recorded through tracking, refunds on the lines,
+    /// so each fact has one door and the workflow gate guards it.
+    /// </summary>
     public async Task<AppResult<OrderDetailDto>> UpdateStatusAsync(
         Guid id,
         UpdateOrderStatusRequest request,
@@ -268,69 +279,90 @@ public sealed class OrdersWorkflowService(
             return AppResult<OrderDetailDto>.NotFound();
         }
 
+        OrderWorkflowAction? action = request.Status switch
+        {
+            OrderStatus.Paid => OrderWorkflowAction.RecordPayment,
+            OrderStatus.Cancelled => OrderWorkflowAction.Cancel,
+            _ => null,
+        };
+        if (action is null)
+        {
+            return AppResult<OrderDetailDto>.Validation(
+                "Only payment and cancellation are set here. Record shipping and delivery with tracking, and refunds on the order's lines.");
+        }
+
+        OrderTransition transition = OrderWorkflow.Evaluate(
+            order.ToWorkflowFacts(await HasOpenReturnAsync(order.Id, cancellationToken)),
+            action.Value);
+        if (!transition.Allowed)
+        {
+            return AppResult<OrderDetailDto>.Validation(string.Join(" ", transition.Blockers));
+        }
+
         OrderStatus previous = order.Status;
         DateTimeOffset now = DateTimeOffset.UtcNow;
-        order.Status = request.Status;
-        switch (request.Status)
+        try
         {
-            case OrderStatus.Paid:
-                order.PaymentStatus = PaymentStatus.Paid;
-                order.PaidAt ??= now;
-                break;
-            case OrderStatus.Fulfilling:
-                order.FulfillmentStatus = FulfillmentStatus.Partial;
-                break;
-            case OrderStatus.Shipped:
-                order.FulfillmentStatus = FulfillmentStatus.Fulfilled;
-                order.ShippedAt ??= now;
-                if (order.PaymentStatus == PaymentStatus.Pending)
+            await unitOfWork.InTransactionAsync(async token =>
+            {
+                if (action == OrderWorkflowAction.Cancel)
+                {
+                    await CancelSalesAsync(order, now, token);
+                    order.CancelledAt ??= now;
+                }
+                else
                 {
                     order.PaymentStatus = PaymentStatus.Paid;
                     order.PaidAt ??= now;
                 }
-                break;
-            case OrderStatus.Delivered:
-                order.FulfillmentStatus = FulfillmentStatus.Fulfilled;
-                order.ShippedAt ??= now;
-                order.DeliveredAt ??= now;
-                break;
-            case OrderStatus.Cancelled:
-                order.CancelledAt ??= now;
-                break;
-            case OrderStatus.Refunded:
-                order.PaymentStatus = PaymentStatus.Refunded;
-                break;
-            case OrderStatus.Pending:
-            default:
-                break;
+
+                order.Status = request.Status;
+                db.AuditLogs.Add(new AuditLog
+                {
+                    OrganizationId = currentUser.OrganizationId,
+                    ActorUserId = currentUser.UserId,
+                    EntityName = nameof(Order),
+                    EntityId = order.Id,
+                    Action = "OrderStatusChanged",
+                    DetailsJson = JsonSerializer.Serialize(new { order.OrderNumber, From = previous.ToString(), To = request.Status.ToString() }),
+                });
+
+                await db.SaveChangesAsync(token);
+                return true;
+            }, cancellationToken);
+        }
+        catch (SaleNotCancellable refused)
+        {
+            return AppResult<OrderDetailDto>.Validation(refused.Message);
         }
 
-        SaleStatus? propagate = request.Status switch
-        {
-            OrderStatus.Fulfilling => SaleStatus.Packed,
-            OrderStatus.Shipped => SaleStatus.Shipped,
-            OrderStatus.Delivered => SaleStatus.Delivered,
-            _ => null,
-        };
-        if (propagate is SaleStatus target)
-        {
-            await PropagateFulfillmentToSalesAsync(order.Id, target, cancellationToken);
-        }
-
-        db.AuditLogs.Add(new AuditLog
-        {
-            OrganizationId = currentUser.OrganizationId,
-            ActorUserId = currentUser.UserId,
-            EntityName = nameof(Order),
-            EntityId = order.Id,
-            Action = "OrderStatusChanged",
-            DetailsJson = JsonSerializer.Serialize(new { order.OrderNumber, From = previous.ToString(), To = request.Status.ToString() }),
-        });
-
-        await db.SaveChangesAsync(cancellationToken);
         IReadOnlyDictionary<Guid, Sale> salesByInventoryItem = await SalesByInventoryItemAsync(order.Id, cancellationToken);
         return AppResult<OrderDetailDto>.Ok(order.ToDetailDto(salesByInventoryItem, await HasOpenReturnAsync(order.Id, cancellationToken)));
     }
+
+    /// <summary>
+    /// A cancelled order sold nothing: each live sale is reversed the way its own cancel does it, so the item is
+    /// restocked and the money leaves the books. Without this the order read cancelled while reports still counted it.
+    /// </summary>
+    private async Task CancelSalesAsync(Order order, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        List<Guid> live = await db.Sales
+            .Where(sale => sale.OrganizationId == currentUser.OrganizationId
+                && sale.OrderId == order.Id
+                && sale.Status != SaleStatus.Cancelled)
+            .Select(sale => sale.Id)
+            .ToListAsync(cancellationToken);
+        foreach (Guid saleId in live)
+        {
+            AppResult<bool> result = await sales.CancelAsync(saleId, now, $"Order {order.OrderNumber} cancelled", cancellationToken);
+            if (result.Status != AppResultStatus.Ok)
+            {
+                throw new SaleNotCancellable(result.Message ?? "A sale on this order could not be cancelled.");
+            }
+        }
+    }
+
+    private sealed class SaleNotCancellable(string message) : Exception(message);
 
     public async Task<AppResult<OrderDetailDto>> UpdateTrackingAsync(
         Guid id,
@@ -346,6 +378,17 @@ public sealed class OrdersWorkflowService(
         string? carrier = TrimToNull(request.ShippingCarrier);
         string? trackingNumber = TrimToNull(request.TrackingNumber);
         string? trackingUrl = TrimToNull(request.TrackingUrl);
+
+        // A bare "mark packed/shipped/delivered" (bulk, mobile) is a step, not an edit: it must not wipe tracking.
+        bool stepOnly = (request.MarkPacked || request.MarkShipped || request.MarkDelivered)
+            && carrier is null && trackingNumber is null && trackingUrl is null;
+        if (stepOnly)
+        {
+            carrier = order.ShippingCarrier;
+            trackingNumber = order.TrackingNumber;
+            trackingUrl = order.TrackingUrl;
+        }
+
         if ((carrier is null) != (trackingNumber is null))
         {
             return AppResult<OrderDetailDto>.Validation("Carrier and tracking number must be supplied together.");
@@ -401,9 +444,17 @@ public sealed class OrdersWorkflowService(
         bool shouldAdvanceToDelivered = request.MarkDelivered || hasDeliveredEvidence;
         bool shouldAdvanceToShipped = request.MarkShipped || hasShippedEvidence;
 
-        if (!order.IsLocalPickup && (shouldAdvanceToShipped || shouldAdvanceToDelivered) && (carrier is null || trackingNumber is null))
+        if (!order.IsLocalPickup
+            && !Order.ChannelHandlesShipping(order.Channel)
+            && (shouldAdvanceToShipped || shouldAdvanceToDelivered)
+            && (carrier is null || trackingNumber is null))
         {
-            return AppResult<OrderDetailDto>.Validation("Carrier and tracking number are required before marking a shipped storefront order shipped or delivered.");
+            return AppResult<OrderDetailDto>.Validation("Enter the carrier and tracking number before marking this order shipped or delivered.");
+        }
+
+        if (order.Status is OrderStatus.Cancelled && (request.MarkPacked || shouldAdvanceToShipped || shouldAdvanceToDelivered))
+        {
+            return AppResult<OrderDetailDto>.Validation("This order is cancelled.");
         }
 
         var previous = new

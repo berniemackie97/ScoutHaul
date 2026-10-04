@@ -91,7 +91,7 @@ public sealed class OperatorConsoleTests
             db,
             currentUser,
             new StubAuthorizer(granted),
-            new OrdersWorkflowService(db, currentUser, assembler),
+            OrdersServiceFactory.Create(db, currentUser, assembler),
             inventory,
             new EfStorefrontOfferStore(db),
             new EfPlatformOrderStore(db, assembler),

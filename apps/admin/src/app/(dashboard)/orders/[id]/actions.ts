@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import type { components } from "@overhaul/api-client";
 import { getApiAccessToken, getApiBaseUrl, getApiClient } from "@/lib/api";
+import { errorMessage } from "@/lib/api-error";
 
 type OrderStatus = components["schemas"]["OrderStatus"];
 
@@ -17,11 +18,37 @@ export async function updateOrderStatus(
     params: { path: { id } },
     body: { status },
   });
-  if (!result.data) return { ok: false, message: "The order status could not be updated." };
+  if (!result.data) return { ok: false, message: errorMessage(result.error, "The order could not be updated.") };
 
   revalidatePath("/orders");
   revalidatePath(`/orders/${id}`);
-  return { ok: true, message: `Order marked ${status}.` };
+  return { ok: true, message: status === "Cancelled" ? "Order cancelled. Its items are back in stock." : "Payment recorded." };
+}
+
+export type OrderStep = "markPacked" | "markShipped" | "markDelivered";
+
+const STEP_DONE: Record<OrderStep, string> = {
+  markPacked: "Packed — ready to ship.",
+  markShipped: "Marked shipped.",
+  markDelivered: "Marked delivered.",
+};
+
+/** Moves an order one step without touching its tracking. */
+export async function advanceOrder(id: string, step: OrderStep): Promise<OrderActionResult> {
+  const api = await getApiClient();
+  const result = await api.PATCH("/api/orders/{id}/tracking", {
+    params: { path: { id } },
+    body: {
+      markPacked: step === "markPacked",
+      markShipped: step === "markShipped",
+      markDelivered: step === "markDelivered",
+    },
+  });
+  if (!result.data) return { ok: false, message: errorMessage(result.error, "The order could not be updated.") };
+
+  revalidatePath("/orders");
+  revalidatePath(`/orders/${id}`);
+  return { ok: true, message: STEP_DONE[step] };
 }
 
 export async function deleteOrder(id: string): Promise<OrderActionResult> {
@@ -79,8 +106,8 @@ export async function updateOrderTracking(
   });
 
   if (!response.ok) {
-    const bodyText = await response.text();
-    return { ok: false, message: bodyText || "Order tracking could not be saved." };
+    const problem = await response.json().catch(() => null);
+    return { ok: false, message: errorMessage(problem, "Order tracking could not be saved.") };
   }
 
   revalidatePath("/orders");

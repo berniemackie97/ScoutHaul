@@ -165,9 +165,14 @@ public sealed class Order : EntityBase, IOrganizationScoped
     public Guid? CustomerId { get; set; }
     public Customer? Customer { get; set; }
 
+    public const string StorefrontChannel = "Storefront";
+
     /// <summary>The channel this order came from — a SalesChannelCatalog value ("Storefront", "eBay",
     /// "Poshmark"…). The storefront is simply channel #1; there is no storefront-only order type.</summary>
-    public string Channel { get; set; } = "Storefront";
+    public string Channel { get; set; } = StorefrontChannel;
+
+    /// <summary>Off the storefront the channel holds the address and issues the label.</summary>
+    public static bool ChannelHandlesShipping(string channel) => channel != StorefrontChannel;
 
     public Guid? ChannelAccountId { get; set; }
     public ChannelAccount? ChannelAccount { get; set; }

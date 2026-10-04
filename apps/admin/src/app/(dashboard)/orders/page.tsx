@@ -65,6 +65,9 @@ export default async function OrdersPage({
       ? (summary?.totalOrders ?? 0)
       : (summary?.stages?.find((entry) => entry.stage === queue)?.count ?? 0);
 
+  const busiestQueue = (["ToPack", "ToShip", "ReadyForPickup"] as const).reduce((best, queue) =>
+    countFor(queue) > countFor(best) ? queue : best,
+  );
   const revenue = summary?.capturedRevenue ?? 0;
   const openWork = summary?.openWork ?? 0;
   const needsAttention = summary?.needsAttention ?? 0;
@@ -75,7 +78,7 @@ export default async function OrdersPage({
       value: String(openWork),
       detail: "To pack, to ship, or ready for pickup — all orders",
       icon: Truck,
-      href: "/orders?stage=ToPack",
+      href: `/orders?stage=${busiestQueue}`,
     },
     {
       label: "Needs attention",
@@ -98,7 +101,7 @@ export default async function OrdersPage({
       <PageHeader
         eyebrow="Commerce"
         title="Orders"
-        description="The operational surface for every channel order — lines, fees, refunds, and fulfillment. Open one to manage its sale financials and tracking."
+        description="Every order from every channel. Work a queue, select several to step them forward together, or open one for its money and tracking."
         action={
           <div className="flex shrink-0 flex-wrap gap-2">
             <Link
@@ -152,7 +155,7 @@ export default async function OrdersPage({
         })}
       </div>
 
-      <ListSearch defaultValue={search} placeholder="Search order number, email, buyer reference, or marketplace id">
+      <ListSearch defaultValue={search} placeholder="Search item, order number, buyer, or tracking number">
         {active === "All" ? null : <input type="hidden" name="stage" value={active} />}
       </ListSearch>
 

@@ -2,7 +2,10 @@
 
 import Link from "next/link";
 import { useState, useTransition } from "react";
-import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle } from "@overhaul/ui";
+import { ArrowRight } from "lucide-react";
+import type { components } from "@overhaul/api-client";
+import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, formatCurrency } from "@overhaul/ui";
+import { When } from "@/components/when";
 import {
   COMMERCE_MANAGED_STATUSES,
   MANUAL_INVENTORY_STATUSES,
@@ -14,7 +17,9 @@ import { factsFromInventoryItem, readinessBlockers } from "@/features/inventory/
 import { ReadinessChecklist } from "@/features/inventory/readiness-checklist";
 import { changeInventoryStatus } from "./actions";
 
-export function StatusControl({ item }: { item: InventoryItem }) {
+type Sale = components["schemas"]["SaleDto"];
+
+export function StatusControl({ item, sale }: { item: InventoryItem; sale?: Sale }) {
   const id = item.id!;
   const status = item.status!;
   const [nextStatus, setNextStatus] = useState<InventoryStatus>(status);
@@ -49,11 +54,25 @@ export function StatusControl({ item }: { item: InventoryItem }) {
       <CardContent className="space-y-3">
         {isCommerceManaged ? (
           <>
-            <p className="text-muted-foreground text-sm">
-              This stage is controlled by its sale record so inventory, fulfillment, reports, and audit history stay synchronized.
-            </p>
+            {sale ? (
+              <div className="bg-muted/30 space-y-1 rounded-lg border p-3 text-sm">
+                <p className="font-medium">
+                  Sold on {sale.platform} · <When value={sale.soldAt} />
+                </p>
+                <p className="text-muted-foreground tabular-nums">
+                  {formatCurrency(sale.soldPrice)} · net {formatCurrency(sale.netProfit)}
+                </p>
+              </div>
+            ) : (
+              <p className="text-muted-foreground text-sm">
+                Its sale controls this stage, so inventory, fulfillment and reports stay in step.
+              </p>
+            )}
             <Button asChild className="w-full" variant="outline">
-              <Link href="/orders">Open in Orders</Link>
+              <Link href={orderHref(item, sale)}>
+                {sale?.orderId ? `Open order ${sale.groupOrderReference ?? ""}`.trim() : "Find its order"}
+                <ArrowRight className="ml-2 h-4 w-4" aria-hidden />
+              </Link>
             </Button>
           </>
         ) : (
@@ -90,4 +109,10 @@ export function StatusControl({ item }: { item: InventoryItem }) {
       </CardContent>
     </Card>
   );
+}
+
+/** The item's own order when the sale knows it; otherwise the order list searched for the item. */
+function orderHref(item: InventoryItem, sale: Sale | undefined) {
+  if (sale?.orderId) return `/orders/${sale.orderId}`;
+  return `/orders?q=${encodeURIComponent(item.title ?? "")}`;
 }
