@@ -1,5 +1,6 @@
 using HaulScout.Application.Contracts;
 using HaulScout.Application.Services;
+using HaulScout.Domain;
 using HaulScout.Domain.Entities;
 
 namespace HaulScout.Application.Inventory;
@@ -29,9 +30,22 @@ public sealed class InventoryReferenceDataService(IInventoryReferenceDataStore r
             ApplyOverrides("Color", InventoryReferenceCatalog.Colors, overrides),
             ApplyOverrides("SizeSystem", InventoryReferenceCatalog.SizeSystems, overrides),
             ApplyOverrides("Size", InventoryReferenceCatalog.Sizes, overrides),
-            ApplyOverrides("StorageLocation", DynamicWithOther(storageValues), overrides),
-            ApplyOverrides("Country", InventoryReferenceCatalog.Countries, overrides));
+            ApplyOverrides("StorageLocation", Dynamic(storageValues), overrides),
+            ApplyOverrides("Country", InventoryReferenceCatalog.Countries, overrides),
+            Profiles);
     }
+
+    private static readonly ItemProfileDto[] Profiles = ItemProfiles.All
+        .Prepend(ItemProfiles.General)
+        .Select(profile => new ItemProfileDto(
+            profile.Key,
+            profile.Label,
+            profile.Categories,
+            profile.Fields.Select(field => new ItemFieldDto(field.Field, field.Label, field.Readiness)).ToArray(),
+            profile.Attributes.Select(attribute => new ItemAttributeDto(attribute.Key, attribute.Label, attribute.Options)).ToArray(),
+            profile.SizeSystems,
+            profile.BrandLabel))
+        .ToArray();
 
     private static string OverrideKey(string? value, string? parent) =>
         $"{parent?.ToLowerInvariant()}\u001f{value?.ToLowerInvariant()}";
@@ -66,13 +80,15 @@ public sealed class InventoryReferenceDataService(IInventoryReferenceDataStore r
         CancellationToken cancellationToken)
     {
         InventoryReferenceDataDto data = await GetAsync(cancellationToken);
+        // A category nobody recognises is still "something else"; every other field left unrecognised stays blank
+        // rather than being recorded as "Other", which says nothing and then fills reports and listings.
         string? category = ResolveOrOther(data.Categories, request.Category);
-        string? brand = ResolveDependent(data.Brands, request.Brand, category) ?? CleanOperatorValue(request.Brand);
-        string? model = ResolveDependent(data.Models, request.Model, brand) ?? CleanOperatorValue(request.Model);
-        string? color = ResolveOrOther(data.Colors, request.Color);
-        string? condition = ResolveOrOther(data.Conditions, request.Condition);
-        string? sizeSystem = ResolveOrOther(data.SizeSystems, request.SizeSystem);
-        string? sizeValue = ResolveDependentOrOther(data.Sizes, request.SizeValue, sizeSystem);
+        string? brand = ResolveDependent(data.Brands, Meaningful(request.Brand), category) ?? CleanOperatorValue(Meaningful(request.Brand));
+        string? model = ResolveDependent(data.Models, Meaningful(request.Model), brand) ?? CleanOperatorValue(Meaningful(request.Model));
+        string? color = Resolve(data.Colors, request.Color);
+        string? condition = Resolve(data.Conditions, request.Condition);
+        string? sizeSystem = Resolve(data.SizeSystems, request.SizeSystem);
+        string? sizeValue = sizeSystem is null ? null : ResolveDependent(data.Sizes, request.SizeValue, sizeSystem);
         string? storageLocation = ResolveOrClean(data.StorageLocations, request.StorageLocation);
         string? countryOfOrigin = Resolve(data.Countries, request.CountryOfOrigin);
 
@@ -117,24 +133,6 @@ public sealed class InventoryReferenceDataService(IInventoryReferenceDataStore r
                 || string.Equals(option.ParentValue, parent, StringComparison.OrdinalIgnoreCase)))?.Value;
     }
 
-    private static string? ResolveDependentOrOther(
-        IReadOnlyList<InventoryReferenceOptionDto> options,
-        string? supplied,
-        string? parent)
-    {
-        if (string.IsNullOrWhiteSpace(supplied)) return null;
-        string value = supplied.Trim();
-        return options.FirstOrDefault(option =>
-            string.Equals(option.Value, value, StringComparison.OrdinalIgnoreCase)
-            && (string.IsNullOrWhiteSpace(option.ParentValue)
-                || string.Equals(option.ParentValue, parent, StringComparison.OrdinalIgnoreCase)))?.Value
-            ?? options.FirstOrDefault(option =>
-                string.Equals(option.Value, "Other", StringComparison.OrdinalIgnoreCase)
-                && (string.IsNullOrWhiteSpace(option.ParentValue)
-                    || string.Equals(option.ParentValue, parent, StringComparison.OrdinalIgnoreCase)))?.Value
-            ?? "Other";
-    }
-
     private static string? ResolveOrClean(IReadOnlyList<InventoryReferenceOptionDto> options, string? supplied)
     {
         if (string.IsNullOrWhiteSpace(supplied)) return null;
@@ -143,15 +141,23 @@ public sealed class InventoryReferenceDataService(IInventoryReferenceDataStore r
             ?? NormalizeOperatorValue(value);
     }
 
+    /// <summary>Placeholder words a free-text field is better left empty than holding.</summary>
+    private static readonly HashSet<string> Placeholders = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Other", "None", "N/A", "NA", "Unknown", "Unbranded", "No brand", "Not specified", "-",
+    };
+
+    private static string? Meaningful(string? supplied) =>
+        string.IsNullOrWhiteSpace(supplied) || Placeholders.Contains(supplied.Trim()) ? null : supplied;
+
     private static string? CleanOperatorValue(string? supplied) =>
         string.IsNullOrWhiteSpace(supplied) ? null : NormalizeOperatorValue(supplied.Trim());
 
     private static string NormalizeOperatorValue(string value) =>
         string.Join(' ', value.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
 
-    private static InventoryReferenceOptionDto[] DynamicWithOther(IEnumerable<string?> values) =>
+    private static InventoryReferenceOptionDto[] Dynamic(IEnumerable<string?> values) =>
         Clean(values)
-            .Append("Other")
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Order(StringComparer.OrdinalIgnoreCase)
             .Select(value => new InventoryReferenceOptionDto(value, value))

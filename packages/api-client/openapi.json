@@ -14499,6 +14499,13 @@
               "$ref": "#/components/schemas/InventoryReferenceOptionDto"
             },
             "nullable": true
+          },
+          "profiles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ItemProfileDto"
+            },
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -14656,6 +14663,105 @@
         },
         "additionalProperties": false
       },
+      "ItemAttributeDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "nullable": true
+          },
+          "label": {
+            "type": "string",
+            "nullable": true
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ItemField": {
+        "enum": [
+          "Model",
+          "Color",
+          "Size",
+          "FunctionalStatus",
+          "CompletenessStatus",
+          "AuthenticityStatus",
+          "PackagingStatus",
+          "ManufacturerPartNumber",
+          "SerialNumber",
+          "ManufactureYear",
+          "CountryOfOrigin"
+        ],
+        "type": "string"
+      },
+      "ItemFieldDto": {
+        "type": "object",
+        "properties": {
+          "field": {
+            "$ref": "#/components/schemas/ItemField"
+          },
+          "label": {
+            "type": "string",
+            "nullable": true
+          },
+          "readiness": {
+            "$ref": "#/components/schemas/ListingReadiness"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ItemProfileDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "nullable": true
+          },
+          "label": {
+            "type": "string",
+            "nullable": true
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ItemFieldDto"
+            },
+            "nullable": true
+          },
+          "attributes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ItemAttributeDto"
+            },
+            "nullable": true
+          },
+          "sizeSystems": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "brandLabel": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "ListingDto": {
         "type": "object",
         "properties": {
@@ -14713,6 +14819,14 @@
           }
         },
         "additionalProperties": false
+      },
+      "ListingReadiness": {
+        "enum": [
+          "Optional",
+          "Recommended",
+          "Required"
+        ],
+        "type": "string"
       },
       "ListingStatus": {
         "enum": [

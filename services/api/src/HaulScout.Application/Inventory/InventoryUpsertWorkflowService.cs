@@ -335,6 +335,7 @@ public sealed class InventoryUpsertWorkflowService(
         item.EstimatedSalePrice = request.EstimatedSalePrice;
         item.Barcode = TrimToNull(request.Barcode);
         item.Notes = TrimToNull(request.Notes);
+        ItemProfiles.ClearInapplicable(item);
     }
 
     /// <summary>Anything that is not a JSON object — including malformed text — is stored as nothing rather than as

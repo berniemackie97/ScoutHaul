@@ -55,7 +55,6 @@ public static class InventoryReferenceCatalog
         Option("Fair", "Fair"),
         Option("Poor", "Poor"),
         Option("For parts", "For parts / not working"),
-        Option("Other", "Other"),
     ];
 
     public static readonly InventoryReferenceOptionDto[] Colors =
@@ -68,7 +67,7 @@ public static class InventoryReferenceCatalog
         Option("Teal", "Teal"), Option("Maroon", "Maroon"), Option("Gold", "Gold"),
         Option("Rose gold", "Rose gold"), Option("Bronze", "Bronze"), Option("Natural", "Natural"),
         Option("Multicolor", "Multicolor"), Option("Patterned", "Patterned"),
-        Option("Clear", "Clear"), Option("Other", "Other"),
+        Option("Clear", "Clear"),
     ];
 
     public static readonly InventoryReferenceOptionDto[] SizeSystems =
@@ -92,13 +91,12 @@ public static class InventoryReferenceCatalog
         Option("Shoe UK", "Shoe UK"),
         Option("Youth", "Youth / Kids"),
         Option("One size", "One Size"),
-        Option("Other", "Other"),
     ];
 
     public static readonly InventoryReferenceOptionDto[] Sizes = BuildSizes();
 
-    // Curated brands tagged by category (ParentValue = category). Legacy organization values are intentionally
-    // not folded into dropdowns; operators use the explicit "Other" option until a value is promoted into this catalog.
+    // Curated brands tagged by category (ParentValue = category) — suggestions, not a closed list: any other brand is
+    // typed in as itself. There is no "Other" brand; an unknown brand is left blank.
     public static readonly InventoryReferenceOptionDto[] Brands = BuildBrands();
 
     // Curated model/line/set options tagged by brand (ParentValue = brand). This is not meant to replace unique
@@ -148,10 +146,6 @@ public static class InventoryReferenceCatalog
         B(brands, "Office", "HP", "Canon", "Brother", "Epson", "Logitech", "Herman Miller", "Fellowes", "Brother");
         B(brands, "Crafts", "Cricut", "Singer", "Brother", "Bernina", "Silhouette", "Sizzix");
         B(brands, "Books", "Scholastic", "Penguin Random House", "Marvel", "DC Comics", "LEGO");
-        foreach (string category in Categories.Select(category => category.Value))
-        {
-            B(brands, category, "Other");
-        }
         return brands
             .DistinctBy(brand => $"{brand.ParentValue}\u001f{brand.Value}")
             .ToArray();
@@ -186,11 +180,6 @@ public static class InventoryReferenceCatalog
         M(models, "DeWalt", "20V MAX", "FLEXVOLT", "Atomic", "XR");
         M(models, "Milwaukee", "M12", "M18", "Fuel", "Packout");
         M(models, "Makita", "LXT", "XGT", "CXT");
-
-        foreach (string brand in Brands.Select(brand => brand.Value).Distinct(StringComparer.OrdinalIgnoreCase))
-        {
-            M(models, brand, "Other");
-        }
 
         return models
             .DistinctBy(model => $"{model.ParentValue}\u001f{model.Value}")
@@ -236,15 +225,10 @@ public static class InventoryReferenceCatalog
         Add(sizes, "Shoe UK", HalfSteps(1, 14));
         Add(sizes, "Youth", ["Newborn", "0–3M", "3–6M", "6–9M", "9–12M", "12–18M", "18–24M", "2T", "3T", "4T", "5T", "6", "7", "8", "10", "12", "14", "16"]);
         Add(sizes, "One size", ["One size"]);
-        Add(sizes, "Other", ["Other"]);
 
         string[] waists = Enumerable.Range(20, 51).Select(number => number.ToString()).ToArray();
         string[] inseams = Enumerable.Range(24, 17).Select(number => number.ToString()).ToArray();
         Add(sizes, "Waist/Inseam", waists.SelectMany(waist => inseams.Select(inseam => $"{waist}×{inseam}")).ToArray());
-        foreach (string parent in SizeSystems.Select(system => system.Value).Where(value => value != "Other"))
-        {
-            Add(sizes, parent, ["Other"]);
-        }
         return sizes.ToArray();
     }
 
