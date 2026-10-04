@@ -8,87 +8,26 @@ import {
   getApiBaseUrl,
   getApiClient,
 } from "@/lib/api";
-import { failedFormState, type FailedFormState, type FieldErrors } from "@/lib/form-state";
+import { failedFormState, type FailedFormState } from "@/lib/form-state";
+import { readItemForm } from "@/features/inventory/item-form/read-form";
 import { errorMessage } from "@/lib/api-error";
 
 type UpsertInventoryItemRequest = components["schemas"]["UpsertInventoryItemRequest"];
-type OwnershipType = components["schemas"]["InventoryOwnershipType"];
-type FunctionalStatus = components["schemas"]["InventoryFunctionalStatus"];
-type CompletenessStatus = components["schemas"]["InventoryCompletenessStatus"];
-type AuthenticityStatus = components["schemas"]["InventoryAuthenticityStatus"];
-type PackagingStatus = components["schemas"]["InventoryPackagingStatus"];
-type DimensionUnit = components["schemas"]["DimensionUnit"];
-type WeightUnit = components["schemas"]["WeightUnit"];
-
 export type InventoryActionResult = {
   ok: boolean;
   message: string;
 } & FailedFormState;
 
-type NumberOptions = {
-  min?: number;
-  max?: number;
-  integer?: boolean;
-};
-
 const initialFailure = (message: string): InventoryActionResult => ({ ok: false, message });
-
-function textValue(formData: FormData, name: string): string | null {
-  const value = formData.get(name);
-  if (typeof value !== "string") return null;
-  const normalized = value.trim();
-  return normalized.length > 0 ? normalized : null;
-}
-
-function numberValue(
-  formData: FormData,
-  name: string,
-  label: string,
-  fieldErrors: FieldErrors,
-  options: NumberOptions = {},
-): number | null {
-  const value = textValue(formData, name);
-  if (value === null) return null;
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed)) {
-    fieldErrors[name] = `${label} must be a valid number.`;
-    return null;
-  }
-  if (options.integer && !Number.isInteger(parsed)) {
-    fieldErrors[name] = `${label} must be a whole number.`;
-    return null;
-  }
-  if (options.min !== undefined && parsed < options.min) {
-    fieldErrors[name] = `${label} cannot be less than ${options.min}.`;
-    return null;
-  }
-  if (options.max !== undefined && parsed > options.max) {
-    fieldErrors[name] = `${label} cannot be greater than ${options.max}.`;
-    return null;
-  }
-  return parsed;
-}
-
 
 export async function updateInventoryItem(
   id: string,
   _previous: InventoryActionResult,
   formData: FormData,
 ): Promise<InventoryActionResult> {
-  const title = textValue(formData, "title");
-  const fieldErrors: FieldErrors = {};
-  if (!title) fieldErrors.title = "Title is required.";
-
-  const sellerAskingPrice = numberValue(formData, "sellerAskingPrice", "Seller asking price", fieldErrors, { min: 0 });
-  const purchasePrice = numberValue(formData, "purchasePrice", "Acquisition cost", fieldErrors, { min: 0 });
-  const estimatedSalePrice = numberValue(formData, "estimatedSalePrice", "Estimated sale price", fieldErrors, { min: 0 });
-  const manufactureYear = numberValue(formData, "manufactureYear", "Manufacture year", fieldErrors, { min: 1800, max: 2200, integer: true });
-  const length = numberValue(formData, "length", "Length", fieldErrors, { min: 0 });
-  const width = numberValue(formData, "width", "Width", fieldErrors, { min: 0 });
-  const height = numberValue(formData, "height", "Height", fieldErrors, { min: 0 });
-  const weight = numberValue(formData, "weight", "Weight", fieldErrors, { min: 0 });
-  if (Object.keys(fieldErrors).length > 0) {
-    return failedFormState("Fix the highlighted fields.", formData, fieldErrors);
+  const { fields, errors } = readItemForm(formData);
+  if (Object.keys(errors).length > 0) {
+    return failedFormState("Fix the highlighted fields.", formData, errors);
   }
 
   const api = await getApiClient();
@@ -102,43 +41,7 @@ export async function updateInventoryItem(
     sourcingTripId: current.data.sourcingTripId ?? null,
     sourcingTripStopId: current.data.sourcingTripStopId ?? null,
     sourceLocationId: current.data.sourceLocationId ?? null,
-    title,
-    description: textValue(formData, "description"),
-    category: textValue(formData, "category"),
-    brand: textValue(formData, "brand"),
-    model: textValue(formData, "model"),
-    color: textValue(formData, "color"),
-    condition: textValue(formData, "condition"),
-    sizeSystem: textValue(formData, "sizeSystem"),
-    sizeValue: textValue(formData, "sizeValue"),
-    attributesJson: textValue(formData, "attributesJson"),
-    measurementsJson: textValue(formData, "measurementsJson"),
-    storageLocation: textValue(formData, "storageLocation"),
-    accessories: textValue(formData, "accessories"),
-    missingParts: textValue(formData, "missingParts"),
-    testingNotes: textValue(formData, "testingNotes"),
-    cleaningNotes: textValue(formData, "cleaningNotes"),
-    listingNotes: textValue(formData, "listingNotes"),
-    sellerAskingPrice,
-    purchasePrice,
-    estimatedSalePrice,
-    barcode: textValue(formData, "barcode"),
-    notes: textValue(formData, "notes"),
-    ownershipType: textValue(formData, "ownershipType") as OwnershipType,
-    functionalStatus: textValue(formData, "functionalStatus") as FunctionalStatus,
-    completenessStatus: textValue(formData, "completenessStatus") as CompletenessStatus,
-    authenticityStatus: textValue(formData, "authenticityStatus") as AuthenticityStatus,
-    packagingStatus: textValue(formData, "packagingStatus") as PackagingStatus,
-    manufacturerPartNumber: textValue(formData, "manufacturerPartNumber"),
-    serialNumber: textValue(formData, "serialNumber"),
-    countryOfOrigin: textValue(formData, "countryOfOrigin"),
-    manufactureYear,
-    length,
-    width,
-    height,
-    dimensionUnit: textValue(formData, "dimensionUnit") as DimensionUnit,
-    weight,
-    weightUnit: textValue(formData, "weightUnit") as WeightUnit,
+    ...fields,
   };
 
   const result = await api.PUT("/api/inventory/{id}", {
@@ -151,7 +54,7 @@ export async function updateInventoryItem(
 
   revalidatePath("/inventory");
   revalidatePath(`/inventory/${id}`);
-  return { ok: true, message: "Inventory record saved." };
+  return { ok: true, message: "Saved." };
 }
 
 export async function changeInventoryStatus(
