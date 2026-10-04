@@ -3,21 +3,25 @@
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
-import { Archive, ArrowDown, ArrowUp, ChevronLeft, ChevronRight, ImageIcon, Trash2 } from "lucide-react";
-import { Badge, Button, formatCurrency } from "@overhaul/ui";
+import { Archive, ArrowDown, ArrowUp, ImageIcon, MapPin, Tags, X } from "lucide-react";
+import type { components } from "@overhaul/api-client";
+import { Badge, Button, Input, formatCurrency } from "@overhaul/ui";
+import { When } from "@/components/when";
 import {
+  MANUAL_INVENTORY_STATUSES,
+  TERMINAL_STATUSES,
   getInventoryCost,
   getProjectedMetrics,
   inventoryStatusLabel,
   type InventoryItem,
   type InventoryStatus,
 } from "@/features/inventory/inventory-operations";
-import { archiveInventoryItems, type BulkInventoryDeleteResult } from "./actions";
+import { daysHeld, presenceLabel } from "@/features/inventory/inventory-rows";
+import { archiveInventoryItems, moveInventoryItems, setInventoryStage, type BulkInventoryResult } from "./actions";
 
-export type InventoryTableRow = InventoryItem & {
-  thumbnailUrl: string | null;
-};
+type Facts = components["schemas"]["InventoryRowFactsDto"];
 
+export type InventoryTableRow = InventoryItem & { thumbnailUrl: string | null; facts?: Facts };
 
 const badgeVariant = (status: string | undefined) => {
   if (["Listed", "Delivered"].includes(status ?? "")) return "success" as const;
@@ -26,51 +30,24 @@ const badgeVariant = (status: string | undefined) => {
   return "secondary" as const;
 };
 
-const deleteBlockedStatuses = new Set<InventoryStatus>(["Bundled", "Listed", "Sold", "Packed", "Shipped", "Delivered"]);
+type Tool = "location" | "stage" | null;
 
-function deleteBlockReason(item: InventoryTableRow) {
-  if (item.status === "Listed") return "Delist and move out of Listed first.";
-  if (item.status === "Bundled") return "Edit/remove it from the bundle first.";
-  if (item.status && deleteBlockedStatuses.has(item.status)) return "Resolve the sale/fulfillment workflow first.";
-  return null;
-}
-
-export function InventoryTable({
-  items,
-  page = 1,
-  pageCount = 1,
-  sort = "updatedAt",
-  desc = true,
-}: {
-  items: InventoryTableRow[];
-  page?: number;
-  pageCount?: number;
-  sort?: string;
-  desc?: boolean;
-}) {
+export function InventoryTable({ items, sort = "updatedAt", desc = true }: { items: InventoryTableRow[]; sort?: string; desc?: boolean }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [result, setResult] = useState<BulkInventoryDeleteResult | null>(null);
+  const [result, setResult] = useState<BulkInventoryResult | null>(null);
+  const [tool, setTool] = useState<Tool>(null);
+  const [location, setLocation] = useState("");
+  const [stage, setStage] = useState<InventoryStatus>("ReadyToList");
   const [pending, startTransition] = useTransition();
 
-  const selectableItems = useMemo(() => items.filter((item) => Boolean(item.id)), [items]);
-  const selectedItems = useMemo(
-    () => selectableItems.filter((item) => item.id && selectedIds.has(item.id)),
-    [selectableItems, selectedIds],
-  );
-  const blockedItems = selectedItems
-    .map((item) => ({ item, reason: deleteBlockReason(item) }))
-    .filter((entry): entry is { item: InventoryTableRow; reason: string } => Boolean(entry.reason));
-  const allVisibleSelected = selectableItems.length > 0 && selectableItems.every((item) => item.id && selectedIds.has(item.id));
+  const selected = useMemo(() => items.filter((item) => item.id && selectedIds.has(item.id)), [items, selectedIds]);
+  const allSelected = items.length > 0 && items.every((item) => item.id && selectedIds.has(item.id));
+  const targets = selected.map((item) => ({ id: item.id!, title: item.title ?? "Item" }));
 
-  function toggleAll() {
-    setResult(null);
-    setSelectedIds(allVisibleSelected ? new Set() : new Set(selectableItems.map((item) => item.id!).filter(Boolean)));
-  }
-
-  function toggleOne(id: string) {
+  function toggle(id: string) {
     setResult(null);
     setSelectedIds((current) => {
       const next = new Set(current);
@@ -80,167 +57,239 @@ export function InventoryTable({
     });
   }
 
-  function navigate(updates: Record<string, string | null>) {
-    const next = new URLSearchParams(searchParams.toString());
-    for (const [key, value] of Object.entries(updates)) {
-      if (value === null || value === "") next.delete(key);
-      else next.set(key, value);
+  function toggleAll() {
+    setResult(null);
+    setSelectedIds(allSelected ? new Set() : new Set(items.map((item) => item.id!).filter(Boolean)));
+  }
+
+  function finish(next: BulkInventoryResult) {
+    setResult(next);
+    if (next.ok) {
+      setSelectedIds(new Set());
+      setTool(null);
+      router.refresh();
     }
-    router.push(`${pathname}?${next.toString()}`);
+  }
+
+  function run(work: () => Promise<BulkInventoryResult>) {
+    setResult(null);
+    startTransition(async () => finish(await work()));
+  }
+
+  function archive() {
+    if (!window.confirm(`Archive ${selected.length} item${selected.length === 1 ? "" : "s"}? They leave the active list but stay in history and reports. Listed or sold items are refused.`)) return;
+    run(() => archiveInventoryItems(targets));
+  }
+
+  function applyStage() {
+    if (TERMINAL_STATUSES.includes(stage) && !window.confirm(`Mark ${selected.length} item${selected.length === 1 ? "" : "s"} ${inventoryStatusLabel(stage).toLowerCase()}? This removes them from active stock.`)) return;
+    run(() => setInventoryStage(targets, stage));
   }
 
   function applySort(column: string) {
-    const nextDesc = sort === column ? !desc : true;
-    navigate({ sort: column, desc: nextDesc ? null : "false", page: null });
+    const next = new URLSearchParams(searchParams.toString());
+    next.set("sort", column);
+    if (sort === column && desc) next.set("desc", "false");
+    else next.delete("desc");
+    next.delete("page");
+    router.push(`${pathname}?${next.toString()}`);
   }
 
-  const SortHeader = ({ column, label, align = "left", className = "" }: { column: string; label: string; align?: "left" | "right"; className?: string }) => (
-    <th className={`px-4 py-3 font-medium ${align === "right" ? "text-right" : ""} ${className}`}>
-      <button onClick={() => applySort(column)} className={`inline-flex items-center gap-1 hover:text-foreground ${align === "right" ? "flex-row-reverse" : ""}`}>
+  const SortHeader = ({ column, label, right = false, className = "" }: { column: string; label: string; right?: boolean; className?: string }) => (
+    <th className={`px-4 py-3 font-medium ${right ? "text-right" : ""} ${className}`}>
+      <button type="button" onClick={() => applySort(column)} className={`hover:text-foreground inline-flex items-center gap-1 uppercase ${right ? "flex-row-reverse" : ""}`}>
         {label}
         {sort === column && (desc ? <ArrowDown className="h-3 w-3" /> : <ArrowUp className="h-3 w-3" />)}
       </button>
     </th>
   );
 
-  function archiveSelected() {
-    if (selectedItems.length === 0 || blockedItems.length > 0) return;
-    const label = selectedItems.length === 1 ? selectedItems[0]?.title ?? "this item" : `${selectedItems.length} items`;
-    if (!window.confirm(`Archive ${label}? Archived records are hidden from the active inventory list but remain available for history and audit reporting.`)) {
-      return;
-    }
-
-    startTransition(async () => {
-      const next = await archiveInventoryItems(selectedItems.map((item) => item.id!).filter(Boolean));
-      setResult(next);
-      if (next.ok) {
-        setSelectedIds(new Set());
-        router.refresh();
-      }
-    });
-  }
-
   return (
     <div className="space-y-3">
-      <div className="flex flex-col gap-3 rounded-xl border bg-card p-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="text-sm">
-          <span className="font-medium">{selectedItems.length} selected</span>
-          {blockedItems.length > 0 && (
-            <p className="text-destructive mt-1">
-              {blockedItems.length} selected item{blockedItems.length === 1 ? "" : "s"} must be delisted, removed from a bundle, or resolved in fulfillment before deletion.
-            </p>
+      {(selected.length > 0 || result) && (
+        <div className="bg-card sticky top-2 z-10 space-y-3 rounded-xl border p-3 shadow-sm">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex min-w-0 items-center gap-3 text-sm">
+              {selected.length > 0 && (
+                <>
+                  <span className="font-medium">{selected.length} selected</span>
+                  <button type="button" onClick={() => setSelectedIds(new Set())} className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs">
+                    <X className="h-3.5 w-3.5" /> Clear
+                  </button>
+                </>
+              )}
+              {result?.message && <span className={result.ok ? "text-emerald-700" : "text-destructive"}>{result.message}</span>}
+            </div>
+            {selected.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" variant={tool === "location" ? "secondary" : "outline"} onClick={() => setTool(tool === "location" ? null : "location")}>
+                  <MapPin className="mr-1.5 h-4 w-4" aria-hidden /> Move to…
+                </Button>
+                <Button size="sm" variant={tool === "stage" ? "secondary" : "outline"} onClick={() => setTool(tool === "stage" ? null : "stage")}>
+                  <Tags className="mr-1.5 h-4 w-4" aria-hidden /> Set stage
+                </Button>
+                <Button size="sm" variant="outline" disabled={pending} onClick={archive}>
+                  <Archive className="mr-1.5 h-4 w-4" aria-hidden /> Archive
+                </Button>
+              </div>
+            )}
+          </div>
+          {tool === "location" && selected.length > 0 && (
+            <form
+              className="flex flex-wrap items-center gap-2"
+              onSubmit={(event) => {
+                event.preventDefault();
+                run(() => moveInventoryItems(targets.map((target) => target.id), location));
+              }}
+            >
+              <Input autoFocus value={location} onChange={(event) => setLocation(event.target.value)} placeholder="Bin, shelf or tote — blank clears it" className="h-9 max-w-xs" maxLength={160} />
+              <Button type="submit" size="sm" disabled={pending}>{pending ? "Moving…" : `Move ${selected.length}`}</Button>
+            </form>
           )}
-          {result?.message && (
-            <p className={`mt-1 ${result.ok ? "text-green-700" : "text-destructive"}`}>
-              {result.message}
-            </p>
+          {tool === "stage" && selected.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                value={stage}
+                onChange={(event) => setStage(event.target.value as InventoryStatus)}
+                className="border-input bg-background h-9 rounded-md border px-3 text-sm"
+                aria-label="Stage"
+              >
+                {MANUAL_INVENTORY_STATUSES.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+              <Button size="sm" disabled={pending} onClick={applyStage}>{pending ? "Updating…" : `Set ${selected.length}`}</Button>
+              <span className="text-muted-foreground text-xs">Items with a sale, or not ready to list, are refused and named.</span>
+            </div>
           )}
         </div>
-        <Button
-          type="button"
-          variant="destructive"
-          disabled={pending || selectedItems.length === 0 || blockedItems.length > 0}
-          onClick={archiveSelected}
-          className="justify-center"
-        >
-          <Trash2 className="mr-2 h-4 w-4" aria-hidden />
-          {pending ? "Deleting…" : "Delete selected"}
-        </Button>
-      </div>
+      )}
 
-      <div className="overflow-x-auto rounded-xl border bg-card">
+      <div className="bg-card overflow-x-auto rounded-xl border">
         <table className="w-full text-sm">
-          <thead className="border-b bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
+          <thead className="bg-muted/40 text-muted-foreground border-b text-left text-xs uppercase tracking-wide">
             <tr>
-              <th className="w-10 px-4 py-3 font-medium">
-                <input
-                  type="checkbox"
-                  aria-label="Select all visible inventory"
-                  checked={allVisibleSelected}
-                  onChange={toggleAll}
-                  className="h-4 w-4 rounded border-input"
-                />
+              <th className="w-10 px-4 py-3">
+                <input type="checkbox" aria-label="Select every item on this page" checked={allSelected} onChange={toggleAll} className="border-input h-4 w-4 rounded" />
               </th>
               <SortHeader column="title" label="Item" />
               <th className="px-4 py-3 font-medium">Stage</th>
-              <th className="hidden px-4 py-3 font-medium xl:table-cell">Location</th>
-              <SortHeader column="purchasePrice" label="Cost" align="right" className="hidden md:table-cell" />
-              <SortHeader column="estimatedSalePrice" label="Expected" align="right" className="hidden lg:table-cell" />
-              <th className="px-4 py-3 text-right font-medium">Projected profit</th>
+              <th className="hidden px-4 py-3 font-medium lg:table-cell">Channels</th>
+              <SortHeader column="acquiredAt" label="Held" className="hidden md:table-cell" />
+              <SortHeader column="purchasePrice" label="Cost" right className="hidden md:table-cell" />
+              <SortHeader column="estimatedSalePrice" label="Price" right />
+              <th className="px-4 py-3 text-right font-medium">Profit</th>
             </tr>
           </thead>
           <tbody className="divide-y">
             {items.map((item) => {
+              const facts = item.facts;
+              const sold = Boolean(item.isSold && facts?.soldPrice != null);
               const cost = getInventoryCost(item);
-              const { profit: projectedProfit } = getProjectedMetrics(item);
-              const subtitle = [
-                item.brand,
-                item.model,
-                item.category,
-                item.isBundle ? `${item.bundleComponentCount ?? 0} components` : null,
-              ].filter(Boolean).join(" · ") || "Uncategorized";
+              const { profit: projected } = getProjectedMetrics(item);
+              const profit = sold ? facts!.netProfit : projected;
+              const subtitle = [item.brand, item.category, item.isBundle ? `${item.bundleComponentCount ?? 0} in bundle` : null]
+                .filter(Boolean)
+                .join(" · ");
               const checked = Boolean(item.id && selectedIds.has(item.id));
-              const blockReason = deleteBlockReason(item);
+              const days = facts ? daysHeld(facts.acquiredAt) : null;
 
               return (
-                <tr key={item.id} className={`transition-colors hover:bg-muted/30 ${checked ? "bg-brand-50/40" : ""}`}>
-                  <td className="px-4 py-3 align-middle">
-                    <input
-                      type="checkbox"
-                      aria-label={`Select ${item.title}`}
-                      checked={checked}
-                      onChange={() => item.id && toggleOne(item.id)}
-                      className="h-4 w-4 rounded border-input"
-                    />
+                <tr key={item.id} className={`hover:bg-muted/30 transition-colors ${checked ? "bg-brand-500/5" : ""}`}>
+                  <td className="px-4 py-3">
+                    <input type="checkbox" aria-label={`Select ${item.title}`} checked={checked} onChange={() => item.id && toggle(item.id)} className="border-input h-4 w-4 rounded" />
                   </td>
                   <td className="p-0">
                     <Link href={`/inventory/${item.id}`} className="flex min-w-0 items-center gap-3 px-4 py-3 sm:min-w-64">
-                      <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-muted">
+                      <div className="bg-muted flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-md border">
                         {item.thumbnailUrl ? (
                           // eslint-disable-next-line @next/next/no-img-element
-                          <img src={item.thumbnailUrl} alt="" className="h-full w-full object-cover" />
-                        ) : <ImageIcon className="h-5 w-5 text-muted-foreground" />}
+                          <img src={item.thumbnailUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
+                        ) : (
+                          <ImageIcon className="text-muted-foreground h-5 w-5" />
+                        )}
                       </div>
                       <div className="min-w-0">
-                        <p className="truncate font-medium text-foreground">{item.title}</p>
-                        <p className="truncate text-xs text-muted-foreground">{subtitle}</p>
-                        {blockReason && <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground"><Archive className="h-3 w-3" /> {blockReason}</p>}
+                        <p className="text-foreground max-w-[340px] truncate font-medium">{item.title}</p>
+                        {(subtitle || item.storageLocation) && (
+                          <p className="text-muted-foreground flex max-w-[340px] items-center gap-2 truncate text-xs">
+                            {subtitle && <span className="truncate">{subtitle}</span>}
+                            {item.storageLocation && (
+                              <span className="inline-flex shrink-0 items-center gap-0.5">
+                                <MapPin className="h-3 w-3" aria-hidden /> {item.storageLocation}
+                              </span>
+                            )}
+                          </p>
+                        )}
                       </div>
                     </Link>
                   </td>
-                  <td className="px-4 py-3"><Badge variant={badgeVariant(item.status)}>{inventoryStatusLabel(item.status)}</Badge></td>
-                  <td className="hidden px-4 py-3 text-muted-foreground xl:table-cell">{item.storageLocation ?? "—"}</td>
-                  <td className="hidden px-4 py-3 text-right tabular-nums md:table-cell">{formatCurrency(cost)}</td>
-                  <td className="hidden px-4 py-3 text-right tabular-nums lg:table-cell">{formatCurrency(item.estimatedSalePrice)}</td>
-                  <td className={`px-4 py-3 text-right font-medium tabular-nums ${projectedProfit != null && projectedProfit < 0 ? "text-destructive" : ""}`}>{formatCurrency(projectedProfit)}</td>
+                  <td className="whitespace-nowrap px-4 py-3">
+                    <Badge variant={badgeVariant(item.status)}>{inventoryStatusLabel(item.status)}</Badge>
+                  </td>
+                  <td className="hidden px-4 py-3 lg:table-cell">
+                    <Channels facts={facts} />
+                  </td>
+                  <td className="text-muted-foreground hidden whitespace-nowrap px-4 py-3 md:table-cell">
+                    {sold && facts?.soldAt ? (
+                      <span className="text-xs">
+                        Sold <When value={facts.soldAt} />
+                      </span>
+                    ) : days != null ? (
+                      <span className={days > 90 ? "font-medium text-amber-700" : ""}>{days}d</span>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
+                  <td className="text-muted-foreground hidden whitespace-nowrap px-4 py-3 text-right tabular-nums md:table-cell">{formatCurrency(cost)}</td>
+                  <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums">
+                    {sold ? (
+                      facts?.orderId ? (
+                        <Link href={`/orders/${facts.orderId}`} className="hover:underline">
+                          {formatCurrency(facts.soldPrice)}
+                        </Link>
+                      ) : (
+                        formatCurrency(facts?.soldPrice)
+                      )
+                    ) : (
+                      formatCurrency(item.estimatedSalePrice)
+                    )}
+                    <span className="text-muted-foreground block text-[11px]">{sold ? `sold on ${facts?.soldOn}` : "expected"}</span>
+                  </td>
+                  <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums">
+                    <span className={`font-medium ${profit != null && profit < 0 ? "text-destructive" : ""}`}>{formatCurrency(profit)}</span>
+                    <span className="text-muted-foreground block text-[11px]">{sold ? "net" : "projected"}</span>
+                  </td>
                 </tr>
               );
             })}
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
 
-      {pageCount > 1 && (
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-muted-foreground">Page {page} of {pageCount}</span>
-          <div className="flex gap-2">
-            <button
-              disabled={page <= 1}
-              onClick={() => navigate({ page: String(page - 1) })}
-              className="inline-flex h-8 items-center gap-1 rounded-lg border px-3 hover:bg-muted disabled:opacity-40"
-            >
-              <ChevronLeft className="h-4 w-4" /> Prev
-            </button>
-            <button
-              disabled={page >= pageCount}
-              onClick={() => navigate({ page: String(page + 1) })}
-              className="inline-flex h-8 items-center gap-1 rounded-lg border px-3 hover:bg-muted disabled:opacity-40"
-            >
-              Next <ChevronRight className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
-      )}
+function Channels({ facts }: { facts?: Facts }) {
+  const channels = facts?.channels ?? [];
+  if (channels.length === 0) return <span className="text-muted-foreground text-xs">Not listed</span>;
+  const shown = channels.slice(0, 3);
+  return (
+    <div className="flex max-w-[240px] flex-wrap gap-1">
+      {shown.map((channel) => {
+        const { text, tone } = presenceLabel(channel);
+        const className = `inline-flex items-center rounded border px-1.5 py-0.5 text-[11px] font-medium ${
+          tone === "warning" ? "border-amber-300 bg-amber-50 text-amber-800 dark:bg-amber-950 dark:text-amber-200" : tone === "muted" ? "text-muted-foreground" : ""
+        }`;
+        return channel.url ? (
+          <a key={`${channel.platform}-${channel.status}`} href={channel.url} target="_blank" rel="noreferrer" className={`${className} hover:underline`}>
+            {text}
+          </a>
+        ) : (
+          <span key={`${channel.platform}-${channel.status}`} className={className}>{text}</span>
+        );
+      })}
+      {channels.length > shown.length && <span className="text-muted-foreground text-[11px]">+{channels.length - shown.length}</span>}
     </div>
   );
 }

@@ -1,57 +1,74 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getApiAccessToken, getApiBaseUrl } from "@/lib/api";
+import type { components } from "@overhaul/api-client";
+import { getApiClient } from "@/lib/api";
+import { errorMessage } from "@/lib/api-error";
 
-export type BulkInventoryDeleteResult = {
-  ok: boolean;
-  message: string;
-  archivedCount?: number;
-  failed?: Array<{ id: string; message: string }>;
-};
+type InventoryStatus = components["schemas"]["InventoryStatus"];
 
-export async function archiveInventoryItems(ids: string[]): Promise<BulkInventoryDeleteResult> {
-  const token = await getApiAccessToken();
-  if (!token) return { ok: false, message: "Your session expired. Sign in again." };
+export type BulkInventoryResult = { ok: boolean; message: string };
 
-  const uniqueIds = [...new Set(ids.map((id) => id.trim()).filter(Boolean))];
-  if (uniqueIds.length === 0) return { ok: false, message: "Select at least one inventory item." };
-  if (uniqueIds.length > 100) return { ok: false, message: "Archive at most 100 items at a time." };
+const MAX_ITEMS = 200;
 
-  const failed: Array<{ id: string; message: string }> = [];
-  let archivedCount = 0;
+function clean(ids: string[]) {
+  return [...new Set(ids.map((id) => id.trim()).filter(Boolean))];
+}
 
-  for (const id of uniqueIds) {
-    const response = await fetch(`${getApiBaseUrl()}/api/inventory/${id}?hard=false`, {
-      method: "DELETE",
-      headers: { Authorization: `Bearer ${token}` },
-      cache: "no-store",
-    });
+/** Each item answers for itself, so one refusal never blocks the rest; the first few reasons are reported. */
+function summarize(verb: string, done: number, refusals: Array<{ title: string; message: string }>): BulkInventoryResult {
+  const head = `${verb} ${done} item${done === 1 ? "" : "s"}.`;
+  if (refusals.length === 0) return { ok: true, message: head };
+  const detail = refusals.slice(0, 2).map((refusal) => `${refusal.title}: ${refusal.message}`).join(" ");
+  const more = refusals.length > 2 ? ` …and ${refusals.length - 2} more.` : "";
+  return { ok: done > 0, message: `${head} ${refusals.length} refused. ${detail}${more}` };
+}
 
-    if (response.ok) {
-      archivedCount += 1;
-      continue;
-    }
+export async function archiveInventoryItems(items: Array<{ id: string; title: string }>): Promise<BulkInventoryResult> {
+  const targets = items.filter((item) => item.id).slice(0, MAX_ITEMS);
+  if (targets.length === 0) return { ok: false, message: "Select at least one item." };
 
-    const body = await response.text();
-    failed.push({ id, message: body || "Inventory item could not be archived." });
+  const api = await getApiClient();
+  const refusals: Array<{ title: string; message: string }> = [];
+  let done = 0;
+  for (const item of targets) {
+    const result = await api.DELETE("/api/inventory/{id}", { params: { path: { id: item.id }, query: { hard: false } } });
+    if (result.response.ok) done += 1;
+    else refusals.push({ title: item.title, message: errorMessage(result.error, "could not be archived") });
   }
 
   revalidatePath("/inventory");
-  if (failed.length > 0) {
-    return {
-      ok: false,
-      archivedCount,
-      failed,
-      message: archivedCount > 0
-        ? `Archived ${archivedCount} item${archivedCount === 1 ? "" : "s"}; ${failed.length} failed.`
-        : `No items archived. ${failed[0]?.message ?? "One or more items failed."}`,
-    };
+  return summarize("Archived", done, refusals);
+}
+
+export async function moveInventoryItems(ids: string[], location: string): Promise<BulkInventoryResult> {
+  const inventoryItemIds = clean(ids);
+  if (inventoryItemIds.length === 0) return { ok: false, message: "Select at least one item." };
+
+  const api = await getApiClient();
+  const { data, error } = await api.POST("/api/inventory/location", {
+    body: { inventoryItemIds, storageLocation: location.trim() || null },
+  });
+  if (!data) return { ok: false, message: errorMessage(error, "The items could not be moved.") };
+
+  revalidatePath("/inventory");
+  const where = location.trim() ? `to ${location.trim()}` : "out of their location";
+  return { ok: true, message: `Moved ${data.updated} item${data.updated === 1 ? "" : "s"} ${where}.` };
+}
+
+export async function setInventoryStage(items: Array<{ id: string; title: string }>, status: InventoryStatus): Promise<BulkInventoryResult> {
+  const targets = items.filter((item) => item.id).slice(0, MAX_ITEMS);
+  if (targets.length === 0) return { ok: false, message: "Select at least one item." };
+
+  const api = await getApiClient();
+  const refusals: Array<{ title: string; message: string }> = [];
+  let done = 0;
+  for (const item of targets) {
+    const result = await api.PATCH("/api/inventory/{id}/status", { params: { path: { id: item.id } }, body: { status } });
+    if (result.data) done += 1;
+    else refusals.push({ title: item.title, message: errorMessage(result.error, "could not be moved") });
   }
 
-  return {
-    ok: true,
-    archivedCount,
-    message: `Archived ${archivedCount} item${archivedCount === 1 ? "" : "s"}.`,
-  };
+  revalidatePath("/inventory");
+  return summarize("Updated", done, refusals);
 }

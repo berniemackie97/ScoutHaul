@@ -48,6 +48,6 @@ describe("inventory operations", () => {
   });
 
   it("formats enum values for operators", () => {
-    expect(inventoryStatusLabel("ReadyToList")).toBe("Ready To List");
+    expect(inventoryStatusLabel("ReadyToList")).toBe("Ready to list");
   });
 });
