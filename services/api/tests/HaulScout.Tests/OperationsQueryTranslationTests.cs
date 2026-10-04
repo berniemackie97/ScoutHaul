@@ -142,6 +142,62 @@ public sealed class OperationsQueryTranslationTests(PostgresFixture postgres)
     }
 
     [Fact]
+    public async Task Inventory_rows_carry_channels_sales_and_lifecycle_counts()
+    {
+        (HaulScoutDbContext db, Guid org, Guid user) = await postgres.NewOrganizationAsync();
+        await using HaulScoutDbContext _ = db;
+        ChannelAccount ebay = new() { OrganizationId = org, Channel = "eBay", DisplayName = "eBay" };
+        ChannelAccount depop = new() { OrganizationId = org, Channel = "Depop", DisplayName = "Depop" };
+        ChannelAccount posh = new() { OrganizationId = org, Channel = "Poshmark", DisplayName = "Poshmark" };
+        InventoryItem listed = new() { OrganizationId = org, Title = "Brass lamp", Status = InventoryStatus.Listed, PurchasedAt = DateTimeOffset.UtcNow.AddDays(-40) };
+        InventoryItem sold = new() { OrganizationId = org, Title = "Brass bowl", Status = InventoryStatus.Sold };
+        Order order = new() { OrganizationId = org, OrderNumber = "SH-9", Status = OrderStatus.Paid, PaymentStatus = PaymentStatus.Paid };
+        db.AddRange(ebay, depop, posh, listed, sold, order);
+        db.ChannelListings.AddRange(
+            new ChannelListing { OrganizationId = org, InventoryItem = listed, ChannelAccount = ebay, Status = ChannelListingStatus.Active, ListedPrice = 24m },
+            new ChannelListing { OrganizationId = org, InventoryItem = listed, ChannelAccount = depop, Status = ChannelListingStatus.Active, ListedPrice = 22m },
+            new ChannelListing { OrganizationId = org, InventoryItem = listed, ChannelAccount = posh, Status = ChannelListingStatus.Delisted });
+        Sale sale = new() { OrganizationId = org, InventoryItem = sold, Order = order, Platform = "eBay", SoldPrice = 30m, CostOfGoods = 5m, Status = SaleStatus.Recorded, SoldAt = DateTimeOffset.UtcNow };
+        sale.RecomputeNet();
+        db.Sales.Add(sale);
+        await db.SaveChangesAsync();
+
+        InventoryQueryService queries = new(new EfInventoryStore(db), new StubCurrentUser(org, user));
+        InventoryListDto active = await queries.BrowseAsync(
+            null, InventoryLifecycleGroup.Active, false, "brass", null, "acquiredAt", true, 1, 25, null, false, false, CancellationToken.None);
+        InventoryListDto all = await queries.BrowseAsync(
+            null, null, false, "brass", null, null, true, 1, 25, null, false, false, CancellationToken.None);
+
+        InventoryRowFactsDto row = Assert.Single(active.Facts!);
+        Assert.Equal(["Depop", "eBay"], row.Channels.Select(channel => channel.Platform));
+        Assert.Equal(1, active.LifecycleCounts!.Single(count => count.Group == InventoryLifecycleGroup.Active).Count);
+        Assert.Equal(1, active.LifecycleCounts!.Single(count => count.Group == InventoryLifecycleGroup.Sold).Count);
+        InventoryRowFactsDto soldRow = all.Facts!.Single(facts => facts.InventoryItemId == sold.Id);
+        Assert.Equal(order.Id, soldRow.OrderId);
+        Assert.Equal(25m, soldRow.NetProfit);
+    }
+
+    [Fact]
+    public async Task Moving_items_to_a_location_updates_them_together()
+    {
+        (HaulScoutDbContext db, Guid org, Guid user) = await postgres.NewOrganizationAsync();
+        await using HaulScoutDbContext _ = db;
+        InventoryItem first = new() { OrganizationId = org, Title = "Lamp", Status = InventoryStatus.ReadyToList };
+        InventoryItem second = new() { OrganizationId = org, Title = "Bowl", Status = InventoryStatus.ReadyToList, StorageLocation = "Old shelf" };
+        db.AddRange(first, second);
+        await db.SaveChangesAsync();
+
+        InventoryStatusWorkflowService statuses = new(new EfInventoryStore(db), new StubCurrentUser(org, user), TimeProvider.System);
+        AppResult<BulkInventoryUpdateResultDto> result = await statuses.SetLocationAsync(
+            new SetInventoryLocationRequest([first.Id, second.Id, Guid.NewGuid()], "  Bin B3 "), CancellationToken.None);
+
+        Assert.Equal(2, result.Value!.Updated);
+        Assert.Equal(1, result.Value.NotFound);
+        await using HaulScoutDbContext fresh = postgres.NewContext(org);
+        Assert.All(await fresh.InventoryItems.ToListAsync(), item => Assert.Equal("Bin B3", item.StorageLocation));
+    }
+
+    [Fact]
     public async Task Lot_candidates_and_sale_candidate_search_translate_to_sql()
     {
         (HaulScoutDbContext db, Guid org, Guid user) = await postgres.NewOrganizationAsync();

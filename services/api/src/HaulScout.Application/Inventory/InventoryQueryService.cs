@@ -62,9 +62,38 @@ public sealed class InventoryQueryService(IInventoryStore inventory, ICurrentUse
 
         int total = scalars.Count;
         int pageCount = Math.Max(1, (int)Math.Ceiling(total / (double)pageSize));
+
+        IReadOnlyList<InventoryRowFacts> facts = await inventory.RowFactsAsync(
+            organizationId, pageItems.Select(item => item.Id).ToArray(), cancellationToken);
+
+        // Tab counts ignore the group and stage being shown, so every tab says what it holds.
+        IReadOnlyList<InventoryScalars> everyGroup = filter.Lifecycle is null && filter.Status is null
+            ? scalars
+            : await inventory.ListScalarsAsync(organizationId, filter with { Lifecycle = null, Status = null }, cancellationToken);
+        IReadOnlyList<InventoryLifecycleCountDto> lifecycleCounts = Enum.GetValues<InventoryLifecycleGroup>()
+            .Select(group => new InventoryLifecycleCountDto(group, everyGroup.Count(item => InventoryLifecycle.Group(item.Status) == group)))
+            .ToArray();
+
         return new InventoryListDto(
-            pageItems.Select(item => item.ToDto()).ToList(), total, page, pageSize, pageCount, summary);
+            pageItems.Select(item => item.ToDto()).ToList(),
+            total,
+            page,
+            pageSize,
+            pageCount,
+            summary,
+            facts.Select(ToDto).ToArray(),
+            lifecycleCounts);
     }
+
+    private static InventoryRowFactsDto ToDto(InventoryRowFacts facts) => new(
+        facts.InventoryItemId,
+        facts.AcquiredAt,
+        facts.Channels.Select(channel => new InventoryChannelPresenceDto(channel.Platform, channel.Status, channel.Price, channel.Url)).ToArray(),
+        facts.Sale?.Platform,
+        facts.Sale?.SoldPrice,
+        facts.Sale?.NetProfit,
+        facts.Sale?.SoldAt,
+        facts.Sale?.OrderId);
 
     /// <summary>
     /// The browse summary for a filter, without fetching a page of items to go with it.
@@ -102,6 +131,7 @@ public sealed class InventoryQueryService(IInventoryStore inventory, ICurrentUse
             "purchaseprice" => InventorySortField.PurchasePrice,
             "estimatedsaleprice" => InventorySortField.EstimatedSalePrice,
             "createdat" => InventorySortField.CreatedAt,
+            "acquiredat" => InventorySortField.AcquiredAt,
             _ => InventorySortField.UpdatedAt,
         },
         desc);

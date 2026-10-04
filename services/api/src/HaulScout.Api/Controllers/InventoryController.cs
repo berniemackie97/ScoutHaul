@@ -221,6 +221,12 @@ public sealed class InventoryController(
         return ToActionResult(result);
     }
 
+    [HttpPost("location")]
+    public async Task<ActionResult<BulkInventoryUpdateResultDto>> SetLocation(
+        SetInventoryLocationRequest request,
+        CancellationToken cancellationToken) =>
+        ToActionResult(await statuses.SetLocationAsync(request, cancellationToken));
+
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(
         Guid id,

@@ -256,7 +256,7 @@ public sealed class HaulScoutDbContext(
             ConfigureMoney(entity.Property(item => item.Weight));
             entity.Property(item => item.AttributesJson).HasColumnType("jsonb");
             entity.Property(item => item.MeasurementsJson).HasColumnType("jsonb");
-            entity.Property(item => item.StorageLocation).HasMaxLength(160);
+            entity.Property(item => item.StorageLocation).HasMaxLength(InventoryItem.StorageLocationLimit);
             entity.Property(item => item.Barcode).HasMaxLength(80);
             entity.Property(item => item.Status).HasConversion<string>().HasMaxLength(40);
             ConfigureMoney(entity.Property(item => item.SellerAskingPrice));

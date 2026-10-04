@@ -2147,6 +2147,49 @@ export interface paths {
         };
         trace?: never;
     };
+    "/api/inventory/location": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["SetInventoryLocationRequest"];
+                    "text/json": components["schemas"]["SetInventoryLocationRequest"];
+                    "application/*+json": components["schemas"]["SetInventoryLocationRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["BulkInventoryUpdateResultDto"];
+                        "application/json": components["schemas"]["BulkInventoryUpdateResultDto"];
+                        "text/json": components["schemas"]["BulkInventoryUpdateResultDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/listing/generate": {
         parameters: {
             query?: never;
@@ -9458,6 +9501,12 @@ export interface components {
             /** Format: double */
             remainingAmount?: number;
         };
+        BulkInventoryUpdateResultDto: {
+            /** Format: int32 */
+            updated?: number;
+            /** Format: int32 */
+            notFound?: number;
+        };
         BundledSaleItemInput: {
             /** Format: uuid */
             inventoryItemId?: string;
@@ -10074,6 +10123,13 @@ export interface components {
             costSnapshot?: number;
             notes?: string | null;
         };
+        InventoryChannelPresenceDto: {
+            platform?: string | null;
+            status?: components["schemas"]["ChannelListingStatus"];
+            /** Format: double */
+            price?: number | null;
+            url?: string | null;
+        };
         /** @enum {string} */
         InventoryCompletenessStatus: "Unknown" | "Complete" | "MissingAccessories" | "MissingParts" | "Incomplete";
         /** @enum {string} */
@@ -10173,6 +10229,11 @@ export interface components {
             weight?: number | null;
             weightUnit?: components["schemas"]["WeightUnit"];
         };
+        InventoryLifecycleCountDto: {
+            group?: components["schemas"]["InventoryLifecycleGroup"];
+            /** Format: int32 */
+            count?: number;
+        };
         /** @enum {string} */
         InventoryLifecycleGroup: "Active" | "Sold" | "Returned" | "Removed";
         InventoryListDto: {
@@ -10186,6 +10247,8 @@ export interface components {
             /** Format: int32 */
             pageCount?: number;
             summary?: components["schemas"]["InventorySummaryDto"];
+            facts?: components["schemas"]["InventoryRowFactsDto"][] | null;
+            lifecycleCounts?: components["schemas"]["InventoryLifecycleCountDto"][] | null;
         };
         /** @enum {string} */
         InventoryOwnershipType: "Owned" | "Consigned" | "CustomerRepair" | "VendorManaged";
@@ -10237,6 +10300,22 @@ export interface components {
             group?: string | null;
             parentValue?: string | null;
             isLegacy?: boolean;
+        };
+        InventoryRowFactsDto: {
+            /** Format: uuid */
+            inventoryItemId?: string;
+            /** Format: date-time */
+            acquiredAt?: string;
+            channels?: components["schemas"]["InventoryChannelPresenceDto"][] | null;
+            soldOn?: string | null;
+            /** Format: double */
+            soldPrice?: number | null;
+            /** Format: double */
+            netProfit?: number | null;
+            /** Format: date-time */
+            soldAt?: string | null;
+            /** Format: uuid */
+            orderId?: string | null;
         };
         /** @enum {string} */
         InventoryStatus: "Draft" | "Researching" | "Watchlist" | "Purchased" | "NeedsCleaning" | "NeedsTesting" | "NeedsRepair" | "NeedsPhotos" | "ReadyToList" | "Bundled" | "Listed" | "Sold" | "Packed" | "Shipped" | "Delivered" | "Returned" | "Donated" | "Disposed";
@@ -11626,6 +11705,10 @@ export interface components {
             id?: string;
             email?: string | null;
             displayName?: string | null;
+        };
+        SetInventoryLocationRequest: {
+            inventoryItemIds?: string[] | null;
+            storageLocation?: string | null;
         };
         SkipSourcingStopRequest: {
             reason?: string | null;

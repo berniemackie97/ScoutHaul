@@ -2619,6 +2619,54 @@
         }
       }
     },
+    "/api/inventory/location": {
+      "post": {
+        "tags": [
+          "Inventory"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetInventoryLocationRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetInventoryLocationRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetInventoryLocationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkInventoryUpdateResultDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkInventoryUpdateResultDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkInventoryUpdateResultDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/listing/generate": {
       "post": {
         "tags": [
@@ -11954,6 +12002,20 @@
         },
         "additionalProperties": false
       },
+      "BulkInventoryUpdateResultDto": {
+        "type": "object",
+        "properties": {
+          "updated": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "notFound": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
       "BundledSaleItemInput": {
         "type": "object",
         "properties": {
@@ -13860,6 +13922,28 @@
         },
         "additionalProperties": false
       },
+      "InventoryChannelPresenceDto": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "$ref": "#/components/schemas/ChannelListingStatus"
+          },
+          "price": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "url": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "InventoryCompletenessStatus": {
         "enum": [
           "Unknown",
@@ -14173,6 +14257,19 @@
         },
         "additionalProperties": false
       },
+      "InventoryLifecycleCountDto": {
+        "type": "object",
+        "properties": {
+          "group": {
+            "$ref": "#/components/schemas/InventoryLifecycleGroup"
+          },
+          "count": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
       "InventoryLifecycleGroup": {
         "enum": [
           "Active",
@@ -14210,6 +14307,20 @@
           },
           "summary": {
             "$ref": "#/components/schemas/InventorySummaryDto"
+          },
+          "facts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InventoryRowFactsDto"
+            },
+            "nullable": true
+          },
+          "lifecycleCounts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InventoryLifecycleCountDto"
+            },
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -14408,6 +14519,51 @@
           },
           "isLegacy": {
             "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "InventoryRowFactsDto": {
+        "type": "object",
+        "properties": {
+          "inventoryItemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "acquiredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "channels": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InventoryChannelPresenceDto"
+            },
+            "nullable": true
+          },
+          "soldOn": {
+            "type": "string",
+            "nullable": true
+          },
+          "soldPrice": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "netProfit": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "soldAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "orderId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -18397,6 +18553,24 @@
             "nullable": true
           },
           "displayName": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "SetInventoryLocationRequest": {
+        "type": "object",
+        "properties": {
+          "inventoryItemIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "nullable": true
+          },
+          "storageLocation": {
             "type": "string",
             "nullable": true
           }

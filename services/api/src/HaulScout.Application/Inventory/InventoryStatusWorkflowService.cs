@@ -68,4 +68,38 @@ public sealed class InventoryStatusWorkflowService(
         await inventory.SaveChangesAsync(cancellationToken);
         return AppResult<InventoryItemDto>.Ok(item.ToDto());
     }
+
+    /// <summary>Most items moved in one request; a shelf, not the warehouse.</summary>
+    public const int MaxBulkItems = 200;
+
+    public async Task<AppResult<BulkInventoryUpdateResultDto>> SetLocationAsync(
+        SetInventoryLocationRequest request,
+        CancellationToken cancellationToken)
+    {
+        Guid[] ids = (request.InventoryItemIds ?? []).Distinct().ToArray();
+        if (ids.Length == 0)
+        {
+            return AppResult<BulkInventoryUpdateResultDto>.Validation("Select at least one item.");
+        }
+
+        if (ids.Length > MaxBulkItems)
+        {
+            return AppResult<BulkInventoryUpdateResultDto>.Validation($"Move at most {MaxBulkItems} items at a time.");
+        }
+
+        string? location = string.IsNullOrWhiteSpace(request.StorageLocation) ? null : request.StorageLocation.Trim();
+        if (location?.Length > InventoryItem.StorageLocationLimit)
+        {
+            return AppResult<BulkInventoryUpdateResultDto>.Validation($"Keep the location under {InventoryItem.StorageLocationLimit} characters.");
+        }
+
+        IReadOnlyList<InventoryItem> items = await inventory.FindManyAsync(currentUser.OrganizationId, ids, cancellationToken);
+        foreach (InventoryItem item in items)
+        {
+            item.StorageLocation = location;
+        }
+
+        await inventory.SaveChangesAsync(cancellationToken);
+        return AppResult<BulkInventoryUpdateResultDto>.Ok(new BulkInventoryUpdateResultDto(items.Count, ids.Length - items.Count));
+    }
 }
