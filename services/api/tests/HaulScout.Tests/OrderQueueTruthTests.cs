@@ -45,7 +45,7 @@ public sealed class OrderQueueTruthTests
         db.SaveChanges();
 
         StubCurrentUser currentUser = new(org);
-        return (new OrdersWorkflowService(db, currentUser, new OrderAssembler(db, currentUser)), db, org);
+        return (OrdersServiceFactory.Create(db, currentUser), db, org);
     }
 
     private static Order Order(

@@ -47,14 +47,15 @@ public class OrderWorkflowGateTests
         Guid org,
         PaymentStatus payment = PaymentStatus.Paid,
         bool localPickup = false,
-        bool withAddress = true)
+        bool withAddress = true,
+        string channel = "Storefront")
     {
         InventoryItem item = new() { OrganizationId = org, Title = "Brass Lamp", PurchasePrice = 40m, Status = InventoryStatus.Sold };
         db.InventoryItems.Add(item);
         Order order = new()
         {
             OrganizationId = org,
-            Channel = "Storefront",
+            Channel = channel,
             OrderNumber = "ORD-1",
             Status = payment == PaymentStatus.Paid ? OrderStatus.Paid : OrderStatus.Pending,
             PaymentStatus = payment,
@@ -67,7 +68,7 @@ public class OrderWorkflowGateTests
         {
             OrganizationId = org,
             InventoryItemId = item.Id,
-            Platform = "Storefront",
+            Platform = channel,
             SoldPrice = 100m,
             CostOfGoods = 40m,
             Status = SaleStatus.Recorded,
@@ -81,7 +82,7 @@ public class OrderWorkflowGateTests
     }
 
     private static OrdersController NewController(HaulScoutDbContext db, StubCurrentUser currentUser) =>
-        new(new OrdersWorkflowService(db, currentUser, new OrderAssembler(db, currentUser)));
+        new(OrdersServiceFactory.Create(db, currentUser));
 
     [Fact]
     public async Task The_order_reports_the_stage_it_is_actually_in()
@@ -260,5 +261,132 @@ public class OrderWorkflowGateTests
         OrderDetailDto? detail = (await controller.Get(order.Id, CancellationToken.None)).Value;
 
         Assert.Equal(nameof(OrderWorkflowStage.NeedsAttention), detail?.Workflow?.Stage);
+    }
+
+    private static UpdateOrderTrackingRequest Step(bool packed = false, bool shipped = false, bool delivered = false) =>
+        new(null, null, null, null, null, MarkShipped: shipped, MarkDelivered: delivered, MarkPacked: packed);
+
+    [Fact]
+    public async Task A_marketplace_order_packs_and_ships_without_an_address_or_tracking()
+    {
+        // Depop and Poshmark keep the address and print the label; demanding either here stranded the order in To pack.
+        (HaulScoutDbContext db, Guid org, Guid user) = NewContext(nameof(A_marketplace_order_packs_and_ships_without_an_address_or_tracking));
+        await using HaulScoutDbContext _ = db;
+        Order order = await SeedOrder(db, org, withAddress: false, channel: "Depop");
+        OrdersController controller = NewController(db, new StubCurrentUser(org, user));
+
+        await controller.UpdateTracking(order.Id, Step(packed: true), CancellationToken.None);
+        Assert.NotNull((await db.Orders.SingleAsync()).PackedAt);
+
+        await controller.UpdateTracking(order.Id, Step(shipped: true), CancellationToken.None);
+        OrderDetailDto? detail = (await controller.Get(order.Id, CancellationToken.None)).Value;
+        Assert.Equal(nameof(OrderWorkflowStage.InTransit), detail?.Workflow?.Stage);
+    }
+
+    [Fact]
+    public async Task A_storefront_order_still_needs_tracking_to_ship()
+    {
+        (HaulScoutDbContext db, Guid org, Guid user) = NewContext(nameof(A_storefront_order_still_needs_tracking_to_ship));
+        await using HaulScoutDbContext _ = db;
+        Order order = await SeedOrder(db, org);
+        OrdersController controller = NewController(db, new StubCurrentUser(org, user));
+
+        await controller.UpdateTracking(order.Id, Step(packed: true), CancellationToken.None);
+        await controller.UpdateTracking(order.Id, Step(shipped: true), CancellationToken.None);
+
+        Assert.Null((await db.Orders.SingleAsync()).ShippedAt);
+    }
+
+    [Fact]
+    public async Task A_bare_step_keeps_the_tracking_already_recorded()
+    {
+        (HaulScoutDbContext db, Guid org, Guid user) = NewContext(nameof(A_bare_step_keeps_the_tracking_already_recorded));
+        await using HaulScoutDbContext _ = db;
+        Order order = await SeedOrder(db, org);
+        OrdersController controller = NewController(db, new StubCurrentUser(org, user));
+        await controller.UpdateTracking(
+            order.Id,
+            new UpdateOrderTrackingRequest("USPS", "9400abc", null, null, null, MarkShipped: true, MarkDelivered: false),
+            CancellationToken.None);
+
+        await controller.UpdateTracking(order.Id, Step(delivered: true), CancellationToken.None);
+
+        Order stored = await db.Orders.SingleAsync();
+        Assert.Equal("9400abc", stored.TrackingNumber);
+        Assert.NotNull(stored.DeliveredAt);
+    }
+
+    [Fact]
+    public async Task Shipping_and_delivery_cannot_be_set_through_the_status_door()
+    {
+        (HaulScoutDbContext db, Guid org, Guid user) = NewContext(nameof(Shipping_and_delivery_cannot_be_set_through_the_status_door));
+        await using HaulScoutDbContext _ = db;
+        Order order = await SeedOrder(db, org, payment: PaymentStatus.Pending);
+        OrdersController controller = NewController(db, new StubCurrentUser(org, user));
+
+        await controller.UpdateStatus(order.Id, new UpdateOrderStatusRequest(OrderStatus.Delivered), CancellationToken.None);
+
+        Order stored = await db.Orders.SingleAsync();
+        Assert.Equal(OrderStatus.Pending, stored.Status);
+        Assert.Null(stored.DeliveredAt);
+    }
+
+    [Fact]
+    public async Task A_delivered_order_cannot_be_cancelled()
+    {
+        (HaulScoutDbContext db, Guid org, Guid user) = NewContext(nameof(A_delivered_order_cannot_be_cancelled));
+        await using HaulScoutDbContext _ = db;
+        Order order = await SeedOrder(db, org, channel: "eBay");
+        OrdersController controller = NewController(db, new StubCurrentUser(org, user));
+        await controller.UpdateTracking(order.Id, Step(delivered: true), CancellationToken.None);
+
+        await controller.UpdateStatus(order.Id, new UpdateOrderStatusRequest(OrderStatus.Cancelled), CancellationToken.None);
+
+        Assert.Equal(OrderStatus.Delivered, (await db.Orders.SingleAsync()).Status);
+        Assert.NotEqual(SaleStatus.Cancelled, (await db.Sales.SingleAsync()).Status);
+    }
+
+    [Fact]
+    public async Task Cancelling_an_order_reverses_its_sales_and_restocks_the_item()
+    {
+        // Before, the order read Cancelled while its sale stayed realized revenue and the item stayed sold.
+        (HaulScoutDbContext db, Guid org, Guid user) = NewContext(nameof(Cancelling_an_order_reverses_its_sales_and_restocks_the_item));
+        await using HaulScoutDbContext _ = db;
+        Order order = await SeedOrder(db, org);
+        OrdersController controller = NewController(db, new StubCurrentUser(org, user));
+
+        await controller.UpdateStatus(order.Id, new UpdateOrderStatusRequest(OrderStatus.Cancelled), CancellationToken.None);
+
+        Assert.Equal(OrderStatus.Cancelled, (await db.Orders.SingleAsync()).Status);
+        Assert.Equal(SaleStatus.Cancelled, (await db.Sales.SingleAsync()).Status);
+        Assert.NotEqual(InventoryStatus.Sold, (await db.InventoryItems.SingleAsync()).Status);
+    }
+
+    [Fact]
+    public async Task The_order_margin_uses_the_sales_cost_of_goods()
+    {
+        // A cost entered after the sale updates the sale, not the line snapshot; the margin read the stale snapshot.
+        (HaulScoutDbContext db, Guid org, Guid user) = NewContext(nameof(The_order_margin_uses_the_sales_cost_of_goods));
+        await using HaulScoutDbContext _ = db;
+        Order order = await SeedOrder(db, org);
+        db.OrderLines.Add(new OrderLine
+        {
+            OrganizationId = org,
+            OrderId = order.Id,
+            InventoryItemId = (await db.InventoryItems.SingleAsync()).Id,
+            TitleSnapshot = "Brass Lamp",
+            UnitPrice = 100m,
+            LineTotal = 100m,
+            Quantity = 1,
+            UnitCostSnapshot = 0m,
+        });
+        order.Subtotal = 100m;
+        await db.SaveChangesAsync();
+        OrdersController controller = NewController(db, new StubCurrentUser(org, user));
+
+        OrderDetailDto? detail = (await controller.Get(order.Id, CancellationToken.None)).Value;
+
+        Assert.Equal(40m, detail?.CostOfGoods);
+        Assert.Equal(60m, detail?.GrossMargin);
     }
 }

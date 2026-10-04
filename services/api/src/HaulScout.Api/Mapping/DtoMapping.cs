@@ -310,7 +310,9 @@ public static class DtoMapping
         item.Channel,
         item.ExternalOrderId,
         item.BuyerReference,
-        OrderWorkflow.StageFor(item.ToWorkflowFacts(hasOpenReturn)).ToString());
+        OrderWorkflow.StageFor(item.ToWorkflowFacts(hasOpenReturn)).ToString(),
+        item.Lines.OrderBy(line => line.TitleSnapshot).Select(line => line.TitleSnapshot).FirstOrDefault(),
+        item.TrackingUrl);
 
     public static CustomerChannelIdentityDto ToDto(this CustomerChannelIdentity item) => new(
         item.Id,
@@ -331,7 +333,8 @@ public static class DtoMapping
                 ? sale
                 : null;
 
-        decimal cogs = item.Lines.Sum(line => (line.UnitCostSnapshot ?? 0) * line.Quantity);
+        // The sale's COGS is the live figure; the line snapshot goes stale when a cost is entered after the sale.
+        decimal cogs = item.Lines.Sum(line => SaleFor(line)?.CostOfGoods ?? (line.UnitCostSnapshot ?? 0) * line.Quantity);
         // Refunds live on the sale lines; roll them up so the order shows what the buyer was actually charged net.
         decimal totalRefunded = salesByInventoryItem is null
             ? 0
@@ -397,21 +400,12 @@ public static class DtoMapping
         HasShippingAddress: !string.IsNullOrWhiteSpace(item.ShipToLine1),
         IsShipped: item.ShippedAt is not null,
         IsDelivered: item.DeliveredAt is not null,
-        hasOpenReturn);
+        hasOpenReturn,
+        Order.ChannelHandlesShipping(item.Channel));
 
     public static OrderWorkflowStateDto ToWorkflowState(this Order item, bool hasOpenReturn)
     {
-        OrderWorkflowFacts facts = new(
-            item.Status,
-            item.PaymentStatus,
-            item.IsLocalPickup,
-            IsPacked: item.PackedAt is not null,
-            HasCarrier: !string.IsNullOrWhiteSpace(item.ShippingCarrier),
-            HasTrackingNumber: !string.IsNullOrWhiteSpace(item.TrackingNumber),
-            HasShippingAddress: !string.IsNullOrWhiteSpace(item.ShipToLine1),
-            IsShipped: item.ShippedAt is not null,
-            IsDelivered: item.DeliveredAt is not null,
-            hasOpenReturn);
+        OrderWorkflowFacts facts = item.ToWorkflowFacts(hasOpenReturn);
 
         IReadOnlyList<OrderWorkflowAction> available = OrderWorkflow.AvailableActions(facts);
 

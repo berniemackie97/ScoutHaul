@@ -15,9 +15,10 @@ public class OrderWorkflowTests
         bool isDelivered = false,
         bool hasOpenReturn = false,
         OrderStatus status = OrderStatus.Paid,
-        PaymentStatus paymentStatus = PaymentStatus.Paid) =>
+        PaymentStatus paymentStatus = PaymentStatus.Paid,
+        bool channelHandlesShipping = false) =>
         new(status, paymentStatus, isLocalPickup, isPacked, hasCarrier, hasTrackingNumber,
-            hasShippingAddress, isShipped, isDelivered, hasOpenReturn);
+            hasShippingAddress, isShipped, isDelivered, hasOpenReturn, channelHandlesShipping);
 
     // ── Stage derivation ──────────────────────────────────────────────
 
@@ -284,4 +285,16 @@ public class OrderWorkflowTests
     [InlineData(OrderWorkflowStage.Closed, false)]
     public void Open_work_is_what_the_shift_board_counts(OrderWorkflowStage stage, bool expected)
         => Assert.Equal(expected, OrderWorkflow.IsOpenWork(stage));
+
+    [Fact]
+    public void A_marketplace_order_packs_without_an_address()
+        => Assert.True(OrderWorkflow.Evaluate(Paid(hasShippingAddress: false, channelHandlesShipping: true), OrderWorkflowAction.MarkPacked).Allowed);
+
+    [Fact]
+    public void A_marketplace_order_ships_without_tracking()
+        => Assert.True(OrderWorkflow.Evaluate(Paid(isPacked: true, channelHandlesShipping: true), OrderWorkflowAction.Ship).Allowed);
+
+    [Fact]
+    public void A_storefront_order_needs_tracking_to_ship()
+        => Assert.False(OrderWorkflow.Evaluate(Paid(isPacked: true), OrderWorkflowAction.Ship).Allowed);
 }

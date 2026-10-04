@@ -57,6 +57,10 @@ public sealed class SalesController(
         CancellationToken cancellationToken = default) =>
         await queries.BrowseAsync(status, search, sort, desc, page, pageSize, cancellationToken);
 
+    [HttpGet("by-item/{inventoryItemId:guid}")]
+    public async Task<ActionResult<IReadOnlyList<SaleDto>>> ForItem(Guid inventoryItemId, CancellationToken cancellationToken) =>
+        Ok(await queries.ForItemAsync(inventoryItemId, cancellationToken));
+
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<SaleDto>> Get(Guid id, CancellationToken cancellationToken) =>
         ToActionResult(await queries.GetAsync(id, cancellationToken));

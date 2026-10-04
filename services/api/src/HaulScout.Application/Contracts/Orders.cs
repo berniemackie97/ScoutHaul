@@ -39,7 +39,10 @@ public sealed record OrderSummaryDto(
     string? ExternalOrderId = null,
     string? BuyerReference = null,
     // The queue this order belongs in, so the list can be grouped by work rather than by raw status.
-    string? Stage = null);
+    string? Stage = null,
+    // What the operator recognises an order by — the first line's title.
+    string? LeadItemTitle = null,
+    string? TrackingUrl = null);
 
 /// <summary>
 /// Where an order sits in the day's work, and what may be done with it. Derived from the order's own

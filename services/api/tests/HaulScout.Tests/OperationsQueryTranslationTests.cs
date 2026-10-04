@@ -192,7 +192,7 @@ public sealed class OperationsQueryTranslationTests(PostgresFixture postgres)
         await db.SaveChangesAsync();
 
         StubCurrentUser currentUser = new(org, user);
-        OrdersWorkflowService orders = new(db, currentUser, new OrderAssembler(db, currentUser));
+        OrdersWorkflowService orders = OrdersServiceFactory.Create(db, currentUser);
 
         OrderListDto all = await orders.BrowseAsync(null, null, null, 1, 25, CancellationToken.None);
         Assert.Equal(2, all.Total);
@@ -277,7 +277,7 @@ public sealed class OperationsQueryTranslationTests(PostgresFixture postgres)
             db,
             currentUser,
             new AllowAllAuthorizer(),
-            new OrdersWorkflowService(db, currentUser, assembler),
+            OrdersServiceFactory.Create(db, currentUser, assembler),
             inventory,
             new EfStorefrontOfferStore(db),
             new EfPlatformOrderStore(db, assembler),

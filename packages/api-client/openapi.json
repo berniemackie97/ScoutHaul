@@ -6533,6 +6533,55 @@
         }
       }
     },
+    "/api/sales/by-item/{inventoryItemId}": {
+      "get": {
+        "tags": [
+          "Sales"
+        ],
+        "parameters": [
+          {
+            "name": "inventoryItemId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SaleDto"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SaleDto"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SaleDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/sales/{id}": {
       "get": {
         "tags": [
@@ -15413,6 +15462,14 @@
             "nullable": true
           },
           "stage": {
+            "type": "string",
+            "nullable": true
+          },
+          "leadItemTitle": {
+            "type": "string",
+            "nullable": true
+          },
+          "trackingUrl": {
             "type": "string",
             "nullable": true
           }

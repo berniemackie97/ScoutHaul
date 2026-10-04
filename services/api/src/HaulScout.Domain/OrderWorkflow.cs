@@ -49,6 +49,7 @@ public enum OrderWorkflowAction
 /// rules trivially testable.
 /// </summary>
 /// <param name="HasOpenReturn">A return or refund is in flight on any line of the order.</param>
+/// <param name="ChannelHandlesShipping">A marketplace order: the channel holds the address and issues the label, so we only record what it reports.</param>
 public readonly record struct OrderWorkflowFacts(
     OrderStatus Status,
     PaymentStatus PaymentStatus,
@@ -59,7 +60,8 @@ public readonly record struct OrderWorkflowFacts(
     bool HasShippingAddress,
     bool IsShipped,
     bool IsDelivered,
-    bool HasOpenReturn);
+    bool HasOpenReturn,
+    bool ChannelHandlesShipping = false);
 
 /// <summary>Whether an action may run, and if not, exactly what is missing — in operator language.</summary>
 /// <param name="Blockers">Empty when <paramref name="Allowed"/> is true.</param>
@@ -180,9 +182,9 @@ public static class OrderWorkflow
             blockers.Add("This order has already shipped.");
         }
 
-        // A shipping order with nowhere to send it cannot be packed into a labelled box. Pickup
-        // orders are exempt — the buyer is the address.
-        if (!facts.IsLocalPickup && !facts.HasShippingAddress)
+        // A shipping order with nowhere to send it cannot be packed into a labelled box. Pickup orders
+        // and marketplace orders are exempt — the buyer, or the marketplace's label, is the address.
+        if (!facts.IsLocalPickup && !facts.ChannelHandlesShipping && !facts.HasShippingAddress)
         {
             blockers.Add("Add a shipping address before packing this order.");
         }
@@ -229,14 +231,14 @@ public static class OrderWorkflow
             blockers.Add("Pack this order before shipping it.");
         }
 
-        // The gate that makes tracking reliable: it is demanded by the transition, so a shipped
-        // order without a way to find the parcel cannot exist.
-        if (!facts.HasCarrier)
+        // The gate that makes tracking reliable: a shipped storefront order without a way to find the
+        // parcel cannot exist. A marketplace tracks its own labels, so there it is optional.
+        if (!facts.ChannelHandlesShipping && !facts.HasCarrier)
         {
             blockers.Add("Enter the carrier.");
         }
 
-        if (!facts.HasTrackingNumber)
+        if (!facts.ChannelHandlesShipping && !facts.HasTrackingNumber)
         {
             blockers.Add("Enter the tracking number.");
         }
