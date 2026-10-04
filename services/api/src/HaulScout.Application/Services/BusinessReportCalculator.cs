@@ -1,3 +1,4 @@
+using System.Globalization;
 using HaulScout.Application.Contracts;
 using HaulScout.Domain;
 
@@ -20,7 +21,8 @@ public sealed record ReportSaleInput(
     SaleStatus Status,
     DateTimeOffset SoldAt,
     decimal SalesTaxCollected = 0,
-    bool TaxRemittedByPlatform = true);
+    bool TaxRemittedByPlatform = true,
+    Guid? OrderId = null);
 
 public sealed record ReportExpenseInput(ExpenseCategory Category, decimal Amount, DateTimeOffset OccurredAt);
 
@@ -45,8 +47,11 @@ public static class BusinessReportCalculator
         IReadOnlyList<ReportExpenseInput> currentExpenses,
         IReadOnlyList<ReportExpenseInput> previousExpenses,
         IReadOnlyList<ReportInventoryInput> inventory,
-        DateTimeOffset generatedAt)
+        DateTimeOffset generatedAt,
+        TimeZoneInfo? zone = null)
     {
+        // Days, weeks and months are the business's own, not UTC's: an evening sale in Los Angeles is that day's sale.
+        zone ??= TimeZoneInfo.Utc;
         if (toExclusive <= from)
         {
             throw new ArgumentException("Report end must be after report start.");
@@ -56,21 +61,21 @@ public static class BusinessReportCalculator
         ReportKpiDto previous = CalculateKpis(previousSales, previousExpenses);
         string granularity = SelectGranularity(from, toExclusive);
 
-        Dictionary<DateTimeOffset, ReportSaleInput[]> salesByPeriod = currentSales
+        Dictionary<DateTime, ReportSaleInput[]> salesByPeriod = currentSales
             .Where(sale => SaleWorkflow.IsRealized(sale.Status))
-            .GroupBy(sale => BucketStart(sale.SoldAt, granularity))
+            .GroupBy(sale => BucketStart(sale.SoldAt, granularity, zone))
             .ToDictionary(group => group.Key, group => group.ToArray());
-        Dictionary<DateTimeOffset, ReportExpenseInput[]> expensesByPeriod = currentExpenses
-            .GroupBy(expense => BucketStart(expense.OccurredAt, granularity))
+        Dictionary<DateTime, ReportExpenseInput[]> expensesByPeriod = currentExpenses
+            .GroupBy(expense => BucketStart(expense.OccurredAt, granularity, zone))
             .ToDictionary(group => group.Key, group => group.ToArray());
 
         List<ReportSeriesPointDto> series = [];
-        for (DateTimeOffset cursor = BucketStart(from, granularity); cursor < toExclusive; cursor = NextBucket(cursor, granularity))
+        for (DateTime cursor = BucketStart(from, granularity, zone); AtZone(cursor, zone) < toExclusive; cursor = NextBucket(cursor, granularity))
         {
             ReportSaleInput[] sales = salesByPeriod.GetValueOrDefault(cursor) ?? [];
             ReportExpenseInput[] expenses = expensesByPeriod.GetValueOrDefault(cursor) ?? [];
             series.Add(new ReportSeriesPointDto(
-                cursor,
+                AtZone(cursor, zone),
                 BucketLabel(cursor, granularity),
                 sales.Sum(SaleRevenue),
                 sales.Sum(item => item.NetProfit),
@@ -121,6 +126,13 @@ public static class BusinessReportCalculator
             .Select(ToSaleRow)
             .ToArray();
 
+        ReportSaleRowDto[] losingSales = currentSales
+            .Where(sale => SaleWorkflow.IsRealized(sale.Status) && sale.NetProfit < 0)
+            .OrderBy(sale => sale.NetProfit)
+            .Take(10)
+            .Select(ToSaleRow)
+            .ToArray();
+
         int staleCount = inventory.Count(item => (ageNow - item.AcquiredAt).TotalDays > 60 && item.Status != InventoryStatus.Listed);
         ReportInventorySnapshotDto inventorySnapshot = new(
             inventory.Count,
@@ -141,8 +153,8 @@ public static class BusinessReportCalculator
             Change(current.OperatingExpenses, previous.OperatingExpenses));
 
         return new BusinessReportDto(
-            from,
-            toExclusive.AddTicks(-1),
+            TimeZoneInfo.ConvertTime(from, zone),
+            TimeZoneInfo.ConvertTime(toExclusive.AddTicks(-1), zone),
             granularity,
             generatedAt,
             current,
@@ -154,7 +166,10 @@ public static class BusinessReportCalculator
             inventoryCategories,
             inventoryStatuses,
             aging,
-            topSales);
+            topSales,
+            previous,
+            losingSales,
+            zone.Id);
     }
 
     private static ReportKpiDto CalculateKpis(IReadOnlyList<ReportSaleInput> sales, IReadOnlyList<ReportExpenseInput> expenses)
@@ -171,6 +186,10 @@ public static class BusinessReportCalculator
         decimal salesTaxOwed = realized.Sum(item => item.TaxRemittedByPlatform ? 0m : Math.Max(0, item.SalesTaxCollected));
         // True business net income for the period: realized profit on goods, less operating overhead.
         decimal netIncomeAfterExpenses = netProfit - operatingExpenses;
+        decimal platformFees = realized.Sum(item => item.PlatformFees);
+        decimal paymentFees = realized.Sum(item => item.PaymentFees);
+        decimal shippingCosts = realized.Sum(item => item.ShippingCost);
+        decimal suppliesAndOther = realized.Sum(item => item.SuppliesCost + item.OtherCosts);
         return new ReportKpiDto(
             realized.Length,
             sales.Count(item => item.Status is SaleStatus.Returned or SaleStatus.Refunded),
@@ -184,14 +203,21 @@ public static class BusinessReportCalculator
             realized.Length == 0 ? 0 : grossSales / realized.Length,
             grossSales == 0 ? 0 : netProfit / grossSales * 100,
             salesTaxOwed,
-            netIncomeAfterExpenses);
+            netIncomeAfterExpenses,
+            realized.Sum(item => item.SoldPrice),
+            realized.Sum(item => item.ShippingCharged),
+            platformFees,
+            paymentFees,
+            shippingCosts,
+            suppliesAndOther,
+            grossSales - costOfGoods - saleCosts - netProfit);
     }
 
     private static ReportSaleRowDto ToSaleRow(ReportSaleInput sale)
     {
         decimal revenue = SaleRevenue(sale);
         decimal margin = revenue == 0 ? 0 : sale.NetProfit / revenue * 100;
-        return new ReportSaleRowDto(sale.Id, sale.InventoryItemId, sale.InventoryItemTitle, sale.Platform, sale.SoldPrice, sale.PurchasePrice, sale.NetProfit, margin, sale.SoldAt);
+        return new ReportSaleRowDto(sale.Id, sale.InventoryItemId, sale.InventoryItemTitle, sale.Platform, sale.SoldPrice, sale.PurchasePrice, sale.NetProfit, margin, sale.SoldAt, sale.OrderId);
     }
 
     private static decimal SaleRevenue(ReportSaleInput sale) => sale.SoldPrice + sale.ShippingCharged;
@@ -216,29 +242,29 @@ public static class BusinessReportCalculator
         _ => "month"
     };
 
-    private static DateTimeOffset BucketStart(DateTimeOffset value, string granularity)
+    /// <summary>The bucket's first local day, in the business's zone.</summary>
+    private static DateTime BucketStart(DateTimeOffset value, string granularity, TimeZoneInfo zone)
     {
-        DateTimeOffset utc = value.ToUniversalTime();
-        if (granularity == "month") return new DateTimeOffset(utc.Year, utc.Month, 1, 0, 0, 0, TimeSpan.Zero);
-        if (granularity == "week")
-        {
-            int daysSinceMonday = ((int)utc.DayOfWeek + 6) % 7;
-            return new DateTimeOffset(utc.Date.AddDays(-daysSinceMonday), TimeSpan.Zero);
-        }
-        return new DateTimeOffset(utc.Date, TimeSpan.Zero);
+        DateTime local = TimeZoneInfo.ConvertTime(value, zone).Date;
+        if (granularity == "month") return new DateTime(local.Year, local.Month, 1);
+        if (granularity == "week") return local.AddDays(-(((int)local.DayOfWeek + 6) % 7));
+        return local;
     }
 
-    private static DateTimeOffset NextBucket(DateTimeOffset value, string granularity) => granularity switch
+    private static DateTime NextBucket(DateTime value, string granularity) => granularity switch
     {
         "month" => value.AddMonths(1),
         "week" => value.AddDays(7),
         _ => value.AddDays(1)
     };
 
-    private static string BucketLabel(DateTimeOffset value, string granularity) => granularity switch
+    /// <summary>Local midnight as an instant, with that day's offset so DST weeks stay whole.</summary>
+    private static DateTimeOffset AtZone(DateTime local, TimeZoneInfo zone) => new(local, zone.GetUtcOffset(local));
+
+    private static string BucketLabel(DateTime value, string granularity) => granularity switch
     {
-        "month" => value.ToString("MMM yyyy"),
-        "week" => $"Week of {value:MMM d}",
-        _ => value.ToString("MMM d")
+        "month" => value.ToString("MMM yyyy", CultureInfo.InvariantCulture),
+        "week" => string.Create(CultureInfo.InvariantCulture, $"Week of {value:MMM d}"),
+        _ => value.ToString("MMM d", CultureInfo.InvariantCulture)
     };
 }

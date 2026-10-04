@@ -109,12 +109,12 @@ public sealed class OperatorConsoleService(
         ConsoleMoneyDto? money = null;
         if (canReports)
         {
-            DateOnly today = DateOnly.FromDateTime(clock.GetUtcNow().UtcDateTime);
-            ReportRange range = ReportRange.Trailing(today, MoneyWindowDays);
+            TimeZoneInfo zone = await reports.ZoneAsync(cancellationToken);
+            ReportRange range = ReportRange.Trailing(BusinessReportService.Today(zone, clock.GetUtcNow()), MoneyWindowDays, zone);
             BusinessReportDto report = await reports.BuildAsync(range, cancellationToken);
             money = new ConsoleMoneyDto(
                 MoneyWindowDays,
-                DateOnly.FromDateTime(range.From.UtcDateTime),
+                range.FromInclusive,
                 range.ToInclusive,
                 report.Kpis,
                 report.Comparison);

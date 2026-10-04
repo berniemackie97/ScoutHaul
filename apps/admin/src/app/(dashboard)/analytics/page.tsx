@@ -1,60 +1,54 @@
 import Link from "next/link";
 import type { components } from "@overhaul/api-client";
+import { ArrowUpRight, CalendarRange, CheckCircle2, Download, PackageSearch } from "lucide-react";
+import { Card, formatCurrency } from "@overhaul/ui";
 import {
-  ArrowDownRight,
-  ArrowUpRight,
-  Boxes,
-  CalendarRange,
-  CircleDollarSign,
-  Download,
-  PackageSearch,
-  ReceiptText,
-  ShieldAlert,
-  TrendingUp,
-  WalletCards,
-} from "lucide-react";
-import { Badge, Card, formatCurrency, formatDate } from "@overhaul/ui";
+  RANGE_PRESETS,
+  humanize,
+  isRangePreset,
+  moneyBreakdown,
+  percentChange,
+  reportDay,
+  type RangePreset,
+} from "@/features/reports/report-format";
 import { getApiClient } from "@/lib/api";
-import { AgingChart, InventoryStatusChart, PerformanceChart, PlatformChart } from "./report-charts";
+import { When } from "@/components/when";
 import { refusal } from "@/lib/page-access";
+import { BreakdownBar, Delta, LegendKey, RowBar, Sparkline } from "./report-visuals";
+import { TrendChart } from "./trend-chart";
 
 export const dynamic = "force-dynamic";
 
-type ReportChange = components["schemas"]["ReportChangeDto"];
+type Report = components["schemas"]["BusinessReportDto"];
+type Kpis = components["schemas"]["ReportKpiDto"];
+type SaleRow = components["schemas"]["ReportSaleRowDto"];
 
-// Reported totals: an aggregate of nothing is nought, not unknown.
-const money = (value: number | null | undefined, digits = 0) =>
-  formatCurrency(value ?? 0, { maximumFractionDigits: digits });
-const number = (value: number | null | undefined) => new Intl.NumberFormat("en-US").format(value ?? 0);
-const percent = (value: number | null | undefined) => `${(value ?? 0).toFixed(1)}%`;
-const dateLabel = (value: string | null | undefined) => formatDate(value);
+const money = (value: number | null | undefined, digits = 0) => formatCurrency(value ?? 0, { maximumFractionDigits: digits });
+const count = (value: number | null | undefined) => new Intl.NumberFormat("en-US").format(value ?? 0);
+const isDay = (value: unknown): value is string => typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value);
 
-function isoDaysAgo(days: number) {
-  const value = new Date();
-  value.setUTCDate(value.getUTCDate() - days);
-  return value.toISOString().slice(0, 10);
-}
-
-function validDate(value: unknown, fallback: string) {
-  return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : fallback;
-}
-
-function Change({ change, invert = false }: { change: ReportChange | null | undefined; invert?: boolean }) {
-  if (change?.percentChange == null) return <span className="text-xs text-muted-foreground">No prior-period baseline</span>;
-  const positive = invert ? change.percentChange <= 0 : change.percentChange >= 0;
-  const Icon = change.percentChange >= 0 ? ArrowUpRight : ArrowDownRight;
-  return <span className={`inline-flex items-center gap-1 text-xs font-medium ${positive ? "text-green-700" : "text-red-700"}`}><Icon className="h-3.5 w-3.5" />{Math.abs(change.percentChange).toFixed(1)}% vs prior period</span>;
-}
-
-function Kpi({ label, value, detail, icon: Icon, change, invert }: { label: string; value: string; detail: string; icon: typeof TrendingUp; change?: ReportChange | null; invert?: boolean }) {
-  return (
-    <Card className="p-5">
-      <div className="flex items-center justify-between"><span className="text-sm text-muted-foreground">{label}</span><Icon className="h-4 w-4 text-muted-foreground" /></div>
-      <p className="mt-3 text-3xl font-semibold tracking-tight tabular-nums">{value}</p>
-      <p className="mt-1 text-xs text-muted-foreground">{detail}</p>
-      {change && <div className="mt-3"><Change change={change} invert={invert} /></div>}
-    </Card>
+/** A calendar day as sent, never shifted by the server's own zone. */
+function dayLabel(day: string | undefined, withYear = true) {
+  if (!day) return "—";
+  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: withYear ? "numeric" : undefined, timeZone: "UTC" }).format(
+    new Date(`${day}T00:00:00Z`),
   );
+}
+
+/** "Pacific Daylight Time" rather than "America/Los_Angeles". */
+function zoneName(zone: string | null | undefined) {
+  if (!zone) return "UTC";
+  try {
+    return new Intl.DateTimeFormat("en-US", { timeZone: zone, timeZoneName: "long" }).formatToParts(new Date()).find((part) => part.type === "timeZoneName")?.value ?? zone;
+  } catch {
+    return zone;
+  }
+}
+
+function shiftDay(day: string, days: number) {
+  const date = new Date(`${day}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
 }
 
 export default async function AnalyticsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
@@ -62,126 +56,521 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
   if (refused) return refused;
 
   const query = await searchParams;
-  const to = validDate(query.to, isoDaysAgo(0));
-  const from = validDate(query.from, isoDaysAgo(89));
+  const custom = isDay(query.from) && isDay(query.to);
+  const preset: RangePreset | undefined = isRangePreset(query.preset) ? query.preset : custom ? undefined : "90d";
   const api = await getApiClient();
-  const result = await api.GET("/api/reports/overview", { params: { query: { from, to } } });
-  const report = result.data;
+  const { data: report } = await api.GET("/api/reports/overview", {
+    params: { query: preset ? { preset } : { from: query.from as string, to: query.to as string } },
+  });
 
-  if (!report?.kpis || !report.inventory || !report.comparison) {
+  if (!report?.kpis || !report.inventory) {
     return (
       <div className="space-y-4">
         <h1 className="text-2xl font-semibold">Reports</h1>
-        <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-6 text-sm text-destructive">The report could not be generated. Check the date range and your reporting permissions.</div>
+        <div className="border-destructive/30 bg-destructive/5 text-destructive rounded-xl border p-6 text-sm">
+          The report could not be produced. Check the dates (a range can be up to two years) and try again.
+        </div>
       </div>
     );
   }
 
   const kpis = report.kpis;
-  const comparison = report.comparison;
-  const inventory = report.inventory;
+  const previous = report.previousKpis;
+  const from = reportDay(report.from)!;
+  const to = reportDay(report.to)!;
+  const days = Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000) + 1;
+  const { segments, loss } = moneyBreakdown(kpis);
+  const series = report.series ?? [];
+  const margin = kpis.netMarginPercent ?? 0;
+  const marginChange = previous && (previous.grossSales ?? 0) > 0 ? margin - (previous.netMarginPercent ?? 0) : null;
   const exportQuery = new URLSearchParams({ from, to }).toString();
 
   return (
-    <div className="space-y-8">
-      <header className="flex flex-col justify-between gap-5 xl:flex-row xl:items-end">
+    <div className="space-y-6">
+      <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
         <div>
-          <p className="text-sm text-muted-foreground">Intelligence</p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight">Business reports</h1>
-          <p className="mt-1 max-w-3xl text-sm text-muted-foreground">Auditable sales, profit, expense, inventory, aging, and data-quality reporting from the system of record.</p>
+          <p className="text-muted-foreground text-sm">Intelligence</p>
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight">Reports</h1>
+          <p className="text-muted-foreground mt-1 text-sm">What you sold, what it cost, and what you kept.</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          {/* Listing quality is reporting data — performance observations per listing — so it lives
-              here rather than on the Imports page, where nothing was ever done with it. */}
-          <Link href="/analytics/listing-quality" className="inline-flex h-10 items-center gap-2 rounded-lg border bg-background px-4 text-sm font-medium hover:bg-muted"><PackageSearch className="h-4 w-4" /> Listing quality</Link>
-          <Link href={`/api/reports/export?${exportQuery}`} className="inline-flex h-10 items-center gap-2 rounded-lg border bg-background px-4 text-sm font-medium hover:bg-muted"><Download className="h-4 w-4" /> Export CSV</Link>
+          <Link href="/analytics/listing-quality" className="bg-background hover:bg-muted inline-flex h-9 items-center gap-2 rounded-md border px-3 text-sm font-medium">
+            <PackageSearch className="h-4 w-4" aria-hidden /> Listing quality
+          </Link>
+          <a href={`/api/reports/export?${exportQuery}`} download className="bg-background hover:bg-muted inline-flex h-9 items-center gap-2 rounded-md border px-3 text-sm font-medium">
+            <Download className="h-4 w-4" aria-hidden /> Export CSV
+          </a>
         </div>
       </header>
 
-      <form className="flex flex-col gap-3 rounded-xl border bg-card p-4 lg:flex-row lg:items-end">
-        <div className="grid flex-1 gap-3 sm:grid-cols-2">
-          <label className="space-y-1.5 text-sm"><span className="font-medium">From</span><input type="date" name="from" defaultValue={from} className="h-10 w-full rounded-lg border bg-background px-3" /></label>
-          <label className="space-y-1.5 text-sm"><span className="font-medium">Through</span><input type="date" name="to" defaultValue={to} className="h-10 w-full rounded-lg border bg-background px-3" /></label>
+      {/* One filter row scopes everything below it. */}
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-wrap items-center gap-3">
+          <nav className="bg-muted/60 inline-flex rounded-lg p-1" aria-label="Report range">
+            {RANGE_PRESETS.map((option) => (
+              <Link
+                key={option.key}
+                href={`/analytics?preset=${option.key}`}
+                title={option.title}
+                aria-current={preset === option.key ? "page" : undefined}
+                className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
+                  preset === option.key ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {option.label}
+              </Link>
+            ))}
+          </nav>
+          <p className="text-muted-foreground text-sm">
+            <span className="text-foreground font-medium">
+              {dayLabel(from, false)} – {dayLabel(to)}
+            </span>{" "}
+            · compared with {dayLabel(shiftDay(from, -days), false)} – {dayLabel(shiftDay(from, -1))}
+          </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Link href={`/analytics?from=${isoDaysAgo(29)}&to=${isoDaysAgo(0)}`} className="inline-flex h-10 items-center rounded-lg border px-3 text-sm hover:bg-muted">30 days</Link>
-          <Link href={`/analytics?from=${isoDaysAgo(89)}&to=${isoDaysAgo(0)}`} className="inline-flex h-10 items-center rounded-lg border px-3 text-sm hover:bg-muted">90 days</Link>
-          <Link href={`/analytics?from=${isoDaysAgo(364)}&to=${isoDaysAgo(0)}`} className="inline-flex h-10 items-center rounded-lg border px-3 text-sm hover:bg-muted">1 year</Link>
-          <button type="submit" className="inline-flex h-10 items-center gap-2 rounded-lg bg-brand-600 px-4 text-sm font-medium text-white hover:bg-brand-700"><CalendarRange className="h-4 w-4" /> Run report</button>
+        <form className="flex flex-wrap items-center gap-2" action="/analytics">
+          <input type="date" name="from" defaultValue={from} aria-label="From" className="bg-background h-9 rounded-md border px-2 text-sm" />
+          <span className="text-muted-foreground text-sm">to</span>
+          <input type="date" name="to" defaultValue={to} aria-label="Through" className="bg-background h-9 rounded-md border px-2 text-sm" />
+          <button type="submit" className="hover:bg-muted inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-sm font-medium">
+            <CalendarRange className="h-4 w-4" aria-hidden /> Apply
+          </button>
+        </form>
+      </div>
+
+      <Card className="grid gap-8 p-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.4fr)]">
+        <div>
+          <p className="text-muted-foreground text-sm">Net profit</p>
+          <p className={`mt-2 font-sans text-5xl font-semibold tracking-tight ${(kpis.realizedNetProfit ?? 0) < 0 ? "text-destructive" : ""}`}>
+            {money(kpis.realizedNetProfit)}
+          </p>
+          <Delta change={percentChange(kpis.realizedNetProfit, previous?.realizedNetProfit)} className="mt-2" />
+          <p className="text-muted-foreground mt-4 max-w-sm text-sm leading-relaxed">
+            Kept <span className="text-foreground font-medium">{margin.toFixed(1)}%</span> of{" "}
+            <span className="text-foreground font-medium">{money(kpis.grossSales)}</span> in sales across {count(kpis.salesCount)} sale
+            {kpis.salesCount === 1 ? "" : "s"}
+            {(kpis.returnedSalesCount ?? 0) > 0 ? `, after ${count(kpis.returnedSalesCount)} returned or refunded` : ""}.
+          </p>
+          {(kpis.operatingExpenses ?? 0) > 0 && (
+            <p className="text-muted-foreground mt-2 text-sm">
+              After {money(kpis.operatingExpenses)} of overhead:{" "}
+              <span className="text-foreground font-medium">{money(kpis.netIncomeAfterExpenses)}</span> net income.
+            </p>
+          )}
         </div>
-      </form>
-
-      <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-        <Badge variant="outline">{dateLabel(report.from)} – {dateLabel(report.to)}</Badge>
-        <span>Grouped by {report.granularity}</span><span>·</span><span>Generated {dateLabel(report.generatedAt)}</span>
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Kpi label="Gross sales" value={money(kpis.grossSales)} detail={`${number(kpis.salesCount)} completed sales`} icon={CircleDollarSign} change={comparison.grossSales} />
-        <Kpi label="Realized net profit" value={money(kpis.realizedNetProfit)} detail={`${percent(kpis.netMarginPercent)} net margin`} icon={TrendingUp} change={comparison.netProfit} />
-        <Kpi label="Average sale value" value={money(kpis.averageSaleValue)} detail={`${number(kpis.returnedSalesCount)} returned sales excluded`} icon={WalletCards} change={comparison.averageSaleValue} />
-        <Kpi label="Operating expenses" value={money(kpis.operatingExpenses)} detail="Recorded non-inventory expenses" icon={ReceiptText} change={comparison.operatingExpenses} invert />
-      </div>
+        <div>
+          <p className="mb-4 text-sm font-medium">Where every sales dollar went</p>
+          <BreakdownBar segments={segments} total={segments.reduce((sum, segment) => sum + segment.value, 0)} />
+          {loss > 0 && (
+            <p className="text-destructive mt-3 text-sm">Costs were {money(loss)} more than sales brought in.</p>
+          )}
+        </div>
+      </Card>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Kpi label="Net income after expenses" value={money(kpis.netIncomeAfterExpenses)} detail="Realized profit less operating overhead" icon={TrendingUp} />
-        <Kpi label="Sales tax owed" value={money(kpis.salesTaxOwed)} detail="We collected it; owed to the state (not profit)" icon={ReceiptText} />
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Kpi label="Cost of goods" value={money(kpis.costOfGoods)} detail="Specific item acquisition costs" icon={Boxes} />
-        <Kpi label="Gross profit" value={money(kpis.grossProfit)} detail="Sales less specific-item COGS" icon={TrendingUp} />
-        <Kpi label="Transaction costs" value={money(kpis.saleCosts)} detail="Platform, payment, shipping, supplies, other" icon={ReceiptText} />
-        <Kpi label="Inventory acquired" value={money(kpis.inventorySpend)} detail="Recorded inventory-purchase expenses" icon={PackageSearch} />
+        <StatTile
+          label="Gross sales"
+          value={money(kpis.grossSales)}
+          change={percentChange(kpis.grossSales, previous?.grossSales)}
+          trend={series.map((point) => point.grossSales ?? 0)}
+        />
+        <StatTile
+          label="Sales"
+          value={count(kpis.salesCount)}
+          change={percentChange(kpis.salesCount, previous?.salesCount)}
+          trend={series.map((point) => point.salesCount ?? 0)}
+        />
+        <StatTile label="Average sale" value={money(kpis.averageSaleValue, 2)} change={percentChange(kpis.averageSaleValue, previous?.averageSaleValue)} />
+        <StatTile label="Net margin" value={`${margin.toFixed(1)}%`} change={marginChange} points />
       </div>
 
       <Card className="p-6">
-        <div className="mb-5"><h2 className="font-semibold">Performance over time</h2><p className="text-sm text-muted-foreground">Gross sales, realized net profit, and separately recorded operating expenses.</p></div>
-        <PerformanceChart series={report.series ?? []} />
+        <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 className="font-semibold">Sales and profit over time</h2>
+            <p className="text-muted-foreground text-sm">By {report.granularity}, in {zoneName(report.timeZone)}.</p>
+          </div>
+          <div className="flex gap-4">
+            <LegendKey color="var(--viz-1)" label="Net profit" line />
+            <LegendKey color="var(--viz-context)" label="Gross sales" line />
+          </div>
+        </div>
+        <TrendChart series={series} />
+        <details className="mt-4">
+          <summary className="text-muted-foreground hover:text-foreground cursor-pointer text-xs">Show as a table</summary>
+          <div className="mt-3 max-h-80 overflow-auto rounded-lg border">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/40 text-muted-foreground sticky top-0 text-left text-xs uppercase tracking-wide">
+                <tr>
+                  <th className="px-3 py-2 font-medium">Period</th>
+                  <th className="px-3 py-2 text-right font-medium">Sales</th>
+                  <th className="px-3 py-2 text-right font-medium">Gross sales</th>
+                  <th className="px-3 py-2 text-right font-medium">Net profit</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y tabular-nums">
+                {series.map((point) => (
+                  <tr key={point.label}>
+                    <td className="px-3 py-1.5">{point.label}</td>
+                    <td className="px-3 py-1.5 text-right">{point.salesCount}</td>
+                    <td className="px-3 py-1.5 text-right">{money(point.grossSales, 2)}</td>
+                    <td className="px-3 py-1.5 text-right">{money(point.netProfit, 2)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </details>
       </Card>
 
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
+        <ProfitAndLoss kpis={kpis} previous={previous} expenses={report.expenseCategories ?? []} />
+        <Channels platforms={report.platforms ?? []} />
+      </div>
+
+      <section className="space-y-4">
+        <div>
+          <h2 className="text-lg font-semibold">Inventory on hand</h2>
+          <p className="text-muted-foreground text-sm">Everything not yet sold, as of now — not limited to the dates above.</p>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <StatTile label="Items" value={count(report.inventory.itemCount)} detail={`${count(report.inventory.unlistedCount)} not listed yet`} />
+          <StatTile label="Cost tied up" value={money(report.inventory.cost)} detail="What you paid for it" />
+          <StatTile label="Expected value" value={money(report.inventory.estimatedValue)} detail="At your estimated prices" />
+          <StatTile
+            label="Projected spread"
+            value={money((report.inventory.estimatedValue ?? 0) - (report.inventory.cost ?? 0))}
+            detail="Expected value less cost, before fees"
+          />
+        </div>
+        <div className="grid gap-6 xl:grid-cols-3">
+          <Aging report={report} />
+          <Stages report={report} />
+          <DataQuality inventory={report.inventory} />
+        </div>
+      </section>
+
       <div className="grid gap-6 xl:grid-cols-2">
-        <Card className="p-6"><div className="mb-4"><h2 className="font-semibold">Channel performance</h2><p className="text-sm text-muted-foreground">Revenue and realized net profit by selling platform.</p></div><PlatformChart data={report.platforms ?? []} /></Card>
-        <Card className="p-6"><div className="mb-4"><h2 className="font-semibold">Inventory lifecycle</h2><p className="text-sm text-muted-foreground">Current inventory distribution across operational stages.</p></div><InventoryStatusChart data={report.inventoryStatuses ?? []} /></Card>
+        <SalesTable title="Most profitable sales" rows={report.topSales ?? []} empty="No completed sales in this period." />
+        <SalesTable
+          title="Sales that lost money"
+          rows={report.losingSales ?? []}
+          empty={
+            <span className="inline-flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4 text-[color:var(--viz-up)]" aria-hidden /> No sale lost money in this period.
+            </span>
+          }
+        />
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]">
-        <Card className="p-6"><div className="mb-4"><h2 className="font-semibold">Inventory aging exposure</h2><p className="text-sm text-muted-foreground">Cost basis and expected value by days held.</p></div><AgingChart data={report.aging ?? []} /></Card>
-        <Card className="p-6">
-          <div className="flex items-start justify-between"><div><h2 className="font-semibold">Inventory position</h2><p className="text-sm text-muted-foreground">Current unsold operating inventory.</p></div><Boxes className="h-5 w-5 text-muted-foreground" /></div>
-          <div className="mt-6 space-y-4 text-sm">
-            <div className="flex justify-between"><span className="text-muted-foreground">Items</span><strong>{number(inventory.itemCount)}</strong></div>
-            <div className="flex justify-between"><span className="text-muted-foreground">Cost basis</span><strong>{money(inventory.cost)}</strong></div>
-            <div className="flex justify-between"><span className="text-muted-foreground">Expected value</span><strong>{money(inventory.estimatedValue)}</strong></div>
-            <div className="flex justify-between border-t pt-4"><span className="text-muted-foreground">Projected spread</span><strong>{money((inventory.estimatedValue ?? 0) - (inventory.cost ?? 0))}</strong></div>
-            <div className="flex justify-between"><span className="text-muted-foreground">Unlisted</span><strong>{number(inventory.unlistedCount)}</strong></div>
-            <div className="flex justify-between"><span className="text-muted-foreground">Aged over 60 days</span><strong>{number(inventory.staleCount)}</strong></div>
-          </div>
-        </Card>
-      </div>
-
-      <div className="grid gap-6 xl:grid-cols-2">
-        <Card className="overflow-hidden">
-          <div className="border-b p-6"><h2 className="font-semibold">Top realized profit</h2><p className="text-sm text-muted-foreground">Best-performing item sales in the selected period.</p></div>
-          <div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground"><tr><th className="px-4 py-3">Item</th><th className="px-4 py-3">Channel</th><th className="px-4 py-3 text-right">Sale</th><th className="px-4 py-3 text-right">Profit</th><th className="px-4 py-3 text-right">Margin</th></tr></thead><tbody className="divide-y">{(report.topSales ?? []).map((sale) => <tr key={sale.saleId}><td className="px-4 py-3"><Link href={`/inventory/${sale.inventoryItemId}`} className="font-medium hover:underline">{sale.title}</Link><p className="text-xs text-muted-foreground">{dateLabel(sale.soldAt)}</p></td><td className="px-4 py-3 text-muted-foreground">{sale.platform}</td><td className="px-4 py-3 text-right tabular-nums">{money(sale.soldPrice)}</td><td className="px-4 py-3 text-right font-medium tabular-nums">{money(sale.netProfit)}</td><td className="px-4 py-3 text-right tabular-nums">{percent(sale.marginPercent)}</td></tr>)}{(report.topSales ?? []).length === 0 && <tr><td colSpan={5} className="p-8 text-center text-muted-foreground">No completed sales in this period.</td></tr>}</tbody></table></div>
-        </Card>
-
-        <Card className="p-6">
-          <div className="flex items-start justify-between"><div><h2 className="font-semibold">Data quality control</h2><p className="text-sm text-muted-foreground">Missing fields that weaken valuation, fulfillment, and reporting.</p></div><ShieldAlert className="h-5 w-5 text-amber-600" /></div>
-          <div className="mt-5 space-y-3">
-            {([
-              ["Missing acquisition cost", inventory.missingCostCount, "MissingCost"],
-              ["Missing expected value", inventory.missingValueCount, "MissingValue"],
-              ["Missing storage location", inventory.missingLocationCount, "MissingLocation"],
-              ["Missing photography", inventory.missingPhotoCount, "MissingPhotos"],
-            ] as const).map(([label, count, attention]) => <Link key={label} href={`/inventory?attention=${attention}`} className="flex items-center justify-between rounded-lg border p-3 hover:bg-muted/40"><span className="text-sm">{label}</span><span className="inline-flex items-center gap-2 font-semibold tabular-nums">{number(count)}<ArrowUpRight className="h-3.5 w-3.5" /></span></Link>)}
-          </div>
-        </Card>
-      </div>
-
-      <div className="rounded-xl border bg-muted/20 p-4 text-xs leading-relaxed text-muted-foreground">
-        <strong className="text-foreground">Report definitions:</strong> returned sales are excluded from realized sales metrics; COGS uses each sold item’s recorded acquisition cost; transaction costs come from the sale record; operating expenses exclude inventory-purchase expenses and are displayed separately to avoid presenting an unreconciled P&amp;L as final accounting truth.
-      </div>
+      <details className="bg-muted/20 text-muted-foreground rounded-xl border p-4 text-xs leading-relaxed">
+        <summary className="text-foreground cursor-pointer font-medium">How these figures are counted</summary>
+        <p className="mt-2">
+          Gross sales are item prices plus the shipping buyers paid, for sales that were not cancelled, returned or fully refunded.
+          Cost of goods is each sold item&apos;s recorded cost. Net profit is gross sales less cost of goods, fees, shipping labels,
+          supplies and refunds. Operating expenses are recorded overhead, excluding inventory purchases. Sales tax you collected is a
+          liability you owe, never income. Days are counted in {zoneName(report.timeZone)}.
+        </p>
+      </details>
     </div>
+  );
+}
+
+function StatTile({
+  label,
+  value,
+  change,
+  trend,
+  detail,
+  points = false,
+  upIsGood = true,
+}: {
+  label: string;
+  value: string;
+  change?: number | null;
+  trend?: number[];
+  detail?: string;
+  points?: boolean;
+  upIsGood?: boolean;
+}) {
+  return (
+    <Card className="flex flex-col justify-between gap-3 p-5">
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <p className="text-muted-foreground text-sm">{label}</p>
+          <p className="mt-2 font-sans text-3xl font-semibold tracking-tight">{value}</p>
+        </div>
+        {trend && <Sparkline values={trend} label={`${label} trend`} />}
+      </div>
+      {change !== undefined ? <Delta change={change} points={points} upIsGood={upIsGood} /> : null}
+      {detail && <p className="text-muted-foreground text-xs">{detail}</p>}
+    </Card>
+  );
+}
+
+function ProfitAndLoss({ kpis, previous, expenses }: { kpis: Kpis; previous?: Kpis | null; expenses: components["schemas"]["ReportDimensionDto"][] }) {
+  type Line = { label: string; key: keyof Kpis; cost?: boolean; total?: boolean; hideWhenZero?: boolean };
+  const lines: Line[] = [
+    { label: "Item sales", key: "itemSales" },
+    { label: "Buyer-paid shipping", key: "buyerShipping" },
+    { label: "Gross sales", key: "grossSales", total: true },
+    { label: "Cost of goods", key: "costOfGoods", cost: true },
+    { label: "Gross profit", key: "grossProfit", total: true },
+    { label: "Platform fees", key: "platformFees", cost: true },
+    { label: "Payment fees", key: "paymentFees", cost: true, hideWhenZero: true },
+    { label: "Shipping labels", key: "shippingCosts", cost: true },
+    { label: "Supplies & other", key: "suppliesAndOther", cost: true, hideWhenZero: true },
+    { label: "Refunds & adjustments", key: "refundsAndAdjustments", cost: true, hideWhenZero: true },
+    { label: "Net profit on sales", key: "realizedNetProfit", total: true },
+    { label: "Operating expenses", key: "operatingExpenses", cost: true },
+    { label: "Net income", key: "netIncomeAfterExpenses", total: true },
+  ];
+  const read = (source: Kpis | null | undefined, key: keyof Kpis) => Number(source?.[key] ?? 0);
+  const overhead = expenses.filter((entry) => entry.name !== "InventoryPurchase" && (entry.amount ?? 0) > 0);
+
+  return (
+    <Card className="overflow-hidden">
+      <div className="p-6 pb-3">
+        <h2 className="font-semibold">Profit and loss</h2>
+        <p className="text-muted-foreground text-sm">This period against the one before it.</p>
+      </div>
+      <table className="w-full text-sm">
+        <thead className="text-muted-foreground border-y text-left text-xs uppercase tracking-wide">
+          <tr>
+            <th className="px-6 py-2 font-medium" />
+            <th className="px-3 py-2 text-right font-medium">This period</th>
+            <th className="px-3 py-2 text-right font-medium">Previous</th>
+            <th className="px-6 py-2 text-right font-medium">Change</th>
+          </tr>
+        </thead>
+        <tbody className="tabular-nums">
+          {lines
+            .filter((line) => !line.hideWhenZero || read(kpis, line.key) !== 0 || read(previous, line.key) !== 0)
+            .map((line) => {
+              const current = read(kpis, line.key);
+              const prior = read(previous, line.key);
+              const show = (value: number) => (line.cost && value > 0 ? `−${money(value, 2)}` : money(value, 2));
+              return (
+                <tr key={line.key} className={line.total ? "bg-muted/30 font-semibold" : ""}>
+                  <td className={`px-6 py-2 ${line.total ? "" : "text-muted-foreground pl-9"}`}>{line.label}</td>
+                  <td className={`px-3 py-2 text-right ${line.total && current < 0 ? "text-destructive" : ""}`}>{show(current)}</td>
+                  <td className="text-muted-foreground px-3 py-2 text-right font-normal">{previous ? show(prior) : "—"}</td>
+                  <td className="px-6 py-2 text-right font-normal">
+                    {previous ? <ChangeCell change={percentChange(current, prior)} upIsGood={!line.cost} /> : "—"}
+                  </td>
+                </tr>
+              );
+            })}
+        </tbody>
+      </table>
+      <div className="text-muted-foreground space-y-1 border-t px-6 py-4 text-xs">
+        <p className="flex justify-between">
+          <span>Sales tax collected and owed (a liability, not income)</span>
+          <span className="tabular-nums">{money(kpis.salesTaxOwed, 2)}</span>
+        </p>
+        <p className="flex justify-between">
+          <span>Inventory bought (shows up later as cost of goods)</span>
+          <span className="tabular-nums">{money(kpis.inventorySpend, 2)}</span>
+        </p>
+        {overhead.length > 0 && (
+          <p className="pt-1">
+            Overhead: {overhead.map((entry) => `${humanize(entry.name)} ${money(entry.amount)}`).join(" · ")}
+          </p>
+        )}
+      </div>
+    </Card>
+  );
+}
+
+function ChangeCell({ change, upIsGood }: { change: number | null; upIsGood: boolean }) {
+  if (change == null) return <span className="text-muted-foreground">—</span>;
+  const good = Math.abs(change) < 0.05 ? null : change > 0 === upIsGood;
+  return (
+    <span className={good == null ? "text-muted-foreground" : good ? "text-[color:var(--viz-up)]" : "text-[color:var(--viz-down)]"}>
+      {change > 0 ? "+" : change < 0 ? "−" : ""}
+      {Math.abs(change).toFixed(1)}%
+    </span>
+  );
+}
+
+function Channels({ platforms }: { platforms: components["schemas"]["ReportDimensionDto"][] }) {
+  const max = Math.max(...platforms.map((platform) => platform.amount ?? 0), 0);
+  return (
+    <Card className="p-6">
+      <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 className="font-semibold">Channels</h2>
+          <p className="text-muted-foreground text-sm">Sales on each marketplace, and how much of it you kept.</p>
+        </div>
+        <div className="flex gap-4">
+          <LegendKey color="var(--viz-1)" label="Net profit" />
+          <LegendKey color="var(--viz-context)" label="Gross sales" />
+        </div>
+      </div>
+      {platforms.length === 0 ? (
+        <p className="text-muted-foreground text-sm">No completed sales in this period.</p>
+      ) : (
+        <ul className="space-y-4">
+          {platforms.map((platform) => {
+            const gross = platform.amount ?? 0;
+            const net = platform.secondaryAmount ?? 0;
+            return (
+              <li key={platform.name} className="space-y-1.5">
+                <div className="flex items-baseline justify-between gap-3 text-sm">
+                  <span className="font-medium">
+                    {platform.name}
+                    <span className="text-muted-foreground ml-2 text-xs font-normal">
+                      {count(platform.count)} sale{platform.count === 1 ? "" : "s"}
+                    </span>
+                  </span>
+                  <span className="whitespace-nowrap tabular-nums">
+                    <span className="font-medium">{money(net)}</span>
+                    <span className="text-muted-foreground"> of {money(gross)}</span>
+                    <span className="text-muted-foreground ml-2 inline-block w-12 text-right text-xs">
+                      {gross > 0 ? `${((net / gross) * 100).toFixed(0)}%` : "—"}
+                    </span>
+                  </span>
+                </div>
+                <RowBar ratio={max > 0 ? Math.max(0, net) / max : 0} color="var(--viz-1)" track={max > 0 ? gross / max : 0} />
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </Card>
+  );
+}
+
+function Aging({ report }: { report: Report }) {
+  const buckets = report.aging ?? [];
+  const max = Math.max(...buckets.map((bucket) => bucket.cost ?? 0), 0);
+  return (
+    <Card className="p-6">
+      <h3 className="font-semibold">Age of stock</h3>
+      <p className="text-muted-foreground mb-5 text-sm">Cost tied up, by days since you bought it.</p>
+      <ul className="space-y-3.5">
+        {buckets.map((bucket) => (
+          <li key={bucket.label} className="space-y-1.5">
+            <div className="flex justify-between gap-3 text-sm">
+              <span>
+                {bucket.label}
+                <span className="text-muted-foreground ml-2 text-xs">{count(bucket.count)} items</span>
+              </span>
+              <span className="font-medium tabular-nums">{money(bucket.cost)}</span>
+            </div>
+            <RowBar ratio={max > 0 ? (bucket.cost ?? 0) / max : 0} color="var(--viz-2)" />
+          </li>
+        ))}
+      </ul>
+    </Card>
+  );
+}
+
+function Stages({ report }: { report: Report }) {
+  const stages = report.inventoryStatuses ?? [];
+  const max = Math.max(...stages.map((stage) => stage.count ?? 0), 0);
+  return (
+    <Card className="p-6">
+      <h3 className="font-semibold">Where stock is</h3>
+      <p className="text-muted-foreground mb-5 text-sm">Items at each stage before sale.</p>
+      {stages.length === 0 ? (
+        <p className="text-muted-foreground text-sm">No unsold stock.</p>
+      ) : (
+        <ul className="space-y-3.5">
+          {stages.map((stage) => (
+            <li key={stage.name} className="space-y-1.5">
+              <Link href={`/inventory?status=${stage.name}`} className="flex justify-between gap-3 text-sm hover:underline">
+                <span>{humanize(stage.name)}</span>
+                <span className="font-medium tabular-nums">{count(stage.count)}</span>
+              </Link>
+              <RowBar ratio={max > 0 ? (stage.count ?? 0) / max : 0} color="var(--viz-context)" />
+            </li>
+          ))}
+        </ul>
+      )}
+    </Card>
+  );
+}
+
+function DataQuality({ inventory }: { inventory: components["schemas"]["ReportInventorySnapshotDto"] }) {
+  const checks = [
+    { label: "Missing cost", value: inventory.missingCostCount, attention: "MissingCost", why: "Profit can't be known" },
+    { label: "Missing expected price", value: inventory.missingValueCount, attention: "MissingValue", why: "Stock value is understated" },
+    { label: "Missing storage location", value: inventory.missingLocationCount, attention: "MissingLocation", why: "Slower to pick and pack" },
+    { label: "Missing photos", value: inventory.missingPhotoCount, attention: "MissingPhotos", why: "Can't be listed" },
+  ];
+  const clean = checks.every((check) => (check.value ?? 0) === 0);
+  return (
+    <Card className="p-6">
+      <h3 className="font-semibold">Records to finish</h3>
+      <p className="text-muted-foreground mb-4 text-sm">Gaps that make these numbers less exact.</p>
+      {clean ? (
+        <p className="inline-flex items-center gap-2 text-sm">
+          <CheckCircle2 className="h-4 w-4 text-[color:var(--viz-up)]" aria-hidden /> Every item has what it needs.
+        </p>
+      ) : (
+        <ul className="divide-y">
+          {checks.map((check) => (
+            <li key={check.attention}>
+              <Link href={`/inventory?attention=${check.attention}`} className="hover:bg-muted/40 -mx-2 flex items-center justify-between gap-3 rounded-md px-2 py-2.5">
+                <span>
+                  <span className="block text-sm">{check.label}</span>
+                  <span className="text-muted-foreground block text-xs">{check.why}</span>
+                </span>
+                <span className={`inline-flex items-center gap-1 text-sm font-semibold tabular-nums ${(check.value ?? 0) === 0 ? "text-muted-foreground" : ""}`}>
+                  {count(check.value)}
+                  <ArrowUpRight className="h-3.5 w-3.5" aria-hidden />
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Card>
+  );
+}
+
+function SalesTable({ title, rows, empty }: { title: string; rows: SaleRow[]; empty: React.ReactNode }) {
+  return (
+    <Card className="overflow-hidden">
+      <div className="p-6 pb-3">
+        <h2 className="font-semibold">{title}</h2>
+      </div>
+      {rows.length === 0 ? (
+        <p className="text-muted-foreground px-6 pb-6 text-sm">{empty}</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/40 text-muted-foreground border-y text-left text-xs uppercase tracking-wide">
+              <tr>
+                <th className="px-6 py-2 font-medium">Item</th>
+                <th className="px-3 py-2 text-right font-medium">Sold for</th>
+                <th className="px-3 py-2 text-right font-medium">Net</th>
+                <th className="px-6 py-2 text-right font-medium">Margin</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y tabular-nums">
+              {rows.map((sale) => (
+                <tr key={sale.saleId} className="hover:bg-muted/30">
+                  <td className="max-w-[280px] px-6 py-2.5">
+                    <Link href={sale.orderId ? `/orders/${sale.orderId}` : `/inventory/${sale.inventoryItemId}`} className="block truncate font-medium hover:underline">
+                      {sale.title}
+                    </Link>
+                    <span className="text-muted-foreground text-xs">
+                      {sale.platform} · <When value={sale.soldAt} />
+                    </span>
+                  </td>
+                  <td className="px-3 py-2.5 text-right">{money(sale.soldPrice, 2)}</td>
+                  <td className={`px-3 py-2.5 text-right font-semibold ${(sale.netProfit ?? 0) < 0 ? "text-destructive" : ""}`}>
+                    {money(sale.netProfit, 2)}
+                  </td>
+                  <td className="text-muted-foreground px-6 py-2.5 text-right">{(sale.marginPercent ?? 0).toFixed(0)}%</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Card>
   );
 }

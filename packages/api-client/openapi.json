@@ -6174,6 +6174,13 @@
               "type": "string",
               "format": "date"
             }
+          },
+          {
+            "name": "preset",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -6220,6 +6227,13 @@
             "schema": {
               "type": "string",
               "format": "date"
+            }
+          },
+          {
+            "name": "preset",
+            "in": "query",
+            "schema": {
+              "type": "string"
             }
           }
         ],
@@ -12060,6 +12074,20 @@
               "$ref": "#/components/schemas/ReportSaleRowDto"
             },
             "nullable": true
+          },
+          "previousKpis": {
+            "$ref": "#/components/schemas/ReportKpiDto"
+          },
+          "losingSales": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReportSaleRowDto"
+            },
+            "nullable": true
+          },
+          "timeZone": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -17422,6 +17450,34 @@
           "netIncomeAfterExpenses": {
             "type": "number",
             "format": "double"
+          },
+          "itemSales": {
+            "type": "number",
+            "format": "double"
+          },
+          "buyerShipping": {
+            "type": "number",
+            "format": "double"
+          },
+          "platformFees": {
+            "type": "number",
+            "format": "double"
+          },
+          "paymentFees": {
+            "type": "number",
+            "format": "double"
+          },
+          "shippingCosts": {
+            "type": "number",
+            "format": "double"
+          },
+          "suppliesAndOther": {
+            "type": "number",
+            "format": "double"
+          },
+          "refundsAndAdjustments": {
+            "type": "number",
+            "format": "double"
           }
         },
         "additionalProperties": false
@@ -17464,6 +17520,11 @@
           "soldAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "orderId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
           }
         },
         "additionalProperties": false

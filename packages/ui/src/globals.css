@@ -42,6 +42,17 @@
     --ink: 209 64% 13%;
     --paper: 40 36% 96%;
 
+    /* Data viz: categorical slots in fixed order, validated (dataviz validator) against --card. */
+    --viz-1: #2a78d6;
+    --viz-2: #eb6834;
+    --viz-3: #1baf7a;
+    --viz-4: #eda100;
+    --viz-5: #e87ba4;
+    --viz-context: #8a8f96;
+    --viz-grid: #e6e1d6;
+    --viz-up: #006300;
+    --viz-down: #b42318;
+
     /* Elevation — soft, warm-tinted */
     --shadow-sm: 0 1px 2px hsl(209 40% 12% / 0.06), 0 1px 1px hsl(209 40% 12% / 0.04);
     --shadow-md: 0 6px 20px -8px hsl(209 42% 14% / 0.16);
@@ -79,6 +90,16 @@
     --copper: 30 62% 54%;
     --ink: 209 64% 13%;
     --paper: 209 52% 8%;
+
+    --viz-1: #3987e5;
+    --viz-2: #d95926;
+    --viz-3: #199e70;
+    --viz-4: #c98500;
+    --viz-5: #d55181;
+    --viz-context: #7d8794;
+    --viz-grid: #1f2c39;
+    --viz-up: #0ca30c;
+    --viz-down: #f07167;
     --shadow-sm: 0 1px 2px hsl(0 0% 0% / 0.4);
     --shadow-md: 0 8px 24px -8px hsl(0 0% 0% / 0.5);
     --shadow-lg: 0 30px 60px -20px hsl(0 0% 0% / 0.6);
