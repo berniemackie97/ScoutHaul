@@ -31,6 +31,7 @@ public sealed record ProductIdentityDto(
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);
 
+/// <param name="Colors">The item's colors, main one first. Null leaves them as they are, for clients that do not edit them.</param>
 public sealed record UpsertInventoryItemRequest(
     Guid? ProductIdentityId,
     Guid? SourcingTripId,
@@ -41,7 +42,7 @@ public sealed record UpsertInventoryItemRequest(
     string? Category,
     string? Brand,
     string? Model,
-    string? Color,
+    IReadOnlyList<string>? Colors,
     string? Condition,
     string? SizeSystem,
     string? SizeValue,
@@ -99,7 +100,7 @@ public sealed record InventoryReferenceDataDto(
 
 public sealed record ItemFieldDto(ItemField Field, string Label, ListingReadiness Readiness);
 
-public sealed record ItemAttributeDto(string Key, string Label, IReadOnlyList<string>? Options);
+public sealed record ItemAttributeDto(string Key, string Label, IReadOnlyList<string>? Options, int MaxValues);
 
 public sealed record ItemProfileDto(
     string Key,
@@ -121,7 +122,7 @@ public sealed record InventoryItemDto(
     string? Category,
     string? Brand,
     string? Model,
-    string? Color,
+    IReadOnlyList<string> Colors,
     string? Condition,
     string? SizeSystem,
     string? SizeValue,

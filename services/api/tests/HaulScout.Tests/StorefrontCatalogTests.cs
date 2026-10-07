@@ -94,7 +94,7 @@ public class StorefrontCatalogTests
                 EstimatedSalePrice = 250m,
                 Brand = "Nintendo",
                 Model = "Switch OLED",
-                Color = "White",
+                Colors = ["White"],
                 FunctionalStatus = InventoryFunctionalStatus.FullyFunctional,
                 CompletenessStatus = InventoryCompletenessStatus.Complete,
                 PackagingStatus = InventoryPackagingStatus.OriginalExcellent,

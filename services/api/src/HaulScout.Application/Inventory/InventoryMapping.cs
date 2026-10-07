@@ -23,7 +23,7 @@ public static class InventoryMapping
             item.Category,
             item.Brand,
             item.Model,
-            item.Color,
+            item.Colors,
             item.Condition,
             item.SizeSystem,
             item.SizeValue,

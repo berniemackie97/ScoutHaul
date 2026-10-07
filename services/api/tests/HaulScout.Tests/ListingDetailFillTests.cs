@@ -31,7 +31,7 @@ public sealed class ListingDetailFillTests
 
         Assert.Equal("Worn twice, no flaws.", item.Description);
         Assert.Equal("Carhartt", item.Brand);
-        Assert.Equal("Brown", item.Color);
+        Assert.Equal(["Brown"], item.Colors);
         Assert.Equal("M", item.SizeValue);
         Assert.Equal("Very good", item.Condition);
         Assert.Equal("Jackets", item.Category);
@@ -45,7 +45,7 @@ public sealed class ListingDetailFillTests
             Title = "Jacket",
             Description = "Small tear on the left cuff, priced accordingly.",
             Brand = "Carhartt WIP",
-            Color = "Hamilton Brown",
+            Colors = ["Tan"],
         };
 
         bool changed = ListingDetailFill.Apply(item, Listing());
@@ -53,7 +53,7 @@ public sealed class ListingDetailFillTests
         Assert.True(changed);
         Assert.Equal("Small tear on the left cuff, priced accordingly.", item.Description);
         Assert.Equal("Carhartt WIP", item.Brand);
-        Assert.Equal("Hamilton Brown", item.Color);
+        Assert.Equal(["Tan"], item.Colors);
         // The blanks it did have are filled.
         Assert.Equal("M", item.SizeValue);
     }
@@ -71,14 +71,14 @@ public sealed class ListingDetailFillTests
     [Fact]
     public void Whitespace_is_neither_stored_nor_counted_as_an_answer()
     {
-        InventoryItem item = new() { Title = "Jacket", Color = "   " };
+        InventoryItem item = new() { Title = "Jacket" };
         PlatformListing listing = new() { Platform = "eBay", ExternalListingId = "1", Title = "Jacket", Brand = "  Nike  ", Color = "   " };
 
         Assert.True(ListingDetailFill.Apply(item, listing));
 
         Assert.Equal("Nike", item.Brand);
-        // A colour of spaces is not a colour, from either side.
-        Assert.Equal("   ", item.Color);
+        // A colour of spaces is not a colour.
+        Assert.Empty(item.Colors);
     }
 
     [Fact]
@@ -99,6 +99,16 @@ public sealed class ListingDetailFillTests
 
         Assert.False(ListingDetailFill.Apply(item, ebay));
         Assert.Equal("Carhartt", item.Brand);
-        Assert.Equal("Brown", item.Color);
+        Assert.Equal(["Brown"], item.Colors);
+    }
+
+    [Fact]
+    public void A_listings_colors_arrive_in_the_standard_list()
+    {
+        InventoryItem item = new() { Title = "Scarf" };
+        PlatformListing poshmark = new() { Platform = "Poshmark", ExternalListingId = "1", Title = "Scarf", Color = "Grey, Off-White" };
+
+        Assert.True(ListingDetailFill.Apply(item, poshmark));
+        Assert.Equal(["Gray", "Cream"], item.Colors);
     }
 }

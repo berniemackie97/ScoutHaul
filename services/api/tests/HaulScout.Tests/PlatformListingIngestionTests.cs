@@ -136,7 +136,7 @@ public class PlatformListingIngestionTests
             CancellationToken.None);
 
         InventoryItem filled = await db.InventoryItems.SingleAsync();
-        Assert.Equal("Indigo", filled.Color);
+        Assert.Equal(["Blue"], filled.Colors);
         Assert.Equal("L", filled.SizeValue);
         Assert.Equal("A jacket.", filled.Description);
         // The brand someone typed stands; the listing does not get to correct them.

@@ -140,7 +140,7 @@ public sealed record StorefrontListingDetailDto(
     // Category name (free-text from the inventory item).
     string? Category,
     string? Model,
-    string? Color,
+    IReadOnlyList<string> Colors,
     string? SizeSystem,
     string? SizeValue,
     InventoryFunctionalStatus FunctionalStatus,

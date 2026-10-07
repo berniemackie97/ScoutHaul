@@ -85,15 +85,32 @@ public sealed class InventoryReferenceDataServiceTests
         InventoryReferenceDataService service = new(new EfInventoryReferenceDataStore(db, new StubCurrentUser(organizationId)));
 
         (InventoryReferenceDataService.ControlledValues? values, _) = await service.ResolveAsync(
-            Request(category: "Clothing", brand: "Unbranded", model: "Other") with { Color = "Chartreuse-ish", Condition = "Other", SizeValue = "M" },
+            Request(category: "Clothing", brand: "Unbranded", model: "Other") with { Colors = ["Chartreuse-ish"], Condition = "Other", SizeValue = "M" },
             CancellationToken.None);
 
         Assert.Null(values!.Brand);
         Assert.Null(values.Model);
-        Assert.Null(values.Color);
+        Assert.Empty(values.Colors!);
         Assert.Null(values.Condition);
         // A size means nothing without the system it is measured in.
         Assert.Null(values.SizeValue);
+    }
+
+    [Fact]
+    public async Task Colors_are_read_as_listed_terms_two_at_most_and_left_alone_when_not_sent()
+    {
+        Guid organizationId = Guid.NewGuid();
+        await using HaulScoutDbContext db = NewContext(organizationId, nameof(Colors_are_read_as_listed_terms_two_at_most_and_left_alone_when_not_sent));
+        InventoryReferenceDataService service = new(new EfInventoryReferenceDataStore(db, new StubCurrentUser(organizationId)));
+        UpsertInventoryItemRequest request = Request(category: "Clothing", brand: "Levi's", model: "501");
+
+        (InventoryReferenceDataService.ControlledValues? two, _) = await service.ResolveAsync(request with { Colors = ["grey", "Off-White", "gray"] }, CancellationToken.None);
+        (_, string? tooMany) = await service.ResolveAsync(request with { Colors = ["Red", "Blue", "Green"] }, CancellationToken.None);
+        (InventoryReferenceDataService.ControlledValues? untouched, _) = await service.ResolveAsync(request with { Colors = null }, CancellationToken.None);
+
+        Assert.Equal(["Gray", "Cream"], two!.Colors);
+        Assert.Contains("at most 2 colors", tooMany);
+        Assert.Null(untouched!.Colors);
     }
 
     private static HaulScoutDbContext NewContext(Guid organizationId, string databaseName)
@@ -116,7 +133,7 @@ public sealed class InventoryReferenceDataServiceTests
         Category: category,
         Brand: brand,
         Model: model,
-        Color: "Black",
+        Colors: ["Black"],
         Condition: "Good",
         SizeSystem: null,
         SizeValue: null,

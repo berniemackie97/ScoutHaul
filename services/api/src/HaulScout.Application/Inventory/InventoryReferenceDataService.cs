@@ -11,7 +11,7 @@ public sealed class InventoryReferenceDataService(IInventoryReferenceDataStore r
         string? Category,
         string? Brand,
         string? Model,
-        string? Color,
+        IReadOnlyList<string>? Colors,
         string? Condition,
         string? SizeSystem,
         string? SizeValue,
@@ -42,7 +42,7 @@ public sealed class InventoryReferenceDataService(IInventoryReferenceDataStore r
             profile.Label,
             profile.Categories,
             profile.Fields.Select(field => new ItemFieldDto(field.Field, field.Label, field.Readiness)).ToArray(),
-            profile.Attributes.Select(attribute => new ItemAttributeDto(attribute.Key, attribute.Label, attribute.Options)).ToArray(),
+            profile.Attributes.Select(attribute => new ItemAttributeDto(attribute.Key, attribute.Label, attribute.Options, attribute.MaxValues)).ToArray(),
             profile.SizeSystems,
             profile.BrandLabel))
         .ToArray();
@@ -85,7 +85,14 @@ public sealed class InventoryReferenceDataService(IInventoryReferenceDataStore r
         string? category = ResolveOrOther(data.Categories, request.Category);
         string? brand = ResolveDependent(data.Brands, Meaningful(request.Brand), category) ?? CleanOperatorValue(Meaningful(request.Brand));
         string? model = ResolveDependent(data.Models, Meaningful(request.Model), brand) ?? CleanOperatorValue(Meaningful(request.Model));
-        string? color = Resolve(data.Colors, request.Color);
+        IReadOnlyList<string>? colors = request.Colors is null
+            ? null
+            : ItemColors.From(data.Colors.Select(option => option.Value)).CanonicalList(request.Colors, int.MaxValue);
+        if (colors?.Count > ItemColors.Max)
+        {
+            return (null, $"Choose at most {ItemColors.Max} colors. Use Multicolor or Patterned for more.");
+        }
+
         string? condition = Resolve(data.Conditions, request.Condition);
         string? sizeSystem = Resolve(data.SizeSystems, request.SizeSystem);
         string? sizeValue = sizeSystem is null ? null : ResolveDependent(data.Sizes, request.SizeValue, sizeSystem);
@@ -102,7 +109,7 @@ public sealed class InventoryReferenceDataService(IInventoryReferenceDataStore r
             return (null, $"{invalid.Label} must be selected from the organization's controlled inventory options.");
         }
 
-        return (new ControlledValues(category, brand, model, color, condition, sizeSystem, sizeValue, storageLocation), null);
+        return (new ControlledValues(category, brand, model, colors, condition, sizeSystem, sizeValue, storageLocation), null);
     }
 
     private static string? Resolve(IReadOnlyList<InventoryReferenceOptionDto> options, string? supplied)

@@ -303,7 +303,7 @@ public sealed class InventoryUpsertWorkflowService(
         item.Category = controlled.Category;
         item.Brand = controlled.Brand;
         item.Model = controlled.Model;
-        item.Color = controlled.Color;
+        if (controlled.Colors is not null) item.Colors = [.. controlled.Colors];
         item.Condition = controlled.Condition;
         item.OwnershipType = request.OwnershipType ?? item.OwnershipType;
         item.FunctionalStatus = request.FunctionalStatus ?? item.FunctionalStatus;

@@ -67,7 +67,32 @@ public class ItemProfilesTests
 
         Assert.Null(item.SizeSystem);
         Assert.Null(item.SerialNumber);
-        Assert.Equal("""{"material":"Wool"}""", item.AttributesJson);
+        Assert.Equal("""{"material":["Wool"]}""", item.AttributesJson);
+    }
+
+    [Fact]
+    public void Materials_written_as_one_phrase_are_kept_as_listed_terms_up_to_the_limit()
+    {
+        InventoryItem item = new()
+        {
+            Title = "Blouse",
+            Category = "Clothing",
+            AttributesJson = """{"material":"Silk/polyester, 5% elastane, viscose lining"}""",
+        };
+
+        ItemProfiles.ClearInapplicable(item);
+
+        Assert.Equal("""{"material":["Silk","Polyester","Spandex"]}""", item.AttributesJson);
+    }
+
+    [Fact]
+    public void A_watch_is_not_made_of_cotton()
+    {
+        InventoryItem item = new() { Title = "Seiko", Category = "Watches", AttributesJson = """{"material":["Cotton","stainless steel"]}""" };
+
+        ItemProfiles.ClearInapplicable(item);
+
+        Assert.Equal("""{"material":["Stainless steel"]}""", item.AttributesJson);
     }
 
     [Fact]

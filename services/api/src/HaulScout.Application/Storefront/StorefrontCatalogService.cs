@@ -76,7 +76,7 @@ public sealed class StorefrontCatalogService(IStorefrontCatalogStore catalog, II
             row.ListPrice, row.CompareAtPrice, row.AcceptsOffers, row.MinimumOfferAmount, row.MaximumOfferAmount,
             row.ShippingPolicy, row.ShippingAmountOverride, item.Brand, item.Condition,
             row.MetaTitle ?? row.Title, row.MetaDescription ?? row.Description,
-            gallery.FirstOrDefault(), item.Category, item.Model, item.Color, item.SizeSystem, item.SizeValue,
+            gallery.FirstOrDefault(), item.Category, item.Model, item.Colors, item.SizeSystem, item.SizeValue,
             item.FunctionalStatus, item.CompletenessStatus, item.PackagingStatus, item.CountryOfOrigin,
             item.ManufactureYear, item.Length, item.Width, item.Height, item.DimensionUnit, item.Weight, item.WeightUnit,
             gallery,

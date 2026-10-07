@@ -57,7 +57,10 @@ public sealed class InventoryItem : EntityBase, IOrganizationScoped
     public string? Category { get; set; }
     public string? Brand { get; set; }
     public string? Model { get; set; }
-    public string? Color { get; set; }
+
+    /// <summary>Its colors from <see cref="ItemColors"/>, the main one first; at most <see cref="ItemColors.Max"/>.</summary>
+    public List<string> Colors { get; set; } = [];
+
     public string? Condition { get; set; }
     public InventoryOwnershipType OwnershipType { get; set; } = InventoryOwnershipType.Owned;
     public InventoryFunctionalStatus FunctionalStatus { get; set; } = InventoryFunctionalStatus.Unknown;

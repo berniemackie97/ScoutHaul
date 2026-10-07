@@ -90,7 +90,7 @@ public sealed class EfStorefrontCatalogStore(HaulScoutDbContext db) : IStorefron
                     listing.InventoryItem!.Brand,
                     listing.InventoryItem.Model,
                     listing.InventoryItem.Category,
-                    listing.InventoryItem.Color,
+                    listing.InventoryItem.Colors,
                     listing.InventoryItem.Condition,
                     listing.InventoryItem.SizeSystem,
                     listing.InventoryItem.SizeValue,
