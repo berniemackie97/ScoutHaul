@@ -48,7 +48,8 @@ public class InventoryBrowseTests
             new InventoryQueryService(new EfInventoryStore(db), currentUser),
             null!,
             new InventoryIssueWorkflowService(new EfInventoryStore(db), new EfInventoryIssueStore(db), currentUser),
-            new InventoryStatusWorkflowService(new EfInventoryStore(db), currentUser, TimeProvider.System));
+            new InventoryStatusWorkflowService(new EfInventoryStore(db), currentUser, TimeProvider.System),
+            null!);
     }
 
     private static void SeedItem(HaulScoutDbContext db, Guid org, string title, InventoryStatus status, decimal cost, string? brand = null)

@@ -54,6 +54,7 @@ public class InventoryPhotoServingTests
             null!,
             new InventoryPhotoWorkflowService(new EfInventoryPhotoStore(db), null!, null!, new DatabaseInventoryPhotoBlobStore(), null!),
             null!,
+            null!,
             null!);
 
         IActionResult result = await controller.GetPhotoThumbnail(itemId, photoId, CancellationToken.None);
@@ -113,6 +114,7 @@ public class InventoryPhotoServingTests
                     Options.Create(new PhotoObjectStorageOptions { Bucket = "photos" }),
                     NullLogger<ObjectStoreInventoryPhotoBlobStore>.Instance),
                 null!),
+            null!,
             null!,
             null!);
 

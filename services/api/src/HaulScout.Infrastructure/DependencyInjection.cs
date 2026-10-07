@@ -52,6 +52,7 @@ public static class DependencyInjection
         // The transaction seam. Scoped, so it shares the request's DbContext and its ambient transaction.
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
         services.AddScoped<IInventoryStore, EfInventoryStore>();
+        services.AddScoped<IInventoryMergeStore, EfInventoryMergeStore>();
         services.AddScoped<ISearchStore, EfSearchStore>();
         services.AddScoped<ISyncRunStore, EfSyncRunStore>();
         services.AddScoped<ISyncAgentStore, EfSyncAgentStore>();

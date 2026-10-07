@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
-import { Archive, ArrowDown, ArrowUp, ImageIcon, MapPin, Tags, X } from "lucide-react";
+import { Archive, ArrowDown, ArrowUp, GitMerge, ImageIcon, MapPin, Tags, X } from "lucide-react";
 import type { components } from "@overhaul/api-client";
 import { Badge, Button, Input, formatCurrency } from "@overhaul/ui";
 import { When } from "@/components/when";
@@ -18,6 +18,7 @@ import {
 } from "@/features/inventory/inventory-operations";
 import { daysHeld, presenceLabel } from "@/features/inventory/inventory-rows";
 import { archiveInventoryItems, moveInventoryItems, setInventoryStage, type BulkInventoryResult } from "./actions";
+import { MAX_MERGE, MergeDialog } from "./merge-dialog";
 
 type Facts = components["schemas"]["InventoryRowFactsDto"];
 
@@ -30,7 +31,7 @@ const badgeVariant = (status: string | undefined) => {
   return "secondary" as const;
 };
 
-type Tool = "location" | "stage" | null;
+type Tool = "location" | "stage" | "merge" | null;
 
 export function InventoryTable({ items, sort = "updatedAt", desc = true }: { items: InventoryTableRow[]; sort?: string; desc?: boolean }) {
   const router = useRouter();
@@ -128,6 +129,15 @@ export function InventoryTable({ items, sort = "updatedAt", desc = true }: { ite
                 <Button size="sm" variant={tool === "stage" ? "secondary" : "outline"} onClick={() => setTool(tool === "stage" ? null : "stage")}>
                   <Tags className="mr-1.5 h-4 w-4" aria-hidden /> Set stage
                 </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={pending || selected.length < 2 || selected.length > MAX_MERGE}
+                  title={selected.length < 2 ? "Select the duplicate records of one item" : selected.length > MAX_MERGE ? `Merge up to ${MAX_MERGE} records at a time` : undefined}
+                  onClick={() => setTool("merge")}
+                >
+                  <GitMerge className="mr-1.5 h-4 w-4" aria-hidden /> Merge
+                </Button>
                 <Button size="sm" variant="outline" disabled={pending} onClick={archive}>
                   <Archive className="mr-1.5 h-4 w-4" aria-hidden /> Archive
                 </Button>
@@ -164,6 +174,7 @@ export function InventoryTable({ items, sort = "updatedAt", desc = true }: { ite
           )}
         </div>
       )}
+      {tool === "merge" && selected.length > 1 && <MergeDialog rows={selected} onClose={() => setTool(null)} />}
 
       <div className="bg-card overflow-x-auto rounded-xl border">
         <table className="w-full text-sm">

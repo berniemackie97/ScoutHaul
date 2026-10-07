@@ -21,7 +21,8 @@ public sealed class InventoryController(
     InventoryQueryService queries,
     InventoryPhotoWorkflowService photos,
     InventoryIssueWorkflowService issues,
-    InventoryStatusWorkflowService statuses) : HaulScoutControllerBase
+    InventoryStatusWorkflowService statuses,
+    InventoryMergeService merges) : HaulScoutControllerBase
 {
     public sealed class UploadInventoryPhotoForm
     {
@@ -227,6 +228,13 @@ public sealed class InventoryController(
         CancellationToken cancellationToken) =>
         ToActionResult(await statuses.SetLocationAsync(request, cancellationToken));
 
+    /// <summary>Folds duplicate records of one item into the one kept; the duplicates are removed.</summary>
+    [HttpPost("merge")]
+    public async Task<ActionResult<MergeInventoryItemsResultDto>> Merge(
+        MergeInventoryItemsRequest request,
+        CancellationToken cancellationToken) =>
+        ToActionResult(await merges.MergeAsync(request, cancellationToken));
+
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(
         Guid id,
@@ -236,6 +244,4 @@ public sealed class InventoryController(
         AppResult result = await deletion.DeleteAsync(id, hard, cancellationToken);
         return ToActionResult(result);
     }
-
-
 }

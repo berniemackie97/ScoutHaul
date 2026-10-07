@@ -40,6 +40,7 @@ public static class DependencyInjection
         services.AddScoped<InventoryPhotoSyncService>();
         services.AddScoped<InventoryPhotoBackfillService>();
         services.AddScoped<InventoryStatusWorkflowService>();
+        services.AddScoped<InventoryMergeService>();
         services.AddScoped<InventoryIssueWorkflowService>();
         services.AddScoped<OrganizationInviteCodeWorkflowService>();
         services.AddScoped<OrganizationMemberWorkflowService>();

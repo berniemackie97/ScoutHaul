@@ -25,3 +25,11 @@ export function presenceLabel(channel: Presence): { text: string; tone: "default
       return { text: `${channel.platform} · ${String(channel.status ?? "").toLowerCase()}`, tone: "muted" };
   }
 }
+
+type MergeCandidate = { thumbnailUrl: string | null; createdAt?: string; facts?: { channels?: Presence[] | null } };
+
+/** The record a merge keeps unless told otherwise: the one with photos and the most listings, then the oldest. */
+export function suggestKeeper<T extends MergeCandidate>(rows: readonly T[]): T | undefined {
+  const weight = (row: T) => (row.thumbnailUrl ? 100 : 0) + (row.facts?.channels?.length ?? 0);
+  return [...rows].sort((a, b) => weight(b) - weight(a) || (a.createdAt ?? "").localeCompare(b.createdAt ?? ""))[0];
+}
