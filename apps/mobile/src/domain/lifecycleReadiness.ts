@@ -1,3 +1,5 @@
+import type { ItemField, ItemProfile } from '../api/inventory';
+import { fieldSpec } from '../features/inventoryEdit/itemProfiles';
 import type { InventoryItem, InventoryStatus } from './types';
 
 export type InventoryReadinessFacts = {
@@ -14,6 +16,8 @@ export type InventoryReadinessFacts = {
   photoCount?: number | null;
   componentCount?: number | null;
   isBundle?: boolean | null;
+  /** The item's kind decides which condition details it must have; without one, only the common checks apply. */
+  profile?: ItemProfile | null;
 };
 
 export type ReadinessRequirement = {
@@ -22,11 +26,6 @@ export type ReadinessRequirement = {
   met: boolean;
   severity: 'blocker' | 'warning';
 };
-
-const testingCategories = new Set(['Video Games', 'Tech', 'Phones', 'Cameras', 'Audio', 'TV', 'Electronics', 'Appliances', 'Musical Instruments', 'Tools', 'Fitness']);
-const completenessCategories = new Set(['Video Games', 'Tech', 'Phones', 'Cameras', 'Audio', 'TV', 'Electronics', 'Appliances', 'Toys', 'Collectibles', 'Media', 'Musical Instruments', 'Tools', 'Baby']);
-const packagingCategories = new Set(['Video Games', 'Collectibles', 'Toys', 'Tech', 'Phones', 'Cameras', 'Audio', 'TV', 'Electronics', 'Media', 'Books', 'Watches', 'Jewelry', 'Shoes', 'Handbags']);
-const authenticityCategories = new Set(['Collectibles', 'Jewelry', 'Watches', 'Handbags', 'Shoes', 'Clothing', 'Sporting Goods']);
 
 function present(value: unknown) {
   return typeof value === 'string' ? value.trim().length > 0 : value !== null && value !== undefined;
@@ -40,6 +39,14 @@ function positiveMoney(value: string | number | null | undefined) {
 
 function known(value: string | null | undefined, unknownValues: string[]) {
   return Boolean(value && !unknownValues.includes(value));
+}
+
+/** 'blocker' or 'warning' when the item's kind asks for this field before listing; null when it does not. */
+function severityFor(facts: InventoryReadinessFacts, field: ItemField, readyIntent: boolean): ReadinessRequirement['severity'] | null {
+  const readiness = facts.profile ? fieldSpec(facts.profile, field)?.readiness : undefined;
+  if (readiness === 'Required') return readyIntent ? 'blocker' : 'warning';
+  if (readiness === 'Recommended') return 'warning';
+  return null;
 }
 
 export function readinessRequirements(targetStatus: InventoryStatus, facts: InventoryReadinessFacts): ReadinessRequirement[] {
@@ -69,46 +76,30 @@ export function readinessRequirements(targetStatus: InventoryStatus, facts: Inve
     });
   }
 
-  if (facts.category && testingCategories.has(facts.category)) {
+  const functional = severityFor(facts, 'FunctionalStatus', readyIntent);
+  if (functional) {
     requirements.push({
       id: 'functionalStatus',
-      label: 'Functional/test status recorded',
+      label: 'Working condition recorded',
       met: known(facts.functionalStatus, ['Unknown', 'Untested']),
-      severity: readyIntent ? 'blocker' : 'warning',
+      severity: functional,
     });
     requirements.push({
       id: 'testingNotes',
-      label: 'Testing notes/disclosure recorded',
+      label: 'Testing notes or disclosure recorded',
       met: present(facts.testingNotes) || known(facts.functionalStatus, ['Unknown', 'Untested', 'FullyFunctional']),
       severity: 'warning',
     });
   }
 
-  if (facts.category && completenessCategories.has(facts.category)) {
-    requirements.push({
-      id: 'completenessStatus',
-      label: 'Completeness recorded',
-      met: known(facts.completenessStatus, ['Unknown']),
-      severity: readyIntent ? 'blocker' : 'warning',
-    });
-  }
-
-  if (facts.category && packagingCategories.has(facts.category)) {
-    requirements.push({
-      id: 'packagingStatus',
-      label: 'Packaging / CIB state recorded',
-      met: known(facts.packagingStatus, ['NotApplicable']),
-      severity: 'warning',
-    });
-  }
-
-  if (facts.category && authenticityCategories.has(facts.category)) {
-    requirements.push({
-      id: 'authenticityStatus',
-      label: 'Authenticity assessed or disclosed',
-      met: known(facts.authenticityStatus, ['NotAssessed']),
-      severity: 'warning',
-    });
+  const checks: { field: ItemField; id: string; label: string; value: string | null | undefined; unknown: string[] }[] = [
+    { field: 'CompletenessStatus', id: 'completenessStatus', label: 'Completeness recorded', value: facts.completenessStatus, unknown: ['Unknown'] },
+    { field: 'PackagingStatus', id: 'packagingStatus', label: 'Packaging recorded', value: facts.packagingStatus, unknown: ['NotApplicable'] },
+    { field: 'AuthenticityStatus', id: 'authenticityStatus', label: 'Authenticity assessed or disclosed', value: facts.authenticityStatus, unknown: ['NotAssessed'] },
+  ];
+  for (const check of checks) {
+    const severity = severityFor(facts, check.field, readyIntent);
+    if (severity) requirements.push({ id: check.id, label: check.label, met: known(check.value, check.unknown), severity });
   }
 
   if (photoRequired && facts.photoCount !== null && facts.photoCount !== undefined) {
@@ -127,8 +118,9 @@ export function readinessBlockers(targetStatus: InventoryStatus, facts: Inventor
   return readinessRequirements(targetStatus, facts).filter((requirement) => requirement.severity === 'blocker' && !requirement.met);
 }
 
-export function factsFromInventoryItem(item: InventoryItem): InventoryReadinessFacts {
+export function factsFromInventoryItem(item: InventoryItem, profile?: ItemProfile | null): InventoryReadinessFacts {
   return {
+    profile,
     title: item.title,
     description: item.description,
     category: item.category,

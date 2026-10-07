@@ -25,6 +25,7 @@ import {
   isOrderManagedInventory,
 } from '../../src/domain/inventoryOperations';
 import { factsFromInventoryItem, readinessBlockers } from '../../src/domain/lifecycleReadiness';
+import { profileFor } from '../../src/features/inventoryEdit/itemProfiles';
 import { formatMoney } from '../../src/utils/money';
 import { getPhotos, type ItemPhoto } from '../../src/utils/photos';
 import { resolvePhotoUrl } from '../../src/utils/photoUrl';
@@ -153,7 +154,9 @@ export default function InventoryDetailScreen() {
       return;
     }
     if (item && (status === 'ReadyToList' || status === 'Listed')) {
-      const blockers = readinessBlockers(status, { ...factsFromInventoryItem(item), photoCount: photos.length });
+      // What must be recorded depends on the kind of item; offline, the API still checks when the change is sent.
+      const profiles = await api.inventoryReferenceData().then((data) => data.profiles).catch(() => null);
+      const blockers = readinessBlockers(status, { ...factsFromInventoryItem(item, profileFor(profiles, item.category)), photoCount: photos.length });
       if (blockers.length > 0) {
         setError(`Resolve ${blockers.length} readiness blocker${blockers.length === 1 ? '' : 's'} before moving to ${inventoryStatusLabel(status)}.`);
         return;
