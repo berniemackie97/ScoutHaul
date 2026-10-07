@@ -1,5 +1,8 @@
+import type { components } from "@overhaul/api-client";
 import { imageUrl } from "./commerce";
 import { storefrontApi, liveCatalogEnabled } from "./store";
+
+type StorefrontListing = components["schemas"]["StorefrontListingDto"];
 
 // One catalog item, projected from the org's real inventory via /api/storefront/*.
 export type Specimen = {
@@ -56,31 +59,53 @@ export class CatalogUnavailableError extends Error {
   }
 }
 
-export async function getListings(opts?: { category?: string; search?: string }): Promise<Specimen[]> {
-  if (!liveCatalogEnabled) return [];
+/** Items per catalogue page. The API serves at most 60, so this must stay at or under that. */
+export const CATALOG_PAGE_SIZE = 48;
+
+export type CatalogPage = { items: Specimen[]; page: number; pageCount: number; total: number };
+
+/** The category part of a catalogue address, made the way the API makes it: letters and digits, hyphen-joined. */
+export function categorySlug(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function toSpecimen(dto: StorefrontListing): Specimen {
+  return {
+    id: dto.id ?? "",
+    slug: dto.slug ?? "",
+    title: dto.title ?? "",
+    brand: dto.brand ?? undefined,
+    category: dto.category ?? "",
+    condition: dto.condition ?? "Good",
+    price: dto.listPrice ?? 0,
+    compareAt: dto.compareAtPrice ?? undefined,
+    acceptsOffers: dto.acceptsOffers ?? true,
+    minimumOfferAmount: dto.minimumOfferAmount ?? null,
+    maximumOfferAmount: dto.maximumOfferAmount ?? null,
+    shippingPolicy: dto.shippingPolicy,
+    shippingAmountOverride: dto.shippingAmountOverride ?? null,
+    blurb: dto.subtitle ?? "",
+    image: imageUrl(dto.imageUrl),
+  };
+}
+
+/** One page of the live shelf, with the shelf's real size, so nothing past the first page is out of reach. */
+export async function getListings(
+  opts: { category?: string; search?: string; page?: number; pageSize?: number } = {},
+): Promise<CatalogPage> {
+  const pageSize = opts.pageSize ?? CATALOG_PAGE_SIZE;
+  const page = Math.max(1, Math.floor(opts.page ?? 1));
+  if (!liveCatalogEnabled) return { items: [], page, pageCount: 1, total: 0 };
   try {
     const { data } = await storefrontApi().GET("/api/storefront/listings", {
-      params: { query: { category: opts?.category, search: opts?.search, page: 1, pageSize: 48 } },
+      params: { query: { category: opts.category, search: opts.search, page, pageSize } },
     });
-    return (data?.items ?? []).map(
-      (dto): Specimen => ({
-        id: dto.id ?? "",
-        slug: dto.slug ?? "",
-        title: dto.title ?? "",
-        brand: dto.brand ?? undefined,
-        category: dto.category ?? "",
-        condition: dto.condition ?? "Good",
-        price: dto.listPrice ?? 0,
-        compareAt: dto.compareAtPrice ?? undefined,
-        acceptsOffers: dto.acceptsOffers ?? true,
-        minimumOfferAmount: dto.minimumOfferAmount ?? null,
-        maximumOfferAmount: dto.maximumOfferAmount ?? null,
-        shippingPolicy: dto.shippingPolicy,
-        shippingAmountOverride: dto.shippingAmountOverride ?? null,
-        blurb: dto.subtitle ?? "",
-        image: imageUrl(dto.imageUrl),
-      }),
-    );
+    const items = (data?.items ?? []).map(toSpecimen);
+    const total = typeof data?.total === "number" ? data.total : items.length;
+    return { items, page, total, pageCount: Math.max(1, Math.ceil(total / pageSize)) };
   } catch (error) {
     throw new CatalogUnavailableError(error);
   }
@@ -162,20 +187,19 @@ function weightUnit(value?: string): string {
   return ({ Ounces: "oz", Pounds: "lb", Grams: "g", Kilograms: "kg" } as Record<string, string>)[value ?? ""] ?? value ?? "";
 }
 
-export async function getRelated(slug: string, limit = 4): Promise<Specimen[]> {
-  const all = await getListings();
-  const current = all.find((item) => item.slug === slug);
-  return all
-    .filter((item) => item.slug !== slug && (!current || !current.category || item.category === current.category))
-    .slice(0, limit);
+/** Other live items from the same category, asked of the API rather than picked from one page of the shelf. */
+export async function getRelated(item: { slug: string; category: string }, limit = 4): Promise<Specimen[]> {
+  const category = item.category ? categorySlug(item.category) : undefined;
+  const { items } = await getListings({ category, pageSize: limit + 1 });
+  return items.filter((candidate) => candidate.slug !== item.slug).slice(0, limit);
 }
 
 /** One listing reduced to what the sitemap and category counts need. */
 export type ListingSummary = { slug: string; category: string; image?: string };
 
 /**
- * Every live listing, paged through in full. {@link getListings} is capped at 48 for the grid; the sitemap and the
- * per-category counts need the whole shelf, so this walks every page. Returns what it has if a page fails.
+ * Every live listing, paged through in full, for the sitemap and the per-category counts. Returns what it has if a
+ * page fails.
  */
 export async function getAllListings(): Promise<ListingSummary[]> {
   if (!liveCatalogEnabled) return [];
