@@ -1,7 +1,9 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Search } from "lucide-react";
 import { ProductCard } from "@/components/store/product-card";
 import { Reveal } from "@/components/ui/reveal";
+import { CatalogPager } from "@/components/store/catalog-pager";
 import { getListings, getCategories } from "@/lib/catalog";
 
 export const dynamic = "force-dynamic";
@@ -22,13 +24,24 @@ function pillClass(active: boolean) {
 export default async function ProductsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ category?: string; q?: string }>;
+  searchParams: Promise<{ category?: string; q?: string; page?: string }>;
 }) {
   const sp = await searchParams;
-  const [items, categories] = await Promise.all([
-    getListings({ category: sp.category, search: sp.q }),
+  const requested = Math.max(1, Number.parseInt(sp.page ?? "1", 10) || 1);
+  const [{ items, page, pageCount, total }, categories] = await Promise.all([
+    getListings({ category: sp.category, search: sp.q, page: requested }),
     getCategories(),
   ]);
+  const href = (target: number) => {
+    const query = new URLSearchParams();
+    if (sp.category) query.set("category", sp.category);
+    if (sp.q) query.set("q", sp.q);
+    if (target > 1) query.set("page", String(target));
+    const text = query.toString();
+    return text ? `/products?${text}` : "/products";
+  };
+  // A page past the end (the shelf shrank since the link was made) lands on the last real one.
+  if (items.length === 0 && total > 0) redirect(href(pageCount));
   const activeCat = categories.find((c) => c.slug === sp.category);
   const eyebrow = sp.q ? `Results for “${sp.q}”` : activeCat ? activeCat.name : "The catalogue";
 
@@ -42,7 +55,7 @@ export default async function ProductsPage({
           </h1>
         </div>
         <span className="font-mono text-[11px] uppercase tracking-[0.18em] text-slate/60">
-          {items.length} {items.length === 1 ? "lot" : "lots"} live
+          {total} {total === 1 ? "lot" : "lots"} live{pageCount > 1 ? ` · page ${page} of ${pageCount}` : ""}
         </span>
       </Reveal>
 
@@ -71,7 +84,7 @@ export default async function ProductsPage({
         </form>
       </div>
 
-      {items.length > 0 ? (
+      {items.length > 0 && (
         <div className="grid grid-cols-2 gap-x-6 gap-y-12 sm:grid-cols-3 lg:grid-cols-4">
           {items.map((item, i) => (
             <Reveal key={item.id} delay={(i % 4) * 70}>
@@ -79,7 +92,11 @@ export default async function ProductsPage({
             </Reveal>
           ))}
         </div>
-      ) : (
+      )}
+
+      <CatalogPager page={page} pageCount={pageCount} href={href} />
+
+      {items.length === 0 && (
         <div className="bg-surface px-6 py-24 text-center ring-1 ring-rule">
           <p className="font-heading text-2xl text-ink">Nothing matches that yet.</p>
           <p className="mt-2 text-sm text-slate">

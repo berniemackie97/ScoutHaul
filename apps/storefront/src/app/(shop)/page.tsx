@@ -42,7 +42,7 @@ const collections = [
 ];
 
 export default async function HomePage() {
-  const [items, categories, liveCount] = await Promise.all([getListings(), getCategories(), getShelfCount()]);
+  const [{ items }, categories, liveCount] = await Promise.all([getListings(), getCategories(), getShelfCount()]);
   const heroStats = buildHeroStats(liveCount);
   const featured = items[0];
   const floor = items.slice(0, 8);

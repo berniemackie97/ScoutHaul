@@ -267,6 +267,19 @@ describe("noticing the operator sign in, or clear a security check", () => {
     expect(await runningItem.getValue()).toBeNull();
   });
 
+  it("does not knock on a marketplace it knows is signed out when the popup opens, unless asked to", async () => {
+    await sessionsItem.setValue({ eBay: { ...signedInSession, signedIn: false, username: null, checkedAt: new Date(now.getTime() - 60 * 60 * 1000).toISOString() } });
+    // No eBay tab of the operator's to read from: only the sync tab could answer.
+    const tabs = fakeTabs(servedTab(ebay()));
+    const { agent } = agentWith(api(), tabs);
+
+    await agent.popupOpened();
+    expect(tabs.acquire).not.toHaveBeenCalled();
+
+    await agent.checkSessions({ platform: "eBay", force: true });
+    expect(tabs.acquire).toHaveBeenCalledWith(expect.objectContaining({ platform: "eBay" }));
+  });
+
   it("leaves the operator alone on the sign-in form and on the security check itself", async () => {
     await sessionsItem.setValue({ eBay: { ...signedInSession, signedIn: false, username: null } });
     const tabs = fakeTabs(servedTab(ebay()), servedTab(ebay()));

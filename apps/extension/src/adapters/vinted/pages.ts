@@ -1,4 +1,4 @@
-import { AdapterError, type PageResponse } from "../types";
+import { AdapterError, type PageResponse, type Session } from "../types";
 
 /**
  * What a Vinted response turned out to be, before anything reads it. Vinted guards itself with
@@ -44,4 +44,12 @@ export function siteChanged(what: string): AdapterError {
 export function signedOutPage(page: PageResponse): boolean {
   return /\/member\/(login|signup)/i.test(new URL(page.url, "https://www.vinted.com").pathname)
     || /\\?"isLoggedIn\\?":\s*false/.test(page.body);
+}
+
+/**
+ * Sign-in as a Vinted page already shows it, at no cost to anyone. Signed out is certain from the page; signed in is
+ * not enough on its own, because the page does not name the account — so that answer is left to a check that may ask.
+ */
+export function sessionOnPage(page: PageResponse): Session | null {
+  return signedOutPage(page) ? { signedIn: false, username: null, marketplaceUserId: null } : null;
 }

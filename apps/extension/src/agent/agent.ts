@@ -384,7 +384,10 @@ export class Agent {
         continue;
       }
 
-      await this.exclusive(() => this.checkSignIn(adapter, options.tabId));
+      // A browser known to be signed out is not knocked on again unprompted: the marketplace sees a stranger asking,
+      // which is what bot protection is for. A tab the operator has open still tells, for free, when they sign in.
+      const ownTabOnly = !options.force && session?.signedIn === false;
+      await this.exclusive(() => this.checkSignIn(adapter, options.tabId, ownTabOnly));
     }
   }
 
@@ -392,7 +395,7 @@ export class Agent {
    * One sign-in check: through a tab the operator already has open on the marketplace when there
    * is one — just after they sign in, the very tab they signed in with — or else the sync tab.
    */
-  private async checkSignIn(adapter: MarketplaceAdapter, tabId?: number): Promise<void> {
+  private async checkSignIn(adapter: MarketplaceAdapter, tabId?: number, ownTabOnly = false): Promise<void> {
     this.lastChecked.set(adapter.platform, this.deps.now().getTime());
     const limits = limitsFor(await heartbeatItem.getValue(), adapter.platform);
     const stop = keepAlive();
@@ -407,6 +410,10 @@ export class Agent {
         } catch {
           // Their tab moved on mid-check; the sync tab answers instead.
         }
+      }
+
+      if (ownTabOnly) {
+        return;
       }
 
       try {
