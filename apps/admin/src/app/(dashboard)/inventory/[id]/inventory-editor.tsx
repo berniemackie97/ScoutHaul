@@ -75,7 +75,9 @@ export function InventoryEditor({ item, referenceData }: { item: InventoryItem; 
             <OptionField
               label="Category"
               name="category"
-              value={matchOption(category, referenceData.categories ?? [])}
+              // A category off the list (one the organization has since disabled) still shows and posts, rather than
+              // reading as blank and saving the item uncategorised.
+              value={matchOption(category, referenceData.categories ?? [], true)}
               options={referenceData.categories ?? []}
               onChange={editing(setCategory)}
               error={errors.category}

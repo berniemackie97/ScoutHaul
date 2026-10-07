@@ -82,7 +82,7 @@ public sealed class InventoryReferenceDataService(IInventoryReferenceDataStore r
         InventoryReferenceDataDto data = await GetAsync(cancellationToken);
         // A category nobody recognises is still "something else"; every other field left unrecognised stays blank
         // rather than being recorded as "Other", which says nothing and then fills reports and listings.
-        string? category = ResolveOrOther(data.Categories, request.Category);
+        string? category = ResolveCategory(data.Categories, request.Category);
         string? brand = ResolveDependent(data.Brands, Meaningful(request.Brand), category) ?? CleanOperatorValue(Meaningful(request.Brand));
         string? model = ResolveDependent(data.Models, Meaningful(request.Model), brand) ?? CleanOperatorValue(Meaningful(request.Model));
         IReadOnlyList<string>? colors = request.Colors is null
@@ -93,7 +93,8 @@ public sealed class InventoryReferenceDataService(IInventoryReferenceDataStore r
             return (null, $"Choose at most {ItemColors.Max} colors. Use Multicolor or Patterned for more.");
         }
 
-        string? condition = Resolve(data.Conditions, request.Condition);
+        string? condition = Resolve(data.Conditions, request.Condition)
+            ?? ItemConditions.From(data.Conditions.Select(option => option.Value)).Canonical(request.Condition);
         string? sizeSystem = Resolve(data.SizeSystems, request.SizeSystem);
         string? sizeValue = sizeSystem is null ? null : ResolveDependent(data.Sizes, request.SizeValue, sizeSystem);
         string? storageLocation = ResolveOrClean(data.StorageLocations, request.StorageLocation);
@@ -119,12 +120,14 @@ public sealed class InventoryReferenceDataService(IInventoryReferenceDataStore r
         return options.FirstOrDefault(option => string.Equals(option.Value, value, StringComparison.OrdinalIgnoreCase))?.Value;
     }
 
-    private static string? ResolveOrOther(IReadOnlyList<InventoryReferenceOptionDto> options, string? supplied)
+    /// <summary>A listed category, the one a marketplace's category name belongs to, or else Other.</summary>
+    private static string? ResolveCategory(IReadOnlyList<InventoryReferenceOptionDto> options, string? supplied)
     {
         if (string.IsNullOrWhiteSpace(supplied)) return null;
         string value = supplied.Trim();
         return options.FirstOrDefault(option => string.Equals(option.Value, value, StringComparison.OrdinalIgnoreCase))?.Value
-            ?? options.FirstOrDefault(option => string.Equals(option.Value, "Other", StringComparison.OrdinalIgnoreCase))?.Value;
+            ?? ItemCategories.Canonical(ItemCategories.From(options.Select(option => option.Value)), value)
+            ?? options.FirstOrDefault(option => string.Equals(option.Value, ItemCategories.Other, StringComparison.OrdinalIgnoreCase))?.Value;
     }
 
     private static string? ResolveDependent(

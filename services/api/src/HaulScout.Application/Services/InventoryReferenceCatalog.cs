@@ -44,19 +44,7 @@ public static class InventoryReferenceCatalog
     ];
 
     public static readonly InventoryReferenceOptionDto[] Conditions =
-    [
-        Option("Factory sealed", "Factory sealed"),
-        Option("New", "New"),
-        Option("New with tags", "New with tags"),
-        Option("New without tags", "New without tags"),
-        Option("Open box", "Open box"),
-        Option("Refurbished", "Refurbished"),
-        Option("Excellent", "Excellent"),
-        Option("Good", "Good"),
-        Option("Fair", "Fair"),
-        Option("Poor", "Poor"),
-        Option("For parts", "For parts / not working"),
-    ];
+        [.. ItemConditions.Terms.Select(condition => Option(condition, condition == "For parts" ? "For parts / not working" : condition))];
 
     public static readonly InventoryReferenceOptionDto[] Colors = [.. ItemColors.Terms.Select(color => Option(color, color))];
 

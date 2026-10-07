@@ -1,4 +1,7 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
+using Npgsql;
 using HaulScout.Application.Common;
 using HaulScout.Domain.Entities;
 using HaulScout.Infrastructure.Persistence;
@@ -42,6 +45,32 @@ public sealed class PostgresFixture : IAsyncLifetime
         TenantContext tenant = new();
         tenant.SetOrganization(organizationId);
         return new HaulScoutDbContext(options, tenant);
+    }
+
+    /// <summary>
+    /// A database of its own, migrated only as far as <paramref name="migration"/>, with one organization in it: for
+    /// seeding data the way it was before a data migration, then applying it with the returned migrator.
+    /// </summary>
+    public async Task<(HaulScoutDbContext Db, IMigrator Migrator)> DatabaseAtAsync(string migration, Guid organizationId)
+    {
+        string database = $"migration_{Guid.NewGuid():N}";
+        await using (NpgsqlConnection admin = new(ConnectionString))
+        {
+            await admin.OpenAsync();
+            await using NpgsqlCommand create = new($"CREATE DATABASE {database}", admin);
+            await create.ExecuteNonQueryAsync();
+        }
+
+        TenantContext tenant = new();
+        tenant.SetOrganization(organizationId);
+        HaulScoutDbContext db = new(
+            new DbContextOptionsBuilder<HaulScoutDbContext>().UseNpgsql(new NpgsqlConnectionStringBuilder(ConnectionString) { Database = database }.ConnectionString).Options,
+            tenant);
+        IMigrator migrator = db.GetService<IMigrator>();
+        await migrator.MigrateAsync(migration);
+        db.Organizations.Add(new Organization { Id = organizationId, Name = $"Org {organizationId:N}" });
+        await db.SaveChangesAsync();
+        return (db, migrator);
     }
 
     /// <summary>Seeds an organization + user. Each test gets its own org, so the shared container stays isolated.</summary>

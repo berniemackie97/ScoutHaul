@@ -34,7 +34,7 @@ public sealed class ListingDetailFillTests
         Assert.Equal(["Brown"], item.Colors);
         Assert.Equal("M", item.SizeValue);
         Assert.Equal("Very good", item.Condition);
-        Assert.Equal("Jackets", item.Category);
+        Assert.Equal("Clothing", item.Category);
     }
 
     [Fact]
