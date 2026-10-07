@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import type { components } from "@overhaul/api-client";
 import { getApiClient } from "@/lib/api";
 import { errorMessage } from "@/lib/api-error";
@@ -73,18 +74,18 @@ export async function setInventoryStage(items: Array<{ id: string; title: string
   return summarize("Updated", done, refusals);
 }
 
-export type MergeInventoryResult = { ok: true; keptId: string } | { ok: false; message: string };
-
-/** Folds the duplicates into the record kept. The API refuses records that are not one item, and says why. */
-export async function mergeInventoryItems(keepId: string, duplicateIds: string[]): Promise<MergeInventoryResult> {
+/**
+ * Folds the duplicates into the record kept and opens it; returns only with a refusal. The redirect rides the same
+ * response as the revalidation — a client push queued behind this action could strand the dialog on "Merging…".
+ */
+export async function mergeInventoryItems(keepId: string, duplicateIds: string[]): Promise<{ message: string }> {
   const duplicates = clean(duplicateIds).filter((id) => id !== keepId);
-  if (!keepId || duplicates.length === 0) return { ok: false, message: "Choose the record to keep and at least one to merge into it." };
+  if (!keepId || duplicates.length === 0) return { message: "Choose the record to keep and at least one to merge into it." };
 
   const api = await getApiClient();
   const { data, error } = await api.POST("/api/inventory/merge", { body: { keepId, duplicateIds: duplicates } });
-  if (!data?.keptId) return { ok: false, message: errorMessage(error, "The records could not be merged.") };
+  if (!data?.keptId) return { message: errorMessage(error, "The records could not be merged.") };
 
   revalidatePath("/inventory");
-  revalidatePath(`/inventory/${data.keptId}`);
-  return { ok: true, keptId: data.keptId };
+  redirect(`/inventory/${data.keptId}`);
 }

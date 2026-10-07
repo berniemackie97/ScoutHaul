@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { ImageIcon } from "lucide-react";
 import { Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, formatCurrency } from "@overhaul/ui";
@@ -15,7 +14,6 @@ export const MAX_MERGE = 21;
 
 /** Picks which of the selected records survives, then folds the rest into it and opens it. */
 export function MergeDialog({ rows, onClose }: { rows: InventoryTableRow[]; onClose: () => void }) {
-  const router = useRouter();
   const [keepId, setKeepId] = useState(() => suggestKeeper(rows)?.id ?? "");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -24,9 +22,9 @@ export function MergeDialog({ rows, onClose }: { rows: InventoryTableRow[]; onCl
   function merge() {
     setError(null);
     startTransition(async () => {
-      const result = await mergeInventoryItems(keepId, rows.map((row) => row.id!).filter((id) => id !== keepId));
-      if (result.ok) router.push(`/inventory/${result.keptId}`);
-      else setError(result.message);
+      // On success the action redirects to the kept item; it only comes back with a refusal.
+      const refusal = await mergeInventoryItems(keepId, rows.map((row) => row.id!).filter((id) => id !== keepId));
+      setError(refusal.message);
     });
   }
 
