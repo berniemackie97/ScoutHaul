@@ -10211,7 +10211,7 @@ export interface components {
             category?: string | null;
             brand?: string | null;
             model?: string | null;
-            color?: string | null;
+            colors?: string[] | null;
             condition?: string | null;
             sizeSystem?: string | null;
             sizeValue?: string | null;
@@ -10396,6 +10396,8 @@ export interface components {
             key?: string | null;
             label?: string | null;
             options?: string[] | null;
+            /** Format: int32 */
+            maxValues?: number;
         };
         /** @enum {string} */
         ItemField: "Model" | "Color" | "Size" | "FunctionalStatus" | "CompletenessStatus" | "AuthenticityStatus" | "PackagingStatus" | "ManufacturerPartNumber" | "SerialNumber" | "ManufactureYear" | "CountryOfOrigin";
@@ -12083,7 +12085,7 @@ export interface components {
             imageUrl?: string | null;
             category?: string | null;
             model?: string | null;
-            color?: string | null;
+            colors?: string[] | null;
             sizeSystem?: string | null;
             sizeValue?: string | null;
             functionalStatus?: components["schemas"]["InventoryFunctionalStatus"];
@@ -12659,7 +12661,7 @@ export interface components {
             category?: string | null;
             brand?: string | null;
             model?: string | null;
-            color?: string | null;
+            colors?: string[] | null;
             condition?: string | null;
             sizeSystem?: string | null;
             sizeValue?: string | null;

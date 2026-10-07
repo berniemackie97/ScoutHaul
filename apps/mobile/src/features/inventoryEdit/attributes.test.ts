@@ -23,6 +23,10 @@ describe('parseAttributes', () => {
     // A number or nested object would break the text inputs bound to these.
     expect(parseAttributes('{"a":"keep","b":42,"c":null,"d":{"nested":true}}')).toEqual({ a: 'keep' });
   });
+
+  it('reads a stored list as one line, so saving it back keeps every entry', () => {
+    expect(parseAttributes('{"material":["Silk","Cotton"],"empty":[]}')).toEqual({ material: 'Silk, Cotton' });
+  });
 });
 
 describe('serializeAttributes', () => {

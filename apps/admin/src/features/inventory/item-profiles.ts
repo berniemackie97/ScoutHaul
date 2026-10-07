@@ -1,4 +1,5 @@
 import type { components } from "@overhaul/api-client";
+import { readListInput } from "@/lib/list-input";
 
 type Schemas = components["schemas"];
 export type ItemProfile = Schemas["ItemProfileDto"];
@@ -23,31 +24,50 @@ export function hasField(profile: ItemProfile, field: ItemField): boolean {
   return fieldSpec(profile, field) !== undefined;
 }
 
-const ATTRIBUTE_PREFIX = "attr.";
+export type ItemAttribute = Schemas["ItemAttributeDto"];
+export type AttributeValues = Record<string, string | string[]>;
 
-export function attributeInputName(key: string): string {
-  return `${ATTRIBUTE_PREFIX}${key}`;
+const ATTRIBUTE_PREFIX = "attr.";
+const LIST_PREFIX = "attrs.";
+
+/** A detail that takes several terms from its list, such as materials. */
+export function isListAttribute(attribute: ItemAttribute): boolean {
+  return (attribute.maxValues ?? 1) > 1 && (attribute.options?.length ?? 0) > 0;
 }
 
-/** The item's stored details as a plain map; anything unreadable reads as none. */
-export function readAttributes(json: string | null | undefined): Record<string, string> {
+/** The input a detail posts under: one value, or for a list, the JSON array a `MultiCombobox` writes. */
+export function attributeInputName(attribute: ItemAttribute): string {
+  return `${isListAttribute(attribute) ? LIST_PREFIX : ATTRIBUTE_PREFIX}${attribute.key}`;
+}
+
+/** The item's stored details as a plain map of text and lists of text; anything unreadable reads as none. */
+export function readAttributes(json: string | null | undefined): AttributeValues {
   if (!json) return {};
   try {
     const parsed: unknown = JSON.parse(json);
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
-    return Object.fromEntries(Object.entries(parsed).filter((entry): entry is [string, string] => typeof entry[1] === "string"));
+    const values: AttributeValues = {};
+    for (const [key, value] of Object.entries(parsed)) {
+      if (typeof value === "string") values[key] = value;
+      else if (Array.isArray(value)) values[key] = value.filter((entry): entry is string => typeof entry === "string");
+    }
+    return values;
   } catch {
     return {};
   }
 }
 
 /** The details among posted form entries, keyed without their input prefix. */
-export function pickAttributes(entries: Iterable<[string, unknown]>): Record<string, string> {
-  const attributes: Record<string, string> = {};
+export function pickAttributes(entries: Iterable<[string, unknown]>): AttributeValues {
+  const attributes: AttributeValues = {};
   for (const [name, value] of entries) {
-    if (!name.startsWith(ATTRIBUTE_PREFIX) || typeof value !== "string") continue;
-    const trimmed = value.trim();
-    if (trimmed) attributes[name.slice(ATTRIBUTE_PREFIX.length)] = trimmed;
+    if (typeof value !== "string") continue;
+    if (name.startsWith(LIST_PREFIX)) {
+      const list = readListInput(value);
+      if (list && list.length > 0) attributes[name.slice(LIST_PREFIX.length)] = list;
+    } else if (name.startsWith(ATTRIBUTE_PREFIX) && value.trim()) {
+      attributes[name.slice(ATTRIBUTE_PREFIX.length)] = value.trim();
+    }
   }
   return attributes;
 }

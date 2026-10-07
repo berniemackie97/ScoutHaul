@@ -43,7 +43,7 @@ export default function GenerateListingScreen() {
         model: inv.model,
         category: inv.category,
         condition: inv.condition,
-        color: inv.color,
+        color: inv.colors?.join(', ') || null,
         sizeSystem: inv.sizeSystem,
         sizeValue: inv.sizeValue,
         attributesJson: inv.attributesJson,

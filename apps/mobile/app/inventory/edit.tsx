@@ -103,6 +103,7 @@ export default function EditInventoryScreen() {
   const [brand, setBrand] = useState(params.brand ?? '');
   const [model, setModel] = useState(params.model ?? '');
   const [color, setColor] = useState(params.color ?? '');
+  const [secondColor, setSecondColor] = useState('');
   const [sizeSystem, setSizeSystem] = useState('');
   const [sizeValue, setSizeValue] = useState('');
   const [attributes, setAttributes] = useState<AttributeMap>({});
@@ -155,6 +156,10 @@ export default function EditInventoryScreen() {
   const controlledCategories = useMemo(() => referenceOptions(referenceData?.categories, categoryOptions, category), [referenceData, category]);
   const controlledConditions = useMemo(() => referenceOptions(referenceData?.conditions, conditionOptions, condition), [referenceData, condition]);
   const controlledColors = useMemo(() => referenceOptions(referenceData?.colors, colorOptions, color), [referenceData, color]);
+  const controlledSecondColors = useMemo(
+    () => referenceOptions(referenceData?.colors, colorOptions, secondColor).filter((option) => option.value !== color),
+    [referenceData, color, secondColor],
+  );
   const controlledSizeSystems = useMemo(() => referenceOptions(referenceData?.sizeSystems, sizeSystemOptions, sizeSystem), [referenceData, sizeSystem]);
   const controlledBrands = useMemo(() => referenceOptions(referenceData?.brands, [], brand), [referenceData, brand]);
   const controlledModels = useMemo(
@@ -301,7 +306,8 @@ export default function EditInventoryScreen() {
       setCategory(item.category ?? '');
       setBrand(item.brand ?? '');
       setModel(item.model ?? '');
-      setColor(item.color ?? '');
+      setColor(item.colors?.[0] ?? '');
+      setSecondColor(item.colors?.[1] ?? '');
       setSizeSystem(item.sizeSystem ?? '');
       setSizeValue(item.sizeValue ?? '');
       setAttributes(parseAttributes(item.attributesJson));
@@ -430,7 +436,8 @@ export default function EditInventoryScreen() {
     if (serialNumber.trim()) facts.push(`Serial number: ${serialNumber.trim()}`);
     if (barcode.trim()) facts.push(`Barcode / GTIN: ${barcode.trim()}`);
     if (category) facts.push(`Category: ${category}`);
-    if (color.trim()) facts.push(`Color: ${color.trim()}`);
+    const itemColors = [color, secondColor].filter(Boolean);
+    if (itemColors.length > 0) facts.push(`Color: ${itemColors.join(', ')}`);
     if (condition) facts.push(`Condition: ${condition}`);
     if (countryOfOrigin) facts.push(`Country of origin: ${countryOfOrigin}`);
     if (manufactureYear.trim()) facts.push(`Manufacture year: ${manufactureYear.trim()}`);
@@ -484,7 +491,7 @@ export default function EditInventoryScreen() {
       category: category || null,
       brand: brand || null,
       model: model || null,
-      color: color || null,
+      colors: [...new Set([color, secondColor].filter(Boolean))],
       condition: condition || null,
       sizeSystem: sizeSystem || null,
       sizeValue: sizeValue || null,
@@ -758,7 +765,23 @@ export default function EditInventoryScreen() {
           <SelectField label="Brand" value={brand} options={controlledBrands} onChange={(value) => { setBrand(value); setModel(''); }} placeholder="Select approved brand..." searchable containerStyle={styles.flex} />
           <SelectField label="Model" value={model} options={controlledModels} onChange={setModel} placeholder="Select approved model..." searchable containerStyle={styles.flex} />
         </View>
-        <SelectField label="Color" value={color} options={controlledColors} onChange={setColor} placeholder="Select color..." searchable />
+        <View style={styles.row}>
+          <SelectField
+            label="Color"
+            value={color}
+            options={controlledColors}
+            onChange={(value) => {
+              setColor(value);
+              if (!value) setSecondColor('');
+            }}
+            placeholder="Select color..."
+            searchable
+            containerStyle={styles.flex}
+          />
+          {color ? (
+            <SelectField label="Second color" value={secondColor} options={controlledSecondColors} onChange={setSecondColor} placeholder="Optional" searchable containerStyle={styles.flex} />
+          ) : null}
+        </View>
         <SelectField
           label="Condition"
           value={condition}

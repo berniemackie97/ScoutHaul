@@ -14107,8 +14107,11 @@
             "type": "string",
             "nullable": true
           },
-          "color": {
-            "type": "string",
+          "colors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
             "nullable": true
           },
           "condition": {
@@ -14728,6 +14731,10 @@
               "type": "string"
             },
             "nullable": true
+          },
+          "maxValues": {
+            "type": "integer",
+            "format": "int32"
           }
         },
         "additionalProperties": false
@@ -19623,8 +19630,11 @@
             "type": "string",
             "nullable": true
           },
-          "color": {
-            "type": "string",
+          "colors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
             "nullable": true
           },
           "sizeSystem": {
@@ -21345,8 +21355,11 @@
             "type": "string",
             "nullable": true
           },
-          "color": {
-            "type": "string",
+          "colors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
             "nullable": true
           },
           "condition": {

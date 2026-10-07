@@ -45,7 +45,8 @@ export type CreateInventoryRequest = {
   category?: string | null;
   brand?: string | null;
   model?: string | null;
-  color?: string | null;
+  /** Main color first; the API takes two. Omit to leave the item's colors as they are. */
+  colors?: string[] | null;
   condition?: string | null;
   sizeSystem?: string | null;
   sizeValue?: string | null;

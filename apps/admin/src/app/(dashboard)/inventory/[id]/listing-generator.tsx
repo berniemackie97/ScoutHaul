@@ -54,7 +54,7 @@ export function ListingGenerator({ item }: { item: InventoryItem }) {
         model: item.model,
         category: item.category,
         condition: item.condition,
-        color: item.color,
+        color: item.colors?.join(", ") || null,
         sizeSystem: item.sizeSystem,
         sizeValue: item.sizeValue,
         attributesJson: item.attributesJson,
