@@ -1,8 +1,5 @@
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
-using Npgsql;
-using HaulScout.Application.Common;
 using HaulScout.Domain.Entities;
 using HaulScout.Infrastructure.Persistence;
 
@@ -20,20 +17,9 @@ public sealed class ColorsAndMaterialsMigrationTests(PostgresFixture postgres)
     [Fact]
     public async Task Text_colors_and_materials_become_lists_in_the_order_written()
     {
-        string database = $"migration_{Guid.NewGuid():N}";
-        await using (NpgsqlConnection admin = new(postgres.ConnectionString))
-        {
-            await admin.OpenAsync();
-            await using NpgsqlCommand create = new($"CREATE DATABASE {database}", admin);
-            await create.ExecuteNonQueryAsync();
-        }
-
         Guid org = Guid.NewGuid();
-        await using HaulScoutDbContext db = Context(new NpgsqlConnectionStringBuilder(postgres.ConnectionString) { Database = database }.ConnectionString, org);
-        IMigrator migrator = db.GetService<IMigrator>();
-        await migrator.MigrateAsync(StepBefore);
-        db.Organizations.Add(new Organization { Id = org, Name = "Migration org" });
-        await db.SaveChangesAsync();
+        (HaulScoutDbContext db, IMigrator migrator) = await postgres.DatabaseAtAsync(StepBefore, org);
+        await using HaulScoutDbContext scope = db;
         Guid twoColors = Guid.NewGuid(), unknownColor = Guid.NewGuid(), blank = Guid.NewGuid();
         await db.Database.ExecuteSqlRawAsync(
             """
@@ -65,12 +51,5 @@ public sealed class ColorsAndMaterialsMigrationTests(PostgresFixture postgres)
         Assert.Equal("""{"material": ["Brass"]}""", items[unknownColor].AttributesJson);
         Assert.Empty(items[blank].Colors);
         Assert.Null(items[blank].AttributesJson);
-    }
-
-    private static HaulScoutDbContext Context(string connectionString, Guid org)
-    {
-        TenantContext tenant = new();
-        tenant.SetOrganization(org);
-        return new HaulScoutDbContext(new DbContextOptionsBuilder<HaulScoutDbContext>().UseNpgsql(connectionString).Options, tenant);
     }
 }

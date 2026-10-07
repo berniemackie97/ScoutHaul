@@ -113,6 +113,21 @@ public sealed class InventoryReferenceDataServiceTests
         Assert.Null(untouched!.Colors);
     }
 
+    [Theory]
+    [InlineData("Tops", "Clothing")]
+    [InlineData("Women > Shoes > Heels", "Shoes")]
+    [InlineData("Football-NFL", "Other")]
+    public async Task A_marketplace_category_is_saved_as_the_category_it_belongs_to(string supplied, string expected)
+    {
+        Guid organizationId = Guid.NewGuid();
+        await using HaulScoutDbContext db = NewContext(organizationId, $"{nameof(A_marketplace_category_is_saved_as_the_category_it_belongs_to)}-{supplied}");
+        InventoryReferenceDataService service = new(new EfInventoryReferenceDataStore(db, new StubCurrentUser(organizationId)));
+
+        (InventoryReferenceDataService.ControlledValues? values, _) = await service.ResolveAsync(Request(category: supplied, brand: "Levi's", model: "501"), CancellationToken.None);
+
+        Assert.Equal(expected, values!.Category);
+    }
+
     private static HaulScoutDbContext NewContext(Guid organizationId, string databaseName)
     {
         DbContextOptions<HaulScoutDbContext> options = new DbContextOptionsBuilder<HaulScoutDbContext>()

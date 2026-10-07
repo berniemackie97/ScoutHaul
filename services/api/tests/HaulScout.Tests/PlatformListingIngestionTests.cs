@@ -130,14 +130,16 @@ public class PlatformListingIngestionTests
                     Brand = "Wrangler",
                     Color = "Indigo",
                     Size = "L",
+                    CategoryName = "Coats & Jackets",
                     Description = "A jacket.",
                 },
             ]),
             CancellationToken.None);
 
         InventoryItem filled = await db.InventoryItems.SingleAsync();
+        Assert.Equal("Clothing", filled.Category);
         Assert.Equal(["Blue"], filled.Colors);
-        Assert.Equal("L", filled.SizeValue);
+        Assert.Equal(("US letter", "L"), (filled.SizeSystem, filled.SizeValue));
         Assert.Equal("A jacket.", filled.Description);
         // The brand someone typed stands; the listing does not get to correct them.
         Assert.Equal("Levi's", filled.Brand);
