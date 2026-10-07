@@ -7,7 +7,7 @@ vi.mock("./store", async () => {
   return { ...actual, liveCatalogEnabled: true, storefrontApi: () => ({ GET: get }) };
 });
 
-import { CatalogUnavailableError, getListing, getListings, getShelfCount } from "./catalog";
+import { CatalogUnavailableError, categorySlug, getListing, getListings, getRelated, getShelfCount } from "./catalog";
 import { STORE } from "./store";
 
 beforeEach(() => vi.clearAllMocks());
@@ -38,7 +38,7 @@ describe("getListings", () => {
       },
     });
 
-    const item = first(await getListings());
+    const item = first((await getListings()).items);
     expect(item.title).toBe("Brass Lamp");
     expect(item.price).toBe(120);
     expect(item.image).toBe(`${STORE.apiBaseUrl}/uploads/lamp.jpg`);
@@ -51,14 +51,14 @@ describe("getListings", () => {
       data: { items: [{ id: "1", imageUrl: "https://cdn.example.com/lamp.jpg" }] },
     });
 
-    const item = first(await getListings());
+    const item = first((await getListings()).items);
     expect(item.image).toBe("https://cdn.example.com/lamp.jpg");
   });
 
   it("fills in defaults rather than rendering undefined at a shopper", async () => {
     get.mockResolvedValue({ data: { items: [{ id: "1" }] } });
 
-    const item = first(await getListings());
+    const item = first((await getListings()).items);
     expect(item.price).toBe(0);
     expect(item.condition).toBe("Good");
     expect(item.acceptsOffers).toBe(true);
@@ -73,8 +73,18 @@ describe("getListings", () => {
   });
 
   it("still reports a genuinely empty catalog as empty", async () => {
-    get.mockResolvedValue({ data: { items: [] } });
-    await expect(getListings()).resolves.toEqual([]);
+    get.mockResolvedValue({ data: { items: [], total: 0 } });
+    await expect(getListings()).resolves.toEqual({ items: [], page: 1, pageCount: 1, total: 0 });
+  });
+
+  it("reaches every page of a shelf bigger than one page", async () => {
+    // The catalogue used to ask for page 1 and stop, so everything past the first 48 items was unreachable.
+    get.mockResolvedValue({ data: { items: [{ id: "49" }], total: 147 } });
+    const result = await getListings({ page: 2 });
+
+    const [, options] = get.mock.calls[0] ?? [];
+    expect(options?.params?.query).toMatchObject({ page: 2, pageSize: 48 });
+    expect(result).toMatchObject({ page: 2, pageCount: 4, total: 147 });
   });
 
   it("passes the shopper's category and search through", async () => {
@@ -142,5 +152,24 @@ describe("the shelf count", () => {
     // "say nothing". Throwing here would blank the home page over a decorative number.
     get.mockRejectedValue(new Error("network down"));
     await expect(getShelfCount()).resolves.toBeNull();
+  });
+});
+
+describe("getRelated", () => {
+  it("asks for the item's own category rather than searching one page of the shelf", async () => {
+    get.mockResolvedValue({ data: { items: [{ id: "1", slug: "this-one" }, { id: "2", slug: "another" }], total: 2 } });
+
+    const related = await getRelated({ slug: "this-one", category: "Health & Beauty" });
+
+    const [, options] = get.mock.calls[0] ?? [];
+    expect(options?.params?.query).toMatchObject({ category: "health-beauty" });
+    expect(related.map((item) => item.slug)).toEqual(["another"]);
+  });
+});
+
+describe("categorySlug", () => {
+  it("joins letters and digits with single hyphens, like the API", () => {
+    expect(categorySlug("Health & Beauty")).toBe("health-beauty");
+    expect(categorySlug(" Café / Décor ")).toBe("café-décor");
   });
 });

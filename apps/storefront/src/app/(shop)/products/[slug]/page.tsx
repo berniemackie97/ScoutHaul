@@ -5,7 +5,7 @@ import { ProductGallery } from "@/components/store/product-gallery";
 import { ProductCard } from "@/components/store/product-card";
 import { ProductCommercePanel } from "@/components/store/product-commerce-panel";
 import { Reveal } from "@/components/ui/reveal";
-import { CatalogUnavailableError, getListing, getRelated } from "@/lib/catalog";
+import { CatalogUnavailableError, categorySlug, getListing, getRelated } from "@/lib/catalog";
 import { STORE } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
@@ -79,8 +79,8 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
   const item = await getListing(slug);
   if (!item) notFound();
 
-  const related = await getRelated(slug);
-  const categorySlug = item.category.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+  const related = await getRelated(item);
+  const itemCategorySlug = categorySlug(item.category);
   const savings = item.compareAt ? Math.round((1 - item.price / item.compareAt) * 100) : null;
 
   const productImages = (item.images?.length ? item.images : item.image ? [item.image] : []).map(fullSize);
@@ -153,7 +153,7 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
         <div>
           <Reveal>
             <div className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.18em] text-slate/70">
-              <Link href={`/products?category=${categorySlug}`} className="transition-colors hover:text-ink">
+              <Link href={`/products?category=${itemCategorySlug}`} className="transition-colors hover:text-ink">
                 {item.category}
               </Link>
               <span aria-hidden className="h-1 w-1 rounded-full bg-copper" />
