@@ -57,7 +57,7 @@ export type InventoryItem = {
   category?: string | null;
   brand?: string | null;
   model?: string | null;
-  color?: string | null;
+  colors?: string[] | null;
   condition?: string | null;
   sizeSystem?: string | null;
   sizeValue?: string | null;

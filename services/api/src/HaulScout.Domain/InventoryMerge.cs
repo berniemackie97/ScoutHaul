@@ -15,7 +15,7 @@ public static class InventoryMerge
         kept.Category = Prefer(kept.Category, duplicate.Category);
         kept.Brand = Prefer(kept.Brand, duplicate.Brand);
         kept.Model = Prefer(kept.Model, duplicate.Model);
-        kept.Color = Prefer(kept.Color, duplicate.Color);
+        if (kept.Colors.Count == 0) kept.Colors = [.. duplicate.Colors];
         kept.Condition = Prefer(kept.Condition, duplicate.Condition);
         if (string.IsNullOrWhiteSpace(kept.SizeSystem))
         {

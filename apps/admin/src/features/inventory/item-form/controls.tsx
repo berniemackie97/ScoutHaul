@@ -3,6 +3,7 @@
 import type { components } from "@overhaul/api-client";
 import { Input, Label, Textarea } from "@overhaul/ui";
 import { Combobox } from "@/components/combobox";
+import { MultiCombobox } from "@/components/multi-combobox";
 
 type ReferenceOption = components["schemas"]["InventoryReferenceOptionDto"];
 
@@ -145,6 +146,37 @@ export function OptionField({ label, name, value, options, onChange, error, disa
       />
     </Shell>
   );
+}
+
+/** Up to `max` picks from a closed list, as chips. Posts the values as a JSON array under `name`. */
+export function MultiOptionField({ label, name, values, options, max, onChange, error, placeholder }: {
+  label: string;
+  name: string;
+  values: readonly string[];
+  options: readonly string[];
+  max: number;
+  onChange: (values: string[]) => void;
+  error?: string;
+  placeholder?: string;
+}) {
+  return (
+    <Shell label={max > 1 ? `${label} (up to ${max})` : label} name={name} error={error}>
+      <MultiCombobox
+        name={name}
+        values={values}
+        onChange={onChange}
+        options={options.map((option) => ({ value: option, label: option }))}
+        max={max}
+        placeholder={placeholder ?? `Add ${label.toLowerCase()}…`}
+      />
+    </Shell>
+  );
+}
+
+/** The listed options matching values regardless of case, in their order; values off the list are dropped. */
+export function matchOptions(values: readonly string[] | null | undefined, options: readonly string[]): string[] {
+  const matched = (values ?? []).map((value) => options.find((option) => option.toLowerCase() === value.trim().toLowerCase()));
+  return [...new Set(matched.filter((value): value is string => Boolean(value)))];
 }
 
 /** The listed option matching a value regardless of case, or the value itself when `custom` values are allowed. */

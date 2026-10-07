@@ -3,8 +3,19 @@
 import { useEffect, useState } from "react";
 import type { components } from "@overhaul/api-client";
 import type { FieldErrors, FormValues } from "@/lib/form-state";
-import { attributeInputName, fieldSpec, pickAttributes, readAttributes, type ItemField, type ItemProfile } from "../item-profiles";
-import { matchOption, OptionField, SelectField, TextField } from "./controls";
+import { readListInput } from "@/lib/list-input";
+import {
+  attributeInputName,
+  fieldSpec,
+  isListAttribute,
+  pickAttributes,
+  readAttributes,
+  type AttributeValues,
+  type ItemAttribute,
+  type ItemField,
+  type ItemProfile,
+} from "../item-profiles";
+import { matchOption, matchOptions, MultiOptionField, OptionField, SelectField, TextField } from "./controls";
 import { AUTHENTICITY, COMPLETENESS, FUNCTIONAL, PACKAGING } from "./options";
 
 type ReferenceData = components["schemas"]["InventoryReferenceDataDto"];
@@ -13,7 +24,7 @@ type ReferenceData = components["schemas"]["InventoryReferenceDataDto"];
 export type ItemDetailValues = {
   brand?: string | null;
   model?: string | null;
-  color?: string | null;
+  colors?: string[] | null;
   sizeSystem?: string | null;
   sizeValue?: string | null;
   functionalStatus?: string | null;
@@ -54,7 +65,7 @@ export function ItemDetails({
   const start = (name: keyof ItemDetailValues) => values?.[name] ?? (initial[name] as string | null | undefined) ?? "";
   const [brand, setBrand] = useState(() => start("brand"));
   const [model, setModel] = useState(() => start("model"));
-  const [color, setColor] = useState(() => start("color"));
+  const [colors, setColors] = useState<string[]>(() => (values?.colors !== undefined ? (readListInput(values.colors) ?? []) : (initial.colors ?? [])));
   const [sizeSystem, setSizeSystem] = useState(() => start("sizeSystem"));
   const [sizeValue, setSizeValue] = useState(() => start("sizeValue"));
 
@@ -63,7 +74,7 @@ export function ItemDetails({
     if (!values) return;
     setBrand(values.brand ?? "");
     setModel(values.model ?? "");
-    setColor(values.color ?? "");
+    setColors(readListInput(values.colors) ?? []);
     setSizeSystem(values.sizeSystem ?? "");
     setSizeValue(values.sizeValue ?? "");
   }, [formKey, values]);
@@ -77,9 +88,10 @@ export function ItemDetails({
   const brands = (reference.brands ?? []).filter((option) => !option.parentValue || option.parentValue === category);
   const canonicalBrand = matchOption(brand, reference.brands ?? []);
   const models = (reference.models ?? []).filter((option) => option.parentValue === canonicalBrand);
+  const colorOptions = (reference.colors ?? []).filter((option) => option.value && !option.isLegacy).map((option) => option.value!);
   const sizeSystems = (reference.sizeSystems ?? []).filter((option) => profile.sizeSystems?.includes(option.value ?? ""));
   const sizes = (reference.sizes ?? []).filter((option) => option.parentValue === sizeSystem);
-  const attributes = { ...readAttributes(initial.attributesJson), ...pickAttributes(Object.entries(values ?? {})) };
+  const attributes: AttributeValues = values ? pickAttributes(Object.entries(values)) : readAttributes(initial.attributesJson);
   const statuses = [
     { field: "FunctionalStatus", name: "functionalStatus", choices: FUNCTIONAL },
     { field: "CompletenessStatus", name: "completenessStatus", choices: COMPLETENESS },
@@ -117,7 +129,7 @@ export function ItemDetails({
           />
         )}
         {spec("Color") && (
-          <OptionField label="Color" name="color" value={matchOption(color, reference.colors ?? [])} options={reference.colors ?? []} onChange={edit(setColor)} error={errors.color} />
+          <MultiOptionField label="Colors" name="colors" values={matchOptions(colors, colorOptions)} options={colorOptions} max={COLOR_LIMIT} onChange={edit(setColors)} error={errors.colors} />
         )}
         {spec("Size") && (
           <>
@@ -144,27 +156,9 @@ export function ItemDetails({
             />
           </>
         )}
-        {(profile.attributes ?? []).map((attribute) =>
-          attribute.options && attribute.options.length > 0 ? (
-            <SelectField
-              key={attribute.key}
-              label={attribute.label ?? attribute.key!}
-              name={attributeInputName(attribute.key!)}
-              choices={attribute.options.map((option) => [option, option] as const)}
-              defaultValue={attributes[attribute.key!] ?? ""}
-              formKey={formKey}
-              includeBlank
-            />
-          ) : (
-            <TextField
-              key={attribute.key}
-              label={attribute.label ?? attribute.key!}
-              name={attributeInputName(attribute.key!)}
-              defaultValue={attributes[attribute.key!]}
-              formKey={formKey}
-            />
-          ),
-        )}
+        {(profile.attributes ?? []).map((attribute) => (
+          <AttributeField key={`${profile.key}:${attribute.key}:${formKey ?? "initial"}`} attribute={attribute} initial={attributes[attribute.key!]} onEdit={onEdit} />
+        ))}
         {spec("ManufactureYear") && (
           <TextField
             label={spec("ManufactureYear")!.label ?? "Year made"}
@@ -222,6 +216,32 @@ export function ItemDetails({
       )}
     </div>
   );
+}
+
+/** The API allows two colors; past that an item is Multicolor or Patterned. */
+const COLOR_LIMIT = 2;
+
+/** One profile detail: free text, a searchable pick from its list, or several picks for a list such as materials. */
+function AttributeField({ attribute, initial, onEdit }: { attribute: ItemAttribute; initial: string | string[] | undefined; onEdit?: () => void }) {
+  const label = attribute.label ?? attribute.key!;
+  const options = attribute.options ?? [];
+  const [values, setValues] = useState(() => matchOptions(typeof initial === "string" ? [initial] : initial, options));
+  const [value, setValue] = useState(() => (typeof initial === "string" ? initial : (initial?.[0] ?? "")));
+  const changed = <T,>(set: (next: T) => void) => (next: T) => {
+    set(next);
+    onEdit?.();
+  };
+
+  if (isListAttribute(attribute)) {
+    return <MultiOptionField label={label} name={attributeInputName(attribute)} values={values} options={options} max={attribute.maxValues ?? 1} onChange={changed(setValues)} />;
+  }
+
+  if (options.length > 0) {
+    const choices = options.map((option) => ({ value: option, label: option }));
+    return <OptionField label={label} name={attributeInputName(attribute)} value={matchOption(value, choices)} options={choices} onChange={changed(setValue)} />;
+  }
+
+  return <TextField label={label} name={attributeInputName(attribute)} defaultValue={value} />;
 }
 
 function CountryField({ initial, reference, error, onEdit }: { initial: string; reference: ReferenceData; error?: string; onEdit?: () => void }) {

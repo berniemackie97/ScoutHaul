@@ -1,3 +1,4 @@
+using HaulScout.Domain;
 using HaulScout.Domain.Entities;
 
 namespace HaulScout.Application.Inventory;
@@ -18,11 +19,29 @@ public static class ListingDetailFill
         bool changed = false;
         changed |= Fill(listing.Description, value => item.Description = value, item.Description);
         changed |= Fill(listing.Brand, value => item.Brand = value, item.Brand);
-        changed |= Fill(listing.Color, value => item.Color = value, item.Color);
+        changed |= FillColors(item, listing.Color);
         changed |= Fill(listing.Condition, value => item.Condition = value, item.Condition);
         changed |= Fill(listing.CategoryName, value => item.Category = value, item.Category);
         changed |= Fill(listing.Size, value => item.SizeValue = value, item.SizeValue);
         return changed;
+    }
+
+    /// <summary>A listing names colors its own way ("Grey, Off-White"); the item takes them in the standard list.</summary>
+    private static bool FillColors(InventoryItem item, string? offered)
+    {
+        if (item.Colors.Count > 0)
+        {
+            return false;
+        }
+
+        IReadOnlyList<string> colors = ItemColors.Standard.CanonicalList([offered], ItemColors.Max);
+        if (colors.Count == 0)
+        {
+            return false;
+        }
+
+        item.Colors = [.. colors];
+        return true;
     }
 
     private static bool Fill(string? offered, Action<string> set, string? current)

@@ -128,6 +128,29 @@ public sealed class InventoryMergeStoreTests(PostgresFixture postgres)
     }
 
     [Fact]
+    public async Task A_merge_keeps_details_a_marketplace_category_would_not_have_told_it_about()
+    {
+        (HaulScoutDbContext db, Guid org, Guid user) = await postgres.NewOrganizationAsync();
+        await using HaulScoutDbContext scope = db;
+        InventoryItem kept = Item(org, "Floral blouse", InventoryStatus.Listed);
+        kept.Category = "Tops";
+        kept.SizeSystem = "US letter";
+        kept.SizeValue = "M";
+        InventoryItem duplicate = Item(org, "Floral blouse M", InventoryStatus.Sold);
+        duplicate.Colors = ["Pink", "White"];
+        db.AddRange(kept, duplicate);
+        await db.SaveChangesAsync();
+
+        AppResult<MergeInventoryItemsResultDto> result = await NewService(db, org, user).MergeAsync(new MergeInventoryItemsRequest(kept.Id, [duplicate.Id]), CancellationToken.None);
+
+        Assert.Equal(AppResultStatus.Ok, result.Status);
+        db.ChangeTracker.Clear();
+        InventoryItem merged = await db.InventoryItems.SingleAsync(item => item.Id == kept.Id);
+        Assert.Equal(("US letter", "M"), (merged.SizeSystem, merged.SizeValue));
+        Assert.Equal(["Pink", "White"], merged.Colors);
+    }
+
+    [Fact]
     public async Task Two_items_each_with_a_live_sale_are_refused_and_left_as_they_were()
     {
         (HaulScoutDbContext db, Guid org, Guid user) = await postgres.NewOrganizationAsync();

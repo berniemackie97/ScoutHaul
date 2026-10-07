@@ -69,7 +69,7 @@ public sealed record CatalogItemSpecs(
     string? Brand,
     string? Model,
     string? Category,
-    string? Color,
+    IReadOnlyList<string> Colors,
     string? Condition,
     string? SizeSystem,
     string? SizeValue,

@@ -143,7 +143,7 @@ export async function getListing(slug: string): Promise<Specimen | null> {
       title: data.title ?? "",
       brand: data.brand ?? undefined,
       model: data.model ?? undefined,
-      color: data.color ?? undefined,
+      color: data.colors?.length ? data.colors.join(", ") : undefined,
       category: data.category ?? "",
       condition: data.condition ?? "Good",
       size: [data.sizeSystem, data.sizeValue].filter(Boolean).join(" ") || undefined,

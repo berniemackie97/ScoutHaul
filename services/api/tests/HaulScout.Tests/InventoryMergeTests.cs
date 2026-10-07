@@ -20,7 +20,7 @@ public class InventoryMergeTests
         InventoryItem duplicate = Item("N64 console grey");
         duplicate.Brand = "Other";
         duplicate.PurchasePrice = 15m;
-        duplicate.Color = "Grey";
+        duplicate.Colors = ["Gray"];
         duplicate.EstimatedSalePrice = 120m;
 
         InventoryMerge.FillBlanks(kept, duplicate);
@@ -28,7 +28,7 @@ public class InventoryMergeTests
         Assert.Equal("Nintendo 64 console", kept.Title);
         Assert.Equal("Nintendo", kept.Brand);
         Assert.Equal(40m, kept.PurchasePrice);
-        Assert.Equal("Grey", kept.Color);
+        Assert.Equal(["Gray"], kept.Colors);
         Assert.Equal(120m, kept.EstimatedSalePrice);
     }
 

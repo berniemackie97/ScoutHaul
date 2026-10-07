@@ -32,8 +32,16 @@ public enum ListingReadiness
 
 public sealed record ItemFieldSpec(ItemField Field, string Label, ListingReadiness Readiness = ListingReadiness.Optional);
 
-/// <summary>A detail stored in the item's attributes. With options it is a pick list; without, free text.</summary>
-public sealed record ItemAttribute(string Key, string Label, IReadOnlyList<string>? Options = null);
+/// <summary>
+/// A detail stored in the item's attributes. With a vocabulary it is a pick list, of up to <see cref="MaxValues"/>
+/// terms; without one, free text.
+/// </summary>
+public sealed record ItemAttribute(string Key, string Label, Vocabulary? Choices = null, int MaxValues = 1)
+{
+    public IReadOnlyList<string>? Options => Choices?.Terms;
+
+    public bool IsList => Choices is not null && MaxValues > 1;
+}
 
 /// <summary>What describing one kind of item takes: which fields apply, what they are called, and its own details.</summary>
 public sealed record ItemProfile(
@@ -75,8 +83,14 @@ public static class ItemProfiles
     private static ItemFieldSpec Authenticity(ListingReadiness readiness = ListingReadiness.Recommended) =>
         new(ItemField.AuthenticityStatus, "Authenticity", readiness);
 
-    private static readonly ItemAttribute Department = new("department", "Department", ["Women", "Men", "Unisex", "Girls", "Boys", "Baby"]);
-    private static readonly ItemAttribute Material = new("material", "Material");
+    private static readonly ItemAttribute Department = new(
+        "department",
+        "Department",
+        new Vocabulary(["Women", "Men", "Unisex", "Girls", "Boys", "Baby"], new Dictionary<string, string> { ["Womens"] = "Women", ["Mens"] = "Men" }));
+
+    private static ItemAttribute Material(Vocabulary materials) => new("material", "Material", materials, ItemMaterials.Max);
+
+    private static ItemAttribute PickOne(string key, string label, params string[] options) => new(key, label, new Vocabulary(options));
 
     private static readonly string[] ClothingSizes =
     [
@@ -91,16 +105,16 @@ public static class ItemProfiles
 
     public static readonly IReadOnlyList<ItemProfile> All =
     [
-        new("apparel", "Clothing", ["Clothing"], [Color, Size, Authenticity()], [Department, Material], ClothingSizes),
+        new("apparel", "Clothing", ["Clothing"], [Color, Size, Authenticity()], [Department, Material(ItemMaterials.Clothing)], ClothingSizes),
         new("baby", "Baby", ["Baby"], [Model(), Color, Size, Completeness(), Packaging(ListingReadiness.Optional)], [], ["Youth", "One size"]),
-        new("footwear", "Shoes", ["Shoes"], [Model(), Color, Size, Authenticity(), Packaging()], [Department, Material], ShoeSizes),
-        new("accessories", "Bags & jewelry", ["Handbags", "Jewelry"], [Model(), Color, Authenticity(), Packaging()], [Material], []),
+        new("footwear", "Shoes", ["Shoes"], [Model(), Color, Size, Authenticity(), Packaging()], [Department, Material(ItemMaterials.Footwear)], ShoeSizes),
+        new("accessories", "Bags & jewelry", ["Handbags", "Jewelry"], [Model(), Color, Authenticity(), Packaging()], [Material(ItemMaterials.BagsAndJewelry)], []),
         new(
             "watches",
             "Watches",
             ["Watches"],
             [Model(), Color, Serial, Year, Functional(ListingReadiness.Recommended), Completeness(ListingReadiness.Optional), Authenticity(), Packaging()],
-            [Material],
+            [Material(ItemMaterials.Watches)],
             []),
         new(
             "electronics",
@@ -114,7 +128,7 @@ public static class ItemProfiles
             "Video games",
             ["Video Games"],
             [Model("Platform"), Color, Year, Functional(), Completeness(), Packaging()],
-            [new ItemAttribute("region", "Region", ["NTSC-U (North America)", "PAL (Europe)", "NTSC-J (Japan)", "Region free"])],
+            [PickOne("region", "Region", "NTSC-U (North America)", "PAL (Europe)", "NTSC-J (Japan)", "Region free")],
             [],
             BrandLabel: "Console maker or publisher"),
         new(
@@ -122,7 +136,7 @@ public static class ItemProfiles
             "Collectibles & toys",
             ["Collectibles", "Toys"],
             [Model("Set or series"), Year, Completeness(), Authenticity(), Packaging(), Origin],
-            [new ItemAttribute("grader", "Grading company", ["PSA", "BGS", "CGC", "SGC", "Ungraded"]), new ItemAttribute("grade", "Grade")],
+            [PickOne("grader", "Grading company", "PSA", "BGS", "CGC", "SGC", "Ungraded"), new ItemAttribute("grade", "Grade")],
             []),
         new(
             "media",
@@ -131,7 +145,7 @@ public static class ItemProfiles
             [Year, Completeness(), Packaging()],
             [
                 new ItemAttribute("creator", "Author or artist"),
-                new ItemAttribute("format", "Format", ["Hardcover", "Paperback", "Vinyl", "CD", "Cassette", "DVD", "Blu-ray", "VHS", "Digital code"]),
+                PickOne("format", "Format", "Hardcover", "Paperback", "Vinyl", "CD", "Cassette", "DVD", "Blu-ray", "VHS", "Digital code"),
             ],
             [],
             BrandLabel: "Publisher or label"),
@@ -142,13 +156,13 @@ public static class ItemProfiles
             [Model(), Color, PartNumber, Serial, Functional(), Completeness()],
             [],
             []),
-        new("sporting", "Sporting goods", ["Sporting Goods"], [Model(), Color, Authenticity(), Completeness(ListingReadiness.Optional)], [Material], []),
+        new("sporting", "Sporting goods", ["Sporting Goods"], [Model(), Color, Authenticity(), Completeness(ListingReadiness.Optional)], [Material(ItemMaterials.Sporting)], []),
         new(
             "home",
             "Home & lifestyle",
             ["Furniture", "Decor", "Home", "Crafts", "Health & Beauty", "Pet Supplies", "Other"],
             [Model(), Color, Completeness(ListingReadiness.Optional), Packaging(ListingReadiness.Optional), Origin],
-            [Material],
+            [Material(ItemMaterials.Home)],
             []),
     ];
 
@@ -168,7 +182,7 @@ public static class ItemProfiles
     {
         ItemProfile profile = For(item.Category);
         if (!profile.Has(ItemField.Model)) item.Model = null;
-        if (!profile.Has(ItemField.Color)) item.Color = null;
+        if (!profile.Has(ItemField.Color)) item.Colors.Clear();
         if (!profile.Has(ItemField.Size) || !profile.SizeSystems.Contains(item.SizeSystem ?? string.Empty, StringComparer.OrdinalIgnoreCase))
         {
             item.SizeSystem = null;
@@ -187,8 +201,8 @@ public static class ItemProfiles
     }
 
     /// <summary>
-    /// The attributes this profile defines, trimmed, with pick-list values held to their list. Anything else is dropped
-    /// rather than kept as an unexplained key.
+    /// The attributes this profile defines, trimmed, with pick-list values held to their vocabulary — one term, or a
+    /// list of up to the attribute's limit. Anything else is dropped rather than kept as an unexplained key.
     /// </summary>
     public static string? KeepAttributes(string? attributesJson, ItemProfile profile)
     {
@@ -210,15 +224,20 @@ public static class ItemProfiles
         JsonObject kept = [];
         foreach (ItemAttribute attribute in profile.Attributes)
         {
-            string? value = source?[attribute.Key] is JsonValue node && node.TryGetValue(out string? text) ? text?.Trim() : null;
-            if (string.IsNullOrEmpty(value))
+            IReadOnlyList<string?> values = Texts(source?[attribute.Key]);
+            if (attribute.IsList)
             {
+                IReadOnlyList<string> terms = attribute.Choices!.CanonicalList(values, attribute.MaxValues);
+                if (terms.Count > 0)
+                {
+                    kept[attribute.Key] = new JsonArray([.. terms.Select(term => JsonValue.Create(term))]);
+                }
+
                 continue;
             }
 
-            string? canonical = attribute.Options is null
-                ? value
-                : attribute.Options.FirstOrDefault(option => string.Equals(option, value, StringComparison.OrdinalIgnoreCase));
+            string? value = values.FirstOrDefault()?.Trim();
+            string? canonical = attribute.Choices is null ? (string.IsNullOrEmpty(value) ? null : value) : attribute.Choices.Canonical(value);
             if (canonical is not null)
             {
                 kept[attribute.Key] = canonical;
@@ -227,4 +246,12 @@ public static class ItemProfiles
 
         return kept.Count == 0 ? null : kept.ToJsonString();
     }
+
+    /// <summary>The text a stored attribute holds, whether written as one string or, for a list, as an array.</summary>
+    private static IReadOnlyList<string?> Texts(JsonNode? node) => node switch
+    {
+        JsonValue value when value.TryGetValue(out string? text) => [text],
+        JsonArray array => [.. array.Select(entry => entry is JsonValue value && value.TryGetValue(out string? text) ? text : null)],
+        _ => [],
+    };
 }

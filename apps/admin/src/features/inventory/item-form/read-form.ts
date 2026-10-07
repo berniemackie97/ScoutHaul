@@ -1,5 +1,6 @@
 import type { components } from "@overhaul/api-client";
 import type { FieldErrors } from "@/lib/form-state";
+import { readListInput } from "@/lib/list-input";
 import { attributesFromForm } from "../item-profiles";
 
 type Schemas = components["schemas"];
@@ -47,7 +48,7 @@ export function readItemForm(formData: FormData): { fields: ItemFormFields; erro
     category: text(formData, "category"),
     brand: text(formData, "brand"),
     model: text(formData, "model"),
-    color: text(formData, "color"),
+    colors: readListInput(formData.get("colors")),
     condition: text(formData, "condition"),
     sizeSystem: text(formData, "sizeSystem"),
     sizeValue: text(formData, "sizeValue"),

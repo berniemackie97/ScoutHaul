@@ -235,7 +235,7 @@ public sealed class HaulScoutDbContext(
             entity.Property(item => item.Category).HasMaxLength(160);
             entity.Property(item => item.Brand).HasMaxLength(160);
             entity.Property(item => item.Model).HasMaxLength(160);
-            entity.Property(item => item.Color).HasMaxLength(120);
+            entity.Property(item => item.Colors).HasDefaultValueSql("'{}'::text[]");
             entity.Property(item => item.Condition).HasMaxLength(120);
             entity.Property(item => item.PhotoSourceKey).HasMaxLength(200);
             entity.Property(item => item.OwnershipType).HasConversion<string>().HasMaxLength(40);

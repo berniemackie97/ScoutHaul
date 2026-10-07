@@ -72,7 +72,8 @@ public sealed class InventoryMergeService(
             store.Remove(duplicate);
         }
 
-        ItemProfiles.ClearInapplicable(kept);
+        // No profile pass here: a merge moves what the records already hold, and an item whose category came in from a
+        // marketplace unrecognised would read as the general profile and lose its size and colors.
         await store.SaveChangesAsync(cancellationToken);
         return (AppResult<MergeInventoryItemsResultDto>.Ok(new MergeInventoryItemsResultDto(kept.Id, duplicates.Count)), dropped);
     }

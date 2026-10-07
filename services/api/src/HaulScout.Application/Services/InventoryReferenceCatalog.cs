@@ -1,4 +1,5 @@
 using HaulScout.Application.Contracts;
+using HaulScout.Domain;
 using System.Globalization;
 
 namespace HaulScout.Application.Services;
@@ -57,18 +58,7 @@ public static class InventoryReferenceCatalog
         Option("For parts", "For parts / not working"),
     ];
 
-    public static readonly InventoryReferenceOptionDto[] Colors =
-    [
-        Option("Black", "Black"), Option("White", "White"), Option("Gray", "Gray"),
-        Option("Silver", "Silver"), Option("Red", "Red"), Option("Orange", "Orange"),
-        Option("Yellow", "Yellow"), Option("Green", "Green"), Option("Blue", "Blue"),
-        Option("Purple", "Purple"), Option("Pink", "Pink"), Option("Brown", "Brown"),
-        Option("Beige", "Beige"), Option("Cream", "Cream"), Option("Navy", "Navy"),
-        Option("Teal", "Teal"), Option("Maroon", "Maroon"), Option("Gold", "Gold"),
-        Option("Rose gold", "Rose gold"), Option("Bronze", "Bronze"), Option("Natural", "Natural"),
-        Option("Multicolor", "Multicolor"), Option("Patterned", "Patterned"),
-        Option("Clear", "Clear"),
-    ];
+    public static readonly InventoryReferenceOptionDto[] Colors = [.. ItemColors.Terms.Select(color => Option(color, color))];
 
     public static readonly InventoryReferenceOptionDto[] SizeSystems =
     [

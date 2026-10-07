@@ -5,18 +5,24 @@ export type AttributeMap = Record<string, string>;
  * Reads the stored attribute JSON, tolerating anything that is not the shape we expect.
  *
  * The value comes back from the API as free-form text, so a null, a legacy string, an array or an
- * object holding numbers all have to degrade to "no attributes" rather than crash the form.
+ * object holding numbers all have to degrade to "no attributes" rather than crash the form. A detail
+ * stored as a list (materials) reads as one line, "Silk, Cotton"; the API reads that line back into
+ * the list on save, so editing it here keeps every entry.
  */
 export function parseAttributes(value?: string | null): AttributeMap {
   if (!value) return {};
   try {
     const parsed = JSON.parse(value) as unknown;
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
-    return Object.fromEntries(
-      Object.entries(parsed as Record<string, unknown>)
-        .filter(([, entry]) => typeof entry === 'string')
-        .map(([key, entry]) => [key, entry as string]),
-    );
+    const attributes: AttributeMap = {};
+    for (const [key, entry] of Object.entries(parsed as Record<string, unknown>)) {
+      if (typeof entry === 'string') attributes[key] = entry;
+      else if (Array.isArray(entry)) {
+        const text = entry.filter((item): item is string => typeof item === 'string').join(', ');
+        if (text) attributes[key] = text;
+      }
+    }
+    return attributes;
   } catch {
     return {};
   }
