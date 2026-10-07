@@ -2667,6 +2667,54 @@
         }
       }
     },
+    "/api/inventory/merge": {
+      "post": {
+        "tags": [
+          "Inventory"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MergeInventoryItemsRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MergeInventoryItemsRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/MergeInventoryItemsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/MergeInventoryItemsResultDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MergeInventoryItemsResultDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MergeInventoryItemsResultDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/listing/generate": {
       "post": {
         "tags": [
@@ -15265,6 +15313,38 @@
               "$ref": "#/components/schemas/MarketplaceSearchLinkDto"
             },
             "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "MergeInventoryItemsRequest": {
+        "type": "object",
+        "properties": {
+          "keepId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "duplicateIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "MergeInventoryItemsResultDto": {
+        "type": "object",
+        "properties": {
+          "keptId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "merged": {
+            "type": "integer",
+            "format": "int32"
           }
         },
         "additionalProperties": false

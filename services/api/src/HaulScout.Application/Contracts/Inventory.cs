@@ -222,6 +222,11 @@ public sealed record SetInventoryLocationRequest(IReadOnlyList<Guid> InventoryIt
 
 public sealed record BulkInventoryUpdateResultDto(int Updated, int NotFound);
 
+/// <summary>Folds duplicate records of one physical item into the record to keep.</summary>
+public sealed record MergeInventoryItemsRequest(Guid KeepId, IReadOnlyList<Guid> DuplicateIds);
+
+public sealed record MergeInventoryItemsResultDto(Guid KeptId, int Merged);
+
 public sealed record AcquisitionLotItemInputDto(
     Guid InventoryItemId,
     decimal? ManualAllocatedCost = null,
