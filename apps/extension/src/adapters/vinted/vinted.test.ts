@@ -211,27 +211,39 @@ describe("scanning Vinted sales", () => {
 
 describe("who is signed in to Vinted", () => {
   const current = { user: { id: 5550001, login: "test_seller" } };
+  const page = (signedIn: boolean) => (url: URL): Answer =>
+    url.pathname === "/my_orders" ? { status: 200, url: url.href, contentType: "text/html", body: vintedPage(signedIn) } : current;
 
-  it("is read from the account Vinted's own pages use", async () => {
-    expect(await vintedAdapter.detectSession(vinted(() => current))).toEqual(seller);
-  });
-
-  it("renews a lapsed sign-in by loading a Vinted page, the way Vinted itself does", async () => {
-    let calls = 0;
-    const context = vinted((url) => url.pathname === "/my_orders"
-      ? { status: 200, url: url.href, contentType: "text/html", body: vintedPage(true) }
-      : ++calls === 1 ? { status: 401, url: url.href, contentType: "application/json", body: "{}" } : current);
+  it("loads a page first, and asks which account only once the page shows a sign-in", async () => {
+    const context = vinted(page(true));
 
     expect(await vintedAdapter.detectSession(context)).toEqual(seller);
     expect(context.opened).toEqual(["https://www.vinted.com/my_orders?order_type=sold"]);
+    expect(context.requested).toEqual(["https://www.vinted.com/api/v2/users/current"]);
   });
 
-  it("is no one when the page Vinted shows is the signed-out one", async () => {
-    const context = vinted((url) => url.pathname === "/my_orders"
-      ? { status: 200, url: url.href, contentType: "text/html", body: vintedPage(false) }
-      : { status: 401, url: url.href, contentType: "application/json", body: "{}" });
+  it("asks Vinted nothing when the page shows no one is signed in", async () => {
+    // A question to the API without a session is what Vinted's bot protection blocks.
+    const context = vinted(page(false));
 
     expect(await vintedAdapter.detectSession(context)).toEqual({ signedIn: false, username: null, marketplaceUserId: null });
+    expect(context.requested).toEqual([]);
+  });
+
+  it("stops at a security check on the page", async () => {
+    const context = vinted((url) => ({ status: 403, url: url.href, contentType: "text/html", body: "<script src=https://geo.captcha-delivery.com/c.js>" }));
+
+    await expect(vintedAdapter.detectSession(context)).rejects.toMatchObject({ kind: "Challenge" });
+    expect(context.requested).toEqual([]);
+  });
+
+  it("is read as signed out from the operator's own tab, without a request", () => {
+    const signedOut: PageResponse = { status: 200, url: "https://www.vinted.com/", contentType: "text/html", body: vintedPage(false) };
+    const signedIn: PageResponse = { ...signedOut, body: vintedPage(true) };
+
+    expect(vintedAdapter.sessionFrom!(signedOut)).toEqual({ signedIn: false, username: null, marketplaceUserId: null });
+    // A signed-in page does not name the account, so that is left to a full check.
+    expect(vintedAdapter.sessionFrom!(signedIn)).toBeNull();
   });
 });
 

@@ -11,7 +11,7 @@ import {
 } from "../types";
 import { toIngestListing, type VintedWardrobe } from "./listings";
 import { saleStamp, saleState, toIngestOrder, type VintedOrderList, type VintedOrderRow, type VintedTransaction } from "./orders";
-import { assertReadable, signedOutPage, siteChanged } from "./pages";
+import { assertReadable, sessionOnPage, signedOutPage, siteChanged } from "./pages";
 
 const origin = "https://www.vinted.com";
 
@@ -124,24 +124,30 @@ export const vintedAdapter: MarketplaceAdapter = {
     return /^\/(my_orders|wallet|inbox)(\/|$)|^\/member\/\d+/i.test(path) ? "seller" : "other";
   },
 
+  /**
+   * A page first, the way a person arrives: it renews a lapsed sign-in and says plainly when there is none. Only a
+   * signed-in browser is then asked which account it is. Vinted's API questioned without a session is exactly the
+   * pattern its bot protection blocks, so a signed-out browser is never asked anything at all.
+   */
   async detectSession(context: MarketplaceContext): Promise<Session> {
-    try {
-      const current = await readJson<{ user?: { id?: number | string | null; login?: string | null } }>(context, "/api/v2/users/current", "account details");
-      const login = current.user?.login?.trim();
-      if (!login) {
-        throw siteChanged("account details");
-      }
-
-      const id = current.user?.id;
-      return { signedIn: true, username: login, marketplaceUserId: id === null || id === undefined ? null : String(id) };
-    } catch (error) {
-      if (error instanceof AdapterError && error.kind === "SignedOut") {
-        return { signedIn: false, username: null, marketplaceUserId: null };
-      }
-
-      throw error;
+    const page = await context.page(ordersPage);
+    assertReadable(page);
+    if (signedOutPage(page)) {
+      return { signedIn: false, username: null, marketplaceUserId: null };
     }
+
+    const current = await readJson<{ user?: { id?: number | string | null; login?: string | null } }>(context, "/api/v2/users/current", "account details");
+    const login = current.user?.login?.trim();
+    if (!login) {
+      throw siteChanged("account details");
+    }
+
+    const id = current.user?.id;
+    return { signedIn: true, username: login, marketplaceUserId: id === null || id === undefined ? null : String(id) };
   },
+
+  // The operator's own Vinted tab says when it is signed out, so that is read for free rather than asked of Vinted.
+  sessionFrom: sessionOnPage,
 
   async scanSales(context: MarketplaceContext, window: SalesWindow): Promise<SalesScan> {
     const now = context.now();
