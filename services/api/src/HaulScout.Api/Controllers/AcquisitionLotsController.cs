@@ -188,9 +188,9 @@ public sealed class AcquisitionLotsController(HaulScoutDbContext db, ICurrentUse
         {
             return Blocked(LotChanged);
         }
-        catch (DbUpdateException exception) when (InAnotherLot(exception))
+        catch (Exception exception) when (LostRaceForLot(exception))
         {
-            // Another save to this lot re-inserting the same item, or another lot taking it: both mean reload.
+            // Another save to this lot re-inserting the same item, another lot taking it, or the two deadlocking: reload.
             return Blocked(ChangedWhileSaving);
         }
     }
@@ -221,13 +221,13 @@ public sealed class AcquisitionLotsController(HaulScoutDbContext db, ICurrentUse
             {
                 return await AddItemsOnce(id, newItems, attach, cancellationToken);
             }
-            catch (DbUpdateException exception) when (attempt < AttemptsToAdd && (exception is DbUpdateConcurrencyException || InAnotherLot(exception)))
+            catch (Exception exception) when (attempt < AttemptsToAdd && LostRaceForLot(exception))
             {
                 // Another save to this lot landed first. Adding is safe to repeat against the lot as it now is; an item
                 // another lot has taken is then refused by name before anything is written.
                 db.ChangeTracker.Clear();
             }
-            catch (DbUpdateException exception) when (exception is DbUpdateConcurrencyException || InAnotherLot(exception))
+            catch (Exception exception) when (LostRaceForLot(exception))
             {
                 return Blocked(ChangedWhileSaving);
             }
@@ -584,6 +584,13 @@ public sealed class AcquisitionLotsController(HaulScoutDbContext db, ICurrentUse
 
     private static bool InAnotherLot(DbUpdateException exception) =>
         exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation, ConstraintName: "IX_AcquisitionLotItems_OrganizationId_InventoryItemId" };
+
+    /// <summary>
+    /// Another save to the lot won — by version, by taking the item first, or by Postgres choosing this session as the
+    /// victim when both rewrote the lot's item rows at once.
+    /// </summary>
+    private static bool LostRaceForLot(Exception exception) =>
+        SaveConflicts.Unwrap(exception) is { } failure && (SaveConflicts.LostRace(failure) || InAnotherLot(failure));
 
     private static Dictionary<Guid, decimal> Allocate(UpsertAcquisitionLotRequest request, IReadOnlyList<InventoryItem> items)
     {
