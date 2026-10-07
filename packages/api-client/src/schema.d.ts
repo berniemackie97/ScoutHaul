@@ -2190,6 +2190,49 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/inventory/merge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["MergeInventoryItemsRequest"];
+                    "text/json": components["schemas"]["MergeInventoryItemsRequest"];
+                    "application/*+json": components["schemas"]["MergeInventoryItemsRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["MergeInventoryItemsResultDto"];
+                        "application/json": components["schemas"]["MergeInventoryItemsResultDto"];
+                        "text/json": components["schemas"]["MergeInventoryItemsResultDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/listing/generate": {
         parameters: {
             query?: never;
@@ -10534,6 +10577,17 @@ export interface components {
         MarketplaceSearchLinksDto: {
             query?: string | null;
             links?: components["schemas"]["MarketplaceSearchLinkDto"][] | null;
+        };
+        MergeInventoryItemsRequest: {
+            /** Format: uuid */
+            keepId?: string;
+            duplicateIds?: string[] | null;
+        };
+        MergeInventoryItemsResultDto: {
+            /** Format: uuid */
+            keptId?: string;
+            /** Format: int32 */
+            merged?: number;
         };
         MergeOrdersRequest: {
             orderIds?: string[] | null;
