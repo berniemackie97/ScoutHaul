@@ -116,6 +116,9 @@ public class StorefrontCatalogTests
         Assert.Equal(InventoryFunctionalStatus.FullyFunctional, detail.Value.FunctionalStatus);
         Assert.Equal(InventoryCompletenessStatus.Complete, detail.Value.CompletenessStatus);
         Assert.Equal(3.2m, detail.Value.Weight);
+        // The admin links to the listing at the address the storefront serves it at.
+        StoreListing record = await db.StoreListings.IgnoreQueryFilters().SingleAsync();
+        Assert.Equal($"/products/{browse.Value!.Items.Single().Slug}", record.ToDto().PublicPath);
     }
 
     [Fact]

@@ -6,6 +6,7 @@ import { ExternalLink, Pencil, Plus, Radio, Trash2, X } from "lucide-react";
 import type { components } from "@overhaul/api-client";
 import { Badge, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, formatCurrency } from "@overhaul/ui";
 import { upsertChannelListing, removeChannelListing, type ListingActionResult } from "./channel-listing-actions";
+import { NativeSelect } from "@/components/native-select";
 
 type Account = components["schemas"]["ChannelAccountDto"];
 type Listing = components["schemas"]["ChannelListingDto"];
@@ -20,7 +21,6 @@ const STATUS_LABELS: Record<(typeof STATUSES)[number], string> = {
   Delisted: "Delisted",
   Error: "Needs review",
 };
-const selectClass = "h-9 rounded-lg border border-input bg-background px-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring";
 
 const statusVariant = (status: string | undefined) => {
   if (status === "Active") return "success" as const;
@@ -102,13 +102,13 @@ function Row({ itemId, account, listing }: { itemId: string; account: Account; l
       {editing && (
         <form action={save} className="mt-3 space-y-2 rounded-lg border p-3">
           <div className="grid grid-cols-2 gap-2">
-            <select value={status} onChange={(event) => setStatus(event.target.value)} className={selectClass} aria-label="Status">
+            <NativeSelect value={status} onChange={(event) => setStatus(event.target.value)} className="h-9" aria-label="Status">
               {STATUSES.map((option) => (
                 <option key={option} value={option}>
                   {STATUS_LABELS[option]}
                 </option>
               ))}
-            </select>
+            </NativeSelect>
             <Input name="listedPrice" type="number" step="0.01" min="0" placeholder="Price" defaultValue={listing?.listedPrice ?? undefined} className="h-9" aria-label="Price" />
           </div>
           <Input name="externalUrl" placeholder="Listing link" defaultValue={listing?.externalUrl ?? undefined} className="h-9" aria-label="Listing link" />

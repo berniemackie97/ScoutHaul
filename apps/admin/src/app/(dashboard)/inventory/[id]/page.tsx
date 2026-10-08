@@ -12,9 +12,10 @@ import { ListingGenerator } from "./listing-generator";
 import { ChannelPresencePanel } from "./cross-list-panel";
 import { RecordSaleCard } from "./record-sale-card";
 import { DeleteInventoryCard } from "./delete-inventory-card";
-import { StorefrontPolicyCard } from "./storefront-policy-card";
+import { StorefrontCard } from "./storefront-card";
 import { StatusConflictNotice } from "./status-conflict-notice";
 import { refusal } from "@/lib/page-access";
+import { getSession, storeUrlFrom } from "@/lib/session";
 import { When } from "@/components/when";
 import { ItemFacts } from "./item-facts";
 import { profileFor } from "@/features/inventory/item-profiles";
@@ -41,6 +42,7 @@ export default async function InventoryDetailPage({
   const prefill = soldOnPlatform
     ? { platform: soldOnPlatform, price: one(query.price), soldOn: one(query.soldAt) }
     : undefined;
+  const storeUrl = storeUrlFrom(await getSession());
   const api = await getApiClient();
   const [
     { data: item },
@@ -107,7 +109,7 @@ export default async function InventoryDetailPage({
         </div>
       </header>
 
-      <ItemFacts item={inventoryItem} sale={sale} listings={channelListings ?? []} />
+      <ItemFacts item={inventoryItem} sale={sale} listings={channelListings ?? []} storeListing={storeListing} />
 
       <StatusConflictNotice conflicts={statusConflicts} />
 
@@ -125,7 +127,7 @@ export default async function InventoryDetailPage({
             listings={channelListings ?? []}
           />
           <PhotoManager id={inventoryItem.id} photos={photos} />
-          <StorefrontPolicyCard itemId={inventoryItem.id} listing={storeListing} />
+          <StorefrontCard itemId={inventoryItem.id} listing={storeListing} storeUrl={storeUrl} />
           <ListingGenerator item={inventoryItem} />
 
           {inventoryItem.isBundle && (inventoryItem.bundleComponents?.length ?? 0) > 0 && (

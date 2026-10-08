@@ -4,11 +4,9 @@ import type { components } from "@overhaul/api-client";
 import { Input, Label, Textarea } from "@overhaul/ui";
 import { Combobox } from "@/components/combobox";
 import { MultiCombobox } from "@/components/multi-combobox";
+import { NativeSelect } from "@/components/native-select";
 
 type ReferenceOption = components["schemas"]["InventoryReferenceOptionDto"];
-
-const selectClass =
-  "h-10 w-full rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50";
 
 function Shell({ label, name, error, children }: { label: string; name: string; error?: string; children: React.ReactNode }) {
   return (
@@ -101,19 +99,18 @@ export function SelectField({ label, name, choices, defaultValue, error, formKey
 }) {
   return (
     <Shell label={label} name={name} error={error}>
-      <select
+      <NativeSelect
         key={`${name}:${formKey ?? "initial"}`}
         id={name}
         name={name}
         defaultValue={defaultValue ?? (includeBlank ? "" : choices[0]?.[0])}
-        className={selectClass}
         aria-invalid={error ? "true" : undefined}
       >
         {includeBlank && <option value="">—</option>}
         {choices.map(([value, text]) => (
           <option key={value} value={value}>{text}</option>
         ))}
-      </select>
+      </NativeSelect>
     </Shell>
   );
 }

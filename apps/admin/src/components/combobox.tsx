@@ -47,6 +47,8 @@ export function Combobox({
     return base.slice(0, 100);
   }, [options, query]);
 
+  // The trigger names the choice the way the list does ("US Letter (S/M/L/XL)"), not by its stored value.
+  const shown = options.find((option) => option.value === value)?.label ?? value;
   const showCustom = allowCustom && query.trim().length > 0 && !options.some((option) => option.label.toLowerCase() === query.trim().toLowerCase());
   const rows = showCustom ? [{ value: query.trim(), label: `Use “${query.trim()}”`, group: "custom" } as ComboOption, ...filtered] : filtered;
 
@@ -65,7 +67,7 @@ export function Combobox({
         onClick={() => { setOpen((prev) => !prev); setActive(0); }}
         className="border-input bg-background focus:ring-ring flex h-10 w-full items-center justify-between gap-2 rounded-lg border px-3 text-left text-sm focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:opacity-50"
       >
-        <span className={value ? "" : "text-muted-foreground"}>{value || placeholder}</span>
+        <span className={`truncate ${value ? "" : "text-muted-foreground"}`}>{shown || placeholder}</span>
         <ChevronsUpDown className="text-muted-foreground h-4 w-4 shrink-0" />
       </button>
 

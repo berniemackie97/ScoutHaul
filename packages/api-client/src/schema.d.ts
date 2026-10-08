@@ -10783,6 +10783,7 @@ export interface components {
             name?: string | null;
             /** Format: date-time */
             createdAt?: string;
+            storeDomain?: string | null;
         };
         OrganizationInviteCodeCreatedDto: {
             invite?: components["schemas"]["OrganizationInviteCodeDto"];
@@ -11997,6 +11998,7 @@ export interface components {
             createdAt?: string;
             /** Format: date-time */
             updatedAt?: string;
+            publicPath?: string | null;
         };
         /** @enum {string} */
         StoreListingStatus: "Draft" | "Active" | "Reserved" | "Sold" | "Archived";

@@ -15936,6 +15936,10 @@
           "createdAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "storeDomain": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -19358,6 +19362,10 @@
           "updatedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "publicPath": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false

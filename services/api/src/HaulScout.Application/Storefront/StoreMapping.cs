@@ -27,7 +27,8 @@ public static class StoreMapping
         listing.ViewCount,
         listing.PublishedAt,
         listing.CreatedAt,
-        listing.UpdatedAt);
+        listing.UpdatedAt,
+        StorefrontCatalogService.ProductPath(listing.Title, listing.Id));
 
     public static StoreCategoryDto ToDto(this StoreCategory category) => new(
         category.Id,

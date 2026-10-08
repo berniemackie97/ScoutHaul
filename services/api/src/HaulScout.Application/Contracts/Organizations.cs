@@ -6,7 +6,8 @@ namespace HaulScout.Application.Contracts;
 
 public sealed record CreateOrganizationRequest(string Name);
 public sealed record AddOrganizationMemberRequest(string Email, string DisplayName, OrganizationRole Role, Guid? RoleId = null);
-public sealed record OrganizationDto(Guid Id, string Name, DateTimeOffset CreatedAt);
+/// <param name="StoreDomain">The organization's public storefront address, when it has one.</param>
+public sealed record OrganizationDto(Guid Id, string Name, DateTimeOffset CreatedAt, string? StoreDomain);
 public sealed record OrganizationMemberDto(Guid Id, Guid UserId, string Email, string DisplayName, OrganizationRole Role, Guid? RoleId, string? RoleName, string InviteStatus, DateTimeOffset JoinedAt);
 public sealed record PermissionCatalogDto(IReadOnlyList<string> Permissions);
 public sealed record UpsertOrganizationRoleRequest(string Name, string? Description, IReadOnlyList<string> Permissions, bool GrantsOwnerAccess);

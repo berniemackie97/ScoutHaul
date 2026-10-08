@@ -7,11 +7,11 @@ import { CircleDollarSign } from "lucide-react";
 import type { components } from "@overhaul/api-client";
 import { Button, Card, CardContent, CardHeader, CardTitle, Input, Label, formatCurrency } from "@overhaul/ui";
 import { recordSaleForItem, type SellResult } from "./sell-actions";
+import { NativeSelect } from "@/components/native-select";
 
 type Channel = components["schemas"]["SaleChannelOptionDto"];
 
 const initial: SellResult = { ok: false, message: "" };
-const selectClass = "h-10 w-full rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring";
 const currency = (value: number) => formatCurrency(value);
 const today = () => new Date(Date.now() - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
 
@@ -91,14 +91,14 @@ export function RecordSaleCard({
         <form action={action} className="space-y-3">
           <div className="space-y-1">
             <Label htmlFor="platform" className="text-xs">Channel</Label>
-            <select id="platform" name="platform" required className={selectClass} defaultValue={prefilledChannel}>
+            <NativeSelect id="platform" name="platform" required defaultValue={prefilledChannel}>
               <option value="">Select channel…</option>
               {[...groups.entries()].map(([group, options]) => (
                 <optgroup key={group} label={group}>
                   {options.map((option) => <option key={option.value} value={option.value ?? ""}>{option.label}</option>)}
                 </optgroup>
               ))}
-            </select>
+            </NativeSelect>
           </div>
           <div className="grid grid-cols-2 gap-2">
             <Money label="Sold price" name="soldPrice" value={soldPrice} onChange={setSoldPrice} />
