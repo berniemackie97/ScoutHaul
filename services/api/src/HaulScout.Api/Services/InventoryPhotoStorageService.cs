@@ -1,7 +1,10 @@
 using Microsoft.AspNetCore.Hosting;
 using HaulScout.Application.Inventory;
 using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats;
 using SixLabors.ImageSharp.Formats.Jpeg;
+using SixLabors.ImageSharp.Formats.Png;
+using SixLabors.ImageSharp.Formats.Webp;
 using SixLabors.ImageSharp.Processing;
 
 namespace HaulScout.Api.Services;
@@ -21,6 +24,13 @@ public sealed class InventoryPhotoStorageService(
         "image/jpeg",
         "image/png",
         "image/webp"
+    };
+
+    // Only the formats accepted above are decoded, whatever the bytes turn out to be: ImageSharp sniffs the real format,
+    // and its TIFF code is where known flaws live (see the suppressions in Directory.Build.props).
+    private static readonly DecoderOptions Decoding = new()
+    {
+        Configuration = new SixLabors.ImageSharp.Configuration(new JpegConfigurationModule(), new PngConfigurationModule(), new WebpConfigurationModule()),
     };
 
     public long MaxBytes => configuration.GetValue("Storage:InventoryPhotos:MaxBytes", 8_000_000);
@@ -51,7 +61,7 @@ public sealed class InventoryPhotoStorageService(
         originalStream.Position = 0;
         try
         {
-            using Image image = await Image.LoadAsync(originalStream, cancellationToken);
+            using Image image = await Image.LoadAsync(Decoding, originalStream, cancellationToken);
             int width = image.Width;
             int height = image.Height;
 
