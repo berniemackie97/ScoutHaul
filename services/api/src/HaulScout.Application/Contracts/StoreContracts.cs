@@ -27,7 +27,8 @@ public sealed record StoreListingDto(
     int ViewCount,
     DateTimeOffset? PublishedAt,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    string PublicPath);
 
 /// <summary>Publishes an existing InventoryItem onto the storefront.</summary>
 public sealed record PublishListingRequest(

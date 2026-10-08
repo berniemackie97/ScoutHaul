@@ -109,6 +109,9 @@ public sealed class StorefrontCatalogService(IStorefrontCatalogStore catalog, II
     // Stable, unique public slug: "{title-slug}-{listingId:N}". The id suffix is the lookup key.
     internal static string BuildSlug(string title, Guid id) => $"{Slugify(title)}-{id:N}";
 
+    /// <summary>Where the storefront shows a listing, relative to the organization's store domain.</summary>
+    public static string ProductPath(string title, Guid listingId) => $"/products/{BuildSlug(title, listingId)}";
+
     internal static bool TryGetSlugId(string slug, out Guid id)
     {
         id = Guid.Empty;

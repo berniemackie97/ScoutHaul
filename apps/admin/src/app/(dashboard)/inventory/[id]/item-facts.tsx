@@ -6,13 +6,16 @@ import { getInventoryCost, getProjectedMetrics, type InventoryItem } from "@/fea
 
 type Sale = components["schemas"]["SaleDto"];
 type Listing = components["schemas"]["ChannelListingDto"];
+type StoreListing = components["schemas"]["StoreListingDto"];
 
 /** The handful of numbers someone opens an item to see, in one row instead of spread over the sidebar. */
-export function ItemFacts({ item, sale, listings }: { item: InventoryItem; sale?: Sale; listings: Listing[] }) {
+export function ItemFacts({ item, sale, listings, storeListing }: { item: InventoryItem; sale?: Sale; listings: Listing[]; storeListing?: StoreListing | null }) {
   const cost = getInventoryCost(item);
   const { profit: projected, roiPercent } = getProjectedMetrics(item);
   const sold = Boolean(item.isSold && sale);
-  const live = listings.filter((listing) => listing.status === "Active").length;
+  // The storefront is one of the places an item is for sale, as the inventory list's channel chips show it.
+  const onStore = storeListing?.status === "Active";
+  const live = listings.filter((listing) => listing.status === "Active").length + (onStore ? 1 : 0);
   const takeDown = listings.filter((listing) => listing.status === "PendingDelist").length;
   const acquired = item.purchasedAt ?? item.createdAt;
   const held = daysHeld(acquired, sold && sale?.soldAt ? Date.parse(sale.soldAt) : undefined);
@@ -54,7 +57,7 @@ export function ItemFacts({ item, sale, listings }: { item: InventoryItem; sale?
     {
       label: "Channels",
       value: live > 0 ? `Listed on ${live}` : sold ? "Sold" : "Not listed",
-      detail: takeDown > 0 ? `${takeDown} still to take down` : `${listings.length} tracked`,
+      detail: takeDown > 0 ? `${takeDown} still to take down` : `${listings.length + (storeListing ? 1 : 0)} tracked`,
       tone: takeDown > 0 ? "warning" : undefined,
     },
   ];

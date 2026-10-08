@@ -207,7 +207,7 @@ public sealed class OrganizationInviteCodeWorkflowService(
         member.RoleDefinition ??= inviteCode.RoleDefinition;
 
         return AppResult<OrganizationJoinResultDto>.Ok(new OrganizationJoinResultDto(
-            new OrganizationDto(inviteCode.Organization.Id, inviteCode.Organization.Name, inviteCode.Organization.CreatedAt),
+            inviteCode.Organization.ToDto(),
             member.ToDto(),
             inviteCode.TeamId));
     }

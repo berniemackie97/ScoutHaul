@@ -17,6 +17,7 @@ import { factsFromInventoryItem, readinessBlockers } from "@/features/inventory/
 import { ReadinessChecklist } from "@/features/inventory/readiness-checklist";
 import type { ItemProfile } from "@/features/inventory/item-profiles";
 import { changeInventoryStatus } from "./actions";
+import { NativeSelect } from "@/components/native-select";
 
 type Sale = components["schemas"]["SaleDto"];
 
@@ -78,8 +79,7 @@ export function StatusControl({ item, sale, profile }: { item: InventoryItem; sa
           </>
         ) : (
           <>
-            <select
-              className="border-input bg-background focus:ring-ring h-10 w-full rounded-lg border px-3 text-sm focus:outline-none focus:ring-2"
+            <NativeSelect
               value={nextStatus}
               disabled={isPending}
               onChange={(event) => setNextStatus(event.target.value as InventoryStatus)}
@@ -90,7 +90,7 @@ export function StatusControl({ item, sale, profile }: { item: InventoryItem; sa
                   {option.label}
                 </option>
               ))}
-            </select>
+            </NativeSelect>
             <ReadinessChecklist targetStatus={nextStatus} facts={readinessFacts} compact />
             {blockedReadyToList && (
               <p className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">

@@ -37,3 +37,9 @@ export function initialsOf(name: string): string {
   const initials = words.slice(0, 2).map((word) => word[0]!.toUpperCase()).join("");
   return initials || "?";
 }
+
+/** The public storefront of the organization in use, or null when it has none. */
+export function storeUrlFrom(session: SessionBootstrap | null): string | null {
+  const domain = session?.organizations?.find((entry) => entry.id === session.selectedOrganizationId)?.storeDomain;
+  return domain ? `https://${domain}` : null;
+}

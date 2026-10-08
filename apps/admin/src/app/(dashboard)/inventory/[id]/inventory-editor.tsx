@@ -15,9 +15,9 @@ type ReferenceData = components["schemas"]["InventoryReferenceDataDto"];
 
 const initialState: InventoryActionResult = { ok: false, message: "" };
 
-function SubmitButton() {
+function SubmitButton({ unchanged }: { unchanged: boolean }) {
   const { pending } = useFormStatus();
-  return <Button type="submit" disabled={pending}>{pending ? "Saving…" : "Save changes"}</Button>;
+  return <Button type="submit" disabled={pending || unchanged}>{pending ? "Saving…" : "Save changes"}</Button>;
 }
 
 export function InventoryEditor({ item, referenceData }: { item: InventoryItem; referenceData: ReferenceData }) {
@@ -182,7 +182,7 @@ export function InventoryEditor({ item, referenceData }: { item: InventoryItem; 
         <p aria-live="polite" className={`text-sm ${dirty ? "font-medium text-amber-700 dark:text-amber-400" : state.message ? (state.ok ? "text-green-700" : "text-destructive") : "text-muted-foreground"}`}>
           {dirty ? "Unsaved changes" : state.message || "All changes saved."}
         </p>
-        <SubmitButton />
+        <SubmitButton unchanged={!dirty} />
       </div>
     </form>
   );
