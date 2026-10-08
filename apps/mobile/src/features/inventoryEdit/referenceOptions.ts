@@ -11,15 +11,15 @@ import type { SelectOption } from '../../components/SelectField';
 export function referenceOptions(
   remote: InventoryReferenceOption[] | undefined,
   fallback: SelectOption[],
-  current?: string,
+  current?: string | readonly string[],
 ): SelectOption[] {
   const options = remote?.map((option) => ({
     value: option.value,
     label: option.label,
     group: option.group ?? undefined,
   })) ?? fallback;
-  if (current && !options.some((option) => option.value === current)) {
-    return [...options, { value: current, label: `${current} (existing value)`, group: 'Existing data' }];
-  }
-  return options;
+  const missing = (typeof current === 'string' ? [current] : (current ?? [])).filter(
+    (value) => value && !options.some((option) => option.value === value),
+  );
+  return [...options, ...missing.map((value) => ({ value, label: `${value} (existing value)`, group: 'Existing data' }))];
 }

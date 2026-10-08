@@ -1,5 +1,5 @@
 import { parseOptionalNumber } from '../../utils/money';
-import type { AttributeMap } from './attributes';
+import { hasAttributeValue, type AttributeMap } from './attributes';
 
 /**
  * How much of each section the operator has filled in.
@@ -34,7 +34,7 @@ export function detailsFilled(fields: {
   sizeValue: string;
   attributes: AttributeMap;
 }): number {
-  const attributeCount = Object.values(fields.attributes).filter(typed).length;
+  const attributeCount = Object.values(fields.attributes).filter(hasAttributeValue).length;
   return [picked(fields.sizeSystem), typed(fields.sizeValue)].filter(Boolean).length + attributeCount;
 }
 

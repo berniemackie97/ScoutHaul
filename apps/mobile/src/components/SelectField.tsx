@@ -111,10 +111,93 @@ export function SelectField({
         visible={open}
         title={label}
         options={options}
-        value={value}
+        isSelected={(option) => option === value}
         searchable={searchable}
-        onSelect={(v) => { onChange(v); setOpen(false); }}
+        onPick={(v) => { onChange(v); setOpen(false); }}
         onClose={() => setOpen(false)}
+      />
+    </>
+  );
+}
+
+type MultiSelectFieldProps = {
+  label: string;
+  values: readonly string[];
+  options: SelectOption[];
+  /** How many may be picked; once reached, the rest wait until one is removed. */
+  max: number;
+  onChange: (values: string[]) => void;
+  placeholder?: string;
+  searchable?: boolean;
+  containerStyle?: ViewStyle;
+};
+
+/** Several picks from one list, up to `max` — colors, materials. Shown as one line; picked in a checklist. */
+export function MultiSelectField({
+  label,
+  values,
+  options,
+  max,
+  onChange,
+  placeholder = 'Select...',
+  searchable = false,
+  containerStyle,
+}: MultiSelectFieldProps) {
+  const { colors: c } = useAppTheme();
+  const [open, setOpen] = useState(false);
+  const summary = values.map((value) => options.find((option) => option.value === value)?.label ?? value).join(', ');
+
+  function toggle(value: string) {
+    if (values.includes(value)) onChange(values.filter((entry) => entry !== value));
+    else if (values.length < max) onChange([...values, value]);
+  }
+
+  return (
+    <>
+      <View style={[styles.field, containerStyle]}>
+        <View style={styles.labelRow}>
+          <Text variant="caption" color={c.textSecondary}>
+            {max > 1 ? `${label} (up to ${max})` : label}
+          </Text>
+        </View>
+        <Pressable
+          onPress={() => setOpen(true)}
+          accessibilityRole="button"
+          accessibilityLabel={`${label}: ${summary || 'none selected'}`}
+          style={[styles.trigger, { borderColor: c.border, backgroundColor: c.surface }]}
+        >
+          <Text variant="body" color={summary ? c.text : c.textMuted} numberOfLines={1} style={styles.selectedText}>
+            {summary || placeholder}
+          </Text>
+          <View style={styles.triggerRight}>
+            {values.length > 0 ? (
+              <Pressable
+                onPress={(e) => {
+                  e.stopPropagation();
+                  onChange([]);
+                }}
+                hitSlop={8}
+                style={styles.clearBtn}
+                accessibilityLabel={`Clear ${label}`}
+              >
+                <Ionicons name="close-circle" size={18} color={c.textMuted} />
+              </Pressable>
+            ) : null}
+            <Ionicons name="chevron-down" size={16} color={c.textMuted} />
+          </View>
+        </Pressable>
+      </View>
+
+      <SelectModal
+        visible={open}
+        title={label}
+        options={options}
+        isSelected={(option) => values.includes(option)}
+        isAvailable={(option) => values.includes(option) || values.length < max}
+        searchable={searchable}
+        onPick={toggle}
+        onClose={() => setOpen(false)}
+        multiple
       />
     </>
   );
@@ -124,18 +207,24 @@ function SelectModal({
   visible,
   title,
   options,
-  value,
+  isSelected,
+  isAvailable = () => true,
   searchable,
-  onSelect,
+  onPick,
   onClose,
+  multiple = false,
 }: {
   visible: boolean;
   title: string;
   options: SelectOption[];
-  value: string;
+  isSelected: (value: string) => boolean;
+  /** False for an option that cannot be picked right now, such as one past a multi-pick's limit. */
+  isAvailable?: (value: string) => boolean;
   searchable: boolean;
-  onSelect: (value: string) => void;
+  onPick: (value: string) => void;
   onClose: () => void;
+  /** Picks toggle and the sheet stays open until Done, instead of closing on the first pick. */
+  multiple?: boolean;
 }) {
   const { colors: c } = useAppTheme();
   const insets = useSafeAreaInsets();
@@ -153,9 +242,9 @@ function SelectModal({
 
   const handleSelect = useCallback((optionValue: string) => {
     haptics.selection();
-    onSelect(optionValue);
-    setSearch('');
-  }, [onSelect]);
+    onPick(optionValue);
+    if (!multiple) setSearch('');
+  }, [onPick, multiple, haptics]);
 
   const handleClose = useCallback(() => {
     setSearch('');
@@ -172,8 +261,12 @@ function SelectModal({
       <View style={[styles.modal, { backgroundColor: c.background }]}>
         <View style={[styles.modalHeader, { borderBottomColor: c.borderLight }]}>
           <Text variant="subtitle">{title}</Text>
-          <Pressable onPress={handleClose} hitSlop={8} accessibilityLabel="Close">
-            <Ionicons name="close" size={24} color={c.textSecondary} />
+          <Pressable onPress={handleClose} hitSlop={8} accessibilityLabel={multiple ? 'Done' : 'Close'}>
+            {multiple ? (
+              <Text variant="bodyBold" color={c.primary}>Done</Text>
+            ) : (
+              <Ionicons name="close" size={24} color={c.textSecondary} />
+            )}
           </Pressable>
         </View>
 
@@ -207,25 +300,27 @@ function SelectModal({
             }
 
             const opt = item.option;
-            const isSelected = opt.value === value;
+            const selected = isSelected(opt.value);
+            const available = isAvailable(opt.value);
 
             return (
               <Pressable
                 onPress={() => handleSelect(opt.value)}
+                disabled={!available}
                 style={({ pressed }) => [
                   styles.optionRow,
-                  { backgroundColor: isSelected ? c.primaryLight : pressed ? c.surfaceAlt : c.surface },
+                  { backgroundColor: selected ? c.primaryLight : pressed ? c.surfaceAlt : c.surface, opacity: available ? 1 : 0.4 },
                 ]}
-                accessibilityRole="radio"
-                accessibilityState={{ selected: isSelected }}
+                accessibilityRole={multiple ? 'checkbox' : 'radio'}
+                accessibilityState={multiple ? { checked: selected, disabled: !available } : { selected }}
               >
                 {opt.icon ? (
                   <View style={[styles.optionIcon, { backgroundColor: c.surfaceAlt }]}>
-                    <Ionicons name={opt.icon} size={18} color={isSelected ? c.primary : c.textSecondary} />
+                    <Ionicons name={opt.icon} size={18} color={selected ? c.primary : c.textSecondary} />
                   </View>
                 ) : null}
                 <View style={styles.optionContent}>
-                  <Text variant="bodyBold" color={isSelected ? c.primary : c.text}>
+                  <Text variant="bodyBold" color={selected ? c.primary : c.text}>
                     {opt.label}
                   </Text>
                   {opt.description ? (
@@ -234,10 +329,10 @@ function SelectModal({
                     </Text>
                   ) : null}
                 </View>
-                {isSelected ? (
-                  <Ionicons name="checkmark-circle" size={22} color={c.primary} />
+                {selected ? (
+                  <Ionicons name={multiple ? 'checkbox' : 'checkmark-circle'} size={22} color={c.primary} />
                 ) : (
-                  <View style={[styles.radioOuter, { borderColor: c.border }]} />
+                  <View style={[multiple ? styles.checkboxOuter : styles.radioOuter, { borderColor: c.border }]} />
                 )}
               </Pressable>
             );
@@ -363,6 +458,12 @@ const styles = StyleSheet.create({
     width: 22,
     height: 22,
     borderRadius: 11,
+    borderWidth: 2,
+  },
+  checkboxOuter: {
+    width: 20,
+    height: 20,
+    borderRadius: 5,
     borderWidth: 2,
   },
 });

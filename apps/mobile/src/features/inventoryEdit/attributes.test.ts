@@ -24,8 +24,8 @@ describe('parseAttributes', () => {
     expect(parseAttributes('{"a":"keep","b":42,"c":null,"d":{"nested":true}}')).toEqual({ a: 'keep' });
   });
 
-  it('reads a stored list as one line, so saving it back keeps every entry', () => {
-    expect(parseAttributes('{"material":["Silk","Cotton"],"empty":[]}')).toEqual({ material: 'Silk, Cotton' });
+  it('reads a stored list as a list and drops an empty one', () => {
+    expect(parseAttributes('{"material":["Silk","Cotton",3],"empty":[]}')).toEqual({ material: ['Silk', 'Cotton'] });
   });
 });
 
@@ -54,5 +54,13 @@ describe('serializeAttributes', () => {
   it('survives a round trip', () => {
     const original = { material: 'leather', era: '1970s' };
     expect(parseAttributes(serializeAttributes(original))).toEqual(original);
+  });
+});
+
+describe('serializeAttributes with lists', () => {
+  it('keeps a list as a list and drops an empty one', () => {
+    expect(serializeAttributes({ material: ['Silk', 'Cotton'], lining: [], department: ' Women ' })).toBe(
+      '{"material":["Silk","Cotton"],"department":"Women"}',
+    );
   });
 });

@@ -28,7 +28,38 @@ export type InventoryReferenceOption = {
   isLegacy?: boolean;
 };
 
+/** The optional fields an item profile switches on; title, category, condition, brand, money and shipping always apply. */
+export type ItemField =
+  | 'Model'
+  | 'Color'
+  | 'Size'
+  | 'FunctionalStatus'
+  | 'CompletenessStatus'
+  | 'AuthenticityStatus'
+  | 'PackagingStatus'
+  | 'ManufacturerPartNumber'
+  | 'SerialNumber'
+  | 'ManufactureYear'
+  | 'CountryOfOrigin';
+
+export type ItemFieldSpec = { field: ItemField; label: string; readiness: 'Optional' | 'Recommended' | 'Required' };
+
+/** A detail kept in the item's attributes: free text, one pick from `options`, or up to `maxValues` of them. */
+export type ItemAttribute = { key: string; label: string; options?: string[] | null; maxValues: number };
+
+/** Which fields a kind of item has and what they are called — the table the API enforces on save. */
+export type ItemProfile = {
+  key: string;
+  label: string;
+  categories: string[];
+  fields: ItemFieldSpec[];
+  attributes: ItemAttribute[];
+  sizeSystems: string[];
+  brandLabel: string;
+};
+
 export type InventoryReferenceData = {
+  profiles: ItemProfile[];
   categories: InventoryReferenceOption[];
   brands: InventoryReferenceOption[];
   models: InventoryReferenceOption[];

@@ -4,14 +4,14 @@ import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 import { api } from '../../src/api';
-import type { InventoryReferenceData } from '../../src/api/inventory';
+import type { InventoryReferenceData, ItemField } from '../../src/api/inventory';
 import { Button } from '../../src/components/Button';
 import { ErrorBanner } from '../../src/components/ErrorBanner';
 import { QueuedBanner } from '../../src/components/QueuedBanner';
 import { ExpandableSection } from '../../src/components/ExpandableSection';
 import { LoadingState } from '../../src/components/LoadingState';
 import { Screen } from '../../src/components/Screen';
-import { SelectField } from '../../src/components/SelectField';
+import { MultiSelectField, SelectField } from '../../src/components/SelectField';
 import { StatusPill } from '../../src/components/StatusPill';
 import { Text } from '../../src/components/Text';
 import { TextField } from '../../src/components/TextField';
@@ -23,7 +23,6 @@ import { isWorthQueueing } from '../../src/services/offlineWrites';
 import { savePhoto } from '../../src/utils/photos';
 import { takeIdentifyHandoff } from '../../src/features/scanner/identifyHandoff';
 import {
-  categoryAttributeFields,
   authenticityStatusOptions,
   categoryOptions,
   colorOptions,
@@ -60,6 +59,7 @@ import { PhotoManager, type LocalPhoto } from '../../src/features/inventoryEdit/
 import { parseAttributes, serializeAttributes, type AttributeMap } from '../../src/features/inventoryEdit/attributes';
 import { parseOptionalValidatedNumber } from '../../src/features/inventoryEdit/validation';
 import { referenceOptions } from '../../src/features/inventoryEdit/referenceOptions';
+import { fieldSpec, isListAttribute, profileFor } from '../../src/features/inventoryEdit/itemProfiles';
 import {
   damageFilled as countDamageFilled,
   detailsFilled as countDetailsFilled,
@@ -72,6 +72,9 @@ import {
 
 
 
+
+/** The API keeps two colors, as Poshmark, Depop and Vinted take; beyond that an item is Multicolor or Patterned. */
+const MAX_COLORS = 2;
 
 export default function EditInventoryScreen() {
   const { colors: c } = useAppTheme();
@@ -102,8 +105,7 @@ export default function EditInventoryScreen() {
   const [category, setCategory] = useState(params.category ?? '');
   const [brand, setBrand] = useState(params.brand ?? '');
   const [model, setModel] = useState(params.model ?? '');
-  const [color, setColor] = useState(params.color ?? '');
-  const [secondColor, setSecondColor] = useState('');
+  const [colors, setColors] = useState<string[]>(params.color ? [params.color] : []);
   const [sizeSystem, setSizeSystem] = useState('');
   const [sizeValue, setSizeValue] = useState('');
   const [attributes, setAttributes] = useState<AttributeMap>({});
@@ -147,20 +149,25 @@ export default function EditInventoryScreen() {
   // unsaved edits and any fields applied from the scanner handoff).
   const hasLoadedRef = useRef(false);
 
-  // Dynamic category attribute fields
-  const categoryFields = useMemo(
-    () => categoryAttributeFields[category] ?? [],
-    [category],
-  );
+  // The API's profile for this kind of item decides which fields exist. Until the profiles arrive (offline), every field
+  // shows rather than hiding ones this item may have.
+  const profile = useMemo(() => (referenceData ? profileFor(referenceData.profiles, category) : null), [referenceData, category]);
+  const shows = (field: ItemField) => profile === null || fieldSpec(profile, field) !== undefined;
+  const labelFor = (field: ItemField, fallback: string) => (profile ? fieldSpec(profile, field)?.label : undefined) ?? fallback;
+  const profileAttributes = profile?.attributes ?? [];
 
   const controlledCategories = useMemo(() => referenceOptions(referenceData?.categories, categoryOptions, category), [referenceData, category]);
   const controlledConditions = useMemo(() => referenceOptions(referenceData?.conditions, conditionOptions, condition), [referenceData, condition]);
-  const controlledColors = useMemo(() => referenceOptions(referenceData?.colors, colorOptions, color), [referenceData, color]);
-  const controlledSecondColors = useMemo(
-    () => referenceOptions(referenceData?.colors, colorOptions, secondColor).filter((option) => option.value !== color),
-    [referenceData, color, secondColor],
+  const controlledColors = useMemo(() => referenceOptions(referenceData?.colors, colorOptions, colors), [referenceData, colors]);
+  const controlledSizeSystems = useMemo(
+    () =>
+      referenceOptions(
+        referenceData?.sizeSystems.filter((option) => !profile || profile.sizeSystems.includes(option.value)),
+        sizeSystemOptions,
+        sizeSystem,
+      ),
+    [referenceData, profile, sizeSystem],
   );
-  const controlledSizeSystems = useMemo(() => referenceOptions(referenceData?.sizeSystems, sizeSystemOptions, sizeSystem), [referenceData, sizeSystem]);
   const controlledBrands = useMemo(() => referenceOptions(referenceData?.brands, [], brand), [referenceData, brand]);
   const controlledModels = useMemo(
     () => referenceOptions(referenceData?.models.filter((option) => !option.parentValue || !brand || option.parentValue === brand), [], model),
@@ -205,7 +212,7 @@ export default function EditInventoryScreen() {
     [sizeSystem, sizeValue, attributes],
   );
 
-  const detailsTotal = useMemo(() => 2 + categoryFields.length, [categoryFields]);
+  const detailsTotal = (shows('Size') ? 2 : 0) + profileAttributes.length;
 
   const physicalFilled = useMemo(
     () => countPhysicalFilled({
@@ -224,6 +231,7 @@ export default function EditInventoryScreen() {
   );
 
   const readinessFacts = useMemo(() => ({
+    profile,
     title,
     description,
     category,
@@ -235,9 +243,20 @@ export default function EditInventoryScreen() {
     testingNotes,
     estimatedSalePrice,
     photoCount: photos.length,
-  }), [title, description, category, condition, functionalStatus, completenessStatus, authenticityStatus, packagingStatus, testingNotes, estimatedSalePrice, photos.length]);
+  }), [title, description, category, condition, functionalStatus, completenessStatus, authenticityStatus, packagingStatus, testingNotes, estimatedSalePrice, photos.length, profile]);
   const readinessBlockingItems = useMemo(() => readinessBlockers(status, readinessFacts), [status, readinessFacts]);
   const blockedReadyToList = (status === 'ReadyToList' || status === 'Listed') && readinessBlockingItems.length > 0;
+
+  const conditionControls = (
+    [
+      { field: 'FunctionalStatus', fallback: 'Working condition', value: functionalStatus, options: functionalStatusOptions, answered: functionalStatus !== 'Unknown', onChange: (value: string) => setFunctionalStatus(value as InventoryFunctionalStatus) },
+      { field: 'CompletenessStatus', fallback: 'Completeness', value: completenessStatus, options: completenessStatusOptions, answered: completenessStatus !== 'Unknown', onChange: (value: string) => setCompletenessStatus(value as InventoryCompletenessStatus) },
+      { field: 'AuthenticityStatus', fallback: 'Authenticity', value: authenticityStatus, options: authenticityStatusOptions, answered: authenticityStatus !== 'NotAssessed', onChange: (value: string) => setAuthenticityStatus(value as InventoryAuthenticityStatus) },
+      { field: 'PackagingStatus', fallback: 'Packaging', value: packagingStatus, options: packagingStatusOptions, answered: packagingStatus !== 'NotApplicable', onChange: (value: string) => setPackagingStatus(value as InventoryPackagingStatus) },
+    ] as const
+  )
+    .filter((control) => shows(control.field))
+    .map((control) => ({ ...control, label: labelFor(control.field, control.fallback) }));
 
   const damageFilled = useMemo(
     () => countDamageFilled({ damageType, damageSeverity, damageNote }),
@@ -283,7 +302,7 @@ export default function EditInventoryScreen() {
       setBrand(apply(h.brand));
       setModel(apply(h.model));
       setCategory(apply(h.category));
-      setColor(apply(h.color));
+      setColors((current) => (h.color && (overwrite || current.length === 0) ? [h.color] : current));
       setCondition(apply(h.condition));
       setBarcode(apply(h.barcode));
       setEstimatedSalePrice(apply(h.estimatedSalePrice));
@@ -306,8 +325,7 @@ export default function EditInventoryScreen() {
       setCategory(item.category ?? '');
       setBrand(item.brand ?? '');
       setModel(item.model ?? '');
-      setColor(item.colors?.[0] ?? '');
-      setSecondColor(item.colors?.[1] ?? '');
+      setColors(item.colors ?? []);
       setSizeSystem(item.sizeSystem ?? '');
       setSizeValue(item.sizeValue ?? '');
       setAttributes(parseAttributes(item.attributesJson));
@@ -436,8 +454,7 @@ export default function EditInventoryScreen() {
     if (serialNumber.trim()) facts.push(`Serial number: ${serialNumber.trim()}`);
     if (barcode.trim()) facts.push(`Barcode / GTIN: ${barcode.trim()}`);
     if (category) facts.push(`Category: ${category}`);
-    const itemColors = [color, secondColor].filter(Boolean);
-    if (itemColors.length > 0) facts.push(`Color: ${itemColors.join(', ')}`);
+    if (colors.length > 0) facts.push(`Color: ${colors.join(', ')}`);
     if (condition) facts.push(`Condition: ${condition}`);
     if (countryOfOrigin) facts.push(`Country of origin: ${countryOfOrigin}`);
     if (manufactureYear.trim()) facts.push(`Manufacture year: ${manufactureYear.trim()}`);
@@ -491,7 +508,7 @@ export default function EditInventoryScreen() {
       category: category || null,
       brand: brand || null,
       model: model || null,
-      colors: [...new Set([color, secondColor].filter(Boolean))],
+      colors,
       condition: condition || null,
       sizeSystem: sizeSystem || null,
       sizeValue: sizeValue || null,
@@ -762,26 +779,22 @@ export default function EditInventoryScreen() {
           searchable
         />
         <View style={styles.row}>
-          <SelectField label="Brand" value={brand} options={controlledBrands} onChange={(value) => { setBrand(value); setModel(''); }} placeholder="Select approved brand..." searchable containerStyle={styles.flex} />
-          <SelectField label="Model" value={model} options={controlledModels} onChange={setModel} placeholder="Select approved model..." searchable containerStyle={styles.flex} />
-        </View>
-        <View style={styles.row}>
           <SelectField
-            label="Color"
-            value={color}
-            options={controlledColors}
-            onChange={(value) => {
-              setColor(value);
-              if (!value) setSecondColor('');
-            }}
-            placeholder="Select color..."
+            label={profile?.brandLabel ?? 'Brand'}
+            value={brand}
+            options={controlledBrands}
+            onChange={(value) => { setBrand(value); setModel(''); }}
+            placeholder="Select or search..."
             searchable
             containerStyle={styles.flex}
           />
-          {color ? (
-            <SelectField label="Second color" value={secondColor} options={controlledSecondColors} onChange={setSecondColor} placeholder="Optional" searchable containerStyle={styles.flex} />
+          {shows('Model') ? (
+            <SelectField label={labelFor('Model', 'Model')} value={model} options={controlledModels} onChange={setModel} placeholder="Select or search..." searchable containerStyle={styles.flex} />
           ) : null}
         </View>
+        {shows('Color') ? (
+          <MultiSelectField label="Colors" values={colors} options={controlledColors} max={MAX_COLORS} onChange={setColors} placeholder="Select colors..." searchable />
+        ) : null}
         <SelectField
           label="Condition"
           value={condition}
@@ -792,46 +805,18 @@ export default function EditInventoryScreen() {
         />
       </ExpandableSection>
 
-      <ExpandableSection
-        title="Condition controls"
-        icon="shield-checkmark-outline"
-        filledCount={[
-          functionalStatus !== 'Unknown',
-          completenessStatus !== 'Unknown',
-          authenticityStatus !== 'NotAssessed',
-          packagingStatus !== 'NotApplicable',
-        ].filter(Boolean).length}
-        totalCount={4}
-      >
-        <SelectField
-          label="Functional / tested state"
-          value={functionalStatus}
-          options={functionalStatusOptions}
-          onChange={(value) => setFunctionalStatus(value as InventoryFunctionalStatus)}
-          clearable={false}
-        />
-        <SelectField
-          label="Completeness"
-          value={completenessStatus}
-          options={completenessStatusOptions}
-          onChange={(value) => setCompletenessStatus(value as InventoryCompletenessStatus)}
-          clearable={false}
-        />
-        <SelectField
-          label="Authenticity"
-          value={authenticityStatus}
-          options={authenticityStatusOptions}
-          onChange={(value) => setAuthenticityStatus(value as InventoryAuthenticityStatus)}
-          clearable={false}
-        />
-        <SelectField
-          label="Packaging / CIB state"
-          value={packagingStatus}
-          options={packagingStatusOptions}
-          onChange={(value) => setPackagingStatus(value as InventoryPackagingStatus)}
-          clearable={false}
-        />
-      </ExpandableSection>
+      {conditionControls.length > 0 ? (
+        <ExpandableSection
+          title="Condition controls"
+          icon="shield-checkmark-outline"
+          filledCount={conditionControls.filter((control) => control.answered).length}
+          totalCount={conditionControls.length}
+        >
+          {conditionControls.map((control) => (
+            <SelectField key={control.field} label={control.label} value={control.value} options={control.options} onChange={control.onChange} clearable={false} />
+          ))}
+        </ExpandableSection>
+      ) : null}
 
       {/* ── Identifiers & Physical Data — collapsed ── */}
       <ExpandableSection
@@ -847,41 +832,53 @@ export default function EditInventoryScreen() {
           keyboardType="number-pad"
           placeholder="UPC, EAN, ISBN"
         />
-        <View style={styles.row}>
-          <TextField
-            label="Manufacturer part #"
-            value={manufacturerPartNumber}
-            onChangeText={setManufacturerPartNumber}
-            placeholder="MPN, style code, part number"
-            containerStyle={styles.flex}
-          />
-          <TextField
-            label="Serial number"
-            value={serialNumber}
-            onChangeText={setSerialNumber}
-            placeholder="Serial, IMEI, service tag"
-            containerStyle={styles.flex}
-          />
-        </View>
-        <View style={styles.row}>
-          <SelectField
-            label="Country of origin"
-            value={countryOfOrigin}
-            options={controlledCountries}
-            onChange={setCountryOfOrigin}
-            placeholder="Search countries..."
-            searchable
-            containerStyle={styles.flex}
-          />
-          <TextField
-            label="Manufacture year"
-            value={manufactureYear}
-            onChangeText={setManufactureYear}
-            keyboardType="number-pad"
-            placeholder="YYYY"
-            containerStyle={styles.flex}
-          />
-        </View>
+        {shows('ManufacturerPartNumber') || shows('SerialNumber') ? (
+          <View style={styles.row}>
+            {shows('ManufacturerPartNumber') ? (
+              <TextField
+                label={labelFor('ManufacturerPartNumber', 'Manufacturer part #')}
+                value={manufacturerPartNumber}
+                onChangeText={setManufacturerPartNumber}
+                placeholder="MPN, style code, part number"
+                containerStyle={styles.flex}
+              />
+            ) : null}
+            {shows('SerialNumber') ? (
+              <TextField
+                label={labelFor('SerialNumber', 'Serial number')}
+                value={serialNumber}
+                onChangeText={setSerialNumber}
+                placeholder="Serial, IMEI, service tag"
+                containerStyle={styles.flex}
+              />
+            ) : null}
+          </View>
+        ) : null}
+        {shows('CountryOfOrigin') || shows('ManufactureYear') ? (
+          <View style={styles.row}>
+            {shows('CountryOfOrigin') ? (
+              <SelectField
+                label={labelFor('CountryOfOrigin', 'Country of origin')}
+                value={countryOfOrigin}
+                options={controlledCountries}
+                onChange={setCountryOfOrigin}
+                placeholder="Search countries..."
+                searchable
+                containerStyle={styles.flex}
+              />
+            ) : null}
+            {shows('ManufactureYear') ? (
+              <TextField
+                label={labelFor('ManufactureYear', 'Manufacture year')}
+                value={manufactureYear}
+                onChangeText={setManufactureYear}
+                keyboardType="number-pad"
+                placeholder="YYYY"
+                containerStyle={styles.flex}
+              />
+            ) : null}
+          </View>
+        ) : null}
         <View style={styles.row}>
           <TextField
             label="Length"
@@ -935,73 +932,62 @@ export default function EditInventoryScreen() {
         </View>
       </ExpandableSection>
 
-      {/* ── Size & Category Details — collapsed ── */}
-      <ExpandableSection
-        title="Size & category details"
-        icon="resize-outline"
-        filledCount={detailsFilled}
-        totalCount={detailsTotal}
-      >
-        <SelectField
-          label="Size system"
-          value={sizeSystem}
-          options={controlledSizeSystems}
-          onChange={(value) => { setSizeSystem(value); setSizeValue(''); }}
-          placeholder="Select sizing..."
-        />
-        {sizeSystem ? (
-          <SelectField
-            label="Size value"
-            value={sizeValue}
-            options={controlledSizes}
-            onChange={setSizeValue}
-            placeholder="Select size..."
-            searchable
-          />
-        ) : null}
-
-        {/* Dynamic category attribute fields */}
-        {categoryFields.length > 0 ? (
-          <View style={styles.dynamicSection}>
-            <View style={styles.dynamicHeader}>
-              <View style={[styles.dynamicBadge, { backgroundColor: c.primaryLight }]}>
-                <Ionicons name="layers-outline" size={14} color={c.primary} />
-              </View>
-              <Text variant="bodyBold" color={c.primary}>
-                {category} Details
-              </Text>
-            </View>
-            {categoryFields.map((field) =>
-              field.type === 'select' && field.options ? (
+      {/* ── Size & details — what this kind of item has ── */}
+      {detailsTotal > 0 ? (
+        <ExpandableSection
+          title={profile && profile.key !== 'general' ? `${profile.label} details` : 'Size & details'}
+          icon="resize-outline"
+          filledCount={detailsFilled}
+          totalCount={detailsTotal}
+        >
+          {shows('Size') ? (
+            <>
+              <SelectField
+                label="Size system"
+                value={sizeSystem}
+                options={controlledSizeSystems}
+                onChange={(value) => { setSizeSystem(value); setSizeValue(''); }}
+                placeholder="Select sizing..."
+              />
+              {sizeSystem ? (
                 <SelectField
-                  key={field.key}
-                  label={field.label}
-                  value={attributes[field.key] ?? ''}
-                  options={field.options}
-                  onChange={(v) => setAttributes((curr) => ({ ...curr, [field.key]: v }))}
-                  placeholder={field.placeholder}
+                  label="Size"
+                  value={sizeValue}
+                  options={controlledSizes}
+                  onChange={setSizeValue}
+                  placeholder="Select size..."
+                  searchable
                 />
-              ) : (
-                <TextField
-                  key={field.key}
-                  label={field.label}
-                  value={attributes[field.key] ?? ''}
-                  onChangeText={(v) => setAttributes((curr) => ({ ...curr, [field.key]: v }))}
-                  placeholder={field.placeholder}
-                  multiline={field.multiline}
+              ) : null}
+            </>
+          ) : null}
+          {profileAttributes.map((attribute) => {
+            const stored = attributes[attribute.key];
+            const setAttribute = (value: string | string[]) => setAttributes((current) => ({ ...current, [attribute.key]: value }));
+            const choices = (attribute.options ?? []).map((option) => ({ value: option, label: option }));
+            if (isListAttribute(attribute)) {
+              const values = Array.isArray(stored) ? stored : stored ? [stored] : [];
+              return (
+                <MultiSelectField
+                  key={attribute.key}
+                  label={attribute.label}
+                  values={values}
+                  options={referenceOptions(undefined, choices, values)}
+                  max={attribute.maxValues}
+                  onChange={setAttribute}
+                  searchable
                 />
-              ),
-            )}
-          </View>
-        ) : category ? (
-          <View style={[styles.noCategoryFields, { backgroundColor: c.surfaceAlt }]}>
-            <Ionicons name="information-circle-outline" size={16} color={c.textMuted} />
-            <Text variant="caption" color={c.textMuted}>
-              No additional fields for {category}.
-            </Text>
-          </View>
-        ) : null}
-      </ExpandableSection>
+              );
+            }
+            const value = Array.isArray(stored) ? (stored[0] ?? '') : (stored ?? '');
+            return choices.length > 0 ? (
+              <SelectField key={attribute.key} label={attribute.label} value={value} options={referenceOptions(undefined, choices, value)} onChange={setAttribute} searchable={choices.length > 8} />
+            ) : (
+              <TextField key={attribute.key} label={attribute.label} value={value} onChangeText={setAttribute} />
+            );
+          })}
+        </ExpandableSection>
+      ) : null}
 
       {/* ── Pricing — collapsed, shows margin ── */}
       <ExpandableSection
@@ -1197,30 +1183,6 @@ const styles = StyleSheet.create({
   // Photo section
 
   // Dynamic category fields
-  dynamicSection: {
-    gap: spacing.md,
-  },
-  dynamicHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    paddingTop: spacing.xs,
-  },
-  dynamicBadge: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  noCategoryFields: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    padding: spacing.md,
-    borderRadius: radius.sm,
-  },
-
   // Margin bar
   marginBar: {
     flexDirection: 'row',
