@@ -50,6 +50,28 @@ public sealed class InventoryPhotoStorageServiceTests
         Assert.True(result.ThumbnailByteSize > 0);
     }
 
+    [Fact]
+    public async Task A_TIFF_is_refused_even_when_it_claims_to_be_a_JPEG()
+    {
+        InventoryPhotoStorageService service = new(
+            new TestWebHostEnvironment(),
+            new ConfigurationBuilder().Build(),
+            NullLogger<InventoryPhotoStorageService>.Instance);
+        byte[] tiffBytes;
+        using (Image<Rgba32> image = new(2, 2, Color.Red))
+        {
+            await using MemoryStream tiffStream = new();
+            await image.SaveAsTiffAsync(tiffStream);
+            tiffBytes = tiffStream.ToArray();
+        }
+
+        await using MemoryStream stream = new(tiffBytes);
+        PhotoUpload upload = new(stream, "item.jpg", "image/jpeg", tiffBytes.Length);
+
+        InvalidOperationException refused = await Assert.ThrowsAsync<InvalidOperationException>(() => service.ProcessAsync(upload, CancellationToken.None));
+        Assert.Contains("could not be decoded", refused.Message);
+    }
+
     private sealed class TestWebHostEnvironment : IWebHostEnvironment
     {
         public string ApplicationName { get; set; } = "HaulScout.Tests";
