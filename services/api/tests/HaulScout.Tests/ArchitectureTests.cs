@@ -30,7 +30,6 @@ public class ArchitectureTests
         "ChannelListingsController",
         "CustomersController",
         "ListingsController",
-        "MarketAnalysisController",
         "MarketObservationsController",
         "PlatformListingsController",
         "ProductIdentitiesController",

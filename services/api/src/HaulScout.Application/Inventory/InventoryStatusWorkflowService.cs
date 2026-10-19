@@ -69,6 +69,28 @@ public sealed class InventoryStatusWorkflowService(
         return AppResult<InventoryItemDto>.Ok(item.ToDto());
     }
 
+    /// <summary>Sets what the item is expected to sell for, without touching anything else on it.</summary>
+    public async Task<AppResult<InventoryItemDto>> SetExpectedPriceAsync(
+        Guid id,
+        SetExpectedPriceRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (request.EstimatedSalePrice is < 0 or > 1_000_000)
+        {
+            return AppResult<InventoryItemDto>.Validation("Give a price between $0 and $1,000,000.");
+        }
+
+        InventoryItem? item = await inventory.FindDetailAsync(currentUser.OrganizationId, id, cancellationToken);
+        if (item is null)
+        {
+            return AppResult<InventoryItemDto>.NotFound();
+        }
+
+        item.EstimatedSalePrice = decimal.Round(request.EstimatedSalePrice, 2, MidpointRounding.AwayFromZero);
+        await inventory.SaveChangesAsync(cancellationToken);
+        return AppResult<InventoryItemDto>.Ok(item.ToDto());
+    }
+
     /// <summary>Most items moved in one request; a shelf, not the warehouse.</summary>
     public const int MaxBulkItems = 200;
 

@@ -20,9 +20,10 @@ export function useAppraisal() {
     return controller;
   }, []);
 
-  const price = useCallback(async (item: Identification, controller: AbortController) => {
+  const price = useCallback(async (item: Identification, input: ScanInput, controller: AbortController) => {
     try {
-      const appraisal = await appraise(toAppraiseRequest(item), controller.signal);
+      const inventoryItemId = input.kind === 'item' ? input.inventoryItemId : null;
+      const appraisal = await appraise(toAppraiseRequest(item, inventoryItemId), controller.signal);
       if (!controller.signal.aborted) dispatch({ type: 'appraised', appraisal });
     } catch (error) {
       if (controller.signal.aborted) return;
@@ -40,14 +41,14 @@ export function useAppraisal() {
           {
             photoUri: input.kind === 'photo' ? await preparePhoto(input.photoUri) : undefined,
             barcode: input.kind === 'barcode' ? input.barcode : undefined,
-            details: input.kind === 'barcode' ? undefined : input.details,
+            details: input.kind === 'photo' || input.kind === 'details' ? input.details : undefined,
           },
           controller.signal,
         );
         if (controller.signal.aborted) return;
         haptics.success();
         dispatch({ type: 'identified', item });
-        await price(item, controller);
+        await price(item, input, controller);
       } catch (error) {
         if (controller.signal.aborted) return;
         haptics.warning();
@@ -58,10 +59,20 @@ export function useAppraisal() {
   );
 
   const reprice = useCallback(
-    (item: Identification) => {
+    (item: Identification, input: ScanInput) => {
       const controller = start();
       dispatch({ type: 'reprice', item });
-      void price(item, controller);
+      void price(item, input, controller);
+    },
+    [price, start],
+  );
+
+  /** Prices something already identified, such as an item in stock. */
+  const appraiseKnown = useCallback(
+    (item: Identification, input: ScanInput) => {
+      const controller = start();
+      dispatch({ type: 'appraiseKnown', input, item });
+      void price(item, input, controller);
     },
     [price, start],
   );
@@ -73,5 +84,5 @@ export function useAppraisal() {
     dispatch({ type: 'reset' });
   }, []);
 
-  return { state, scan, reprice, linkProduct, reset };
+  return { state, scan, reprice, appraiseKnown, linkProduct, reset };
 }

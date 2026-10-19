@@ -13,6 +13,7 @@ public sealed partial class AppraisalService(
     IBarcodeLookupService barcodes,
     IVisionIdentificationService vision,
     IEnumerable<ICompSource> sources,
+    IAppraisalHistoryStore history,
     ICurrentUserContext currentUser,
     TimeProvider clock,
     ILogger<AppraisalService> logger)
@@ -73,12 +74,21 @@ public sealed partial class AppraisalService(
             : AppResult<IdentificationDto>.Ok(identified);
     }
 
+    public async Task<IReadOnlyList<AppraisalSnapshotDto>> HistoryAsync(Guid inventoryItemId, CancellationToken cancellationToken) =>
+        await history.ListForItemAsync(currentUser.OrganizationId, inventoryItemId, 20, cancellationToken);
+
     public async Task<AppResult<AppraisalDto>> AppraiseAsync(AppraiseRequest request, CancellationToken cancellationToken)
     {
         string? invalid = Validate(request);
         if (invalid is not null)
         {
             return AppResult<AppraisalDto>.Validation(invalid);
+        }
+
+        if (request.InventoryItemId is { } itemId
+            && !await history.ItemExistsAsync(currentUser.OrganizationId, itemId, cancellationToken))
+        {
+            return AppResult<AppraisalDto>.NotFound("That item is not in this workspace.");
         }
 
         ItemFacts item = new(
@@ -100,6 +110,10 @@ public sealed partial class AppraisalService(
             ?? ToModelEstimate(request.Estimate);
         DateTimeOffset now = clock.GetUtcNow();
         PriceResult price = CompPricing.Price(item, comps, estimate, now);
+        if (request.InventoryItemId is { } appraisedItem)
+        {
+            await history.RecordAsync(currentUser.OrganizationId, appraisedItem, request.ProductIdentityId, price, cancellationToken);
+        }
 
         return AppResult<AppraisalDto>.Ok(new AppraisalDto(
             searchText,
@@ -249,6 +263,17 @@ public sealed partial class AppraisalService(
         if (item.Model is not null && !text.Contains(item.Model, StringComparison.OrdinalIgnoreCase))
         {
             text = $"{text} {item.Model}";
+        }
+
+        // Set, edition, language and card number sharpen a search; a barcode's digits only scatter it.
+        foreach (string identifier in item.Identifiers)
+        {
+            bool barcodeDigits = identifier.Length >= 8 && identifier.All(char.IsDigit);
+            if (!barcodeDigits && !text.Contains(identifier, StringComparison.OrdinalIgnoreCase)
+                && text.Length + identifier.Length + 1 <= 120)
+            {
+                text = $"{text} {identifier}";
+            }
         }
 
         return text.Length <= 120 ? text : text[..120].TrimEnd();

@@ -61,6 +61,27 @@ public sealed class AppraisalTranslationTests(PostgresFixture postgres)
     }
 
     [Fact]
+    public async Task Appraisal_history_round_trips_through_sql()
+    {
+        (HaulScoutDbContext db, Guid org, Guid _) = await postgres.NewOrganizationAsync();
+        await using HaulScoutDbContext _ = db;
+        InventoryItem item = new() { OrganizationId = org, Title = "Brass lamp", Status = InventoryStatus.ReadyToList };
+        db.InventoryItems.Add(item);
+        await db.SaveChangesAsync();
+        EfAppraisalHistoryStore store = new(db);
+        Comp sale = new(CompKind.Sold, "eBay", "Brass lamp", 50m, null, null, null, DateTimeOffset.UtcNow, true);
+
+        await store.RecordAsync(org, item.Id, null,
+            new PriceResult(PriceBasis.Sales, 40m, 49.99m, 55m, 62, ConfidenceLevel.Fair, ["1 matching sale."], [new AssessedComp(sale, true, null)]),
+            CancellationToken.None);
+
+        AppraisalSnapshotDto snapshot = Assert.Single(await store.ListForItemAsync(org, item.Id, 20, CancellationToken.None));
+        Assert.Equal(49.99m, snapshot.List);
+        Assert.Equal(PriceBasis.Sales, snapshot.Basis);
+        Assert.True(await store.ItemExistsAsync(org, item.Id, CancellationToken.None));
+    }
+
+    [Fact]
     public async Task Channel_sales_history_translates_to_sql()
     {
         (HaulScoutDbContext db, Guid org, Guid _) = await postgres.NewOrganizationAsync();

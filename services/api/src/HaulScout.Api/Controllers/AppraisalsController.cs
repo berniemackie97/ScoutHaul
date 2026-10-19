@@ -58,6 +58,13 @@ public sealed class AppraisalsController(AppraisalService appraisals) : HaulScou
         }
     }
 
+    /// <summary>Past appraisals of an item, newest first.</summary>
+    [HttpGet("history")]
+    public async Task<ActionResult<IReadOnlyList<AppraisalSnapshotDto>>> History(
+        [FromQuery] Guid inventoryItemId,
+        CancellationToken cancellationToken) =>
+        Ok(await appraisals.HistoryAsync(inventoryItemId, cancellationToken));
+
     /// <summary>Comps from every source, a price, and how far to trust it.</summary>
     [HttpPost]
     public async Task<ActionResult<AppraisalDto>> Appraise(AppraiseRequest request, CancellationToken cancellationToken) =>

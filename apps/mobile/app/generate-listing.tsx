@@ -102,9 +102,9 @@ export default function GenerateListingScreen() {
   return (
     <Screen>
       <View style={[styles.header, { backgroundColor: c.primaryLight }]}>
-        <Ionicons name="sparkles-outline" size={18} color={c.primary} />
+        <Ionicons name="document-text-outline" size={18} color={c.primary} />
         <Text variant="bodyBold" numberOfLines={1} style={styles.headerText}>
-          {item?.title ?? 'Generate listing'}
+          {item?.title ?? 'Write listing'}
         </Text>
       </View>
 
@@ -139,11 +139,12 @@ export default function GenerateListingScreen() {
           </Card>
 
           <Card>
-            <SectionHeader title="Suggested list price" />
+            <SectionHeader title={listing.priceBasis === 'Estimate' ? 'Rough estimate' : 'List at'} />
             <Text variant="metric" style={{ marginTop: spacing.xs }}>{money(listing.suggestedListPrice)}</Text>
             {(listing.estimatedResaleLow != null || listing.estimatedResaleHigh != null) && (
               <Text variant="caption" color={c.textMuted} style={{ marginTop: spacing.xs }}>
-                Resale range {money(listing.estimatedResaleLow)}–{money(listing.estimatedResaleHigh)}
+                Quick sale {money(listing.estimatedResaleLow)} · High {money(listing.estimatedResaleHigh)}
+                {listing.confidence != null ? ` · confidence ${listing.confidence}` : ''}
               </Text>
             )}
             {listing.priceRationale ? (
@@ -160,9 +161,9 @@ export default function GenerateListingScreen() {
                 <View key={index} style={[styles.compRow, { borderTopColor: c.border, borderTopWidth: index === 0 ? 0 : StyleSheet.hairlineWidth }]}>
                   <Text variant="bodyBold">{money(comp.price)}</Text>
                   <Text variant="caption" color={c.textMuted} numberOfLines={1} style={styles.compNote}>
-                    {comp.status}
-                    {comp.condition ? ` · ${comp.condition}` : ''}
+                    {comp.status === 'sold' ? 'Sold' : 'Listed'}
                     {comp.note ? ` · ${comp.note}` : ''}
+                    {comp.title ? ` · ${comp.title}` : ''}
                   </Text>
                 </View>
               ))}

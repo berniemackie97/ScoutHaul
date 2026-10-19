@@ -148,6 +148,20 @@ public sealed class AppraisalServiceTests
     }
 
     [Fact]
+    public async Task Appraising_an_item_in_stock_keeps_it_and_a_stranger_s_item_is_refused()
+    {
+        RecordingHistory history = new(knownItem: Guid.NewGuid());
+        AppraisalService service = Service(sources: [new FakeSource("Your sales", comps: [Sale(200m)])], history: history);
+
+        AppResult<AppraisalDto> kept = await service.AppraiseAsync(Request() with { InventoryItemId = history.KnownItem }, CancellationToken.None);
+        AppResult<AppraisalDto> refused = await service.AppraiseAsync(Request() with { InventoryItemId = Guid.NewGuid() }, CancellationToken.None);
+
+        Assert.Equal(AppResultStatus.Ok, kept.Status);
+        Assert.Equal(history.KnownItem, Assert.Single(history.Recorded));
+        Assert.Equal(AppResultStatus.NotFound, refused.Status);
+    }
+
+    [Fact]
     public async Task An_item_with_no_name_is_not_priced()
     {
         AppResult<AppraisalDto> result = await Service().AppraiseAsync(Request() with { Title = " " }, CancellationToken.None);
@@ -189,12 +203,14 @@ public sealed class AppraisalServiceTests
     private static AppraisalService Service(
         FakeCatalog? catalog = null,
         FakeVision? vision = null,
-        IEnumerable<ICompSource>? sources = null) =>
+        IEnumerable<ICompSource>? sources = null,
+        IAppraisalHistoryStore? history = null) =>
         new(
             catalog ?? new FakeCatalog(null),
             new FakeBarcodes(),
             vision ?? new FakeVision(),
             sources ?? [],
+            history ?? new ListingGenerationServiceTests.NoHistory(),
             new StubUser(),
             new FakeTimeProvider(Now),
             NullLogger<AppraisalService>.Instance);
@@ -252,6 +268,24 @@ public sealed class AppraisalServiceTests
 
             return new CompSourceResult(comps ?? [], estimate);
         }
+    }
+
+    private sealed class RecordingHistory(Guid knownItem) : IAppraisalHistoryStore
+    {
+        public Guid KnownItem => knownItem;
+        public List<Guid> Recorded { get; } = [];
+
+        public Task<bool> ItemExistsAsync(Guid organizationId, Guid inventoryItemId, CancellationToken cancellationToken) =>
+            Task.FromResult(inventoryItemId == knownItem);
+
+        public Task RecordAsync(Guid organizationId, Guid inventoryItemId, Guid? productIdentityId, PriceResult price, CancellationToken cancellationToken)
+        {
+            Recorded.Add(inventoryItemId);
+            return Task.CompletedTask;
+        }
+
+        public Task<IReadOnlyList<AppraisalSnapshotDto>> ListForItemAsync(Guid organizationId, Guid inventoryItemId, int take, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<AppraisalSnapshotDto>>([]);
     }
 
     private sealed class StubUser : ICurrentUserContext

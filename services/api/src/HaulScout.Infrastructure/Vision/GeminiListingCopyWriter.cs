@@ -3,81 +3,37 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
-using HaulScout.Application.Contracts;
-using HaulScout.Application.Services;
+using HaulScout.Application.Appraisal;
 
 namespace HaulScout.Infrastructure.Vision;
 
-/// <summary>
-/// Generates ready-to-post marketplace listings with Gemini. Pulls real sold/active comps + a used
-/// resale range from <see cref="IResaleEstimator"/> (grounded Google Search, cached), then writes an
-/// optimized title and honest description. The final suggested list price is deterministic and comes
-/// from <see cref="ListingPriceAdvisor"/>, not from the copy model.
-/// </summary>
-internal sealed class GeminiListingWriter(
+/// <summary>Gemini writes the title and description; the appraisal supplies the comps it may mention.</summary>
+internal sealed class GeminiListingCopyWriter(
     HttpClient httpClient,
     IConfiguration configuration,
-    IResaleEstimator resaleEstimator,
-    ILogger<GeminiListingWriter> logger) : IListingGenerationService
+    ILogger<GeminiListingCopyWriter> logger) : IListingCopyWriter
 {
     private string Model => configuration["Gemini:Model"] ?? "gemini-2.5-flash";
 
     public bool IsConfigured => !string.IsNullOrWhiteSpace(configuration["Gemini:ApiKey"]);
 
-    public async Task<GeneratedListingDto?> GenerateAsync(GenerateListingRequest request, CancellationToken cancellationToken)
+    public async Task<ListingCopy?> WriteAsync(string details, AppraisalDto? appraisal, CancellationToken cancellationToken)
     {
         string? apiKey = configuration["Gemini:ApiKey"];
-        if (string.IsNullOrWhiteSpace(apiKey) || string.IsNullOrWhiteSpace(request.Title))
+        if (string.IsNullOrWhiteSpace(apiKey))
         {
             return null;
         }
 
-        string details = BuildDetails(request);
-        ResaleSearchHints searchHints = ResaleSearchHintBuilder.FromListingRequest(request);
-
-        // Real sold/active comps + a used resale range (grounded, cached) drive the suggested price.
-        ResaleEstimate? estimate = await resaleEstimator.EstimateAsync(details, searchHints, cancellationToken);
-
-        ListingPriceAdvice priceAdvice = ListingPriceAdvisor.Calculate(request, estimate);
-
-        ListingCopyDto? copy = await GenerateCopyAsync(details, estimate, priceAdvice, apiKey, cancellationToken);
-        if (copy is null || string.IsNullOrWhiteSpace(copy.Title))
-        {
-            return null;
-        }
-
-        return new GeneratedListingDto(
-            ListingTitle: copy.Title!.Trim(),
-            ListingDescription: (copy.Description ?? string.Empty).Trim(),
-            SuggestedListPrice: priceAdvice.SuggestedListPrice,
-            EstimatedResaleLow: estimate?.Low,
-            EstimatedResaleHigh: estimate?.High,
-            PriceRationale: priceAdvice.PriceRationale ?? Clean(copy.PriceRationale) ?? estimate?.Rationale,
-            Comps: priceAdvice.PricingComps.Count > 0 ? priceAdvice.PricingComps : estimate?.Comps ?? []);
-    }
-
-    private static string BuildDetails(GenerateListingRequest r)
-    {
-        List<string> lines = [r.Title.Trim()];
-        void Add(string label, string? value)
-        {
-            if (!string.IsNullOrWhiteSpace(value)) lines.Add($"{label}: {value.Trim()}");
-        }
-        Add("Brand", r.Brand);
-        Add("Model", r.Model);
-        Add("Category", r.Category);
-        Add("Condition", r.Condition);
-        Add("Color", r.Color);
-        string size = string.Join(" ", new[] { r.SizeSystem, r.SizeValue }.Where(s => !string.IsNullOrWhiteSpace(s)).Select(s => s!.Trim()));
-        if (size.Length > 0) lines.Add($"Size: {size}");
-        Add("Structured attributes JSON", r.AttributesJson);
-        Add("Notes", r.Notes);
-        return string.Join("\n", lines);
+        ListingCopyDto? copy = await GenerateCopyAsync(details, appraisal, apiKey, cancellationToken);
+        return string.IsNullOrWhiteSpace(copy?.Title)
+            ? null
+            : new ListingCopy(copy.Title.Trim(), (copy.Description ?? string.Empty).Trim());
     }
 
     private const string SystemPrompt =
         "You are an expert reseller who writes high-converting secondhand marketplace listings (eBay, " +
-        "Poshmark, Mercari, Facebook Marketplace). From the item details — and the real comps provided — " +
+        "Poshmark, Mercari, Facebook Marketplace). From the item details, and the comps provided, " +
         "produce TWO things:\n" +
         "1) title: a keyword-rich marketplace title, MAX 80 characters. Front-load brand + model + the most " +
         "searched attributes (type, size, color, edition/year). No ALL-CAPS spam, no emojis, no fabricated " +
@@ -92,32 +48,20 @@ internal sealed class GeminiListingWriter(
 
     private async Task<ListingCopyDto?> GenerateCopyAsync(
         string details,
-        ResaleEstimate? estimate,
-        ListingPriceAdvice priceAdvice,
+        AppraisalDto? appraisal,
         string apiKey,
         CancellationToken cancellationToken)
     {
         StringBuilder context = new();
         context.Append("ITEM DETAILS:\n").Append(details).Append("\n\n");
-        if (estimate is not null)
+        if (appraisal?.Comps.Where(comp => comp.Included).Take(8).ToArray() is { Length: > 0 } comps)
         {
-            context.Append($"USED RESALE RANGE: ${estimate.Low:0.##}–${estimate.High:0.##} ({estimate.PriceRangeType}).\n");
-            if (estimate.Comps is { Count: > 0 } comps)
+            context.Append("COMPS THE PRICE IS BASED ON:\n");
+            foreach (CompDto comp in comps)
             {
-                context.Append("REAL COMPS:\n");
-                foreach (ResaleComp c in comps.Take(8))
-                {
-                    string cond = c.Condition is { Length: > 0 } x ? $" {x}" : string.Empty;
-                    string note = c.Note is { Length: > 0 } n ? $" — {n}" : string.Empty;
-                    context.Append($"- ${c.Price:0.##} [{c.Status}]{cond}{note}\n");
-                }
+                string condition = comp.Condition is { Length: > 0 } stated ? $" {stated}" : string.Empty;
+                context.Append($"- ${comp.Price:0.##} [{comp.Kind}]{condition} — {comp.Title}\n");
             }
-        }
-        if (priceAdvice.SuggestedListPrice is { } suggestedPrice)
-        {
-            context.Append("\nAPP-CALCULATED LIST PRICE: $")
-                .Append(suggestedPrice.ToString("0.##"))
-                .Append(". Use it only as market context; do not include the price in copy.\n");
         }
 
         var requestBody = new
@@ -211,8 +155,6 @@ internal sealed class GeminiListingWriter(
         }
     }
 
-    private static string? Clean(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
-
     private static readonly JsonSerializerOptions JsonOpts = new() { PropertyNameCaseInsensitive = true };
 
     private static readonly object ResponseSchema = new
@@ -222,7 +164,6 @@ internal sealed class GeminiListingWriter(
         {
             title = new { type = "string", description = "Marketplace title, max 80 chars, keyword-rich" },
             description = new { type = "string", description = "Honest scannable listing description" },
-            priceRationale = new { type = "string", description = "Optional one-line market context, without choosing a price" },
         },
         required = new[] { "title", "description" },
     };
@@ -231,7 +172,5 @@ internal sealed class GeminiListingWriter(
     {
         [JsonPropertyName("title")] public string? Title { get; set; }
         [JsonPropertyName("description")] public string? Description { get; set; }
-        [JsonPropertyName("listPrice")] public decimal ListPrice { get; set; }
-        [JsonPropertyName("priceRationale")] public string? PriceRationale { get; set; }
     }
 }

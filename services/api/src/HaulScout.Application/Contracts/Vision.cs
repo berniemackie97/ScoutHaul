@@ -57,10 +57,7 @@ public sealed record GenerateListingRequest(
     string? AttributesJson = null,
     string? Notes = null);
 
-/// <summary>
-/// A ready-to-post listing generated from an item's details: title + description copy, plus a
-/// competitive suggested list price backed by real sold/active comps and the resale range.
-/// </summary>
+/// <summary>A ready-to-post listing: title and description, priced by the item's appraisal.</summary>
 public sealed record GeneratedListingDto(
     string ListingTitle,
     string ListingDescription,
@@ -68,4 +65,6 @@ public sealed record GeneratedListingDto(
     decimal? EstimatedResaleLow,
     decimal? EstimatedResaleHigh,
     string? PriceRationale,
-    IReadOnlyList<ResaleComp> Comps);
+    IReadOnlyList<ResaleComp> Comps,
+    Appraisal.PriceBasis? PriceBasis = null,
+    int? Confidence = null);

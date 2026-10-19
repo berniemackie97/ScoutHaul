@@ -159,7 +159,7 @@ public static class DependencyInjection
 
         // Listing generator (Gemini) — writes title + description and a comp-backed suggested list
         // price from an item's details. Reuses the resale estimator for grounded comps.
-        services.AddHttpClient<IListingGenerationService, GeminiListingWriter>(client =>
+        services.AddHttpClient<IListingCopyWriter, GeminiListingCopyWriter>(client =>
         {
             client.Timeout = TimeSpan.FromSeconds(30);
             client.DefaultRequestHeaders.Add("Accept", "application/json");
@@ -175,6 +175,7 @@ public static class DependencyInjection
         // Appraisal: every comp source runs at once, each on its own deadline.
         services.AddScoped<IProductCatalogStore, EfProductCatalogStore>();
         services.AddScoped<IChannelEconomicsStore, EfChannelEconomicsStore>();
+        services.AddScoped<IAppraisalHistoryStore, EfAppraisalHistoryStore>();
         services.AddScoped<ICompSource, OwnSalesCompSource>();
         services.AddScoped<ICompSource, SavedCompSource>();
         services.AddScoped<ICompSource, WebSearchCompSource>();

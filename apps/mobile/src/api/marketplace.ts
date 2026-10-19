@@ -1,3 +1,4 @@
+import type { PriceBasis } from '../features/appraisal/types';
 import { apiRequest, type CallOptions } from './client';
 import type {
   DashboardSummary,
@@ -73,6 +74,8 @@ export type GeneratedListing = {
   estimatedResaleHigh: number | null;
   priceRationale: string | null;
   comps: ResaleComp[];
+  priceBasis: PriceBasis | null;
+  confidence: number | null;
 };
 
 export type ResaleComp = {
@@ -81,4 +84,6 @@ export type ResaleComp = {
   condition?: string | null;
   note?: string | null;
   sourceUrl?: string | null;
+  title?: string | null;
+  date?: string | null;
 };

@@ -4,7 +4,8 @@ import type { Appraisal, Identification } from './types';
 export type ScanInput =
   | { kind: 'barcode'; barcode: string }
   | { kind: 'photo'; photoUri: string; details?: string }
-  | { kind: 'details'; details: string };
+  | { kind: 'details'; details: string }
+  | { kind: 'item'; inventoryItemId: string; title: string };
 
 export type AppraisalState =
   | { phase: 'ready' }
@@ -19,6 +20,7 @@ export type AppraisalAction =
   | { type: 'identified'; item: Identification }
   | { type: 'identifyFailed'; failure: ScanFailure }
   | { type: 'reprice'; item: Identification }
+  | { type: 'appraiseKnown'; input: ScanInput; item: Identification }
   | { type: 'appraised'; appraisal: Appraisal }
   | { type: 'appraiseFailed'; failure: ScanFailure }
   | { type: 'linkProduct'; productIdentityId: string }
@@ -46,6 +48,9 @@ export function appraisalReducer(state: AppraisalState, action: AppraisalAction)
       return state.phase === 'ready' || state.phase === 'identifying' || state.phase === 'unidentified'
         ? state
         : { phase: 'appraising', input: state.input, item: action.item };
+
+    case 'appraiseKnown':
+      return { phase: 'appraising', input: action.input, item: action.item };
 
     case 'appraised':
       return state.phase === 'appraising'

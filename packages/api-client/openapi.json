@@ -391,6 +391,54 @@
         }
       }
     },
+    "/api/appraisals/history": {
+      "get": {
+        "tags": [
+          "Appraisals"
+        ],
+        "parameters": [
+          {
+            "name": "inventoryItemId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AppraisalSnapshotDto"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AppraisalSnapshotDto"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AppraisalSnapshotDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/appraisals": {
       "post": {
         "tags": [
@@ -2776,6 +2824,65 @@
         }
       }
     },
+    "/api/inventory/{id}/price": {
+      "patch": {
+        "tags": [
+          "Inventory"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetExpectedPriceRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetExpectedPriceRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetExpectedPriceRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/InventoryItemDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InventoryItemDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InventoryItemDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/inventory/location": {
       "post": {
         "tags": [
@@ -3164,54 +3271,6 @@
               "text/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ListingDto"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/market-analysis/calculate": {
-      "post": {
-        "tags": [
-          "MarketAnalysis"
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/MarketAnalysisRequest"
-              }
-            },
-            "text/json": {
-              "schema": {
-                "$ref": "#/components/schemas/MarketAnalysisRequest"
-              }
-            },
-            "application/*+json": {
-              "schema": {
-                "$ref": "#/components/schemas/MarketAnalysisRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/MarketAnalysisResponse"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MarketAnalysisResponse"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MarketAnalysisResponse"
                 }
               }
             }
@@ -12689,6 +12748,43 @@
         },
         "additionalProperties": false
       },
+      "AppraisalSnapshotDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "appraisedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "list": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "basis": {
+            "$ref": "#/components/schemas/PriceBasis"
+          },
+          "confidence": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "level": {
+            "$ref": "#/components/schemas/ConfidenceLevel"
+          },
+          "saleComps": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "askingComps": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
       "AppraiseRequest": {
         "type": "object",
         "properties": {
@@ -12737,6 +12833,11 @@
           },
           "estimate": {
             "$ref": "#/components/schemas/EstimateDto"
+          },
+          "inventoryItemId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -13575,30 +13676,6 @@
         ],
         "type": "string"
       },
-      "ConfidenceScoreResult": {
-        "type": "object",
-        "properties": {
-          "score": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "reasons": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            },
-            "nullable": true
-          },
-          "warnings": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            },
-            "nullable": true
-          }
-        },
-        "additionalProperties": false
-      },
       "ConsoleInventoryDto": {
         "type": "object",
         "properties": {
@@ -14152,47 +14229,6 @@
         },
         "additionalProperties": false
       },
-      "DealAnalysisResult": {
-        "type": "object",
-        "properties": {
-          "recommendedMaxBuyPrice": {
-            "type": "number",
-            "format": "double",
-            "nullable": true
-          },
-          "expectedNetProfit": {
-            "type": "number",
-            "format": "double",
-            "nullable": true
-          },
-          "roiPercent": {
-            "type": "number",
-            "format": "double",
-            "nullable": true
-          },
-          "marginPercent": {
-            "type": "number",
-            "format": "double",
-            "nullable": true
-          },
-          "breakEvenPrice": {
-            "type": "number",
-            "format": "double",
-            "nullable": true
-          },
-          "decision": {
-            "$ref": "#/components/schemas/RecommendationDecisionType"
-          },
-          "warnings": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            },
-            "nullable": true
-          }
-        },
-        "additionalProperties": false
-      },
       "DimensionUnit": {
         "enum": [
           "Inches",
@@ -14647,6 +14683,14 @@
             "items": {
               "$ref": "#/components/schemas/ResaleComp"
             },
+            "nullable": true
+          },
+          "priceBasis": {
+            "$ref": "#/components/schemas/PriceBasis"
+          },
+          "confidence": {
+            "type": "integer",
+            "format": "int32",
             "nullable": true
           }
         },
@@ -16338,134 +16382,6 @@
           "Cancelled"
         ],
         "type": "string"
-      },
-      "MarketAnalysisRequest": {
-        "type": "object",
-        "properties": {
-          "productIdentityId": {
-            "type": "string",
-            "format": "uuid",
-            "nullable": true
-          },
-          "inventoryItemId": {
-            "type": "string",
-            "format": "uuid",
-            "nullable": true
-          },
-          "expectedSalePrice": {
-            "type": "number",
-            "format": "double",
-            "nullable": true
-          },
-          "sellerAskingPrice": {
-            "type": "number",
-            "format": "double",
-            "nullable": true
-          },
-          "purchasePrice": {
-            "type": "number",
-            "format": "double",
-            "nullable": true
-          },
-          "platform": {
-            "type": "string",
-            "nullable": true
-          },
-          "platformFeePercent": {
-            "type": "number",
-            "format": "double"
-          },
-          "paymentFeePercent": {
-            "type": "number",
-            "format": "double"
-          },
-          "fixedPaymentFee": {
-            "type": "number",
-            "format": "double"
-          },
-          "estimatedShippingCostPaidBySeller": {
-            "type": "number",
-            "format": "double"
-          },
-          "suppliesCost": {
-            "type": "number",
-            "format": "double"
-          },
-          "riskReserve": {
-            "type": "number",
-            "format": "double"
-          },
-          "desiredMinimumProfit": {
-            "type": "number",
-            "format": "double"
-          },
-          "targetMarginPercent": {
-            "type": "number",
-            "format": "double",
-            "nullable": true
-          },
-          "pricingBasis": {
-            "$ref": "#/components/schemas/PricingBasisType"
-          },
-          "condition": {
-            "type": "string",
-            "nullable": true
-          },
-          "riskFlags": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            },
-            "nullable": true
-          }
-        },
-        "additionalProperties": false
-      },
-      "MarketAnalysisResponse": {
-        "type": "object",
-        "properties": {
-          "analysisId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "recommendationId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "productIdentityId": {
-            "type": "string",
-            "format": "uuid",
-            "nullable": true
-          },
-          "inventoryItemId": {
-            "type": "string",
-            "format": "uuid",
-            "nullable": true
-          },
-          "estimatedSalePrice": {
-            "type": "number",
-            "format": "double",
-            "nullable": true
-          },
-          "pricingBasis": {
-            "$ref": "#/components/schemas/PricingBasisType"
-          },
-          "soldCompCount": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "activeListingCount": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "confidence": {
-            "$ref": "#/components/schemas/ConfidenceScoreResult"
-          },
-          "recommendation": {
-            "$ref": "#/components/schemas/DealAnalysisResult"
-          }
-        },
-        "additionalProperties": false
       },
       "MarketObservationDto": {
         "type": "object",
@@ -18421,17 +18337,6 @@
           }
         },
         "additionalProperties": false
-      },
-      "PricingBasisType": {
-        "enum": [
-          "LiveValidated",
-          "CachedRecent",
-          "CachedStale",
-          "ManualEstimate",
-          "InternalHistory",
-          "Unavailable"
-        ],
-        "type": "string"
       },
       "ProductIdentification": {
         "type": "object",
@@ -21423,6 +21328,16 @@
           "displayName": {
             "type": "string",
             "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "SetExpectedPriceRequest": {
+        "type": "object",
+        "properties": {
+          "estimatedSalePrice": {
+            "type": "number",
+            "format": "double"
           }
         },
         "additionalProperties": false
@@ -24562,9 +24477,6 @@
     },
     {
       "name": "Listings"
-    },
-    {
-      "name": "MarketAnalysis"
     },
     {
       "name": "MarketObservations"
