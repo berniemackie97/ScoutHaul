@@ -345,6 +345,35 @@ public class SalesTaxWorkflowTests
     }
 
     [Fact]
+    public async Task The_preview_shows_the_returns_a_registration_would_require_before_saving()
+    {
+        Harness harness = await NewAsync(nameof(The_preview_shows_the_returns_a_registration_would_require_before_saving), configure: false);
+        var quarterly = new SalesTaxFrequencyDto(new DateOnly(2026, 5, 31), SalesTaxFrequency.Quarterly, SalesTaxPeriodAlignment.Calendar);
+
+        SalesTaxSchedulePreviewDto incomplete = await harness.Service.PreviewAsync(new SalesTaxSchedulePreviewRequest(null, "Manatee", null, [quarterly]), CancellationToken.None);
+        Assert.NotNull(incomplete.Problem);
+        Assert.Equal(.07m, incomplete.CombinedRate);
+        Assert.Empty(incomplete.Periods);
+
+        SalesTaxSchedulePreviewDto preview = await harness.Service.PreviewAsync(
+            new SalesTaxSchedulePreviewRequest(new DateOnly(2026, 5, 31), "manatee", null, [quarterly]), CancellationToken.None);
+        Assert.Null(preview.Problem);
+        Assert.Equal("Manatee", preview.County);
+        Assert.Equal(
+            [SalesTaxPeriodStatus.Open, SalesTaxPeriodStatus.DueSoon, SalesTaxPeriodStatus.Overdue],
+            preview.Periods.Select(period => period.Status));
+        Assert.Equal(new DateOnly(2026, 10, 20), preview.Periods[1].LateAfter);
+
+        SalesTaxSchedulePreviewDto monthly = await harness.Service.PreviewAsync(new SalesTaxSchedulePreviewRequest(new DateOnly(2026, 5, 31), "Manatee", null,
+            [quarterly with { Frequency = SalesTaxFrequency.Monthly }]), CancellationToken.None);
+        Assert.Equal(6, monthly.Periods.Count);
+
+        SalesTaxSchedulePreviewDto future = await harness.Service.PreviewAsync(
+            new SalesTaxSchedulePreviewRequest(new DateOnly(2027, 1, 1), "Manatee", null, [quarterly]), CancellationToken.None);
+        Assert.Equal("The registration date cannot be in the future.", future.Problem);
+    }
+
+    [Fact]
     public async Task A_business_still_on_pacific_time_is_told_to_switch()
     {
         Harness harness = await NewAsync(nameof(A_business_still_on_pacific_time_is_told_to_switch), zone: "America/Los_Angeles");

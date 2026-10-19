@@ -48,6 +48,31 @@ public sealed record SaveSalesTaxProfileRequest(
     string? Notes,
     IReadOnlyList<SalesTaxFrequencyDto> Frequencies);
 
+public sealed record SalesTaxSchedulePreviewRequest(
+    DateOnly? RegisteredOn,
+    string? County,
+    DateOnly? ClosedOn,
+    IReadOnlyList<SalesTaxFrequencyDto>? Frequencies);
+
+public sealed record SalesTaxPreviewPeriodDto(
+    string Key,
+    string Label,
+    DateOnly Start,
+    DateOnly End,
+    DateOnly LateAfter,
+    DateOnly ElectronicPaymentDeadline,
+    SalesTaxPeriodStatus Status,
+    int DaysUntilLateAfter);
+
+/// <summary>What a registration would set up, before it is saved. Never an error: an incomplete form gets a Problem.</summary>
+public sealed record SalesTaxSchedulePreviewDto(
+    string? Problem,
+    string? County,
+    decimal? SurtaxRate,
+    decimal? CombinedRate,
+    DateOnly Today,
+    IReadOnlyList<SalesTaxPreviewPeriodDto> Periods);
+
 public enum SalesTaxPeriodStatus
 {
     Open,

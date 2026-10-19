@@ -139,6 +139,53 @@ public sealed class SalesTaxWorkflowService(
         return AppResult<SalesTaxProfileDto>.Ok(ToProfile(registration, await TimeZoneIdAsync(cancellationToken)));
     }
 
+    /// <summary>The periods a registration would generate and how each stands today, from unsaved form values.</summary>
+    public async Task<SalesTaxSchedulePreviewDto> PreviewAsync(SalesTaxSchedulePreviewRequest request, CancellationToken cancellationToken)
+    {
+        DateOnly today = await TodayAsync(cancellationToken);
+        string? county = FloridaSurtax.Canonical(request.County);
+        decimal? surtax = county is null ? null : FloridaSurtax.RateOn(county, today);
+        SalesTaxSchedulePreviewDto Problem(string message) =>
+            new(message, county, surtax, surtax + FloridaSurtax.StateRate, today, []);
+
+        if (request.RegisteredOn is not DateOnly registeredOn) return Problem("Enter the registration date to see the returns it requires.");
+        if (registeredOn > today) return Problem("The registration date cannot be in the future.");
+        if (request.ClosedOn is DateOnly closed && (closed < registeredOn || closed > today))
+        {
+            return Problem("The closing date must be between the registration date and today.");
+        }
+
+        IReadOnlyList<SalesTaxFrequencyDto> frequencies = request.Frequencies ?? [];
+        if (ValidateSchedule(frequencies, registeredOn) is string scheduleError) return Problem(scheduleError);
+
+        List<SalesTaxFrequencySpan> schedule = frequencies
+            .Select(item => new SalesTaxFrequencySpan(item.EffectiveFrom, item.Frequency, item.Alignment))
+            .ToList();
+        IReadOnlyList<SalesTaxPeriod> periods = FloridaFilingCalendar.Periods(registeredOn, schedule, today, request.ClosedOn);
+        IReadOnlyList<SalesTaxReturn> returns = await store.ListReturnsAsync(currentUser.OrganizationId, Jurisdiction, cancellationToken);
+
+        List<SalesTaxPreviewPeriodDto> preview = periods
+            .Select(period =>
+            {
+                SalesTaxReturn? effective = returns
+                    .Where(filed => !filed.IsVoided && filed.PeriodStart == period.Start && filed.PeriodEnd == period.End)
+                    .MaxBy(filed => filed.CreatedAt);
+                return new SalesTaxPreviewPeriodDto(
+                    period.Key,
+                    Label(period),
+                    period.Start,
+                    period.End,
+                    period.LateAfter,
+                    period.ElectronicPaymentDeadline,
+                    StatusOf(period, effective, changedSinceFiled: false, today),
+                    period.LateAfter.DayNumber - today.DayNumber);
+            })
+            .Reverse()
+            .ToList();
+
+        return new SalesTaxSchedulePreviewDto(null, county, surtax, surtax + FloridaSurtax.StateRate, today, preview);
+    }
+
     // ── Overview and worksheet ─────────────────────────────────────────────
 
     public async Task<SalesTaxOverviewDto> GetOverviewAsync(CancellationToken cancellationToken)
@@ -631,17 +678,20 @@ public sealed class SalesTaxWorkflowService(
         return new Dr15Timing(filedOn, null, registration.FilesElectronically, registration.DonateCollectionAllowance);
     }
 
-    private static SalesTaxPeriodSummaryDto Summary(SalesTaxPeriod period, SalesTaxPeriodComputation computation, SalesTaxReturn? effective, DateOnly today)
-    {
-        Dr15Result result = computation.Result;
-        SalesTaxPeriodStatus status = effective is not null
-            ? effective.SourceFingerprint != computation.Fingerprint ? SalesTaxPeriodStatus.ChangedSinceFiled
+    private static SalesTaxPeriodStatus StatusOf(SalesTaxPeriod period, SalesTaxReturn? effective, bool changedSinceFiled, DateOnly today) =>
+        effective is not null
+            ? changedSinceFiled ? SalesTaxPeriodStatus.ChangedSinceFiled
               : effective.FiledOn > period.LateAfter ? SalesTaxPeriodStatus.FiledLate
               : SalesTaxPeriodStatus.Filed
             : today <= period.End ? SalesTaxPeriodStatus.Open
             : today > period.LateAfter ? SalesTaxPeriodStatus.Overdue
             : period.LateAfter.DayNumber - today.DayNumber <= DueSoonDays ? SalesTaxPeriodStatus.DueSoon
             : SalesTaxPeriodStatus.ReadyToFile;
+
+    private static SalesTaxPeriodSummaryDto Summary(SalesTaxPeriod period, SalesTaxPeriodComputation computation, SalesTaxReturn? effective, DateOnly today)
+    {
+        Dr15Result result = computation.Result;
+        SalesTaxPeriodStatus status = StatusOf(period, effective, effective is not null && effective.SourceFingerprint != computation.Fingerprint, today);
 
         SalesTaxFiledSummaryDto? filed = effective is null
             ? null

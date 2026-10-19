@@ -6526,6 +6526,49 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/sales-tax/profile/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["SalesTaxSchedulePreviewRequest"];
+                    "text/json": components["schemas"]["SalesTaxSchedulePreviewRequest"];
+                    "application/*+json": components["schemas"]["SalesTaxSchedulePreviewRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SalesTaxSchedulePreviewDto"];
+                        "application/json": components["schemas"]["SalesTaxSchedulePreviewDto"];
+                        "text/json": components["schemas"]["SalesTaxSchedulePreviewDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/sales-tax/overview": {
         parameters: {
             query?: never;
@@ -12865,6 +12908,21 @@ export interface components {
             warnings?: number;
             filed?: components["schemas"]["SalesTaxFiledSummaryDto"];
         };
+        SalesTaxPreviewPeriodDto: {
+            key?: string | null;
+            label?: string | null;
+            /** Format: date */
+            start?: string;
+            /** Format: date */
+            end?: string;
+            /** Format: date */
+            lateAfter?: string;
+            /** Format: date */
+            electronicPaymentDeadline?: string;
+            status?: components["schemas"]["SalesTaxPeriodStatus"];
+            /** Format: int32 */
+            daysUntilLateAfter?: number;
+        };
         SalesTaxProfileDto: {
             configured?: boolean;
             jurisdiction?: string | null;
@@ -12940,6 +12998,25 @@ export interface components {
         };
         /** @enum {string} */
         SalesTaxReturnKind: "Original" | "AmendedReplacement";
+        SalesTaxSchedulePreviewDto: {
+            problem?: string | null;
+            county?: string | null;
+            /** Format: double */
+            surtaxRate?: number | null;
+            /** Format: double */
+            combinedRate?: number | null;
+            /** Format: date */
+            today?: string;
+            periods?: components["schemas"]["SalesTaxPreviewPeriodDto"][] | null;
+        };
+        SalesTaxSchedulePreviewRequest: {
+            /** Format: date */
+            registeredOn?: string | null;
+            county?: string | null;
+            /** Format: date */
+            closedOn?: string | null;
+            frequencies?: components["schemas"]["SalesTaxFrequencyDto"][] | null;
+        };
         SalesTaxTimelinessDto: {
             /** Format: date */
             filedOn?: string;

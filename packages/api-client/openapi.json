@@ -8080,6 +8080,54 @@
         }
       }
     },
+    "/api/sales-tax/profile/preview": {
+      "post": {
+        "tags": [
+          "SalesTax"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SalesTaxSchedulePreviewRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SalesTaxSchedulePreviewRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/SalesTaxSchedulePreviewRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesTaxSchedulePreviewDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesTaxSchedulePreviewDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesTaxSchedulePreviewDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/sales-tax/overview": {
       "get": {
         "tags": [
@@ -20557,6 +20605,43 @@
         },
         "additionalProperties": false
       },
+      "SalesTaxPreviewPeriodDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "nullable": true
+          },
+          "label": {
+            "type": "string",
+            "nullable": true
+          },
+          "start": {
+            "type": "string",
+            "format": "date"
+          },
+          "end": {
+            "type": "string",
+            "format": "date"
+          },
+          "lateAfter": {
+            "type": "string",
+            "format": "date"
+          },
+          "electronicPaymentDeadline": {
+            "type": "string",
+            "format": "date"
+          },
+          "status": {
+            "$ref": "#/components/schemas/SalesTaxPeriodStatus"
+          },
+          "daysUntilLateAfter": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
       "SalesTaxProfileDto": {
         "type": "object",
         "properties": {
@@ -20794,6 +20879,68 @@
           "AmendedReplacement"
         ],
         "type": "string"
+      },
+      "SalesTaxSchedulePreviewDto": {
+        "type": "object",
+        "properties": {
+          "problem": {
+            "type": "string",
+            "nullable": true
+          },
+          "county": {
+            "type": "string",
+            "nullable": true
+          },
+          "surtaxRate": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "combinedRate": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "today": {
+            "type": "string",
+            "format": "date"
+          },
+          "periods": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesTaxPreviewPeriodDto"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "SalesTaxSchedulePreviewRequest": {
+        "type": "object",
+        "properties": {
+          "registeredOn": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "county": {
+            "type": "string",
+            "nullable": true
+          },
+          "closedOn": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "frequencies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesTaxFrequencyDto"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
       },
       "SalesTaxTimelinessDto": {
         "type": "object",

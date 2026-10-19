@@ -20,6 +20,10 @@ public sealed class SalesTaxController(SalesTaxWorkflowService salesTax) : HaulS
     public async Task<ActionResult<SalesTaxProfileDto>> SaveProfile(SaveSalesTaxProfileRequest request, CancellationToken cancellationToken) =>
         ToActionResult(await salesTax.SaveProfileAsync(request, cancellationToken));
 
+    [HttpPost("profile/preview")]
+    public Task<SalesTaxSchedulePreviewDto> PreviewProfile(SalesTaxSchedulePreviewRequest request, CancellationToken cancellationToken) =>
+        salesTax.PreviewAsync(request, cancellationToken);
+
     [HttpGet("overview")]
     public Task<SalesTaxOverviewDto> Overview(CancellationToken cancellationToken) => salesTax.GetOverviewAsync(cancellationToken);
 
