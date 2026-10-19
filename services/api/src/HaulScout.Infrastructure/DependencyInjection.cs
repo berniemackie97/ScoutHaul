@@ -171,6 +171,7 @@ public static class DependencyInjection
 
         // Appraisal: every comp source runs at once, each on its own deadline.
         services.AddScoped<IProductCatalogStore, EfProductCatalogStore>();
+        services.AddScoped<IChannelEconomicsStore, EfChannelEconomicsStore>();
         services.AddScoped<ICompSource, OwnSalesCompSource>();
         services.AddScoped<ICompSource, SavedCompSource>();
         services.AddScoped<ICompSource, WebSearchCompSource>();

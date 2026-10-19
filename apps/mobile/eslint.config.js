@@ -12,9 +12,9 @@ const knownDebt = {
   // data-fetching layer yet, so every screen hand-rolls this. Removed wholesale when the shared
   // query layer lands, not screen by screen.
   fetchOnMount: ['app/marketplace-links.tsx', 'src/features/workspaceAdmin/InviteCodeManager.tsx'],
-  // The two biggest screens (1400 and 1150 lines). Their effects are entangled with form and
-  // camera state; they are scheduled for dedicated decomposition slices and get fixed there.
-  bigScreens: ['app/inventory/edit.tsx', 'app/record-sale.tsx', 'app/scanner.tsx'],
+  // The two biggest screens. Their effects are entangled with form state; they are scheduled for
+  // dedicated decomposition slices and get fixed there.
+  bigScreens: ['app/inventory/edit.tsx', 'app/record-sale.tsx'],
 };
 
 // eslint-config-expo is pinned to the version that matches Expo SDK 54 (`expo install --check`

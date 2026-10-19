@@ -7,7 +7,9 @@ import { Card } from '../../components/Card';
 import { Text } from '../../components/Text';
 import { radius, spacing } from '../../components/theme';
 import { useAppTheme } from '../../context/ThemeContext';
+import { AddCompCard, type FoundComp } from './AddCompCard';
 import { photoOf, type AppraisalState } from './appraisalState';
+import { BuyCheckCard } from './BuyCheckCard';
 import { CompList, SearchLinks, SourceReport } from './CompList';
 import type { FailureRemedy, ScanFailure } from './failures';
 import { IdentityCard } from './IdentityCard';
@@ -28,6 +30,9 @@ type AppraisalViewProps = {
   /** Offered when nothing could be identified, so a find can still be recorded. */
   fallbackAction?: ResultAction;
   onCorrect: (item: Identification) => void;
+  onAddComp: (comp: FoundComp) => Promise<string>;
+  askingPrice: string;
+  onAskingPriceChange: (value: string) => void;
   onRemedy: (remedy: FailureRemedy) => void;
   onNewScan: () => void;
   onClose: () => void;
@@ -39,6 +44,9 @@ export function AppraisalView({
   secondaryActions,
   fallbackAction,
   onCorrect,
+  onAddComp,
+  askingPrice,
+  onAskingPriceChange,
   onRemedy,
   onNewScan,
   onClose,
@@ -87,6 +95,15 @@ export function AppraisalView({
         {state.phase === 'appraising' ? <PricingInProgress /> : null}
         {state.phase === 'unpriced' ? <FailureCard failure={state.failure} onRemedy={onRemedy} /> : null}
         {state.phase === 'appraised' ? <PriceSummary appraisal={state.appraisal} /> : null}
+        {state.phase === 'appraised' && state.appraisal.price.list !== null ? (
+          <BuyCheckCard
+            expectedSalePrice={state.appraisal.price.list}
+            basis={state.appraisal.price.basis}
+            confidence={state.appraisal.price.confidence}
+            askingPrice={askingPrice}
+            onAskingPriceChange={onAskingPriceChange}
+          />
+        ) : null}
 
         {settled ? (
           <View style={styles.actions}>
@@ -100,6 +117,7 @@ export function AppraisalView({
         {state.phase === 'appraised' ? (
           <>
             <CompList comps={state.appraisal.comps} />
+            <AddCompCard onSave={onAddComp} />
             <SourceReport appraisal={state.appraisal} />
             <SearchLinks appraisal={state.appraisal} />
           </>

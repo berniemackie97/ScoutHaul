@@ -1,4 +1,4 @@
-import { basisLabel, compDateLabel, conditionFromGrade } from './labels';
+import { basisLabel, compDateLabel, conditionFromGrade, parseSoldDay } from './labels';
 import type { Comp, Price } from './types';
 
 const comp = (overrides: Partial<Comp>): Comp => ({
@@ -39,6 +39,15 @@ describe('labels', () => {
     expect(conditionFromGrade('for-parts')).toBe('For parts');
     expect(conditionFromGrade('mystery')).toBeNull();
     expect(conditionFromGrade(null)).toBeNull();
+  });
+
+  it('reads a typed sale date, treating blank as today and refusing the future', () => {
+    const now = new Date('2026-10-18T15:00:00Z');
+
+    expect(parseSoldDay('', now)).toBe(now.toISOString());
+    expect(parseSoldDay('2026-10-02', now)).toBe('2026-10-02T12:00:00.000Z');
+    expect(parseSoldDay('2026-11-02', now)).toBeNull();
+    expect(parseSoldDay('10/02/2026', now)).toBeNull();
   });
 
   it('dates a sale relative to now and a listing as listed', () => {

@@ -8,21 +8,6 @@ export type MarketObservationType =
   | 'Estimate'
   | 'Unknown';
 
-export type PricingBasisType =
-  | 'LiveValidated'
-  | 'CachedRecent'
-  | 'CachedStale'
-  | 'ManualEstimate'
-  | 'InternalHistory'
-  | 'Unavailable';
-
-export type RecommendationDecisionType =
-  | 'Buy'
-  | 'Negotiate'
-  | 'Pass'
-  | 'ResearchRequired'
-  | 'Unavailable';
-
 export type ProductIdentity = {
   id: string;
   title: string;
@@ -65,31 +50,6 @@ export type MarketplaceSearchLink = {
 export type MarketplaceSearchLinks = {
   query: string;
   links: MarketplaceSearchLink[];
-};
-
-export type DealAnalysisResult = {
-  recommendedMaxBuyPrice?: number | null;
-  expectedNetProfit?: number | null;
-  roiPercent?: number | null;
-  marginPercent?: number | null;
-  breakEvenPrice?: number | null;
-  decision: RecommendationDecisionType;
-  warnings: string[];
-};
-
-export type MarketAnalysisResponse = {
-  analysisId: string;
-  recommendationId: string;
-  estimatedSalePrice?: number | null;
-  pricingBasis: PricingBasisType;
-  soldCompCount: number;
-  activeListingCount: number;
-  confidence: {
-    score: number;
-    reasons: string[];
-    warnings: string[];
-  };
-  recommendation: DealAnalysisResult;
 };
 
 export type DashboardSummary = {

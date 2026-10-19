@@ -133,7 +133,7 @@ function RootStack() {
       <Stack.Screen name="scanner" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
       <Stack.Screen name="marketplace-links" options={{ title: 'Marketplace Search' }} />
       <Stack.Screen name="comp-capture" options={{ title: 'Add Comp' }} />
-      <Stack.Screen name="deal-analyzer" options={{ title: 'Deal Analyzer' }} />
+      <Stack.Screen name="deal-analyzer" options={{ title: 'Deal check' }} />
       <Stack.Screen name="inventory/[id]" options={{ title: 'Item Detail' }} />
       <Stack.Screen name="inventory/edit" options={{ title: 'Add Item' }} />
       <Stack.Screen name="trips/[id]" options={{ title: 'Trip Detail' }} />

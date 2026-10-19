@@ -1,10 +1,8 @@
 import { apiRequest, type CallOptions } from './client';
 import type {
   DashboardSummary,
-  MarketAnalysisResponse,
   MarketObservation,
   MarketplaceSearchLinks,
-  PricingBasisType,
   ProductIdentity,
 } from '../domain/types';
 
@@ -35,26 +33,6 @@ export type CreateCompRequest = {
   notes?: string | null;
 };
 
-export type AnalyzeRequest = {
-  productIdentityId?: string | null;
-  inventoryItemId?: string | null;
-  expectedSalePrice?: number | null;
-  sellerAskingPrice?: number | null;
-  purchasePrice?: number | null;
-  platform: string;
-  platformFeePercent: number;
-  paymentFeePercent: number;
-  fixedPaymentFee: number;
-  estimatedShippingCostPaidBySeller: number;
-  suppliesCost: number;
-  riskReserve: number;
-  desiredMinimumProfit: number;
-  targetMarginPercent?: number | null;
-  pricingBasis?: PricingBasisType | null;
-  condition?: string | null;
-  riskFlags: string[];
-};
-
 export const marketplaceApi = {
   dashboard: () => apiRequest<DashboardSummary>('/api/dashboard/summary'),
 
@@ -67,8 +45,6 @@ export const marketplaceApi = {
   addComp: (body: CreateCompRequest) =>
     apiRequest<MarketObservation>('/api/market-observations', { method: 'POST', body }),
   comps: (params: string) => apiRequest<MarketObservation[]>(`/api/market-observations?${params}`),
-  analyze: (body: AnalyzeRequest) =>
-    apiRequest<MarketAnalysisResponse>('/api/market-analysis/calculate', { method: 'POST', body }),
 
   // Generate a ready-to-post marketplace listing (title, description, comp-backed price) from item details.
   generateListing: (body: GenerateListingRequest, options?: CallOptions) =>
