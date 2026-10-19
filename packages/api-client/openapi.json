@@ -7898,6 +7898,583 @@
         }
       }
     },
+    "/api/sales-tax/profile": {
+      "get": {
+        "tags": [
+          "SalesTax"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesTaxProfileDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesTaxProfileDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesTaxProfileDto"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "SalesTax"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveSalesTaxProfileRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveSalesTaxProfileRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveSalesTaxProfileRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesTaxProfileDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesTaxProfileDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesTaxProfileDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sales-tax/overview": {
+      "get": {
+        "tags": [
+          "SalesTax"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesTaxOverviewDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesTaxOverviewDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesTaxOverviewDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sales-tax/periods/{key}": {
+      "get": {
+        "tags": [
+          "SalesTax"
+        ],
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "filedOn",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesTaxWorksheetDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesTaxWorksheetDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesTaxWorksheetDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sales-tax/periods/{key}/schedule.csv": {
+      "get": {
+        "tags": [
+          "SalesTax"
+        ],
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/sales-tax/periods/{key}/filings": {
+      "post": {
+        "tags": [
+          "SalesTax"
+        ],
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FileSalesTaxReturnRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FileSalesTaxReturnRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/FileSalesTaxReturnRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesTaxWorksheetDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesTaxWorksheetDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesTaxWorksheetDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sales-tax/filings/{id}/void": {
+      "post": {
+        "tags": [
+          "SalesTax"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VoidSalesTaxReturnRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VoidSalesTaxReturnRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/VoidSalesTaxReturnRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/sales-tax/use-entries": {
+      "post": {
+        "tags": [
+          "SalesTax"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveSalesTaxUseEntryRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveSalesTaxUseEntryRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveSalesTaxUseEntryRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesTaxUseEntryDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesTaxUseEntryDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesTaxUseEntryDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sales-tax/use-entries/{id}": {
+      "put": {
+        "tags": [
+          "SalesTax"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveSalesTaxUseEntryRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveSalesTaxUseEntryRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveSalesTaxUseEntryRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesTaxUseEntryDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesTaxUseEntryDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesTaxUseEntryDto"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "SalesTax"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/sales-tax/adjustments": {
+      "post": {
+        "tags": [
+          "SalesTax"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveSalesTaxAdjustmentRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveSalesTaxAdjustmentRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveSalesTaxAdjustmentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesTaxAdjustmentDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesTaxAdjustmentDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesTaxAdjustmentDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sales-tax/adjustments/{id}": {
+      "delete": {
+        "tags": [
+          "SalesTax"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/sales-tax/sales/{saleId}/decision": {
+      "put": {
+        "tags": [
+          "SalesTax"
+        ],
+        "parameters": [
+          {
+            "name": "saleId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveSalesTaxSaleDecisionRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveSalesTaxSaleDecisionRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveSalesTaxSaleDecisionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "SalesTax"
+        ],
+        "parameters": [
+          {
+            "name": "saleId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/sales-tax/sales/{saleId}/collector": {
+      "put": {
+        "tags": [
+          "SalesTax"
+        ],
+        "parameters": [
+          {
+            "name": "saleId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetSaleTaxCollectorRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetSaleTaxCollectorRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetSaleTaxCollectorRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
     "/api/search": {
       "get": {
         "tags": [
@@ -13438,6 +14015,210 @@
         ],
         "type": "string"
       },
+      "Dr15Destination": {
+        "enum": [
+          "FloridaCounty",
+          "OutsideFlorida",
+          "Unknown"
+        ],
+        "type": "string"
+      },
+      "Dr15Exemption": {
+        "enum": [
+          "None",
+          "Resale",
+          "ExemptOrganization",
+          "Other"
+        ],
+        "type": "string"
+      },
+      "Dr15IssueSeverity": {
+        "enum": [
+          "Blocking",
+          "Warning",
+          "Info"
+        ],
+        "type": "string"
+      },
+      "Dr15Lines": {
+        "type": "object",
+        "properties": {
+          "lineA": {
+            "$ref": "#/components/schemas/Dr15Row"
+          },
+          "lineB": {
+            "$ref": "#/components/schemas/Dr15Row"
+          },
+          "lineC": {
+            "$ref": "#/components/schemas/Dr15Row"
+          },
+          "lineD": {
+            "$ref": "#/components/schemas/Dr15Row"
+          },
+          "lineE": {
+            "$ref": "#/components/schemas/Dr15Row"
+          },
+          "line5": {
+            "type": "number",
+            "format": "double"
+          },
+          "line6": {
+            "type": "number",
+            "format": "double"
+          },
+          "line7": {
+            "type": "number",
+            "format": "double"
+          },
+          "line8": {
+            "type": "number",
+            "format": "double"
+          },
+          "line9": {
+            "type": "number",
+            "format": "double"
+          },
+          "line10": {
+            "type": "number",
+            "format": "double"
+          },
+          "line11": {
+            "type": "number",
+            "format": "double"
+          },
+          "line12": {
+            "type": "number",
+            "format": "double"
+          },
+          "line13": {
+            "type": "number",
+            "format": "double"
+          },
+          "line14": {
+            "type": "number",
+            "format": "double"
+          },
+          "line15a": {
+            "type": "number",
+            "format": "double"
+          },
+          "line15b": {
+            "type": "number",
+            "format": "double"
+          },
+          "line15c": {
+            "type": "number",
+            "format": "double"
+          },
+          "line15d": {
+            "type": "number",
+            "format": "double"
+          },
+          "line16": {
+            "type": "number",
+            "format": "double"
+          },
+          "line17": {
+            "type": "number",
+            "format": "double"
+          },
+          "line18": {
+            "type": "number",
+            "format": "double"
+          },
+          "line19": {
+            "type": "number",
+            "format": "double"
+          },
+          "line20": {
+            "type": "number",
+            "format": "double"
+          },
+          "line21": {
+            "type": "number",
+            "format": "double"
+          },
+          "surtaxRate": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "additionalProperties": false
+      },
+      "Dr15Row": {
+        "type": "object",
+        "properties": {
+          "gross": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "exempt": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "taxable": {
+            "type": "number",
+            "format": "double"
+          },
+          "taxDue": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "additionalProperties": false
+      },
+      "Dr15SurtaxClass": {
+        "enum": [
+          "None",
+          "BusinessCountyRate",
+          "DifferentRate",
+          "NotSubjectToSurtax"
+        ],
+        "type": "string"
+      },
+      "Dr15UseTaxResult": {
+        "type": "object",
+        "properties": {
+          "reference": {
+            "type": "string",
+            "nullable": true
+          },
+          "taxable": {
+            "type": "number",
+            "format": "double"
+          },
+          "county": {
+            "type": "string",
+            "nullable": true
+          },
+          "surtaxRate": {
+            "type": "number",
+            "format": "double"
+          },
+          "tax": {
+            "type": "number",
+            "format": "double"
+          },
+          "surtaxPortion": {
+            "type": "number",
+            "format": "double"
+          },
+          "otherStateCredit": {
+            "type": "number",
+            "format": "double"
+          },
+          "overItemCap": {
+            "type": "number",
+            "format": "double"
+          },
+          "surtaxClass": {
+            "$ref": "#/components/schemas/Dr15SurtaxClass"
+          }
+        },
+        "additionalProperties": false
+      },
       "EstimateChannelFeesRequest": {
         "type": "object",
         "properties": {
@@ -13542,6 +14323,50 @@
             "$ref": "#/components/schemas/SyncFailureKind"
           },
           "message": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "FileSalesTaxReturnRequest": {
+        "type": "object",
+        "properties": {
+          "filedOn": {
+            "type": "string",
+            "format": "date"
+          },
+          "paidOn": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "method": {
+            "$ref": "#/components/schemas/SalesTaxFilingMethod"
+          },
+          "confirmationNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "amountPaid": {
+            "type": "number",
+            "format": "double"
+          },
+          "donateCollectionAllowance": {
+            "type": "boolean"
+          },
+          "amended": {
+            "type": "boolean"
+          },
+          "acknowledgedWarnings": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "expectedFingerprint": {
+            "type": "string",
+            "nullable": true
+          },
+          "notes": {
             "type": "string",
             "nullable": true
           }
@@ -19108,6 +19933,1132 @@
         },
         "additionalProperties": false
       },
+      "SalesTaxAdjustmentDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/SalesTaxAdjustmentKind"
+          },
+          "amount": {
+            "type": "number",
+            "format": "double"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "SalesTaxAdjustmentKind": {
+        "enum": [
+          "LawfulDeduction",
+          "CreditOrEstimatedTaxPaid",
+          "EstimatedTaxDue"
+        ],
+        "type": "string"
+      },
+      "SalesTaxCarryDto": {
+        "type": "object",
+        "properties": {
+          "deductionsCarriedIn": {
+            "type": "number",
+            "format": "double"
+          },
+          "creditsCarriedIn": {
+            "type": "number",
+            "format": "double"
+          },
+          "deductionsCarriedOut": {
+            "type": "number",
+            "format": "double"
+          },
+          "creditsCarriedOut": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "additionalProperties": false
+      },
+      "SalesTaxExcludedChannelDto": {
+        "type": "object",
+        "properties": {
+          "channel": {
+            "type": "string",
+            "nullable": true
+          },
+          "salesCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "grossSales": {
+            "type": "number",
+            "format": "double"
+          },
+          "taxCollectedByMarketplace": {
+            "type": "number",
+            "format": "double"
+          },
+          "basis": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "SalesTaxExcludedSaleDto": {
+        "type": "object",
+        "properties": {
+          "saleId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "channel": {
+            "type": "string",
+            "nullable": true
+          },
+          "itemTitle": {
+            "type": "string",
+            "nullable": true
+          },
+          "itemAmount": {
+            "type": "number",
+            "format": "double"
+          },
+          "shippingCharged": {
+            "type": "number",
+            "format": "double"
+          },
+          "taxCollectedByMarketplace": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "additionalProperties": false
+      },
+      "SalesTaxFiledReturnDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/SalesTaxReturnKind"
+          },
+          "supersedesReturnId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "filedOn": {
+            "type": "string",
+            "format": "date"
+          },
+          "paidOn": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "method": {
+            "$ref": "#/components/schemas/SalesTaxFilingMethod"
+          },
+          "confirmationNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "amountPaid": {
+            "type": "number",
+            "format": "double"
+          },
+          "donatedCollectionAllowance": {
+            "type": "boolean"
+          },
+          "totalTaxDue": {
+            "type": "number",
+            "format": "double"
+          },
+          "amountDueWithReturn": {
+            "type": "number",
+            "format": "double"
+          },
+          "warningsAcknowledged": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "recordedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "voided": {
+            "type": "boolean"
+          },
+          "voidReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "isEffective": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "SalesTaxFiledSummaryDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/SalesTaxReturnKind"
+          },
+          "filedOn": {
+            "type": "string",
+            "format": "date"
+          },
+          "paidOn": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "method": {
+            "$ref": "#/components/schemas/SalesTaxFilingMethod"
+          },
+          "confirmationNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "amountPaid": {
+            "type": "number",
+            "format": "double"
+          },
+          "amountDueWithReturn": {
+            "type": "number",
+            "format": "double"
+          },
+          "late": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "SalesTaxFilingMethod": {
+        "enum": [
+          "Electronic",
+          "Paper",
+          "Telefile"
+        ],
+        "type": "string"
+      },
+      "SalesTaxFrequency": {
+        "enum": [
+          "Monthly",
+          "Quarterly",
+          "Semiannual",
+          "Annual"
+        ],
+        "type": "string"
+      },
+      "SalesTaxFrequencyDto": {
+        "type": "object",
+        "properties": {
+          "effectiveFrom": {
+            "type": "string",
+            "format": "date"
+          },
+          "frequency": {
+            "$ref": "#/components/schemas/SalesTaxFrequency"
+          },
+          "alignment": {
+            "$ref": "#/components/schemas/SalesTaxPeriodAlignment"
+          }
+        },
+        "additionalProperties": false
+      },
+      "SalesTaxInvoiceDto": {
+        "type": "object",
+        "properties": {
+          "invoiceKey": {
+            "type": "string",
+            "nullable": true
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "saleIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "nullable": true
+          },
+          "gross": {
+            "type": "number",
+            "format": "double"
+          },
+          "exempt": {
+            "type": "number",
+            "format": "double"
+          },
+          "taxable": {
+            "type": "number",
+            "format": "double"
+          },
+          "county": {
+            "type": "string",
+            "nullable": true
+          },
+          "surtaxRate": {
+            "type": "number",
+            "format": "double"
+          },
+          "computedTax": {
+            "type": "number",
+            "format": "double"
+          },
+          "surtaxPortion": {
+            "type": "number",
+            "format": "double"
+          },
+          "taxCharged": {
+            "type": "number",
+            "format": "double"
+          },
+          "taxDue": {
+            "type": "number",
+            "format": "double"
+          },
+          "overItemCap": {
+            "type": "number",
+            "format": "double"
+          },
+          "surtaxClass": {
+            "$ref": "#/components/schemas/Dr15SurtaxClass"
+          },
+          "treatment": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "SalesTaxIssueDto": {
+        "type": "object",
+        "properties": {
+          "severity": {
+            "$ref": "#/components/schemas/Dr15IssueSeverity"
+          },
+          "code": {
+            "type": "string",
+            "nullable": true
+          },
+          "message": {
+            "type": "string",
+            "nullable": true
+          },
+          "reference": {
+            "type": "string",
+            "nullable": true
+          },
+          "saleIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "SalesTaxLineChangeDto": {
+        "type": "object",
+        "properties": {
+          "line": {
+            "type": "string",
+            "nullable": true
+          },
+          "filed": {
+            "type": "number",
+            "format": "double"
+          },
+          "now": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "additionalProperties": false
+      },
+      "SalesTaxNoticeDto": {
+        "type": "object",
+        "properties": {
+          "severity": {
+            "$ref": "#/components/schemas/Dr15IssueSeverity"
+          },
+          "code": {
+            "type": "string",
+            "nullable": true
+          },
+          "message": {
+            "type": "string",
+            "nullable": true
+          },
+          "periodKey": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "SalesTaxOverviewDto": {
+        "type": "object",
+        "properties": {
+          "profile": {
+            "$ref": "#/components/schemas/SalesTaxProfileDto"
+          },
+          "today": {
+            "type": "string",
+            "format": "date"
+          },
+          "nextDue": {
+            "$ref": "#/components/schemas/SalesTaxPeriodSummaryDto"
+          },
+          "overdueCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "eligibleFrequency": {
+            "$ref": "#/components/schemas/SalesTaxFrequency"
+          },
+          "taxRemittedLastFourQuarters": {
+            "type": "number",
+            "format": "double"
+          },
+          "periods": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesTaxPeriodSummaryDto"
+            },
+            "nullable": true
+          },
+          "notices": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesTaxNoticeDto"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "SalesTaxPeriodAlignment": {
+        "enum": [
+          "Calendar",
+          "Alternate"
+        ],
+        "type": "string"
+      },
+      "SalesTaxPeriodStatus": {
+        "enum": [
+          "Open",
+          "ReadyToFile",
+          "DueSoon",
+          "Overdue",
+          "Filed",
+          "FiledLate",
+          "ChangedSinceFiled"
+        ],
+        "type": "string"
+      },
+      "SalesTaxPeriodSummaryDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "nullable": true
+          },
+          "label": {
+            "type": "string",
+            "nullable": true
+          },
+          "start": {
+            "type": "string",
+            "format": "date"
+          },
+          "end": {
+            "type": "string",
+            "format": "date"
+          },
+          "frequency": {
+            "$ref": "#/components/schemas/SalesTaxFrequency"
+          },
+          "isFinal": {
+            "type": "boolean"
+          },
+          "dueDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "lateAfter": {
+            "type": "string",
+            "format": "date"
+          },
+          "electronicPaymentDeadline": {
+            "type": "string",
+            "format": "date"
+          },
+          "status": {
+            "$ref": "#/components/schemas/SalesTaxPeriodStatus"
+          },
+          "daysUntilLateAfter": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "reportedSalesCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "reportedGrossSales": {
+            "type": "number",
+            "format": "double"
+          },
+          "excludedSalesCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "excludedGrossSales": {
+            "type": "number",
+            "format": "double"
+          },
+          "totalTaxDue": {
+            "type": "number",
+            "format": "double"
+          },
+          "amountDueWithReturn": {
+            "type": "number",
+            "format": "double"
+          },
+          "blockingIssues": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "warnings": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "filed": {
+            "$ref": "#/components/schemas/SalesTaxFiledSummaryDto"
+          }
+        },
+        "additionalProperties": false
+      },
+      "SalesTaxProfileDto": {
+        "type": "object",
+        "properties": {
+          "configured": {
+            "type": "boolean"
+          },
+          "jurisdiction": {
+            "type": "string",
+            "nullable": true
+          },
+          "certificateNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "businessPartnerNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "legalName": {
+            "type": "string",
+            "nullable": true
+          },
+          "doingBusinessAs": {
+            "type": "string",
+            "nullable": true
+          },
+          "addressLine1": {
+            "type": "string",
+            "nullable": true
+          },
+          "addressLine2": {
+            "type": "string",
+            "nullable": true
+          },
+          "city": {
+            "type": "string",
+            "nullable": true
+          },
+          "postalCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "county": {
+            "type": "string",
+            "nullable": true
+          },
+          "countySurtaxRate": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "registeredOn": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "closedOn": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "filesElectronically": {
+            "type": "boolean"
+          },
+          "donateCollectionAllowance": {
+            "type": "boolean"
+          },
+          "deliveryChargesOptional": {
+            "type": "boolean"
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "frequencies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesTaxFrequencyDto"
+            },
+            "nullable": true
+          },
+          "timeZoneId": {
+            "type": "string",
+            "nullable": true
+          },
+          "counties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "SalesTaxRefundLineDto": {
+        "type": "object",
+        "properties": {
+          "refundId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "saleId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "channel": {
+            "type": "string",
+            "nullable": true
+          },
+          "taxRefunded": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "additionalProperties": false
+      },
+      "SalesTaxReportedSaleDto": {
+        "type": "object",
+        "properties": {
+          "saleId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "invoiceKey": {
+            "type": "string",
+            "nullable": true
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "channel": {
+            "type": "string",
+            "nullable": true
+          },
+          "itemTitle": {
+            "type": "string",
+            "nullable": true
+          },
+          "orderNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "orderId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "itemAmount": {
+            "type": "number",
+            "format": "double"
+          },
+          "shippingCharged": {
+            "type": "number",
+            "format": "double"
+          },
+          "taxCharged": {
+            "type": "number",
+            "format": "double"
+          },
+          "destination": {
+            "$ref": "#/components/schemas/Dr15Destination"
+          },
+          "county": {
+            "type": "string",
+            "nullable": true
+          },
+          "destinationSource": {
+            "type": "string",
+            "nullable": true
+          },
+          "exemption": {
+            "$ref": "#/components/schemas/Dr15Exemption"
+          },
+          "hasDecision": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "SalesTaxReturnHeaderDto": {
+        "type": "object",
+        "properties": {
+          "certificateNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "legalName": {
+            "type": "string",
+            "nullable": true
+          },
+          "doingBusinessAs": {
+            "type": "string",
+            "nullable": true
+          },
+          "addressLine1": {
+            "type": "string",
+            "nullable": true
+          },
+          "addressLine2": {
+            "type": "string",
+            "nullable": true
+          },
+          "city": {
+            "type": "string",
+            "nullable": true
+          },
+          "postalCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "county": {
+            "type": "string",
+            "nullable": true
+          },
+          "surtaxRate": {
+            "type": "number",
+            "format": "double"
+          },
+          "formVersion": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "SalesTaxReturnKind": {
+        "enum": [
+          "Original",
+          "AmendedReplacement"
+        ],
+        "type": "string"
+      },
+      "SalesTaxTimelinessDto": {
+        "type": "object",
+        "properties": {
+          "filedOn": {
+            "type": "string",
+            "format": "date"
+          },
+          "paidOn": {
+            "type": "string",
+            "format": "date"
+          },
+          "electronic": {
+            "type": "boolean"
+          },
+          "projected": {
+            "type": "boolean"
+          },
+          "returnLate": {
+            "type": "boolean"
+          },
+          "paymentLate": {
+            "type": "boolean"
+          },
+          "collectionAllowanceEarned": {
+            "type": "boolean"
+          },
+          "interestDays": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "interestSegments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Segment"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "SalesTaxUseEntryDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "occurredOn": {
+            "type": "string",
+            "format": "date"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "amount": {
+            "type": "number",
+            "format": "double"
+          },
+          "county": {
+            "type": "string",
+            "nullable": true
+          },
+          "otherStateTaxPaid": {
+            "type": "number",
+            "format": "double"
+          },
+          "expenseId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "inventoryItemId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "SalesTaxUseLineDto": {
+        "type": "object",
+        "properties": {
+          "entry": {
+            "$ref": "#/components/schemas/SalesTaxUseEntryDto"
+          },
+          "result": {
+            "$ref": "#/components/schemas/Dr15UseTaxResult"
+          }
+        },
+        "additionalProperties": false
+      },
+      "SalesTaxWorksheetDto": {
+        "type": "object",
+        "properties": {
+          "period": {
+            "$ref": "#/components/schemas/SalesTaxPeriodSummaryDto"
+          },
+          "header": {
+            "$ref": "#/components/schemas/SalesTaxReturnHeaderDto"
+          },
+          "lines": {
+            "$ref": "#/components/schemas/Dr15Lines"
+          },
+          "timeliness": {
+            "$ref": "#/components/schemas/SalesTaxTimelinessDto"
+          },
+          "invoices": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesTaxInvoiceDto"
+            },
+            "nullable": true
+          },
+          "reportedSales": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesTaxReportedSaleDto"
+            },
+            "nullable": true
+          },
+          "excludedChannels": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesTaxExcludedChannelDto"
+            },
+            "nullable": true
+          },
+          "excludedSales": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesTaxExcludedSaleDto"
+            },
+            "nullable": true
+          },
+          "useTax": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesTaxUseLineDto"
+            },
+            "nullable": true
+          },
+          "refunds": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesTaxRefundLineDto"
+            },
+            "nullable": true
+          },
+          "adjustments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesTaxAdjustmentDto"
+            },
+            "nullable": true
+          },
+          "carry": {
+            "$ref": "#/components/schemas/SalesTaxCarryDto"
+          },
+          "issues": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesTaxIssueDto"
+            },
+            "nullable": true
+          },
+          "sourceFingerprint": {
+            "type": "string",
+            "nullable": true
+          },
+          "filings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesTaxFiledReturnDto"
+            },
+            "nullable": true
+          },
+          "changesSinceFiled": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesTaxLineChangeDto"
+            },
+            "nullable": true
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "SaveSalesTaxAdjustmentRequest": {
+        "type": "object",
+        "properties": {
+          "periodKey": {
+            "type": "string",
+            "nullable": true
+          },
+          "kind": {
+            "$ref": "#/components/schemas/SalesTaxAdjustmentKind"
+          },
+          "amount": {
+            "type": "number",
+            "format": "double"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "SaveSalesTaxProfileRequest": {
+        "type": "object",
+        "properties": {
+          "certificateNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "businessPartnerNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "legalName": {
+            "type": "string",
+            "nullable": true
+          },
+          "doingBusinessAs": {
+            "type": "string",
+            "nullable": true
+          },
+          "addressLine1": {
+            "type": "string",
+            "nullable": true
+          },
+          "addressLine2": {
+            "type": "string",
+            "nullable": true
+          },
+          "city": {
+            "type": "string",
+            "nullable": true
+          },
+          "postalCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "county": {
+            "type": "string",
+            "nullable": true
+          },
+          "registeredOn": {
+            "type": "string",
+            "format": "date"
+          },
+          "closedOn": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "filesElectronically": {
+            "type": "boolean"
+          },
+          "donateCollectionAllowance": {
+            "type": "boolean"
+          },
+          "deliveryChargesOptional": {
+            "type": "boolean"
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "frequencies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesTaxFrequencyDto"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "SaveSalesTaxSaleDecisionRequest": {
+        "type": "object",
+        "properties": {
+          "destination": {
+            "$ref": "#/components/schemas/Dr15Destination"
+          },
+          "county": {
+            "type": "string",
+            "nullable": true
+          },
+          "exemption": {
+            "$ref": "#/components/schemas/Dr15Exemption"
+          },
+          "exemptionCertificate": {
+            "type": "string",
+            "nullable": true
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "SaveSalesTaxUseEntryRequest": {
+        "type": "object",
+        "properties": {
+          "occurredOn": {
+            "type": "string",
+            "format": "date"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "amount": {
+            "type": "number",
+            "format": "double"
+          },
+          "county": {
+            "type": "string",
+            "nullable": true
+          },
+          "otherStateTaxPaid": {
+            "type": "number",
+            "format": "double"
+          },
+          "expenseId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "inventoryItemId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "SearchGroupDto": {
         "type": "object",
         "properties": {
@@ -19175,6 +21126,35 @@
           "totalHits": {
             "type": "integer",
             "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "Segment": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "format": "date"
+          },
+          "to": {
+            "type": "string",
+            "format": "date"
+          },
+          "days": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "dailyFactor": {
+            "type": "number",
+            "format": "double"
+          },
+          "amount": {
+            "type": "number",
+            "format": "double"
+          },
+          "estimated": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false
@@ -19274,6 +21254,19 @@
             "nullable": true
           },
           "storageLocation": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "SetSaleTaxCollectorRequest": {
+        "type": "object",
+        "properties": {
+          "marketplaceCollected": {
+            "type": "boolean"
+          },
+          "reason": {
             "type": "string",
             "nullable": true
           }
@@ -22300,6 +24293,16 @@
         },
         "additionalProperties": false
       },
+      "VoidSalesTaxReturnRequest": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "WebSourceDto": {
         "type": "object",
         "properties": {
@@ -22407,6 +24410,9 @@
     },
     {
       "name": "Sales"
+    },
+    {
+      "name": "SalesTax"
     },
     {
       "name": "Search"

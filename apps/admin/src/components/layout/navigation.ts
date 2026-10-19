@@ -3,6 +3,7 @@ import {
   FileSpreadsheet,
   Handshake,
   HandCoins,
+  Landmark,
   LayoutDashboard,
   Package,
   Radio,
@@ -66,7 +67,10 @@ export const navGroups: NavGroup[] = [
   },
   {
     label: "Intelligence",
-    items: [{ name: "Reports", href: "/analytics", icon: BarChart3, keywords: ["analytics", "profit", "numbers", "p&l"], requires: needs(permission.reports) }],
+    items: [
+      { name: "Reports", href: "/analytics", icon: BarChart3, keywords: ["analytics", "profit", "numbers", "p&l"], requires: needs(permission.reports) },
+      { name: "Sales tax", href: "/tax", icon: Landmark, keywords: ["dr-15", "florida", "return", "filing", "surtax", "use tax", "dor"], requires: needs(permission.finance) },
+    ],
   },
   {
     label: "System",
@@ -83,6 +87,7 @@ export const subPages: { name: string; href: string; requires: Requirement }[] =
   { name: "Listings to match", href: "/imports/listings", requires: needs(permission.listings, permission.inventory) },
   { name: "Team & access", href: "/settings/team", requires: needs(permission.members) },
   { name: "Menus & controlled values", href: "/settings/menus", requires: needs(permission.inventory) },
+  { name: "Florida registration", href: "/tax/settings", requires: needs(permission.finance) },
 ];
 
 /** The page an address belongs to and what opening it needs — the most specific match wins. */
