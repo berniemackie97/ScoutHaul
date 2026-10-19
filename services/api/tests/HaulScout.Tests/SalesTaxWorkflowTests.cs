@@ -279,8 +279,14 @@ public class SalesTaxWorkflowTests
         Sale sale = harness.AddSale("Storefront", Et(6, 15), 100m, tax: 7m, remitted: false, order: harness.AddOrder(null, pickup: true));
         harness.Db.Refunds.Add(new Refund
         {
-            OrganizationId = harness.Org, SaleId = sale.Id, Type = RefundType.Full, ItemAmount = 100m, TaxRefunded = 7m,
-            Reason = "returned", RecordedByUserId = Guid.NewGuid(), RefundedAt = Et(7, 2),
+            OrganizationId = harness.Org,
+            SaleId = sale.Id,
+            Type = RefundType.Full,
+            ItemAmount = 100m,
+            TaxRefunded = 7m,
+            Reason = "returned",
+            RecordedByUserId = Guid.NewGuid(),
+            RefundedAt = Et(7, 2),
         });
         harness.AddSale("Storefront", Et(8, 1), 50m, tax: 3.5m, remitted: false, order: harness.AddOrder(null, pickup: true));
         await harness.Db.SaveChangesAsync();

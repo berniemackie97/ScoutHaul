@@ -58,18 +58,36 @@ public sealed class SalesTaxPostgresTests(PostgresFixture postgres)
         db.OrderLines.Add(new OrderLine { OrganizationId = org, OrderId = order.Id, InventoryItemId = item.Id, TitleSnapshot = item.Title, UnitPrice = 110m, LineTotal = 110m });
         var sale = new Sale
         {
-            OrganizationId = org, InventoryItemId = item.Id, Platform = "Storefront", SoldPrice = 110m, SalesTaxCollected = 7m,
-            TaxRemittedByPlatform = false, OrderId = order.Id, Status = SaleStatus.Delivered, SoldAt = new DateTimeOffset(2026, 8, 10, 14, 0, 0, TimeSpan.Zero),
+            OrganizationId = org,
+            InventoryItemId = item.Id,
+            Platform = "Storefront",
+            SoldPrice = 110m,
+            SalesTaxCollected = 7m,
+            TaxRemittedByPlatform = false,
+            OrderId = order.Id,
+            Status = SaleStatus.Delivered,
+            SoldAt = new DateTimeOffset(2026, 8, 10, 14, 0, 0, TimeSpan.Zero),
         };
         db.Sales.AddRange(sale, new Sale
         {
-            OrganizationId = org, InventoryItemId = marketItem.Id, Platform = "eBay", SoldPrice = 45m, SalesTaxCollected = 3.15m,
-            Status = SaleStatus.Delivered, SoldAt = new DateTimeOffset(2026, 9, 2, 14, 0, 0, TimeSpan.Zero),
+            OrganizationId = org,
+            InventoryItemId = marketItem.Id,
+            Platform = "eBay",
+            SoldPrice = 45m,
+            SalesTaxCollected = 3.15m,
+            Status = SaleStatus.Delivered,
+            SoldAt = new DateTimeOffset(2026, 9, 2, 14, 0, 0, TimeSpan.Zero),
         });
         db.Refunds.Add(new Refund
         {
-            OrganizationId = org, SaleId = sale.Id, Type = RefundType.Partial, ItemAmount = 10m, TaxRefunded = .7m, Reason = "scuff",
-            RecordedByUserId = user, RefundedAt = new DateTimeOffset(2026, 9, 1, 14, 0, 0, TimeSpan.Zero),
+            OrganizationId = org,
+            SaleId = sale.Id,
+            Type = RefundType.Partial,
+            ItemAmount = 10m,
+            TaxRefunded = .7m,
+            Reason = "scuff",
+            RecordedByUserId = user,
+            RefundedAt = new DateTimeOffset(2026, 9, 1, 14, 0, 0, TimeSpan.Zero),
         });
         await db.SaveChangesAsync();
 
