@@ -23,6 +23,7 @@ public static class DependencyInjection
         services.AddScoped<ITenantContext, TenantContext>();
 
         services.AddScoped<AppraisalService>();
+        services.AddScoped<BuyCheckService>();
         services.AddScoped<IDealAnalyzer, DealAnalyzer>();
         services.AddScoped<IConfidenceScorer, ConfidenceScorer>();
         services.AddScoped<InventoryReferenceDataService>();

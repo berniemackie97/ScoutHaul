@@ -34,14 +34,10 @@ export type {
 
 export type {
   MarketObservationType,
-  PricingBasisType,
-  RecommendationDecisionType,
   ProductIdentity,
   MarketObservation,
   MarketplaceSearchLink,
   MarketplaceSearchLinks,
-  DealAnalysisResult,
-  MarketAnalysisResponse,
   DashboardSummary,
 } from './marketplace.types';
 

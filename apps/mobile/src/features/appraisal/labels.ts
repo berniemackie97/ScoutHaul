@@ -86,6 +86,15 @@ export function compDateLabel(comp: Comp, now: Date = new Date()): string | null
   return comp.kind === 'Asking' ? `Listed ${when}` : `Sold ${when}`;
 }
 
+/** A typed sale date as an ISO instant: blank means today; a malformed or future date is null. */
+export function parseSoldDay(value: string, now: Date = new Date()): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) return now.toISOString();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return null;
+  const date = new Date(`${trimmed}T12:00:00Z`);
+  return Number.isNaN(date.getTime()) || date.getTime() > now.getTime() ? null : date.toISOString();
+}
+
 export function plural(count: number, noun: string): string {
   return `${count} ${noun}${count === 1 ? '' : 's'}`;
 }

@@ -66,10 +66,12 @@ export function useAppraisal() {
     [price, start],
   );
 
+  const linkProduct = useCallback((productIdentityId: string) => dispatch({ type: 'linkProduct', productIdentityId }), []);
+
   const reset = useCallback(() => {
     inFlight.current?.abort();
     dispatch({ type: 'reset' });
   }, []);
 
-  return { state, scan, reprice, reset };
+  return { state, scan, reprice, linkProduct, reset };
 }

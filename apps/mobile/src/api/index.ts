@@ -93,7 +93,6 @@ export const api = {
   marketplaceLinks: marketplaceApi.marketplaceLinks,
   addComp: marketplaceApi.addComp,
   comps: marketplaceApi.comps,
-  analyze: marketplaceApi.analyze,
   generateListing: marketplaceApi.generateListing,
 
   // Sourcing

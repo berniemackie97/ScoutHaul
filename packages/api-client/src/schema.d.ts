@@ -599,6 +599,49 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/buy-checks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["BuyCheckRequest"];
+                    "text/json": components["schemas"]["BuyCheckRequest"];
+                    "application/*+json": components["schemas"]["BuyCheckRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["BuyCheckDto"];
+                        "application/json": components["schemas"]["BuyCheckDto"];
+                        "text/json": components["schemas"]["BuyCheckDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/channel-accounts": {
         parameters: {
             query?: never;
@@ -9701,6 +9744,56 @@ export interface components {
             previousKpis?: components["schemas"]["ReportKpiDto"];
             losingSales?: components["schemas"]["ReportSaleRowDto"][] | null;
             timeZone?: string | null;
+        };
+        BuyChannelDto: {
+            channel?: string | null;
+            label?: string | null;
+            /** Format: double */
+            fees?: number;
+            feesFrom?: string | null;
+            /** Format: double */
+            shipping?: number;
+            shippingFrom?: string | null;
+            /** Format: double */
+            supplies?: number;
+            /** Format: double */
+            netProceeds?: number;
+            /** Format: double */
+            maxBuyPrice?: number;
+        };
+        BuyCheckDto: {
+            /** Format: double */
+            expectedSalePrice?: number;
+            /** Format: double */
+            askingPrice?: number | null;
+            channel?: components["schemas"]["BuyChannelDto"];
+            channels?: components["schemas"]["BuyChannelDto"][] | null;
+            /** Format: double */
+            maxBuyPrice?: number;
+            /** Format: double */
+            profitAtAsking?: number | null;
+            /** Format: double */
+            marginAtAsking?: number | null;
+            decision?: components["schemas"]["RecommendationDecisionType"];
+            reasons?: string[] | null;
+        };
+        BuyCheckRequest: {
+            /** Format: double */
+            expectedSalePrice?: number;
+            /** Format: double */
+            askingPrice?: number | null;
+            channel?: string | null;
+            /** Format: double */
+            shippingCost?: number | null;
+            /** Format: double */
+            suppliesCost?: number | null;
+            /** Format: double */
+            minimumProfit?: number;
+            /** Format: double */
+            targetMarginPercent?: number | null;
+            /** Format: int32 */
+            confidence?: number | null;
+            basis?: components["schemas"]["PriceBasis"];
         };
         ChangeInventoryStatusRequest: {
             status?: components["schemas"]["InventoryStatus"];

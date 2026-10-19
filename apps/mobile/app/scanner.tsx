@@ -2,6 +2,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Alert } from 'react-native';
 import { api } from '../src/api';
+import type { FoundComp } from '../src/features/appraisal/AddCompCard';
 import { AppraisalView, type ResultAction } from '../src/features/appraisal/AppraisalView';
 import type { AppraisalState } from '../src/features/appraisal/appraisalState';
 import { DetailsEntry } from '../src/features/appraisal/DetailsEntry';
@@ -11,6 +12,7 @@ import { conditionFromGrade } from '../src/features/appraisal/labels';
 import { ScoutCamera, type CaptureMode } from '../src/features/appraisal/ScoutCamera';
 import type { Identification } from '../src/features/appraisal/types';
 import { useAppraisal } from '../src/features/appraisal/useAppraisal';
+import { describeCompOutcome, saveComp } from '../src/services/saveComp';
 
 type Entry = { kind: 'camera' } | { kind: 'type'; photoUri: string | null };
 
@@ -30,10 +32,11 @@ type ScannerParams = {
 
 export default function ScannerScreen() {
   const params = useLocalSearchParams<ScannerParams>();
-  const { state, scan, reprice, reset } = useAppraisal();
+  const { state, scan, reprice, linkProduct, reset } = useAppraisal();
   const [mode, setMode] = useState<CaptureMode>(params.mode === 'photo' ? 'photo' : 'barcode');
   const [entry, setEntry] = useState<Entry>(params.mode === 'details' ? { kind: 'type', photoUri: null } : { kind: 'camera' });
   const [rememberedBarcode, setRememberedBarcode] = useState<string | null>(null);
+  const [askingPrice, setAskingPrice] = useState('');
   const startedFromParams = useRef(false);
   const fillMode = params.fill === '1';
   const context = params.context?.trim() || undefined;
@@ -48,6 +51,7 @@ export default function ScannerScreen() {
   function startOver(next: Entry = { kind: 'camera' }) {
     reset();
     setRememberedBarcode(null);
+    setAskingPrice('');
     setEntry(next);
   }
 
@@ -138,6 +142,29 @@ export default function ScannerScreen() {
     });
   }
 
+  async function addComp(comp: FoundComp): Promise<string> {
+    if (!item) throw new Error('Identify the item before adding comps.');
+    const productIdentityId = item.productIdentityId ?? (await rememberProduct(item)).id;
+    const outcome = await saveComp({
+      productIdentityId,
+      inventoryItemId: null,
+      observationType: comp.kind === 'Sold' ? 'ManualSold' : 'ManualActive',
+      source: comp.source,
+      sourceUrl: comp.url,
+      title: item.title,
+      price: comp.price,
+      shippingPrice: comp.shipping,
+      condition: conditionFromGrade(item.conditionGrade) ?? item.condition,
+      observedAt: new Date().toISOString(),
+      soldAt: comp.soldAt,
+      notes: null,
+    });
+    if (outcome.status === 'rejected') throw new Error(outcome.message);
+    if (outcome.status === 'saved') reprice({ ...item, productIdentityId });
+    else linkProduct(productIdentityId);
+    return describeCompOutcome(outcome);
+  }
+
   return (
     <AppraisalView
       state={state}
@@ -146,7 +173,10 @@ export default function ScannerScreen() {
         icon: fillMode ? 'checkmark' : 'add-circle-outline',
         onPress: applyResult,
       }}
-      secondaryActions={secondaryActions(state, item, listPrice, rememberedBarcode, setRememberedBarcode)}
+      secondaryActions={secondaryActions(state, item, listPrice, rememberedBarcode, (barcode, productIdentityId) => {
+        setRememberedBarcode(barcode);
+        linkProduct(productIdentityId);
+      })}
       fallbackAction={
         fillMode
           ? undefined
@@ -167,6 +197,9 @@ export default function ScannerScreen() {
             }
       }
       onCorrect={reprice}
+      onAddComp={addComp}
+      askingPrice={askingPrice}
+      onAskingPriceChange={setAskingPrice}
       onRemedy={handleRemedy}
       onNewScan={() => startOver()}
       onClose={() => router.back()}
@@ -179,7 +212,7 @@ function secondaryActions(
   item: Identification | null,
   listPrice: number | null,
   rememberedBarcode: string | null,
-  onRemembered: (barcode: string) => void,
+  onRemembered: (barcode: string, productIdentityId: string) => void,
 ): ResultAction[] {
   if (!item) return [];
   const actions: ResultAction[] = [];
@@ -201,24 +234,15 @@ function secondaryActions(
   }
 
   const barcode = item.barcode;
-  if (barcode && !item.productIdentityId && item.source !== 'Catalog') {
-    const remembered = rememberedBarcode === barcode;
+  const remembered = barcode !== null && rememberedBarcode === barcode;
+  if (barcode && item.source !== 'Catalog' && (!item.productIdentityId || remembered)) {
     actions.push({
       label: remembered ? 'Barcode remembered' : 'Remember this barcode',
       icon: remembered ? 'checkmark-circle-outline' : 'bookmark-outline',
       disabled: remembered,
       onPress: () =>
-        void api
-          .createProductIdentity({
-            title: item.title,
-            brand: item.brand,
-            model: item.model,
-            category: item.category,
-            upc: barcode.length === 8 || barcode.length === 12 ? barcode : null,
-            ean: barcode.length === 13 || barcode.length === 14 ? barcode : null,
-            searchQuery: item.title,
-          })
-          .then(() => onRemembered(barcode))
+        void rememberProduct(item)
+          .then((product) => onRemembered(barcode, product.id))
           .catch((error: unknown) =>
             Alert.alert("Couldn't remember the barcode", error instanceof Error ? error.message : 'Try again.'),
           ),
@@ -226,6 +250,20 @@ function secondaryActions(
   }
 
   return actions;
+}
+
+// Saves what this item is so its barcode is recognised next time and comps can be filed against it.
+function rememberProduct(item: Identification) {
+  const barcode = item.barcode ?? '';
+  return api.createProductIdentity({
+    title: item.title,
+    brand: item.brand,
+    model: item.model,
+    category: item.category,
+    upc: barcode.length === 8 || barcode.length === 12 ? barcode : null,
+    ean: barcode.length === 13 || barcode.length === 14 ? barcode : null,
+    searchQuery: item.title,
+  });
 }
 
 function definedOnly(values: Record<string, string | null | undefined>): Record<string, string> {
