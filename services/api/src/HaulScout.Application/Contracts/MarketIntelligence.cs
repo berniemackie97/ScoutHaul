@@ -179,15 +179,15 @@ public sealed record ResaleEstimate(
     IReadOnlyList<ResaleComp>? Comps = null,
     IReadOnlyList<ResaleSource>? Sources = null);
 
-/// <summary>
-/// A comparable listing found via Google Search grounding — a REAL recent sold/active comp.
-/// </summary>
+/// <summary>A sold or active listing a grounded web search reported. Read by a model, so unverified.</summary>
 public sealed record ResaleComp(
     decimal Price,
     string Status,      // "sold" | "active"
     string? Condition,
     string? Note,
-    string? SourceUrl = null);
+    string? SourceUrl = null,
+    string? Title = null,
+    DateTimeOffset? Date = null);
 
 /// <summary>A web source the grounded search used (for "verify"/"open listing" links).</summary>
 public sealed record ResaleSource(string Url, string? Title);

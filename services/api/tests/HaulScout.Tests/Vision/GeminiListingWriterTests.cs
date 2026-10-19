@@ -15,6 +15,8 @@ public sealed class GeminiListingWriterTests
         public bool IsConfigured => true;
         public Task<ResaleEstimate?> EstimateAsync(string productDescription, ResaleSearchHints? searchHints, CancellationToken cancellationToken) =>
             Task.FromResult(estimate);
+        public Task<ResaleSearchOutcome> SearchAsync(string productDescription, ResaleSearchHints? searchHints, CancellationToken cancellationToken) =>
+            Task.FromResult(new ResaleSearchOutcome(estimate, null));
     }
 
     private sealed class FakeHandler(string body, HttpStatusCode status = HttpStatusCode.OK) : HttpMessageHandler

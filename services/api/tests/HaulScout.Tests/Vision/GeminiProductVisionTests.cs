@@ -27,7 +27,7 @@ public sealed class GeminiProductVisionTests
             NullLogger<GeminiProductVisionService>.Instance);
 
         // IdentifyAsync now returns a VisionIdentifyResult; tests assert on the Product it wraps.
-        return (await service.IdentifyAsync(new string('A', 200), null, CancellationToken.None)).Product;
+        return (await service.IdentifyAsync(new string('A', 200), "image/jpeg", null, CancellationToken.None)).Product;
     }
 
     private static string GeminiEnvelope(string innerJson)
@@ -95,6 +95,7 @@ public sealed class GeminiProductVisionTests
 
         ProductIdentification? result = (await ServiceWith(handler).IdentifyAsync(
             null,
+            null,
             "Sony WH-1000XM4 headphones, black, used good condition",
             CancellationToken.None)).Product;
 
@@ -113,6 +114,7 @@ public sealed class GeminiProductVisionTests
 
         ProductIdentification? result = (await ServiceWith(handler).IdentifyAsync(
             new string('A', 200),
+            "image/jpeg",
             "User says the bottom stamp reads Pyrex 403, yellow, mixing bowl",
             CancellationToken.None)).Product;
 
@@ -130,7 +132,7 @@ public sealed class GeminiProductVisionTests
             (HttpStatusCode.TooManyRequests, """{"error":"rate limited"}"""),
             (HttpStatusCode.OK, ok));
 
-        ProductIdentification? result = (await ServiceWith(handler).IdentifyAsync(new string('A', 200), null, CancellationToken.None)).Product;
+        ProductIdentification? result = (await ServiceWith(handler).IdentifyAsync(new string('A', 200), "image/jpeg", null, CancellationToken.None)).Product;
 
         Assert.NotNull(result);
         Assert.Equal("Lego Set", result.Name);
@@ -142,7 +144,7 @@ public sealed class GeminiProductVisionTests
     {
         SequenceHandler handler = new((HttpStatusCode.TooManyRequests, "{}"));
         VisionUnavailableException ex = await Assert.ThrowsAsync<VisionUnavailableException>(() =>
-            ServiceWith(handler).IdentifyAsync(new string('A', 200), null, CancellationToken.None));
+            ServiceWith(handler).IdentifyAsync(new string('A', 200), "image/jpeg", null, CancellationToken.None));
 
         Assert.Equal("rate_limited", ex.Code);
         Assert.Equal(4, handler.CallCount); // initial + three retries (exponential backoff), then throw
@@ -155,7 +157,7 @@ public sealed class GeminiProductVisionTests
         SequenceHandler handler = new((HttpStatusCode.TooManyRequests,
             """{"error":{"status":"RESOURCE_EXHAUSTED","details":[{"violations":[{"quotaId":"GenerateRequestsPerDayPerProjectPerModel-FreeTier"}]}]}}"""));
         VisionUnavailableException ex = await Assert.ThrowsAsync<VisionUnavailableException>(() =>
-            ServiceWith(handler).IdentifyAsync(new string('A', 200), null, CancellationToken.None));
+            ServiceWith(handler).IdentifyAsync(new string('A', 200), "image/jpeg", null, CancellationToken.None));
 
         Assert.Equal("quota_exhausted", ex.Code);
         Assert.Equal(1, handler.CallCount); // no retries on a daily-quota wall
@@ -282,7 +284,7 @@ public sealed class GeminiProductVisionTests
         // can show the cause, never a misleading "not identified".
         FakeHandler handler = new("""{"error":{"code":429}}""", HttpStatusCode.TooManyRequests);
         await Assert.ThrowsAsync<VisionUnavailableException>(() =>
-            ServiceWith(handler).IdentifyAsync(new string('A', 200), null, CancellationToken.None));
+            ServiceWith(handler).IdentifyAsync(new string('A', 200), "image/jpeg", null, CancellationToken.None));
     }
 
     [Fact]
@@ -306,6 +308,6 @@ public sealed class GeminiProductVisionTests
         GeminiProductVisionService service = new(new HttpClient(new FakeHandler("{}", HttpStatusCode.OK)), config, NullLogger<GeminiProductVisionService>.Instance);
 
         Assert.False(service.IsConfigured);
-        Assert.Null((await service.IdentifyAsync("AAAA", null, CancellationToken.None)).Product);
+        Assert.Null((await service.IdentifyAsync("AAAA", "image/jpeg", null, CancellationToken.None)).Product);
     }
 }

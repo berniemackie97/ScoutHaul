@@ -69,6 +69,7 @@ public sealed class CompositeMarketplaceLookupTests
     {
         public bool IsConfigured => false;
         public Task<ResaleEstimate?> EstimateAsync(string d, ResaleSearchHints? searchHints, CancellationToken ct) => Task.FromResult<ResaleEstimate?>(null);
+        public Task<ResaleSearchOutcome> SearchAsync(string d, ResaleSearchHints? searchHints, CancellationToken ct) => Task.FromResult(ResaleSearchOutcome.NothingFound);
     }
 
     private sealed class StubEstimator(ResaleEstimate? estimate) : IResaleEstimator
@@ -80,6 +81,8 @@ public sealed class CompositeMarketplaceLookupTests
             CallCount++;
             return Task.FromResult(estimate);
         }
+        public Task<ResaleSearchOutcome> SearchAsync(string d, ResaleSearchHints? searchHints, CancellationToken ct) =>
+            Task.FromResult(new ResaleSearchOutcome(estimate, null));
     }
 
     // Generic comp = a "Used" eBay listing → active-secondhand tier (real resale signal).

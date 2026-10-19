@@ -259,6 +259,95 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/appraisals/identify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "multipart/form-data": {
+                        /** Format: binary */
+                        Photo?: string;
+                        Barcode?: string;
+                        Details?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["IdentificationDto"];
+                        "application/json": components["schemas"]["IdentificationDto"];
+                        "text/json": components["schemas"]["IdentificationDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/appraisals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["AppraiseRequest"];
+                    "text/json": components["schemas"]["AppraiseRequest"];
+                    "application/*+json": components["schemas"]["AppraiseRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["AppraisalDto"];
+                        "application/json": components["schemas"]["AppraisalDto"];
+                        "text/json": components["schemas"]["AppraisalDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/budgets": {
         parameters: {
             query?: never;
@@ -9489,6 +9578,31 @@ export interface components {
             /** Format: uuid */
             scanRequestId?: string | null;
         };
+        AppraisalDto: {
+            searchText?: string | null;
+            price?: components["schemas"]["PriceDto"];
+            comps?: components["schemas"]["CompDto"][] | null;
+            estimate?: components["schemas"]["EstimateDto"];
+            sources?: components["schemas"]["CompSourceReportDto"][] | null;
+            searchLinks?: components["schemas"]["CompSearchLinkDto"][] | null;
+            webSources?: components["schemas"]["WebSourceDto"][] | null;
+            /** Format: date-time */
+            appraisedAt?: string;
+        };
+        AppraiseRequest: {
+            title?: string | null;
+            brand?: string | null;
+            model?: string | null;
+            category?: string | null;
+            color?: string | null;
+            condition?: string | null;
+            barcode?: string | null;
+            identifiers?: string[] | null;
+            certainty?: components["schemas"]["IdentificationCertainty"];
+            /** Format: uuid */
+            productIdentityId?: string | null;
+            estimate?: components["schemas"]["EstimateDto"];
+        };
         AssignTaskRequest: {
             /** Format: uuid */
             assignedToUserId?: string | null;
@@ -9672,6 +9786,38 @@ export interface components {
         };
         /** @enum {string} */
         ChannelListingStatus: "NotListed" | "Draft" | "Active" | "Sold" | "PendingDelist" | "Delisted" | "Error";
+        CompDto: {
+            kind?: components["schemas"]["CompKind"];
+            source?: string | null;
+            title?: string | null;
+            /** Format: double */
+            price?: number;
+            /** Format: double */
+            shipping?: number | null;
+            condition?: string | null;
+            url?: string | null;
+            /** Format: date-time */
+            date?: string | null;
+            verified?: boolean;
+            included?: boolean;
+            excludedBecause?: string | null;
+        };
+        /** @enum {string} */
+        CompKind: "YourSale" | "Sold" | "Asking" | "Guide";
+        CompSearchLinkDto: {
+            label?: string | null;
+            kind?: components["schemas"]["CompKind"];
+            url?: string | null;
+        };
+        CompSourceReportDto: {
+            name?: string | null;
+            status?: components["schemas"]["CompSourceStatus"];
+            /** Format: int32 */
+            count?: number;
+            message?: string | null;
+        };
+        /** @enum {string} */
+        CompSourceStatus: "Found" | "Empty" | "Failed" | "Off";
         CompleteAgentRunRequest: {
             cursor?: string | null;
             /** Format: date-time */
@@ -9683,6 +9829,8 @@ export interface components {
         CompleteSourcingStopRequest: {
             force?: boolean;
         };
+        /** @enum {string} */
+        ConfidenceLevel: "None" | "Guess" | "Thin" | "Fair" | "Strong";
         ConfidenceScoreResult: {
             /** Format: int32 */
             score?: number;
@@ -9905,6 +10053,15 @@ export interface components {
             /** Format: double */
             soldPrice?: number;
         };
+        EstimateDto: {
+            /** Format: double */
+            low?: number;
+            /** Format: double */
+            high?: number;
+            confidence?: string | null;
+            rationale?: string | null;
+            isWide?: boolean;
+        };
         /** @enum {string} */
         ExpenseCategory: "InventoryPurchase" | "Shipping" | "Supplies" | "PlatformFee" | "PaymentFee" | "Refund" | "Fuel" | "Storage" | "Other";
         ExpenseDto: {
@@ -9957,6 +10114,28 @@ export interface components {
             saleIds?: string[] | null;
             orderReference?: string | null;
         };
+        /** @enum {string} */
+        IdentificationCertainty: "High" | "Medium" | "Low";
+        IdentificationDto: {
+            title?: string | null;
+            brand?: string | null;
+            model?: string | null;
+            category?: string | null;
+            color?: string | null;
+            condition?: string | null;
+            conditionGrade?: string | null;
+            barcode?: string | null;
+            identifiers?: string[] | null;
+            certainty?: components["schemas"]["IdentificationCertainty"];
+            source?: components["schemas"]["IdentificationSource"];
+            /** Format: uuid */
+            productIdentityId?: string | null;
+            imageUrl?: string | null;
+            missingInformation?: string[] | null;
+            estimate?: components["schemas"]["EstimateDto"];
+        };
+        /** @enum {string} */
+        IdentificationSource: "Catalog" | "Barcode" | "Photo" | "Details";
         ImportFileOutcomeDto: {
             fileName?: string | null;
             run?: components["schemas"]["SyncRunDto"];
@@ -11119,6 +11298,21 @@ export interface components {
         /** @enum {string} */
         PlatformOrderStatus: "Imported" | "Reconciled" | "Ignored";
         /** @enum {string} */
+        PriceBasis: "Sales" | "Guide" | "Asking" | "Estimate" | "None";
+        PriceDto: {
+            basis?: components["schemas"]["PriceBasis"];
+            /** Format: double */
+            quickSale?: number | null;
+            /** Format: double */
+            list?: number | null;
+            /** Format: double */
+            high?: number | null;
+            /** Format: int32 */
+            confidence?: number;
+            level?: components["schemas"]["ConfidenceLevel"];
+            reasons?: string[] | null;
+        };
+        /** @enum {string} */
         PricingBasisType: "LiveValidated" | "CachedRecent" | "CachedStale" | "ManualEstimate" | "InternalHistory" | "Unavailable";
         ProductIdentification: {
             name?: string | null;
@@ -11510,6 +11704,9 @@ export interface components {
             condition?: string | null;
             note?: string | null;
             sourceUrl?: string | null;
+            title?: string | null;
+            /** Format: date-time */
+            date?: string | null;
         };
         ResaleSource: {
             url?: string | null;
@@ -12798,6 +12995,10 @@ export interface components {
             product?: components["schemas"]["ProductIdentification"];
             searchQuery?: string | null;
             detectedText?: string | null;
+        };
+        WebSourceDto: {
+            url?: string | null;
+            title?: string | null;
         };
         /** @enum {string} */
         WeightUnit: "Ounces" | "Pounds" | "Grams" | "Kilograms";
