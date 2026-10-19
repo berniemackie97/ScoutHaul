@@ -59,4 +59,45 @@ public sealed class AppraisalTranslationTests(PostgresFixture postgres)
         Assert.Equal(product.Id, (await catalog.FindByBarcodeAsync(org, "027242923541", CancellationToken.None))?.ProductIdentityId);
         Assert.Equal(item.Title, (await catalog.FindByBarcodeAsync(org, "027242923534", CancellationToken.None))?.Title);
     }
+
+    [Fact]
+    public async Task Channel_sales_history_translates_to_sql()
+    {
+        (HaulScoutDbContext db, Guid org, Guid _) = await postgres.NewOrganizationAsync();
+        await using HaulScoutDbContext _ = db;
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+
+        db.ChannelAccounts.Add(new ChannelAccount { OrganizationId = org, Channel = "eBay", DisplayName = "shop (ebay)", DefaultFeeProfileId = "store-subscriber" });
+        db.ChannelAccounts.Add(new ChannelAccount { OrganizationId = org, Channel = "Depop", DisplayName = "shop (depop)", IsActive = false });
+        foreach ((decimal price, SaleStatus status) in new[] { (50m, SaleStatus.Delivered), (30m, SaleStatus.Recorded), (70m, SaleStatus.Refunded) })
+        {
+            InventoryItem item = new() { OrganizationId = org, Title = $"Item {price}", Status = InventoryStatus.Sold };
+            db.InventoryItems.Add(item);
+            db.Sales.Add(new Sale
+            {
+                OrganizationId = org,
+                InventoryItemId = item.Id,
+                Platform = "eBay",
+                SoldPrice = price,
+                PlatformFees = price * 0.1m,
+                ShippingCost = 5m,
+                ShippingCharged = 6m,
+                Status = status,
+                SoldAt = now.AddDays(-10),
+            });
+        }
+
+        await db.SaveChangesAsync();
+
+        EfChannelEconomicsStore store = new(db);
+        IReadOnlyList<ChannelAccountRef> channels = await store.ListActiveChannelsAsync(org, CancellationToken.None);
+        IReadOnlyDictionary<string, ChannelSalesHistory> history = await store.SalesHistoryAsync(org, now.AddDays(-365), CancellationToken.None);
+
+        Assert.Equal("eBay", Assert.Single(channels).Channel);
+        ChannelSalesHistory ebay = history["EBAY"];
+        Assert.Equal(2, ebay.Sales);
+        Assert.Equal(80m, ebay.SoldTotal);
+        Assert.Equal(8m, ebay.FeeTotal);
+        Assert.Equal(-2m, ebay.NetShippingTotal);
+    }
 }

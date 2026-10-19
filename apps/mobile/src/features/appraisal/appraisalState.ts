@@ -21,6 +21,7 @@ export type AppraisalAction =
   | { type: 'reprice'; item: Identification }
   | { type: 'appraised'; appraisal: Appraisal }
   | { type: 'appraiseFailed'; failure: ScanFailure }
+  | { type: 'linkProduct'; productIdentityId: string }
   | { type: 'reset' };
 
 export const initialAppraisalState: AppraisalState = { phase: 'ready' };
@@ -54,6 +55,11 @@ export function appraisalReducer(state: AppraisalState, action: AppraisalAction)
     case 'appraiseFailed':
       return state.phase === 'appraising'
         ? { phase: 'unpriced', input: state.input, item: state.item, failure: action.failure }
+        : state;
+
+    case 'linkProduct':
+      return state.phase === 'appraising' || state.phase === 'appraised' || state.phase === 'unpriced'
+        ? { ...state, item: { ...state.item, productIdentityId: action.productIdentityId } }
         : state;
 
     case 'reset':

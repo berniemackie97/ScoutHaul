@@ -675,6 +675,54 @@
         }
       }
     },
+    "/api/buy-checks": {
+      "post": {
+        "tags": [
+          "BuyChecks"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BuyCheckRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BuyCheckRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/BuyCheckRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/BuyCheckDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BuyCheckDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BuyCheckDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/channel-accounts": {
       "get": {
         "tags": [
@@ -12988,6 +13036,143 @@
         },
         "additionalProperties": false
       },
+      "BuyChannelDto": {
+        "type": "object",
+        "properties": {
+          "channel": {
+            "type": "string",
+            "nullable": true
+          },
+          "label": {
+            "type": "string",
+            "nullable": true
+          },
+          "fees": {
+            "type": "number",
+            "format": "double"
+          },
+          "feesFrom": {
+            "type": "string",
+            "nullable": true
+          },
+          "shipping": {
+            "type": "number",
+            "format": "double"
+          },
+          "shippingFrom": {
+            "type": "string",
+            "nullable": true
+          },
+          "supplies": {
+            "type": "number",
+            "format": "double"
+          },
+          "netProceeds": {
+            "type": "number",
+            "format": "double"
+          },
+          "maxBuyPrice": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "additionalProperties": false
+      },
+      "BuyCheckDto": {
+        "type": "object",
+        "properties": {
+          "expectedSalePrice": {
+            "type": "number",
+            "format": "double"
+          },
+          "askingPrice": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "channel": {
+            "$ref": "#/components/schemas/BuyChannelDto"
+          },
+          "channels": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BuyChannelDto"
+            },
+            "nullable": true
+          },
+          "maxBuyPrice": {
+            "type": "number",
+            "format": "double"
+          },
+          "profitAtAsking": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "marginAtAsking": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "decision": {
+            "$ref": "#/components/schemas/RecommendationDecisionType"
+          },
+          "reasons": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "BuyCheckRequest": {
+        "type": "object",
+        "properties": {
+          "expectedSalePrice": {
+            "type": "number",
+            "format": "double"
+          },
+          "askingPrice": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "channel": {
+            "type": "string",
+            "nullable": true
+          },
+          "shippingCost": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "suppliesCost": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "minimumProfit": {
+            "type": "number",
+            "format": "double"
+          },
+          "targetMarginPercent": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "confidence": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "basis": {
+            "$ref": "#/components/schemas/PriceBasis"
+          }
+        },
+        "additionalProperties": false
+      },
       "ChangeInventoryStatusRequest": {
         "type": "object",
         "properties": {
@@ -24347,6 +24532,9 @@
     },
     {
       "name": "Budgets"
+    },
+    {
+      "name": "BuyChecks"
     },
     {
       "name": "ChannelAccounts"

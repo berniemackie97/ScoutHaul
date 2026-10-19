@@ -1,5 +1,5 @@
 import { apiRequest, uploadMultipart } from '../../api/client';
-import type { Appraisal, AppraiseRequest, Identification } from './types';
+import type { Appraisal, AppraiseRequest, BuyCheck, BuyCheckRequest, Identification } from './types';
 
 // Identification can run a vision model with retries; pricing waits on a web search with a 45 s
 // server deadline. Both need more than the client's default.
@@ -33,6 +33,10 @@ export function appraise(request: AppraiseRequest, signal?: AbortSignal): Promis
     signal,
     timeoutMs: APPRAISE_TIMEOUT_MS,
   });
+}
+
+export function checkBuy(request: BuyCheckRequest, signal?: AbortSignal): Promise<BuyCheck> {
+  return apiRequest<BuyCheck>('/api/buy-checks', { method: 'POST', body: request, signal });
 }
 
 export function toAppraiseRequest(item: Identification): AppraiseRequest {

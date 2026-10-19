@@ -53,7 +53,7 @@ export function describeFailure(error: unknown): ScanFailure {
     case 'timeout':
       return { title: 'Took too long', message: 'The connection is slow. Try again.', remedies: ['retry'] };
     case 'unauthenticated':
-      return { title: 'Signed out', message: 'Sign in again to scan.', remedies: ['signIn'] };
+      return { title: 'Signed out', message: 'Sign in again to continue.', remedies: ['signIn'] };
     case 'http':
       if (error.status === 429) {
         return { title: 'Slow down', message: 'That was a lot of scans in a minute. Wait a moment.', remedies: ['wait'] };

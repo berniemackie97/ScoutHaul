@@ -99,3 +99,43 @@ export type Appraisal = {
   webSources: WebSource[];
   appraisedAt: string;
 };
+
+// Mirrors HaulScout.Application/Appraisal/BuyCheck.cs.
+
+export type BuyDecision = 'Buy' | 'Negotiate' | 'Pass' | 'ResearchRequired' | 'Unavailable';
+
+export type BuyCheckRequest = {
+  expectedSalePrice: number;
+  askingPrice: number | null;
+  channel: string | null;
+  shippingCost: number | null;
+  suppliesCost: number | null;
+  minimumProfit: number;
+  targetMarginPercent: number | null;
+  confidence: number | null;
+  basis: PriceBasis | null;
+};
+
+export type BuyChannel = {
+  channel: string;
+  label: string;
+  fees: number;
+  feesFrom: string;
+  shipping: number;
+  shippingFrom: string;
+  supplies: number;
+  netProceeds: number;
+  maxBuyPrice: number;
+};
+
+export type BuyCheck = {
+  expectedSalePrice: number;
+  askingPrice: number | null;
+  channel: BuyChannel;
+  channels: BuyChannel[];
+  maxBuyPrice: number;
+  profitAtAsking: number | null;
+  marginAtAsking: number | null;
+  decision: BuyDecision;
+  reasons: string[];
+};
