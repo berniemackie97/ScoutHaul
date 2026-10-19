@@ -248,6 +248,7 @@ public sealed class SalesTaxWorkflowService(
         }
 
         if (request.AmountPaid < 0) return AppResult<SalesTaxWorksheetDto>.Validation("The amount paid cannot be negative.");
+        if (!Enum.IsDefined(request.Method)) return AppResult<SalesTaxWorksheetDto>.Validation("Choose how the return was filed.");
         string? confirmation = Trim(request.ConfirmationNumber);
         if (request.Method != SalesTaxFilingMethod.Paper && confirmation is null)
         {
@@ -434,6 +435,7 @@ public sealed class SalesTaxWorkflowService(
         string? description = Trim(request.Description);
         if (description is null) return AppResult<SalesTaxAdjustmentDto>.Validation("Describe the adjustment and where it comes from (credit memo number, statute).");
         if (request.Amount <= 0) return AppResult<SalesTaxAdjustmentDto>.Validation("The amount must be more than zero.");
+        if (!Enum.IsDefined(request.Kind)) return AppResult<SalesTaxAdjustmentDto>.Validation("Choose the line the adjustment belongs on.");
 
         Ledger? ledger = await LoadLedgerAsync(null, cancellationToken);
         SalesTaxPeriod? period = ledger?.Periods.Select(item => item.Period).FirstOrDefault(period => period.Key == request.PeriodKey);
@@ -484,6 +486,8 @@ public sealed class SalesTaxWorkflowService(
             default:
                 return AppResult.Validation("Say whether the item was delivered in Florida or outside it.");
         }
+
+        if (!Enum.IsDefined(request.Exemption)) return AppResult.Validation("Choose a valid exemption.");
 
         string? certificate = Trim(request.ExemptionCertificate);
         if (request.Exemption is Dr15Exemption.Resale or Dr15Exemption.ExemptOrganization && certificate is null)

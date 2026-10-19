@@ -323,6 +323,22 @@ public class SalesTaxWorkflowTests
     }
 
     [Fact]
+    public async Task Undefined_enum_values_are_refused()
+    {
+        Harness harness = await NewAsync(nameof(Undefined_enum_values_are_refused));
+        Sale sale = harness.AddSale("Storefront", Et(8, 10), 100m, remitted: false);
+        SalesTaxWorksheetDto worksheet = await Worksheet(harness, Q3);
+
+        Assert.Equal(AppResultStatus.Validation, (await harness.Service.FileAsync(Q3, Filing(worksheet) with { Method = (SalesTaxFilingMethod)99 }, CancellationToken.None)).Status);
+        Assert.Equal(AppResultStatus.Validation, (await harness.Service.AddAdjustmentAsync(
+            new SaveSalesTaxAdjustmentRequest(Q3, (SalesTaxAdjustmentKind)99, 1m, "x"), CancellationToken.None)).Status);
+        Assert.Equal(AppResultStatus.Validation, (await harness.Service.SaveSaleDecisionAsync(sale.Id,
+            new SaveSalesTaxSaleDecisionRequest(Dr15Destination.OutsideFlorida, null, (Dr15Exemption)99, null, null), CancellationToken.None)).Status);
+        Assert.Equal(AppResultStatus.Validation, (await harness.Service.SaveSaleDecisionAsync(sale.Id,
+            new SaveSalesTaxSaleDecisionRequest((Dr15Destination)99, null, Dr15Exemption.None, null, null), CancellationToken.None)).Status);
+    }
+
+    [Fact]
     public async Task A_business_still_on_pacific_time_is_told_to_switch()
     {
         Harness harness = await NewAsync(nameof(A_business_still_on_pacific_time_is_told_to_switch), zone: "America/Los_Angeles");
