@@ -402,3 +402,5 @@ public sealed record InventoryIssueDto(
     bool IsResolved,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);
+
+public sealed record SetExpectedPriceRequest(decimal EstimatedSalePrice);

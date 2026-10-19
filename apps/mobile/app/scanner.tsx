@@ -1,10 +1,12 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Alert } from 'react-native';
+import { ActivityIndicator, Alert, View } from 'react-native';
 import { api } from '../src/api';
 import type { FoundComp } from '../src/features/appraisal/AddCompCard';
 import { AppraisalView, type ResultAction } from '../src/features/appraisal/AppraisalView';
 import type { AppraisalState } from '../src/features/appraisal/appraisalState';
+import type { InventoryItem } from '../src/domain/types';
+import { formatMoney } from '../src/utils/money';
 import { DetailsEntry } from '../src/features/appraisal/DetailsEntry';
 import type { FailureRemedy } from '../src/features/appraisal/failures';
 import { handOffScan } from '../src/features/appraisal/handoff';
@@ -17,7 +19,9 @@ import { describeCompOutcome, saveComp } from '../src/services/saveComp';
 type Entry = { kind: 'camera' } | { kind: 'type'; photoUri: string | null };
 
 type ScannerParams = {
-  mode?: 'barcode' | 'photo' | 'details';
+  mode?: 'barcode' | 'photo' | 'details' | 'item';
+  /** With mode=item: price this item in stock and keep the appraisal in its history. */
+  inventoryItemId?: string;
   /** Typed details to identify straight away. */
   details?: string;
   /** Facts the caller already knows, sent along with a photo. */
@@ -32,7 +36,7 @@ type ScannerParams = {
 
 export default function ScannerScreen() {
   const params = useLocalSearchParams<ScannerParams>();
-  const { state, scan, reprice, linkProduct, reset } = useAppraisal();
+  const { state, scan, reprice, appraiseKnown, linkProduct, reset } = useAppraisal();
   const [mode, setMode] = useState<CaptureMode>(params.mode === 'photo' ? 'photo' : 'barcode');
   const [entry, setEntry] = useState<Entry>(params.mode === 'details' ? { kind: 'type', photoUri: null } : { kind: 'camera' });
   const [rememberedBarcode, setRememberedBarcode] = useState<string | null>(null);
@@ -47,6 +51,19 @@ export default function ScannerScreen() {
     startedFromParams.current = true;
     void scan({ kind: 'details', details });
   }, [params.details, scan]);
+
+  useEffect(() => {
+    const inventoryItemId = params.inventoryItemId;
+    if (startedFromParams.current || params.mode !== 'item' || !inventoryItemId) return;
+    startedFromParams.current = true;
+    api
+      .inventoryItem(inventoryItemId)
+      .then((stocked) => appraiseKnown(identificationOf(stocked), { kind: 'item', inventoryItemId, title: stocked.title }))
+      .catch((error: unknown) => {
+        Alert.alert("Couldn't open the item", error instanceof Error ? error.message : 'Try again.');
+        router.back();
+      });
+  }, [params.mode, params.inventoryItemId, appraiseKnown]);
 
   function startOver(next: Entry = { kind: 'camera' }) {
     reset();
@@ -70,9 +87,17 @@ export default function ScannerScreen() {
         return;
       case 'retry':
       case 'wait':
-        if (state.phase === 'unpriced') reprice(state.item);
+        if (state.phase === 'unpriced') reprice(state.item, state.input);
         else void scan(state.input);
     }
+  }
+
+  if (state.phase === 'ready' && params.mode === 'item') {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator />
+      </View>
+    );
   }
 
   if (state.phase === 'ready') {
@@ -143,7 +168,7 @@ export default function ScannerScreen() {
   }
 
   async function addComp(comp: FoundComp): Promise<string> {
-    if (!item) throw new Error('Identify the item before adding comps.');
+    if (!item || state.phase === 'ready') throw new Error('Identify the item before adding comps.');
     const productIdentityId = item.productIdentityId ?? (await rememberProduct(item)).id;
     const outcome = await saveComp({
       productIdentityId,
@@ -160,7 +185,7 @@ export default function ScannerScreen() {
       notes: null,
     });
     if (outcome.status === 'rejected') throw new Error(outcome.message);
-    if (outcome.status === 'saved') reprice({ ...item, productIdentityId });
+    if (outcome.status === 'saved') reprice({ ...item, productIdentityId }, state.input);
     else linkProduct(productIdentityId);
     return describeCompOutcome(outcome);
   }
@@ -168,17 +193,21 @@ export default function ScannerScreen() {
   return (
     <AppraisalView
       state={state}
-      primaryAction={{
-        label: fillMode ? 'Use these details' : 'Add to inventory',
-        icon: fillMode ? 'checkmark' : 'add-circle-outline',
-        onPress: applyResult,
-      }}
+      primaryAction={
+        state.input.kind === 'item'
+          ? expectedPriceAction(state.input.inventoryItemId, listPrice)
+          : {
+              label: fillMode ? 'Use these details' : 'Add to inventory',
+              icon: fillMode ? 'checkmark' : 'add-circle-outline',
+              onPress: applyResult,
+            }
+      }
       secondaryActions={secondaryActions(state, item, listPrice, rememberedBarcode, (barcode, productIdentityId) => {
         setRememberedBarcode(barcode);
         linkProduct(productIdentityId);
       })}
       fallbackAction={
-        fillMode
+        fillMode || state.input.kind === 'item'
           ? undefined
           : {
               label: 'Add it without a match',
@@ -196,7 +225,7 @@ export default function ScannerScreen() {
                 }),
             }
       }
-      onCorrect={reprice}
+      onCorrect={(corrected) => reprice(corrected, state.input)}
       onAddComp={addComp}
       askingPrice={askingPrice}
       onAskingPriceChange={setAskingPrice}
@@ -226,6 +255,7 @@ function secondaryActions(
           pathname: '/deal-analyzer',
           params: definedOnly({
             expectedSalePrice: String(listPrice),
+            inventoryItemId: state.phase !== 'ready' && state.input.kind === 'item' ? state.input.inventoryItemId : null,
             productIdentityId: item.productIdentityId,
             query: state.phase === 'appraised' ? state.appraisal.searchText : item.title,
           }),
@@ -250,6 +280,44 @@ function secondaryActions(
   }
 
   return actions;
+}
+
+function expectedPriceAction(inventoryItemId: string, listPrice: number | null): ResultAction {
+  return {
+    label: listPrice === null ? 'No price to use' : `Use ${formatMoney(listPrice)} as expected price`,
+    icon: 'checkmark',
+    disabled: listPrice === null,
+    onPress: () => {
+      if (listPrice === null) return;
+      void api
+        .setExpectedPrice(inventoryItemId, listPrice)
+        .then(() => router.back())
+        .catch((error: unknown) =>
+          Alert.alert("Couldn't save the price", error instanceof Error ? error.message : 'Try again.'),
+        );
+    },
+  };
+}
+
+// An item in stock is already identified; its own record is the identification.
+function identificationOf(item: InventoryItem): Identification {
+  return {
+    title: item.title,
+    brand: item.brand ?? null,
+    model: item.model ?? null,
+    category: item.category ?? null,
+    color: item.colors?.[0] ?? null,
+    condition: item.condition ?? null,
+    conditionGrade: null,
+    barcode: item.barcode ?? null,
+    identifiers: item.model ? [item.model] : [],
+    certainty: 'High',
+    source: 'Catalog',
+    productIdentityId: item.productIdentityId ?? null,
+    imageUrl: item.heroPhotoThumbnailUrl ?? null,
+    missingInformation: [],
+    estimate: null,
+  };
 }
 
 // Saves what this item is so its barcode is recognised next time and comps can be filed against it.

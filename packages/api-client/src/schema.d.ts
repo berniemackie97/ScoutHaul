@@ -305,6 +305,45 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/appraisals/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    inventoryItemId?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["AppraisalSnapshotDto"][];
+                        "application/json": components["schemas"]["AppraisalSnapshotDto"][];
+                        "text/json": components["schemas"]["AppraisalSnapshotDto"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/appraisals": {
         parameters: {
             query?: never;
@@ -2279,6 +2318,51 @@ export interface paths {
         };
         trace?: never;
     };
+    "/api/inventory/{id}/price": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["SetExpectedPriceRequest"];
+                    "text/json": components["schemas"]["SetExpectedPriceRequest"];
+                    "application/*+json": components["schemas"]["SetExpectedPriceRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["InventoryItemDto"];
+                        "application/json": components["schemas"]["InventoryItemDto"];
+                        "text/json": components["schemas"]["InventoryItemDto"];
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
     "/api/inventory/location": {
         parameters: {
             query?: never;
@@ -2590,49 +2674,6 @@ export interface paths {
                         "text/plain": components["schemas"]["ListingDto"];
                         "application/json": components["schemas"]["ListingDto"];
                         "text/json": components["schemas"]["ListingDto"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/market-analysis/calculate": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: {
-                content: {
-                    "application/json": components["schemas"]["MarketAnalysisRequest"];
-                    "text/json": components["schemas"]["MarketAnalysisRequest"];
-                    "application/*+json": components["schemas"]["MarketAnalysisRequest"];
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["MarketAnalysisResponse"];
-                        "application/json": components["schemas"]["MarketAnalysisResponse"];
-                        "text/json": components["schemas"]["MarketAnalysisResponse"];
                     };
                 };
             };
@@ -9632,6 +9673,22 @@ export interface components {
             /** Format: date-time */
             appraisedAt?: string;
         };
+        AppraisalSnapshotDto: {
+            /** Format: uuid */
+            id?: string;
+            /** Format: date-time */
+            appraisedAt?: string;
+            /** Format: double */
+            list?: number | null;
+            basis?: components["schemas"]["PriceBasis"];
+            /** Format: int32 */
+            confidence?: number;
+            level?: components["schemas"]["ConfidenceLevel"];
+            /** Format: int32 */
+            saleComps?: number;
+            /** Format: int32 */
+            askingComps?: number;
+        };
         AppraiseRequest: {
             title?: string | null;
             brand?: string | null;
@@ -9645,6 +9702,8 @@ export interface components {
             /** Format: uuid */
             productIdentityId?: string | null;
             estimate?: components["schemas"]["EstimateDto"];
+            /** Format: uuid */
+            inventoryItemId?: string | null;
         };
         AssignTaskRequest: {
             /** Format: uuid */
@@ -9924,12 +9983,6 @@ export interface components {
         };
         /** @enum {string} */
         ConfidenceLevel: "None" | "Guess" | "Thin" | "Fair" | "Strong";
-        ConfidenceScoreResult: {
-            /** Format: int32 */
-            score?: number;
-            reasons?: string[] | null;
-            warnings?: string[] | null;
-        };
         ConsoleInventoryDto: {
             /** Format: int32 */
             activeItems?: number;
@@ -10124,20 +10177,6 @@ export interface components {
             /** Format: int32 */
             staleInventoryCount?: number;
         };
-        DealAnalysisResult: {
-            /** Format: double */
-            recommendedMaxBuyPrice?: number | null;
-            /** Format: double */
-            expectedNetProfit?: number | null;
-            /** Format: double */
-            roiPercent?: number | null;
-            /** Format: double */
-            marginPercent?: number | null;
-            /** Format: double */
-            breakEvenPrice?: number | null;
-            decision?: components["schemas"]["RecommendationDecisionType"];
-            warnings?: string[] | null;
-        };
         /** @enum {string} */
         DimensionUnit: "Inches" | "Centimeters";
         EstimateChannelFeesRequest: {
@@ -10202,6 +10241,9 @@ export interface components {
             estimatedResaleHigh?: number | null;
             priceRationale?: string | null;
             comps?: components["schemas"]["ResaleComp"][] | null;
+            priceBasis?: components["schemas"]["PriceBasis"];
+            /** Format: int32 */
+            confidence?: number | null;
         };
         GroupSalesRequest: {
             saleIds?: string[] | null;
@@ -10711,57 +10753,6 @@ export interface components {
         ListingReadiness: "Optional" | "Recommended" | "Required";
         /** @enum {string} */
         ListingStatus: "Draft" | "Active" | "Ended" | "Sold" | "Cancelled";
-        MarketAnalysisRequest: {
-            /** Format: uuid */
-            productIdentityId?: string | null;
-            /** Format: uuid */
-            inventoryItemId?: string | null;
-            /** Format: double */
-            expectedSalePrice?: number | null;
-            /** Format: double */
-            sellerAskingPrice?: number | null;
-            /** Format: double */
-            purchasePrice?: number | null;
-            platform?: string | null;
-            /** Format: double */
-            platformFeePercent?: number;
-            /** Format: double */
-            paymentFeePercent?: number;
-            /** Format: double */
-            fixedPaymentFee?: number;
-            /** Format: double */
-            estimatedShippingCostPaidBySeller?: number;
-            /** Format: double */
-            suppliesCost?: number;
-            /** Format: double */
-            riskReserve?: number;
-            /** Format: double */
-            desiredMinimumProfit?: number;
-            /** Format: double */
-            targetMarginPercent?: number | null;
-            pricingBasis?: components["schemas"]["PricingBasisType"];
-            condition?: string | null;
-            riskFlags?: string[] | null;
-        };
-        MarketAnalysisResponse: {
-            /** Format: uuid */
-            analysisId?: string;
-            /** Format: uuid */
-            recommendationId?: string;
-            /** Format: uuid */
-            productIdentityId?: string | null;
-            /** Format: uuid */
-            inventoryItemId?: string | null;
-            /** Format: double */
-            estimatedSalePrice?: number | null;
-            pricingBasis?: components["schemas"]["PricingBasisType"];
-            /** Format: int32 */
-            soldCompCount?: number;
-            /** Format: int32 */
-            activeListingCount?: number;
-            confidence?: components["schemas"]["ConfidenceScoreResult"];
-            recommendation?: components["schemas"]["DealAnalysisResult"];
-        };
         MarketObservationDto: {
             /** Format: uuid */
             id?: string;
@@ -11405,8 +11396,6 @@ export interface components {
             level?: components["schemas"]["ConfidenceLevel"];
             reasons?: string[] | null;
         };
-        /** @enum {string} */
-        PricingBasisType: "LiveValidated" | "CachedRecent" | "CachedStale" | "ManualEstimate" | "InternalHistory" | "Unavailable";
         ProductIdentification: {
             name?: string | null;
             brand?: string | null;
@@ -12078,6 +12067,10 @@ export interface components {
             id?: string;
             email?: string | null;
             displayName?: string | null;
+        };
+        SetExpectedPriceRequest: {
+            /** Format: double */
+            estimatedSalePrice?: number;
         };
         SetInventoryLocationRequest: {
             inventoryItemIds?: string[] | null;

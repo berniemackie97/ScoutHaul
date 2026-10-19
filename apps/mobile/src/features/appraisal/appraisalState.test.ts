@@ -57,6 +57,12 @@ describe('appraisalReducer', () => {
     expect(appraisalReducer(unidentified, { type: 'reprice', item })).toBe(unidentified);
   });
 
+  it('prices an item in stock straight away, from any step', () => {
+    const input = { kind: 'item', inventoryItemId: 'item-1', title: 'Sony WH-1000XM5' } as const;
+
+    expect(appraisalReducer(initialAppraisalState, { type: 'appraiseKnown', input, item })).toEqual({ phase: 'appraising', input, item });
+  });
+
   it('keeps the photo across failures so a retry does not need a new one', () => {
     const state = appraisalReducer({ phase: 'identifying', input: photo }, { type: 'identifyFailed', failure });
 

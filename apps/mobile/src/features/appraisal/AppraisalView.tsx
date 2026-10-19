@@ -184,6 +184,8 @@ function describeInput(input: AppraisalViewProps['state']['input']): string {
       return input.details ? 'Photo and your notes' : 'Photo';
     case 'details':
       return `“${input.details.length > 80 ? `${input.details.slice(0, 80)}…` : input.details}”`;
+    case 'item':
+      return input.title;
   }
 }
 

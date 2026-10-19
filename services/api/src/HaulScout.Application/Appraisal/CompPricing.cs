@@ -58,7 +58,7 @@ public static class CompPricing
             Round(pricing.List),
             Round(pricing.High),
             score,
-            pricing.Basis == PriceBasis.None ? ConfidenceLevel.None : LevelOf(score),
+            LevelFor(score, pricing.Basis),
             reasons,
             Order(assessed));
     }
@@ -334,13 +334,15 @@ public static class CompPricing
         return recency * source * kind;
     }
 
-    private static ConfidenceLevel LevelOf(int score) => score switch
-    {
-        >= 75 => ConfidenceLevel.Strong,
-        >= 50 => ConfidenceLevel.Fair,
-        >= 25 => ConfidenceLevel.Thin,
-        _ => ConfidenceLevel.Guess,
-    };
+    public static ConfidenceLevel LevelFor(int score, PriceBasis basis) => basis == PriceBasis.None
+        ? ConfidenceLevel.None
+        : score switch
+        {
+            >= 75 => ConfidenceLevel.Strong,
+            >= 50 => ConfidenceLevel.Fair,
+            >= 25 => ConfidenceLevel.Thin,
+            _ => ConfidenceLevel.Guess,
+        };
 
     private static IReadOnlyList<AssessedComp> Order(List<AssessedComp> assessed) => assessed
         .OrderByDescending(comp => comp.Included)

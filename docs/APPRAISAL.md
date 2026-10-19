@@ -103,7 +103,8 @@ were asked. Sources are ports (`ICompSource`); adapters live in Infrastructure:
 | 1 | `bernie/AppraisalEngine` | Server: vocabulary, `CompMatching` + `CompPricing`, comp sources, `AppraisalService`, the two endpoints, honesty guards, tests. Old endpoints stay for installed builds |
 | 2 | `bernie/ScoutOnAppraisals` | Mobile: Scout rebuilt on the endpoints — one flow for barcode, photo and typed details; one result screen; refine re-prices; decomposed scanner; no client orchestration |
 | 3 | `bernie/BuyCheckWithRealFees` | Buy check on the org's channel fee profiles; deal analyzer folded in; recording a comp you found; marketplace links on the result |
-| 4 | `bernie/OneWayToPrice` | Listing generation and the item page price from the same engine; appraisal kept on the item when it is added; retire `MarketValuation`, `ConfidenceScorer`, old lookup endpoints |
+| 4 | `bernie/OneWayToPrice` | Listing generation priced by the appraisal (Gemini writes words only); item page "Price it now" with appraisals kept in the item's history (`MarketAnalyses` table, no migration) and "use as expected price" (`PATCH /api/inventory/{id}/price`); `MarketValuation`, `ConfidenceScorer`, `ListingPriceAdvisor` and `/api/market-analysis` retired |
+| 5 | later | Retire `/api/marketplace-lookup/*` and `/api/vision/identify` once every phone runs the new build |
 
 Owed outside this arc: eBay developer keys (free) would add real asking prices — a setting for the
 user to fill in, not code.

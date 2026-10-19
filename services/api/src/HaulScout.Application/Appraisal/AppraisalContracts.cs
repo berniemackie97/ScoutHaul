@@ -46,7 +46,9 @@ public sealed record AppraiseRequest(
     IReadOnlyList<string>? Identifiers = null,
     IdentificationCertainty? Certainty = null,
     Guid? ProductIdentityId = null,
-    EstimateDto? Estimate = null);
+    EstimateDto? Estimate = null,
+    /// <summary>An item in stock: the appraisal is kept in its history.</summary>
+    Guid? InventoryItemId = null);
 
 public sealed record PriceDto(
     PriceBasis Basis,

@@ -61,6 +61,7 @@ export const api = {
   updateInventory: inventoryApi.update,
   deleteInventory: inventoryApi.archive,
   changeInventoryStatus: inventoryApi.changeStatus,
+  setExpectedPrice: inventoryApi.setExpectedPrice,
   uploadInventoryPhoto: inventoryApi.uploadPhoto,
   deleteInventoryPhoto: inventoryApi.deletePhoto,
   deleteInventoryPhotoById: inventoryApi.deletePhotoById,

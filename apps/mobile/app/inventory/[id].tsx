@@ -25,6 +25,7 @@ import {
   isOrderManagedInventory,
 } from '../../src/domain/inventoryOperations';
 import { factsFromInventoryItem, readinessBlockers } from '../../src/domain/lifecycleReadiness';
+import { ItemPricingCard } from '../../src/features/appraisal/ItemPricingCard';
 import { profileFor } from '../../src/features/inventoryEdit/itemProfiles';
 import { formatMoney } from '../../src/utils/money';
 import { getPhotos, type ItemPhoto } from '../../src/utils/photos';
@@ -390,34 +391,8 @@ export default function InventoryDetailScreen() {
           onPress={() => router.push({ pathname: '/inventory/edit', params: { id: item.id } })}
         />
         <Button
-          label="Analyze"
-          icon="calculator-outline"
-          onPress={() => router.push({ pathname: '/deal-analyzer', params: { inventoryItemId: item.id } })}
-        />
-      </View>
-      <View style={styles.actionRow}>
-        <Button
-          label="Add Comp"
-          icon="add-circle-outline"
-          variant="secondary"
-          onPress={() =>
-            router.push({
-              pathname: '/comp-capture',
-              params: { inventoryItemId: item.id, title: item.title },
-            })
-          }
-        />
-        <Button
-          label="Marketplace"
-          icon="open-outline"
-          variant="secondary"
-          onPress={() => router.push({ pathname: '/marketplace-links', params: { query: item.title } })}
-        />
-      </View>
-      <View style={styles.actionRow}>
-        <Button
-          label="Generate Listing"
-          icon="sparkles-outline"
+          label="Write listing"
+          icon="document-text-outline"
           onPress={() => router.push({ pathname: '/generate-listing', params: { id: item.id } })}
         />
       </View>
@@ -440,6 +415,9 @@ export default function InventoryDetailScreen() {
           onPress={confirmArchiveItem}
         />
       </View>
+
+      <SectionHeader title="Pricing" />
+      <ItemPricingCard itemId={item.id} expectedPrice={item.estimatedSalePrice ?? null} />
 
       <SectionHeader title="Next operations" />
       <Card>
@@ -496,7 +474,7 @@ export default function InventoryDetailScreen() {
         </View>
       </Card>
 
-      <SectionHeader title={`Comps (${comps.length})`} />
+      <SectionHeader title={`Recorded comps (${comps.length})`} />
       {comps.length === 0 ? (
         <Card>
           <EmptyState

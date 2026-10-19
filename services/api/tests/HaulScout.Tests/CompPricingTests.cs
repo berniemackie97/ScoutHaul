@@ -66,6 +66,25 @@ public sealed class CompPricingTests
     }
 
     [Fact]
+    public void A_graded_card_is_priced_only_from_the_same_grader_and_grade()
+    {
+        ItemFacts card = Item("PSA 9 Gardevoir & Sylveon GX 130/214", brand: "Pokemon");
+
+        PriceResult result = CompPricing.Price(card,
+        [
+            Sold(180m, title: "PSA 9 Gardevoir & Sylveon GX 130/214 Unbroken Bonds"),
+            Sold(60m, title: "Gardevoir & Sylveon GX 130/214 Unbroken Bonds Holo NM"),
+            Sold(420m, title: "PSA 10 Gardevoir & Sylveon GX 130/214 Gem Mint"),
+            Sold(150m, title: "CGC 9 Gardevoir & Sylveon GX 130/214"),
+        ], estimate: null, Now);
+
+        Assert.Equal(180m, Assert.Single(result.Comps, comp => comp.Included).Comp.Price);
+        Assert.Contains(result.Comps, comp => comp.ExcludedBecause == "raw/ungraded comp for graded item");
+        Assert.Contains(result.Comps, comp => comp.ExcludedBecause == "grade mismatch");
+        Assert.Contains(result.Comps, comp => comp.ExcludedBecause == "grading-company mismatch");
+    }
+
+    [Fact]
     public void A_comp_naming_a_different_product_is_left_out()
     {
         PriceResult result = CompPricing.Price(Headphones,

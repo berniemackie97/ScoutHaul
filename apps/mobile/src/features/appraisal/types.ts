@@ -45,6 +45,19 @@ export type AppraiseRequest = {
   certainty: IdentificationCertainty;
   productIdentityId: string | null;
   estimate: Estimate | null;
+  /** An item in stock: the appraisal is kept in its history. */
+  inventoryItemId: string | null;
+};
+
+export type AppraisalSnapshot = {
+  id: string;
+  appraisedAt: string;
+  list: number | null;
+  basis: PriceBasis;
+  confidence: number;
+  level: ConfidenceLevel;
+  saleComps: number;
+  askingComps: number;
 };
 
 export type Price = {

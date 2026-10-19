@@ -222,6 +222,13 @@ public sealed class InventoryController(
         return ToActionResult(result);
     }
 
+    [HttpPatch("{id:guid}/price")]
+    public async Task<ActionResult<InventoryItemDto>> SetExpectedPrice(
+        Guid id,
+        SetExpectedPriceRequest request,
+        CancellationToken cancellationToken) =>
+        ToActionResult(await statuses.SetExpectedPriceAsync(id, request, cancellationToken));
+
     [HttpPost("location")]
     public async Task<ActionResult<BulkInventoryUpdateResultDto>> SetLocation(
         SetInventoryLocationRequest request,

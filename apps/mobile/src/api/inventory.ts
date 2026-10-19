@@ -133,6 +133,8 @@ export const inventoryApi = {
   create: (body: CreateInventoryRequest) => apiRequest<InventoryItem>('/api/inventory', { method: 'POST', body }),
   update: (id: string, body: CreateInventoryRequest) => apiRequest<InventoryItem>(`/api/inventory/${id}`, { method: 'PUT', body }),
   archive: (id: string) => apiRequest<void>(`/api/inventory/${id}`, { method: 'DELETE' }),
+  setExpectedPrice: (id: string, estimatedSalePrice: number) =>
+    apiRequest<InventoryItem>(`/api/inventory/${id}/price`, { method: 'PATCH', body: { estimatedSalePrice } }),
   changeStatus: (id: string, status: InventoryStatus) =>
     apiRequest<InventoryItem>(`/api/inventory/${id}/status`, { method: 'PATCH', body: { status } }),
 

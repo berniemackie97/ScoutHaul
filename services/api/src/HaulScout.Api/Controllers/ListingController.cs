@@ -1,36 +1,29 @@
 using Microsoft.AspNetCore.Mvc;
 using HaulScout.Api.Authorization;
+using HaulScout.Application.Appraisal;
+using HaulScout.Application.Common;
 using HaulScout.Application.Contracts;
 using HaulScout.Application.Security;
-using HaulScout.Application.Services;
 
 namespace HaulScout.Api.Controllers;
 
 [ApiController]
 [Route("api/listing")]
 [RequireOrganizationPermission(HaulScoutPermissions.ManageInventory)]
-public sealed class ListingController(IListingGenerationService listingService) : HaulScoutControllerBase
+public sealed class ListingController(ListingGenerationService listings) : HaulScoutControllerBase
 {
-    /// <summary>
-    /// Generate a ready-to-post marketplace listing — an optimized title, an honest description, and a
-    /// competitive suggested list price backed by real sold/active comps — from an item's details.
-    /// </summary>
+    /// <summary>Title and description for an item, priced by its appraisal.</summary>
     [HttpPost("generate")]
     public async Task<ActionResult<GeneratedListingDto>> Generate(GenerateListingRequest request, CancellationToken cancellationToken)
     {
-        if (!listingService.IsConfigured)
+        if (!listings.IsConfigured)
         {
-            return StatusCode(503, new { title = "AI not configured", detail = "Gemini API key (Gemini__ApiKey) is not set." });
+            return Unavailable("Gemini API key (Gemini__ApiKey) is not set.", "writer_not_configured");
         }
 
-        if (string.IsNullOrWhiteSpace(request.Title))
-        {
-            return Invalid("Provide at least the item title/name to generate a listing.", "title_required");
-        }
-
-        GeneratedListingDto? result = await listingService.GenerateAsync(request, cancellationToken);
-        return result is null
-            ? StatusCode(502, new { title = "Generation failed", detail = "The AI listing generator did not return a result. Try again in a moment." })
-            : Ok(result);
+        AppResult<GeneratedListingDto> result = await listings.GenerateAsync(request, cancellationToken);
+        return result.Code == "generation_failed"
+            ? Refused(StatusCodes.Status502BadGateway, "Generation failed", result.Message!, result.Code)
+            : ToActionResult(result);
     }
 }
