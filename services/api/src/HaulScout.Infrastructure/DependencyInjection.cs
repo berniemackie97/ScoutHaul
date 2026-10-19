@@ -14,6 +14,7 @@ using HaulScout.Application.Organizations;
 using HaulScout.Application.PlatformOrders;
 using HaulScout.Application.ReferenceData;
 using HaulScout.Application.Sales;
+using HaulScout.Application.Tax;
 using HaulScout.Application.Sessions;
 using HaulScout.Application.Services;
 using HaulScout.Application.Storefront;
@@ -33,6 +34,7 @@ using HaulScout.Infrastructure.Sales;
 using HaulScout.Infrastructure.Sessions;
 using HaulScout.Infrastructure.Storefront;
 using HaulScout.Infrastructure.Vision;
+using HaulScout.Infrastructure.Tax;
 
 namespace HaulScout.Infrastructure;
 
@@ -89,6 +91,7 @@ public static class DependencyInjection
         services.AddScoped<ISalesChannelStore, EfSalesChannelStore>();
         services.AddScoped<ISessionBootstrapStore, EfSessionBootstrapStore>();
         services.AddScoped<IStoreSettingsStore, EfStoreSettingsStore>();
+        services.AddScoped<ISalesTaxStore, EfSalesTaxStore>();
         services.AddHttpClient<IOrganizationInviteSender, SupabaseOrganizationInviteSender>();
 
         // Where photo images live. Configuring a bucket moves them out of the database, which is what a deployment

@@ -6421,6 +6421,555 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/sales-tax/profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SalesTaxProfileDto"];
+                        "application/json": components["schemas"]["SalesTaxProfileDto"];
+                        "text/json": components["schemas"]["SalesTaxProfileDto"];
+                    };
+                };
+            };
+        };
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["SaveSalesTaxProfileRequest"];
+                    "text/json": components["schemas"]["SaveSalesTaxProfileRequest"];
+                    "application/*+json": components["schemas"]["SaveSalesTaxProfileRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SalesTaxProfileDto"];
+                        "application/json": components["schemas"]["SalesTaxProfileDto"];
+                        "text/json": components["schemas"]["SalesTaxProfileDto"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sales-tax/overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SalesTaxOverviewDto"];
+                        "application/json": components["schemas"]["SalesTaxOverviewDto"];
+                        "text/json": components["schemas"]["SalesTaxOverviewDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sales-tax/periods/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    filedOn?: string;
+                };
+                header?: never;
+                path: {
+                    key: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SalesTaxWorksheetDto"];
+                        "application/json": components["schemas"]["SalesTaxWorksheetDto"];
+                        "text/json": components["schemas"]["SalesTaxWorksheetDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sales-tax/periods/{key}/schedule.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    key: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sales-tax/periods/{key}/filings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    key: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["FileSalesTaxReturnRequest"];
+                    "text/json": components["schemas"]["FileSalesTaxReturnRequest"];
+                    "application/*+json": components["schemas"]["FileSalesTaxReturnRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SalesTaxWorksheetDto"];
+                        "application/json": components["schemas"]["SalesTaxWorksheetDto"];
+                        "text/json": components["schemas"]["SalesTaxWorksheetDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sales-tax/filings/{id}/void": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["VoidSalesTaxReturnRequest"];
+                    "text/json": components["schemas"]["VoidSalesTaxReturnRequest"];
+                    "application/*+json": components["schemas"]["VoidSalesTaxReturnRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sales-tax/use-entries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["SaveSalesTaxUseEntryRequest"];
+                    "text/json": components["schemas"]["SaveSalesTaxUseEntryRequest"];
+                    "application/*+json": components["schemas"]["SaveSalesTaxUseEntryRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SalesTaxUseEntryDto"];
+                        "application/json": components["schemas"]["SalesTaxUseEntryDto"];
+                        "text/json": components["schemas"]["SalesTaxUseEntryDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sales-tax/use-entries/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["SaveSalesTaxUseEntryRequest"];
+                    "text/json": components["schemas"]["SaveSalesTaxUseEntryRequest"];
+                    "application/*+json": components["schemas"]["SaveSalesTaxUseEntryRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SalesTaxUseEntryDto"];
+                        "application/json": components["schemas"]["SalesTaxUseEntryDto"];
+                        "text/json": components["schemas"]["SalesTaxUseEntryDto"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sales-tax/adjustments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["SaveSalesTaxAdjustmentRequest"];
+                    "text/json": components["schemas"]["SaveSalesTaxAdjustmentRequest"];
+                    "application/*+json": components["schemas"]["SaveSalesTaxAdjustmentRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SalesTaxAdjustmentDto"];
+                        "application/json": components["schemas"]["SalesTaxAdjustmentDto"];
+                        "text/json": components["schemas"]["SalesTaxAdjustmentDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sales-tax/adjustments/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sales-tax/sales/{saleId}/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    saleId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["SaveSalesTaxSaleDecisionRequest"];
+                    "text/json": components["schemas"]["SaveSalesTaxSaleDecisionRequest"];
+                    "application/*+json": components["schemas"]["SaveSalesTaxSaleDecisionRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        post?: never;
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    saleId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sales-tax/sales/{saleId}/collector": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    saleId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["SetSaleTaxCollectorRequest"];
+                    "text/json": components["schemas"]["SetSaleTaxCollectorRequest"];
+                    "application/*+json": components["schemas"]["SetSaleTaxCollectorRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/search": {
         parameters: {
             query?: never;
@@ -10140,6 +10689,90 @@ export interface components {
         };
         /** @enum {string} */
         DimensionUnit: "Inches" | "Centimeters";
+        /** @enum {string} */
+        Dr15Destination: "FloridaCounty" | "OutsideFlorida" | "Unknown";
+        /** @enum {string} */
+        Dr15Exemption: "None" | "Resale" | "ExemptOrganization" | "Other";
+        /** @enum {string} */
+        Dr15IssueSeverity: "Blocking" | "Warning" | "Info";
+        Dr15Lines: {
+            lineA?: components["schemas"]["Dr15Row"];
+            lineB?: components["schemas"]["Dr15Row"];
+            lineC?: components["schemas"]["Dr15Row"];
+            lineD?: components["schemas"]["Dr15Row"];
+            lineE?: components["schemas"]["Dr15Row"];
+            /** Format: double */
+            line5?: number;
+            /** Format: double */
+            line6?: number;
+            /** Format: double */
+            line7?: number;
+            /** Format: double */
+            line8?: number;
+            /** Format: double */
+            line9?: number;
+            /** Format: double */
+            line10?: number;
+            /** Format: double */
+            line11?: number;
+            /** Format: double */
+            line12?: number;
+            /** Format: double */
+            line13?: number;
+            /** Format: double */
+            line14?: number;
+            /** Format: double */
+            line15a?: number;
+            /** Format: double */
+            line15b?: number;
+            /** Format: double */
+            line15c?: number;
+            /** Format: double */
+            line15d?: number;
+            /** Format: double */
+            line16?: number;
+            /** Format: double */
+            line17?: number;
+            /** Format: double */
+            line18?: number;
+            /** Format: double */
+            line19?: number;
+            /** Format: double */
+            line20?: number;
+            /** Format: double */
+            line21?: number;
+            /** Format: double */
+            surtaxRate?: number;
+        };
+        Dr15Row: {
+            /** Format: double */
+            gross?: number | null;
+            /** Format: double */
+            exempt?: number | null;
+            /** Format: double */
+            taxable?: number;
+            /** Format: double */
+            taxDue?: number;
+        };
+        /** @enum {string} */
+        Dr15SurtaxClass: "None" | "BusinessCountyRate" | "DifferentRate" | "NotSubjectToSurtax";
+        Dr15UseTaxResult: {
+            reference?: string | null;
+            /** Format: double */
+            taxable?: number;
+            county?: string | null;
+            /** Format: double */
+            surtaxRate?: number;
+            /** Format: double */
+            tax?: number;
+            /** Format: double */
+            surtaxPortion?: number;
+            /** Format: double */
+            otherStateCredit?: number;
+            /** Format: double */
+            overItemCap?: number;
+            surtaxClass?: components["schemas"]["Dr15SurtaxClass"];
+        };
         EstimateChannelFeesRequest: {
             platform?: string | null;
             feeProfileId?: string | null;
@@ -10176,6 +10809,22 @@ export interface components {
         FailAgentRunRequest: {
             kind?: components["schemas"]["SyncFailureKind"];
             message?: string | null;
+        };
+        FileSalesTaxReturnRequest: {
+            /** Format: date */
+            filedOn?: string;
+            /** Format: date */
+            paidOn?: string | null;
+            method?: components["schemas"]["SalesTaxFilingMethod"];
+            confirmationNumber?: string | null;
+            /** Format: double */
+            amountPaid?: number;
+            donateCollectionAllowance?: boolean;
+            amended?: boolean;
+            /** Format: int32 */
+            acknowledgedWarnings?: number;
+            expectedFingerprint?: string | null;
+            notes?: string | null;
         };
         /** @enum {string} */
         FulfillmentStatus: "Unfulfilled" | "Partial" | "Fulfilled";
@@ -12029,6 +12678,382 @@ export interface components {
             /** Format: double */
             totalRefunded?: number;
         };
+        SalesTaxAdjustmentDto: {
+            /** Format: uuid */
+            id?: string;
+            kind?: components["schemas"]["SalesTaxAdjustmentKind"];
+            /** Format: double */
+            amount?: number;
+            description?: string | null;
+        };
+        /** @enum {string} */
+        SalesTaxAdjustmentKind: "LawfulDeduction" | "CreditOrEstimatedTaxPaid" | "EstimatedTaxDue";
+        SalesTaxCarryDto: {
+            /** Format: double */
+            deductionsCarriedIn?: number;
+            /** Format: double */
+            creditsCarriedIn?: number;
+            /** Format: double */
+            deductionsCarriedOut?: number;
+            /** Format: double */
+            creditsCarriedOut?: number;
+        };
+        SalesTaxExcludedChannelDto: {
+            channel?: string | null;
+            /** Format: int32 */
+            salesCount?: number;
+            /** Format: double */
+            grossSales?: number;
+            /** Format: double */
+            taxCollectedByMarketplace?: number;
+            basis?: string | null;
+        };
+        SalesTaxExcludedSaleDto: {
+            /** Format: uuid */
+            saleId?: string;
+            /** Format: date */
+            date?: string;
+            channel?: string | null;
+            itemTitle?: string | null;
+            /** Format: double */
+            itemAmount?: number;
+            /** Format: double */
+            shippingCharged?: number;
+            /** Format: double */
+            taxCollectedByMarketplace?: number;
+        };
+        SalesTaxFiledReturnDto: {
+            /** Format: uuid */
+            id?: string;
+            kind?: components["schemas"]["SalesTaxReturnKind"];
+            /** Format: uuid */
+            supersedesReturnId?: string | null;
+            /** Format: date */
+            filedOn?: string;
+            /** Format: date */
+            paidOn?: string | null;
+            method?: components["schemas"]["SalesTaxFilingMethod"];
+            confirmationNumber?: string | null;
+            /** Format: double */
+            amountPaid?: number;
+            donatedCollectionAllowance?: boolean;
+            /** Format: double */
+            totalTaxDue?: number;
+            /** Format: double */
+            amountDueWithReturn?: number;
+            /** Format: int32 */
+            warningsAcknowledged?: number;
+            notes?: string | null;
+            /** Format: date-time */
+            recordedAt?: string;
+            voided?: boolean;
+            voidReason?: string | null;
+            isEffective?: boolean;
+        };
+        SalesTaxFiledSummaryDto: {
+            /** Format: uuid */
+            id?: string;
+            kind?: components["schemas"]["SalesTaxReturnKind"];
+            /** Format: date */
+            filedOn?: string;
+            /** Format: date */
+            paidOn?: string | null;
+            method?: components["schemas"]["SalesTaxFilingMethod"];
+            confirmationNumber?: string | null;
+            /** Format: double */
+            amountPaid?: number;
+            /** Format: double */
+            amountDueWithReturn?: number;
+            late?: boolean;
+        };
+        /** @enum {string} */
+        SalesTaxFilingMethod: "Electronic" | "Paper" | "Telefile";
+        /** @enum {string} */
+        SalesTaxFrequency: "Monthly" | "Quarterly" | "Semiannual" | "Annual";
+        SalesTaxFrequencyDto: {
+            /** Format: date */
+            effectiveFrom?: string;
+            frequency?: components["schemas"]["SalesTaxFrequency"];
+            alignment?: components["schemas"]["SalesTaxPeriodAlignment"];
+        };
+        SalesTaxInvoiceDto: {
+            invoiceKey?: string | null;
+            /** Format: date */
+            date?: string;
+            saleIds?: string[] | null;
+            /** Format: double */
+            gross?: number;
+            /** Format: double */
+            exempt?: number;
+            /** Format: double */
+            taxable?: number;
+            county?: string | null;
+            /** Format: double */
+            surtaxRate?: number;
+            /** Format: double */
+            computedTax?: number;
+            /** Format: double */
+            surtaxPortion?: number;
+            /** Format: double */
+            taxCharged?: number;
+            /** Format: double */
+            taxDue?: number;
+            /** Format: double */
+            overItemCap?: number;
+            surtaxClass?: components["schemas"]["Dr15SurtaxClass"];
+            treatment?: string | null;
+        };
+        SalesTaxIssueDto: {
+            severity?: components["schemas"]["Dr15IssueSeverity"];
+            code?: string | null;
+            message?: string | null;
+            reference?: string | null;
+            saleIds?: string[] | null;
+        };
+        SalesTaxLineChangeDto: {
+            line?: string | null;
+            /** Format: double */
+            filed?: number;
+            /** Format: double */
+            now?: number;
+        };
+        SalesTaxNoticeDto: {
+            severity?: components["schemas"]["Dr15IssueSeverity"];
+            code?: string | null;
+            message?: string | null;
+            periodKey?: string | null;
+        };
+        SalesTaxOverviewDto: {
+            profile?: components["schemas"]["SalesTaxProfileDto"];
+            /** Format: date */
+            today?: string;
+            nextDue?: components["schemas"]["SalesTaxPeriodSummaryDto"];
+            /** Format: int32 */
+            overdueCount?: number;
+            eligibleFrequency?: components["schemas"]["SalesTaxFrequency"];
+            /** Format: double */
+            taxRemittedLastFourQuarters?: number;
+            periods?: components["schemas"]["SalesTaxPeriodSummaryDto"][] | null;
+            notices?: components["schemas"]["SalesTaxNoticeDto"][] | null;
+        };
+        /** @enum {string} */
+        SalesTaxPeriodAlignment: "Calendar" | "Alternate";
+        /** @enum {string} */
+        SalesTaxPeriodStatus: "Open" | "ReadyToFile" | "DueSoon" | "Overdue" | "Filed" | "FiledLate" | "ChangedSinceFiled";
+        SalesTaxPeriodSummaryDto: {
+            key?: string | null;
+            label?: string | null;
+            /** Format: date */
+            start?: string;
+            /** Format: date */
+            end?: string;
+            frequency?: components["schemas"]["SalesTaxFrequency"];
+            isFinal?: boolean;
+            /** Format: date */
+            dueDate?: string;
+            /** Format: date */
+            lateAfter?: string;
+            /** Format: date */
+            electronicPaymentDeadline?: string;
+            status?: components["schemas"]["SalesTaxPeriodStatus"];
+            /** Format: int32 */
+            daysUntilLateAfter?: number;
+            /** Format: int32 */
+            reportedSalesCount?: number;
+            /** Format: double */
+            reportedGrossSales?: number;
+            /** Format: int32 */
+            excludedSalesCount?: number;
+            /** Format: double */
+            excludedGrossSales?: number;
+            /** Format: double */
+            totalTaxDue?: number;
+            /** Format: double */
+            amountDueWithReturn?: number;
+            /** Format: int32 */
+            blockingIssues?: number;
+            /** Format: int32 */
+            warnings?: number;
+            filed?: components["schemas"]["SalesTaxFiledSummaryDto"];
+        };
+        SalesTaxProfileDto: {
+            configured?: boolean;
+            jurisdiction?: string | null;
+            certificateNumber?: string | null;
+            businessPartnerNumber?: string | null;
+            legalName?: string | null;
+            doingBusinessAs?: string | null;
+            addressLine1?: string | null;
+            addressLine2?: string | null;
+            city?: string | null;
+            postalCode?: string | null;
+            county?: string | null;
+            /** Format: double */
+            countySurtaxRate?: number | null;
+            /** Format: date */
+            registeredOn?: string | null;
+            /** Format: date */
+            closedOn?: string | null;
+            filesElectronically?: boolean;
+            donateCollectionAllowance?: boolean;
+            deliveryChargesOptional?: boolean;
+            notes?: string | null;
+            frequencies?: components["schemas"]["SalesTaxFrequencyDto"][] | null;
+            timeZoneId?: string | null;
+            counties?: string[] | null;
+        };
+        SalesTaxRefundLineDto: {
+            /** Format: uuid */
+            refundId?: string;
+            /** Format: uuid */
+            saleId?: string;
+            /** Format: date */
+            date?: string;
+            channel?: string | null;
+            /** Format: double */
+            taxRefunded?: number;
+        };
+        SalesTaxReportedSaleDto: {
+            /** Format: uuid */
+            saleId?: string;
+            invoiceKey?: string | null;
+            /** Format: date */
+            date?: string;
+            channel?: string | null;
+            itemTitle?: string | null;
+            orderNumber?: string | null;
+            /** Format: uuid */
+            orderId?: string | null;
+            /** Format: double */
+            itemAmount?: number;
+            /** Format: double */
+            shippingCharged?: number;
+            /** Format: double */
+            taxCharged?: number;
+            destination?: components["schemas"]["Dr15Destination"];
+            county?: string | null;
+            destinationSource?: string | null;
+            exemption?: components["schemas"]["Dr15Exemption"];
+            hasDecision?: boolean;
+        };
+        SalesTaxReturnHeaderDto: {
+            certificateNumber?: string | null;
+            legalName?: string | null;
+            doingBusinessAs?: string | null;
+            addressLine1?: string | null;
+            addressLine2?: string | null;
+            city?: string | null;
+            postalCode?: string | null;
+            county?: string | null;
+            /** Format: double */
+            surtaxRate?: number;
+            formVersion?: string | null;
+        };
+        /** @enum {string} */
+        SalesTaxReturnKind: "Original" | "AmendedReplacement";
+        SalesTaxTimelinessDto: {
+            /** Format: date */
+            filedOn?: string;
+            /** Format: date */
+            paidOn?: string;
+            electronic?: boolean;
+            projected?: boolean;
+            returnLate?: boolean;
+            paymentLate?: boolean;
+            collectionAllowanceEarned?: boolean;
+            /** Format: int32 */
+            interestDays?: number;
+            interestSegments?: components["schemas"]["Segment"][] | null;
+        };
+        SalesTaxUseEntryDto: {
+            /** Format: uuid */
+            id?: string;
+            /** Format: date */
+            occurredOn?: string;
+            description?: string | null;
+            /** Format: double */
+            amount?: number;
+            county?: string | null;
+            /** Format: double */
+            otherStateTaxPaid?: number;
+            /** Format: uuid */
+            expenseId?: string | null;
+            /** Format: uuid */
+            inventoryItemId?: string | null;
+            notes?: string | null;
+        };
+        SalesTaxUseLineDto: {
+            entry?: components["schemas"]["SalesTaxUseEntryDto"];
+            result?: components["schemas"]["Dr15UseTaxResult"];
+        };
+        SalesTaxWorksheetDto: {
+            period?: components["schemas"]["SalesTaxPeriodSummaryDto"];
+            header?: components["schemas"]["SalesTaxReturnHeaderDto"];
+            lines?: components["schemas"]["Dr15Lines"];
+            timeliness?: components["schemas"]["SalesTaxTimelinessDto"];
+            invoices?: components["schemas"]["SalesTaxInvoiceDto"][] | null;
+            reportedSales?: components["schemas"]["SalesTaxReportedSaleDto"][] | null;
+            excludedChannels?: components["schemas"]["SalesTaxExcludedChannelDto"][] | null;
+            excludedSales?: components["schemas"]["SalesTaxExcludedSaleDto"][] | null;
+            useTax?: components["schemas"]["SalesTaxUseLineDto"][] | null;
+            refunds?: components["schemas"]["SalesTaxRefundLineDto"][] | null;
+            adjustments?: components["schemas"]["SalesTaxAdjustmentDto"][] | null;
+            carry?: components["schemas"]["SalesTaxCarryDto"];
+            issues?: components["schemas"]["SalesTaxIssueDto"][] | null;
+            sourceFingerprint?: string | null;
+            filings?: components["schemas"]["SalesTaxFiledReturnDto"][] | null;
+            changesSinceFiled?: components["schemas"]["SalesTaxLineChangeDto"][] | null;
+            sources?: string[] | null;
+        };
+        SaveSalesTaxAdjustmentRequest: {
+            periodKey?: string | null;
+            kind?: components["schemas"]["SalesTaxAdjustmentKind"];
+            /** Format: double */
+            amount?: number;
+            description?: string | null;
+        };
+        SaveSalesTaxProfileRequest: {
+            certificateNumber?: string | null;
+            businessPartnerNumber?: string | null;
+            legalName?: string | null;
+            doingBusinessAs?: string | null;
+            addressLine1?: string | null;
+            addressLine2?: string | null;
+            city?: string | null;
+            postalCode?: string | null;
+            county?: string | null;
+            /** Format: date */
+            registeredOn?: string;
+            /** Format: date */
+            closedOn?: string | null;
+            filesElectronically?: boolean;
+            donateCollectionAllowance?: boolean;
+            deliveryChargesOptional?: boolean;
+            notes?: string | null;
+            frequencies?: components["schemas"]["SalesTaxFrequencyDto"][] | null;
+        };
+        SaveSalesTaxSaleDecisionRequest: {
+            destination?: components["schemas"]["Dr15Destination"];
+            county?: string | null;
+            exemption?: components["schemas"]["Dr15Exemption"];
+            exemptionCertificate?: string | null;
+            notes?: string | null;
+        };
+        SaveSalesTaxUseEntryRequest: {
+            /** Format: date */
+            occurredOn?: string;
+            description?: string | null;
+            /** Format: double */
+            amount?: number;
+            county?: string | null;
+            /** Format: double */
+            otherStateTaxPaid?: number;
+            /** Format: uuid */
+            expenseId?: string | null;
+            /** Format: uuid */
+            inventoryItemId?: string | null;
+            notes?: string | null;
+        };
         SearchGroupDto: {
             kind?: string | null;
             label?: string | null;
@@ -12048,6 +13073,19 @@ export interface components {
             groups?: components["schemas"]["SearchGroupDto"][] | null;
             /** Format: int32 */
             totalHits?: number;
+        };
+        Segment: {
+            /** Format: date */
+            from?: string;
+            /** Format: date */
+            to?: string;
+            /** Format: int32 */
+            days?: number;
+            /** Format: double */
+            dailyFactor?: number;
+            /** Format: double */
+            amount?: number;
+            estimated?: boolean;
         };
         SessionBootstrapDto: {
             user?: components["schemas"]["SessionUserDto"];
@@ -12082,6 +13120,10 @@ export interface components {
         SetInventoryLocationRequest: {
             inventoryItemIds?: string[] | null;
             storageLocation?: string | null;
+        };
+        SetSaleTaxCollectorRequest: {
+            marketplaceCollected?: boolean;
+            reason?: string | null;
         };
         SkipSourcingStopRequest: {
             reason?: string | null;
@@ -13088,6 +14130,9 @@ export interface components {
             product?: components["schemas"]["ProductIdentification"];
             searchQuery?: string | null;
             detectedText?: string | null;
+        };
+        VoidSalesTaxReturnRequest: {
+            reason?: string | null;
         };
         WebSourceDto: {
             url?: string | null;

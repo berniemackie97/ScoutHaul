@@ -48,6 +48,12 @@ public sealed class HaulScoutDbContext(
     public DbSet<SaleCorrection> SaleCorrections => Set<SaleCorrection>();
     public DbSet<Refund> Refunds => Set<Refund>();
     public DbSet<Return> Returns => Set<Return>();
+    public DbSet<SalesTaxRegistration> SalesTaxRegistrations => Set<SalesTaxRegistration>();
+    public DbSet<SalesTaxFrequencyChange> SalesTaxFrequencyChanges => Set<SalesTaxFrequencyChange>();
+    public DbSet<SalesTaxReturn> SalesTaxReturns => Set<SalesTaxReturn>();
+    public DbSet<SalesTaxUseEntry> SalesTaxUseEntries => Set<SalesTaxUseEntry>();
+    public DbSet<SalesTaxSaleDecision> SalesTaxSaleDecisions => Set<SalesTaxSaleDecision>();
+    public DbSet<SalesTaxAdjustment> SalesTaxAdjustments => Set<SalesTaxAdjustment>();
     public DbSet<Shipment> Shipments => Set<Shipment>();
     public DbSet<Expense> Expenses => Set<Expense>();
     public DbSet<Budget> Budgets => Set<Budget>();
@@ -519,6 +525,92 @@ public sealed class HaulScoutDbContext(
             entity.HasOne(item => item.Sale).WithMany(item => item.Returns).HasForeignKey(item => item.SaleId).OnDelete(DeleteBehavior.Cascade);
             entity.HasOne(item => item.Refund).WithMany().HasForeignKey(item => item.RefundId).OnDelete(DeleteBehavior.SetNull);
             entity.HasOne(item => item.RequestedByUser).WithMany().HasForeignKey(item => item.RequestedByUserId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<SalesTaxRegistration>(entity =>
+        {
+            entity.ToTable("SalesTaxRegistrations");
+            entity.Property(item => item.Jurisdiction).HasMaxLength(2).IsRequired();
+            entity.Property(item => item.CertificateNumber).HasMaxLength(32);
+            entity.Property(item => item.BusinessPartnerNumber).HasMaxLength(32);
+            entity.Property(item => item.LegalName).HasMaxLength(200).IsRequired();
+            entity.Property(item => item.DoingBusinessAs).HasMaxLength(200);
+            entity.Property(item => item.AddressLine1).HasMaxLength(200);
+            entity.Property(item => item.AddressLine2).HasMaxLength(200);
+            entity.Property(item => item.City).HasMaxLength(100);
+            entity.Property(item => item.PostalCode).HasMaxLength(10);
+            entity.Property(item => item.County).HasMaxLength(40).IsRequired();
+            entity.Property(item => item.Notes).HasMaxLength(2000);
+            entity.HasIndex(item => new { item.OrganizationId, item.Jurisdiction }).IsUnique();
+            entity.HasMany(item => item.Frequencies).WithOne(item => item.Registration).HasForeignKey(item => item.RegistrationId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<SalesTaxFrequencyChange>(entity =>
+        {
+            entity.ToTable("SalesTaxFrequencyChanges");
+            entity.Property(item => item.Frequency).HasConversion<string>().HasMaxLength(16);
+            entity.Property(item => item.Alignment).HasConversion<string>().HasMaxLength(16);
+            entity.HasIndex(item => new { item.RegistrationId, item.EffectiveFrom }).IsUnique();
+        });
+
+        modelBuilder.Entity<SalesTaxReturn>(entity =>
+        {
+            entity.ToTable("SalesTaxReturns");
+            entity.Property(item => item.Jurisdiction).HasMaxLength(2).IsRequired();
+            entity.Property(item => item.Frequency).HasConversion<string>().HasMaxLength(16);
+            entity.Property(item => item.Kind).HasConversion<string>().HasMaxLength(24);
+            entity.Property(item => item.Method).HasConversion<string>().HasMaxLength(16);
+            entity.Property(item => item.ConfirmationNumber).HasMaxLength(64);
+            entity.Property(item => item.SourceFingerprint).HasMaxLength(64).IsRequired();
+            entity.Property(item => item.SnapshotJson).IsRequired();
+            entity.Property(item => item.Notes).HasMaxLength(2000);
+            entity.Property(item => item.VoidReason).HasMaxLength(500);
+            entity.Ignore(item => item.IsVoided);
+            ConfigureMoney(entity.Property(item => item.AmountPaid));
+            ConfigureMoney(entity.Property(item => item.GrossSales));
+            ConfigureMoney(entity.Property(item => item.TaxableAmount));
+            ConfigureMoney(entity.Property(item => item.TotalTaxDue));
+            ConfigureMoney(entity.Property(item => item.AmountDue));
+            ConfigureMoney(entity.Property(item => item.AmountDueWithReturn));
+            ConfigureMoney(entity.Property(item => item.DeductionsCarriedOut));
+            ConfigureMoney(entity.Property(item => item.CreditsCarriedOut));
+            entity.HasIndex(item => new { item.OrganizationId, item.Jurisdiction, item.PeriodStart, item.PeriodEnd });
+            entity.HasOne<SalesTaxRegistration>().WithMany().HasForeignKey(item => item.RegistrationId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<SalesTaxReturn>().WithMany().HasForeignKey(item => item.SupersedesReturnId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<SalesTaxUseEntry>(entity =>
+        {
+            entity.ToTable("SalesTaxUseEntries");
+            entity.Property(item => item.Description).HasMaxLength(300).IsRequired();
+            entity.Property(item => item.County).HasMaxLength(40);
+            entity.Property(item => item.Notes).HasMaxLength(2000);
+            ConfigureMoney(entity.Property(item => item.Amount));
+            ConfigureMoney(entity.Property(item => item.OtherStateTaxPaid));
+            entity.HasIndex(item => new { item.OrganizationId, item.OccurredOn });
+            entity.HasOne<Expense>().WithMany().HasForeignKey(item => item.ExpenseId).OnDelete(DeleteBehavior.SetNull);
+            entity.HasOne<InventoryItem>().WithMany().HasForeignKey(item => item.InventoryItemId).OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<SalesTaxSaleDecision>(entity =>
+        {
+            entity.ToTable("SalesTaxSaleDecisions");
+            entity.Property(item => item.Destination).HasConversion<string>().HasMaxLength(16);
+            entity.Property(item => item.Exemption).HasConversion<string>().HasMaxLength(24);
+            entity.Property(item => item.County).HasMaxLength(40);
+            entity.Property(item => item.ExemptionCertificate).HasMaxLength(64);
+            entity.Property(item => item.Notes).HasMaxLength(2000);
+            entity.HasIndex(item => new { item.OrganizationId, item.SaleId }).IsUnique();
+            entity.HasOne<Sale>().WithMany().HasForeignKey(item => item.SaleId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<SalesTaxAdjustment>(entity =>
+        {
+            entity.ToTable("SalesTaxAdjustments");
+            entity.Property(item => item.Kind).HasConversion<string>().HasMaxLength(32);
+            entity.Property(item => item.Description).HasMaxLength(300).IsRequired();
+            ConfigureMoney(entity.Property(item => item.Amount));
+            entity.HasIndex(item => new { item.OrganizationId, item.PeriodStart, item.PeriodEnd });
         });
 
         modelBuilder.Entity<Shipment>(entity =>
