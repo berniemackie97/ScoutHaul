@@ -89,21 +89,12 @@ export const api = {
   channelListings: channelsApi.listings,
 
   // Marketplace & Products
-  searchProducts: marketplaceApi.searchProducts,
-  getProductIdentity: marketplaceApi.getProductIdentity,
   createProductIdentity: marketplaceApi.createProductIdentity,
-  updateProductIdentity: marketplaceApi.updateProductIdentity,
-  deleteProductIdentity: marketplaceApi.deleteProductIdentity,
   marketplaceLinks: marketplaceApi.marketplaceLinks,
-  lookupBarcode: marketplaceApi.lookupBarcode,
-  lookupSearch: marketplaceApi.lookupSearch,
   addComp: marketplaceApi.addComp,
   comps: marketplaceApi.comps,
   analyze: marketplaceApi.analyze,
-  visionIdentify: marketplaceApi.visionIdentify,
-  visionIdentifyText: marketplaceApi.visionIdentifyText,
   generateListing: marketplaceApi.generateListing,
-  providerStatus: marketplaceApi.providerStatus,
 
   // Sourcing
   trips: sourcingApi.trips,

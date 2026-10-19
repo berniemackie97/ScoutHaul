@@ -43,11 +43,6 @@ export type {
   DealAnalysisResult,
   MarketAnalysisResponse,
   DashboardSummary,
-  MarketplaceListing,
-  MarketplaceLookupResult,
-  ResaleComp,
-  ResaleSource,
-  BarcodeLookupResult,
 } from './marketplace.types';
 
 export type {
