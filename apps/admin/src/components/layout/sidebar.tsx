@@ -48,7 +48,7 @@ export function Sidebar({
 
       <aside
         className={cn(
-          "bg-card flex flex-col border-r",
+          "bg-card flex flex-col border-r print:hidden",
           // mobile: off-canvas drawer
           "fixed inset-y-0 left-0 z-50 w-[264px] max-w-[85vw] transition-transform duration-200",
           mobileOpen ? "translate-x-0" : "-translate-x-full",

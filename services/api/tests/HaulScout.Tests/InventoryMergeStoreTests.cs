@@ -227,7 +227,7 @@ public sealed class InventoryMergeStoreTests(PostgresFixture postgres)
             "InventoryBundleComponent.ComponentInventoryItemId", "InventoryIssue.InventoryItemId", "InventoryPhoto.InventoryItemId",
             "Listing.InventoryItemId", "MarketAnalysis.InventoryItemId", "MarketObservation.InventoryItemId", "OrderLine.InventoryItemId",
             "PlatformListing.ReconciledInventoryItemId", "PlatformOrderLine.InventoryItemId", "ResaleTask.InventoryItemId",
-            "Sale.InventoryItemId", "StoreListing.InventoryItemId", "StorefrontOffer.InventoryItemId",
+            "Sale.InventoryItemId", "SalesTaxUseEntry.InventoryItemId", "StoreListing.InventoryItemId", "StorefrontOffer.InventoryItemId",
         ];
 
         IEnumerable<string> referring = db.Model.GetEntityTypes()
