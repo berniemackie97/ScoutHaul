@@ -61,7 +61,7 @@ internal sealed class OwnSalesCompSource(HaulScoutDbContext db) : ICompSource
             .Take(ResultLimit)
             .Select(entry => new Comp(
                 CompKind.YourSale,
-                entry.Sale.Source is "Internal" or "" ? "Your sale" : $"Your {entry.Sale.Source} sale",
+                entry.Sale.Source is "Internal" or "" ? "Recorded sale" : entry.Sale.Source,
                 entry.Sale.Title,
                 entry.Sale.Price,
                 entry.Sale.ShippingPrice,

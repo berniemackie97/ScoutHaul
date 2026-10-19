@@ -30,7 +30,7 @@ public sealed class AppraisalCompSourceTests
 
         Assert.Equal([210m, 195m], result.Comps.Select(comp => comp.Price).ToArray());
         Assert.All(result.Comps, comp => Assert.Equal(CompKind.YourSale, comp.Kind));
-        Assert.Contains(result.Comps, comp => comp.Source == "Your Poshmark sale");
+        Assert.Contains(result.Comps, comp => comp.Source == "Poshmark");
     }
 
     [Fact]
@@ -43,7 +43,7 @@ public sealed class AppraisalCompSourceTests
 
         CompSourceResult result = await new OwnSalesCompSource(db).FindAsync(Query(org, "Le Creuset Dutch Oven 5.5 qt", "Le Creuset", null), CancellationToken.None);
 
-        Assert.Equal("Your sale", Assert.Single(result.Comps).Source);
+        Assert.Equal("Recorded sale", Assert.Single(result.Comps).Source);
     }
 
     [Fact]

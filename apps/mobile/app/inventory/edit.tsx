@@ -21,7 +21,7 @@ import { useHaptics } from '../../src/hooks/useHaptics';
 import { enqueueOperation } from '../../src/db/localStore';
 import { isWorthQueueing } from '../../src/services/offlineWrites';
 import { savePhoto } from '../../src/utils/photos';
-import { takeIdentifyHandoff } from '../../src/features/scanner/identifyHandoff';
+import { takeScanHandoff } from '../../src/features/appraisal/handoff';
 import {
   authenticityStatusOptions,
   categoryOptions,
@@ -286,26 +286,22 @@ export default function EditInventoryScreen() {
     }, [params.id]),
   );
 
-  // Apply fields handed back by the scanner's photo-identify flow (fill mode).
-  // Functional updaters read the *current* value so we never clobber what the
-  // user (or loadItem) already filled in.
+  // A scan opened from here hands its result back on return. Updaters read the current value, so a
+  // plain identify only fills blanks; "regenerate" replaces what is there.
   useFocusEffect(
     useCallback(() => {
-      const h = takeIdentifyHandoff();
+      const h = takeScanHandoff();
       if (!h) return;
-      // Explicit regenerate overwrites the AI-derived fields; the scan-to-add path only fills blanks
-      // so it never clobbers what the user typed.
-      const overwrite = h._overwrite === '1';
-      const apply = (next: string | undefined) => (cur: string) =>
-        overwrite ? (next ?? cur) : (cur.trim() ? cur : next ?? cur);
+      const apply = (next: string | null) => (cur: string) =>
+        h.overwrite ? (next ?? cur) : (cur.trim() ? cur : next ?? cur);
       setTitle(apply(h.title));
       setBrand(apply(h.brand));
       setModel(apply(h.model));
       setCategory(apply(h.category));
-      setColors((current) => (h.color && (overwrite || current.length === 0) ? [h.color] : current));
+      setColors((current) => (h.color && (h.overwrite || current.length === 0) ? [h.color] : current));
       setCondition(apply(h.condition));
       setBarcode(apply(h.barcode));
-      setEstimatedSalePrice(apply(h.estimatedSalePrice));
+      setEstimatedSalePrice(apply(h.estimatedSalePrice === null ? null : String(h.estimatedSalePrice)));
       if (h.photoUri) {
         const uri = h.photoUri;
         setPhotos((prev) => (prev.some((p) => p.uri === uri) ? prev : [...prev, { uri, isHero: prev.length === 0 }]));
@@ -440,11 +436,7 @@ export default function EditInventoryScreen() {
     setPhotos((prev) => prev.map((p, i) => ({ ...p, isHero: i === index })));
   }
 
-  // Photo-identify reuses the scanner's full flow (capture → analyze overlay →
-  // grounded comps). The scanner hands the resolved fields back here via the
-  // module handoff, which the focus effect above applies on return.
-  // Any fields already filled in are forwarded as `context` so the AI can use them as ground truth
-  // to sharpen identification + valuation (e.g. you typed the brand → it nails the variant).
+  // What is already filled in goes with the photo as known facts, so identification can pin the variant.
   function buildKnownFactsContext(): string {
     const facts: string[] = [];
     if (brand.trim()) facts.push(`Brand: ${brand.trim()}`);
@@ -469,9 +461,7 @@ export default function EditInventoryScreen() {
     const context = buildKnownFactsContext();
     router.push({
       pathname: '/scanner',
-      // regenerate=1: this is an explicit re-run on an existing record, so the AI result should
-      // overwrite the current fields (using the typed facts as context), not just fill blanks.
-      params: { mode: 'photo-identify', fill: '1', regenerate: '1', ...(context ? { context } : {}) },
+      params: { mode: 'photo', fill: '1', regenerate: '1', ...(context ? { context } : {}) },
     });
   }
 
@@ -1015,7 +1005,7 @@ export default function EditInventoryScreen() {
             prefix="$"
             placeholder="0.00"
             containerStyle={styles.flex}
-            hint={params.estimatedSalePrice ? 'From marketplace avg' : undefined}
+            hint={params.estimatedSalePrice ? 'From the appraisal' : undefined}
           />
         </View>
         {projectedMargin ? (

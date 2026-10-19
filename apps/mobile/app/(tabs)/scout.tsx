@@ -55,7 +55,7 @@ export default function ScoutScreen() {
 
   function handleSearch() {
     if (!searchQuery.trim()) return;
-    router.push({ pathname: '/manual-search', params: { query: searchQuery.trim() } });
+    router.push({ pathname: '/scanner', params: { mode: 'details', details: searchQuery.trim() } });
     setSearchQuery('');
   }
 
@@ -66,7 +66,7 @@ export default function ScoutScreen() {
       sub: 'No photo needed',
       color: c.info,
       bg: c.infoLight,
-      onPress: () => router.push('/manual-search'),
+      onPress: () => router.push({ pathname: '/scanner', params: { mode: 'details' } }),
     },
     {
       icon: 'calculator-outline',
@@ -141,7 +141,7 @@ export default function ScoutScreen() {
         </Pressable>
 
         <Pressable
-          onPress={() => router.push({ pathname: '/scanner', params: { mode: 'photo-identify' } })}
+          onPress={() => router.push({ pathname: '/scanner', params: { mode: 'photo' } })}
           style={({ pressed }) => [
             styles.scanHero,
             styles.scanHeroRight,
