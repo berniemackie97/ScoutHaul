@@ -134,17 +134,21 @@ internal sealed class GeminiListingWriter(
             },
         };
 
-        string url = $"https://generativelanguage.googleapis.com/v1beta/models/{Model}:generateContent?key={apiKey}";
+        Uri endpoint = new($"https://generativelanguage.googleapis.com/v1beta/models/{Model}:generateContent");
         string json = JsonSerializer.Serialize(requestBody);
 
         const int maxAttempts = 4;
         for (int attempt = 1; attempt <= maxAttempts; attempt++)
         {
-            using StringContent content = new(json, Encoding.UTF8, "application/json");
+            using HttpRequestMessage request = new(HttpMethod.Post, endpoint)
+            {
+                Content = new StringContent(json, Encoding.UTF8, "application/json"),
+            };
+            request.Headers.Add("x-goog-api-key", apiKey);
             HttpResponseMessage response;
             try
             {
-                response = await httpClient.PostAsync(url, content, cancellationToken);
+                response = await httpClient.SendAsync(request, cancellationToken);
             }
             catch (OperationCanceledException) { throw; }
             catch (Exception ex)

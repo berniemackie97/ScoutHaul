@@ -9,10 +9,8 @@ using HaulScout.Application.Services;
 namespace HaulScout.Infrastructure.Vision;
 
 /// <summary>
-/// THE product identifier. Gemini multimodal (free tier: 1,500 req/day) reads the photo, reasons
-/// about the item, and returns a specific product name, brand, model, category, condition, and a
-/// conservative used-resale valuation as structured JSON — identification and valuation confidence
-/// kept separate. No reverse-image search, no OCR: this is the single source of truth.
+/// Identifies a product from a photo, typed facts, or both, and gives a knowledge-based used price
+/// range as a last resort. It never reports comps: it has no live market data.
 /// </summary>
 internal sealed class GeminiProductVisionService(
     HttpClient httpClient,
@@ -24,9 +22,13 @@ internal sealed class GeminiProductVisionService(
 
     public bool IsConfigured => !string.IsNullOrWhiteSpace(configuration["Gemini:ApiKey"]);
 
-    public async Task<VisionIdentifyResult> IdentifyAsync(string? imageBase64, string? context, CancellationToken cancellationToken)
+    public async Task<VisionIdentifyResult> IdentifyAsync(
+        string? imageBase64,
+        string? imageMediaType,
+        string? context,
+        CancellationToken cancellationToken)
     {
-        ProductIdentification? product = await IdentifyProductAsync(imageBase64, context, cancellationToken);
+        ProductIdentification? product = await IdentifyProductAsync(imageBase64, imageMediaType ?? "image/jpeg", context, cancellationToken);
         return new VisionIdentifyResult(
             Product: product,
             SearchQuery: BuildSearchQuery(product),
@@ -42,8 +44,7 @@ internal sealed class GeminiProductVisionService(
         return p.SearchKeywords.Count > 0 ? p.SearchKeywords[0] : null;
     }
 
-    // The prompt is composed from these sections so it adapts to the inputs: a photo, typed facts, or
-    // both. The valuation/range/comps rules are shared; only the IDENTIFY guidance changes by mode.
+    // Composed per request: a photo, typed facts, or both. Only the IDENTIFY section changes by mode.
     private const string IntroShared =
         "You are an expert reseller appraiser with strong product knowledge. Do TWO separate jobs and keep " +
         "their confidences separate: (1) IDENTIFY the main item, (2) ESTIMATE its used resale value.\n\n";
@@ -99,12 +100,8 @@ internal sealed class GeminiProductVisionService(
         "If you cannot identify the item well enough, return a broad CATEGORY-level estimate and list the " +
         "missing details. key_value_factors must name what drives value (variant, condition, year, model, size, " +
         "edition, authenticity, completeness, accessories). recommended_next_steps tells the reseller how to " +
-        "narrow it down. Provide 3-6 search keyword phrases for finding comps.\n" +
-        "comps: give 3-6 REPRESENTATIVE comparable price points from your market knowledge — mix recent " +
-        "SOLD prices (status \"sold\") with current ACTIVE asking prices (status \"active\"), each with the " +
-        "condition it reflects and a short note. These are ESTIMATES from training knowledge, NOT live " +
-        "listings — never invent URLs, exact dates, or claim you checked current listings. " +
-        "Respond ONLY with valid JSON matching the schema.";
+        "narrow it down. Provide 3-6 search keyword phrases for finding comps. Do not list example " +
+        "prices or comps: you have no live market data. Respond ONLY with valid JSON matching the schema.";
 
     // Composes the system prompt for the given inputs. Photo present → visual identification (with a
     // ground-truth note when facts are also given); facts only → text identification.
@@ -115,7 +112,11 @@ internal sealed class GeminiProductVisionService(
             : TextIdentify)
         + ValueShared;
 
-    private async Task<ProductIdentification?> IdentifyProductAsync(string? imageBase64, string? context, CancellationToken cancellationToken)
+    private async Task<ProductIdentification?> IdentifyProductAsync(
+        string? imageBase64,
+        string imageMediaType,
+        string? context,
+        CancellationToken cancellationToken)
     {
         string? apiKey = configuration["Gemini:ApiKey"];
         if (string.IsNullOrWhiteSpace(apiKey))
@@ -142,7 +143,7 @@ internal sealed class GeminiProductVisionService(
         }
         if (hasImage)
         {
-            parts.Add(new { inline_data = new { mime_type = "image/jpeg", data = imageBase64 } });
+            parts.Add(new { inline_data = new { mime_type = imageMediaType, data = imageBase64 } });
         }
 
         var requestBody = new
@@ -156,7 +157,7 @@ internal sealed class GeminiProductVisionService(
             },
         };
 
-        string url = $"https://generativelanguage.googleapis.com/v1beta/models/{Model}:generateContent?key={apiKey}";
+        Uri endpoint = new($"https://generativelanguage.googleapis.com/v1beta/models/{Model}:generateContent");
         string json = JsonSerializer.Serialize(requestBody);
 
         // gemini-2.5-flash returns transient 503 UNAVAILABLE ("high demand") on ~1 in 6 calls, plus
@@ -165,11 +166,15 @@ internal sealed class GeminiProductVisionService(
         const int maxAttempts = 4;
         for (int attempt = 1; attempt <= maxAttempts; attempt++)
         {
-            using StringContent content = new(json, Encoding.UTF8, "application/json");
+            using HttpRequestMessage request = new(HttpMethod.Post, endpoint)
+            {
+                Content = new StringContent(json, Encoding.UTF8, "application/json"),
+            };
+            request.Headers.Add("x-goog-api-key", apiKey);
             HttpResponseMessage response;
             try
             {
-                response = await httpClient.PostAsync(url, content, cancellationToken);
+                response = await httpClient.SendAsync(request, cancellationToken);
             }
             catch (OperationCanceledException) { throw; }
             catch (Exception ex)
@@ -292,7 +297,6 @@ internal sealed class GeminiProductVisionService(
                 MissingInformation: CleanList(dto.MissingInformation, 6),
                 RecommendedNextSteps: CleanList(dto.RecommendedNextSteps, 5),
                 Rationale: Clean(dto.Rationale),
-                Comps: GeminiResaleEstimator.CleanComps(dto.Comps),
                 ConditionQuality: Clean(dto.ConditionQuality)?.ToLowerInvariant());
         }
         catch (JsonException ex)
@@ -356,23 +360,6 @@ internal sealed class GeminiProductVisionService(
             missingInformation = new { type = "array", items = new { type = "string" }, description = "Details needed to price it precisely" },
             recommendedNextSteps = new { type = "array", items = new { type = "string" } },
             rationale = new { type = "string", description = "One-to-two sentence valuation rationale" },
-            comps = new
-            {
-                type = "array",
-                description = "3-6 representative SOLD and ACTIVE comp price points from market knowledge (not live)",
-                items = new
-                {
-                    type = "object",
-                    properties = new
-                    {
-                        price = new { type = "number" },
-                        status = new { type = "string", @enum = new[] { "sold", "active" } },
-                        condition = new { type = "string" },
-                        note = new { type = "string" },
-                    },
-                    required = new[] { "price", "status" },
-                },
-            },
         },
         required = new[] { "name", "category", "variantConfidence", "valuationConfidence", "priceRangeType", "searchKeywords" },
     };
@@ -399,6 +386,5 @@ internal sealed class GeminiProductVisionService(
         [JsonPropertyName("missingInformation")] public List<string>? MissingInformation { get; set; }
         [JsonPropertyName("recommendedNextSteps")] public List<string>? RecommendedNextSteps { get; set; }
         [JsonPropertyName("rationale")] public string? Rationale { get; set; }
-        [JsonPropertyName("comps")] public List<GeminiResaleEstimator.CompDto>? Comps { get; set; }
     }
 }

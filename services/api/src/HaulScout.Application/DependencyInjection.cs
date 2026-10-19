@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using HaulScout.Application.Appraisal;
 using HaulScout.Application.Channels;
 using HaulScout.Application.Common;
 using HaulScout.Application.Inventory;
@@ -21,6 +22,7 @@ public static class DependencyInjection
         // Per-request tenant holder used by the data layer's org-scoping query filters.
         services.AddScoped<ITenantContext, TenantContext>();
 
+        services.AddScoped<AppraisalService>();
         services.AddScoped<IDealAnalyzer, DealAnalyzer>();
         services.AddScoped<IConfidenceScorer, ConfidenceScorer>();
         services.AddScoped<InventoryReferenceDataService>();

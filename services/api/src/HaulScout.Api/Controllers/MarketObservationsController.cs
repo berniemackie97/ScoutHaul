@@ -4,6 +4,7 @@ using HaulScout.Api.Authorization;
 using static HaulScout.Api.Helpers.StringHelpers;
 using HaulScout.Api.Mapping;
 using HaulScout.Api.Services;
+using HaulScout.Application.Appraisal;
 using HaulScout.Application.Contracts;
 using HaulScout.Application.Security;
 using HaulScout.Domain;
@@ -156,6 +157,11 @@ public sealed class MarketObservationsController(HaulScoutDbContext db, ICurrent
         if (request.Price < 0 || request.ShippingPrice is < 0)
         {
             return "Prices cannot be negative.";
+        }
+
+        if (request.ObservationType != MarketObservationType.Estimate && CompHonesty.IsModelSource(request.Source))
+        {
+            return "A model's estimate can only be saved as an estimate, never as a sale or a listing.";
         }
 
         if (request.ObservationType is MarketObservationType.Sold or MarketObservationType.ManualSold or MarketObservationType.InternalSale

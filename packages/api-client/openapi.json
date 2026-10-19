@@ -330,6 +330,115 @@
         }
       }
     },
+    "/api/appraisals/identify": {
+      "post": {
+        "tags": [
+          "Appraisals"
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "Photo": {
+                    "type": "string",
+                    "format": "binary"
+                  },
+                  "Barcode": {
+                    "type": "string"
+                  },
+                  "Details": {
+                    "type": "string"
+                  }
+                }
+              },
+              "encoding": {
+                "Photo": {
+                  "style": "form"
+                },
+                "Barcode": {
+                  "style": "form"
+                },
+                "Details": {
+                  "style": "form"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentificationDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentificationDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentificationDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/appraisals": {
+      "post": {
+        "tags": [
+          "Appraisals"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AppraiseRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AppraiseRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/AppraiseRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppraisalDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppraisalDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppraisalDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/budgets": {
       "post": {
         "tags": [
@@ -11907,6 +12016,106 @@
         },
         "additionalProperties": false
       },
+      "AppraisalDto": {
+        "type": "object",
+        "properties": {
+          "searchText": {
+            "type": "string",
+            "nullable": true
+          },
+          "price": {
+            "$ref": "#/components/schemas/PriceDto"
+          },
+          "comps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CompDto"
+            },
+            "nullable": true
+          },
+          "estimate": {
+            "$ref": "#/components/schemas/EstimateDto"
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CompSourceReportDto"
+            },
+            "nullable": true
+          },
+          "searchLinks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CompSearchLinkDto"
+            },
+            "nullable": true
+          },
+          "webSources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WebSourceDto"
+            },
+            "nullable": true
+          },
+          "appraisedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "AppraiseRequest": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "brand": {
+            "type": "string",
+            "nullable": true
+          },
+          "model": {
+            "type": "string",
+            "nullable": true
+          },
+          "category": {
+            "type": "string",
+            "nullable": true
+          },
+          "color": {
+            "type": "string",
+            "nullable": true
+          },
+          "condition": {
+            "type": "string",
+            "nullable": true
+          },
+          "barcode": {
+            "type": "string",
+            "nullable": true
+          },
+          "identifiers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "certainty": {
+            "$ref": "#/components/schemas/IdentificationCertainty"
+          },
+          "productIdentityId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "estimate": {
+            "$ref": "#/components/schemas/EstimateDto"
+          }
+        },
+        "additionalProperties": false
+      },
       "AssignTaskRequest": {
         "type": "object",
         "properties": {
@@ -12457,6 +12666,111 @@
         ],
         "type": "string"
       },
+      "CompDto": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/CompKind"
+          },
+          "source": {
+            "type": "string",
+            "nullable": true
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "price": {
+            "type": "number",
+            "format": "double"
+          },
+          "shipping": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "condition": {
+            "type": "string",
+            "nullable": true
+          },
+          "url": {
+            "type": "string",
+            "nullable": true
+          },
+          "date": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "verified": {
+            "type": "boolean"
+          },
+          "included": {
+            "type": "boolean"
+          },
+          "excludedBecause": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "CompKind": {
+        "enum": [
+          "YourSale",
+          "Sold",
+          "Asking",
+          "Guide"
+        ],
+        "type": "string"
+      },
+      "CompSearchLinkDto": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string",
+            "nullable": true
+          },
+          "kind": {
+            "$ref": "#/components/schemas/CompKind"
+          },
+          "url": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "CompSourceReportDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "$ref": "#/components/schemas/CompSourceStatus"
+          },
+          "count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "message": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "CompSourceStatus": {
+        "enum": [
+          "Found",
+          "Empty",
+          "Failed",
+          "Off"
+        ],
+        "type": "string"
+      },
       "CompleteAgentRunRequest": {
         "type": "object",
         "properties": {
@@ -12488,6 +12802,16 @@
           }
         },
         "additionalProperties": false
+      },
+      "ConfidenceLevel": {
+        "enum": [
+          "None",
+          "Guess",
+          "Thin",
+          "Fair",
+          "Strong"
+        ],
+        "type": "string"
       },
       "ConfidenceScoreResult": {
         "type": "object",
@@ -13132,6 +13456,31 @@
         },
         "additionalProperties": false
       },
+      "EstimateDto": {
+        "type": "object",
+        "properties": {
+          "low": {
+            "type": "number",
+            "format": "double"
+          },
+          "high": {
+            "type": "number",
+            "format": "double"
+          },
+          "confidence": {
+            "type": "string",
+            "nullable": true
+          },
+          "rationale": {
+            "type": "string",
+            "nullable": true
+          },
+          "isWide": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
       "ExpenseCategory": {
         "enum": [
           "InventoryPurchase",
@@ -13310,6 +13659,93 @@
           }
         },
         "additionalProperties": false
+      },
+      "IdentificationCertainty": {
+        "enum": [
+          "High",
+          "Medium",
+          "Low"
+        ],
+        "type": "string"
+      },
+      "IdentificationDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "brand": {
+            "type": "string",
+            "nullable": true
+          },
+          "model": {
+            "type": "string",
+            "nullable": true
+          },
+          "category": {
+            "type": "string",
+            "nullable": true
+          },
+          "color": {
+            "type": "string",
+            "nullable": true
+          },
+          "condition": {
+            "type": "string",
+            "nullable": true
+          },
+          "conditionGrade": {
+            "type": "string",
+            "nullable": true
+          },
+          "barcode": {
+            "type": "string",
+            "nullable": true
+          },
+          "identifiers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "certainty": {
+            "$ref": "#/components/schemas/IdentificationCertainty"
+          },
+          "source": {
+            "$ref": "#/components/schemas/IdentificationSource"
+          },
+          "productIdentityId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "imageUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "missingInformation": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "estimate": {
+            "$ref": "#/components/schemas/EstimateDto"
+          }
+        },
+        "additionalProperties": false
+      },
+      "IdentificationSource": {
+        "enum": [
+          "Catalog",
+          "Barcode",
+          "Photo",
+          "Details"
+        ],
+        "type": "string"
       },
       "ImportFileOutcomeDto": {
         "type": "object",
@@ -16928,6 +17364,54 @@
         ],
         "type": "string"
       },
+      "PriceBasis": {
+        "enum": [
+          "Sales",
+          "Guide",
+          "Asking",
+          "Estimate",
+          "None"
+        ],
+        "type": "string"
+      },
+      "PriceDto": {
+        "type": "object",
+        "properties": {
+          "basis": {
+            "$ref": "#/components/schemas/PriceBasis"
+          },
+          "quickSale": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "list": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "high": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "confidence": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "level": {
+            "$ref": "#/components/schemas/ConfidenceLevel"
+          },
+          "reasons": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "PricingBasisType": {
         "enum": [
           "LiveValidated",
@@ -17993,6 +18477,15 @@
           },
           "sourceUrl": {
             "type": "string",
+            "nullable": true
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "date": {
+            "type": "string",
+            "format": "date-time",
             "nullable": true
           }
         },
@@ -21807,6 +22300,20 @@
         },
         "additionalProperties": false
       },
+      "WebSourceDto": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "nullable": true
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "WeightUnit": {
         "enum": [
           "Ounces",
@@ -21831,6 +22338,9 @@
   "tags": [
     {
       "name": "AcquisitionLots"
+    },
+    {
+      "name": "Appraisals"
     },
     {
       "name": "Budgets"

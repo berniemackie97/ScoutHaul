@@ -80,7 +80,7 @@ public sealed class VisionController(
 
         try
         {
-            VisionIdentifyResult result = await visionService.IdentifyAsync(imageBase64, request.Context, cancellationToken);
+            VisionIdentifyResult result = await visionService.IdentifyAsync(imageBase64, "image/jpeg", request.Context, cancellationToken);
             return Ok(result);
         }
         catch (VisionUnavailableException ex)

@@ -3,6 +3,7 @@ using Amazon.S3;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using HaulScout.Application.Appraisal;
 using HaulScout.Application.Channels;
 using HaulScout.Application.Common;
 using HaulScout.Application.Inventory;
@@ -16,6 +17,7 @@ using HaulScout.Application.Sales;
 using HaulScout.Application.Sessions;
 using HaulScout.Application.Services;
 using HaulScout.Application.Storefront;
+using HaulScout.Infrastructure.Appraisal;
 using HaulScout.Infrastructure.Channels;
 using HaulScout.Infrastructure.Inventory;
 using HaulScout.Infrastructure.Search;
@@ -145,11 +147,10 @@ public static class DependencyInjection
             client.DefaultRequestHeaders.Add("Accept", "application/json");
         });
 
-        // Text-only resale estimator (Gemini) — gives barcode/keyword lookups a value estimate
-        // when no live marketplace comps exist. Reuses the Gemini key.
+        // Grounded web search for resale comps. Searching takes a while; the appraisal deadline governs.
         services.AddHttpClient<IResaleEstimator, GeminiResaleEstimator>(client =>
         {
-            client.Timeout = TimeSpan.FromSeconds(20);
+            client.Timeout = TimeSpan.FromSeconds(45);
             client.DefaultRequestHeaders.Add("Accept", "application/json");
         });
 
@@ -167,6 +168,16 @@ public static class DependencyInjection
         services.AddHttpClient<IMarketplacePricingProvider, PriceChartingMarketplaceProvider>(ConfigureJsonClient);
         services.AddHttpClient<IMarketplacePricingProvider, KeepaMarketplaceProvider>(ConfigureJsonClient);
         services.AddHttpClient<IMarketplacePricingProvider, SerpApiGoogleShoppingProvider>(ConfigureJsonClient);
+
+        // Appraisal: every comp source runs at once, each on its own deadline.
+        services.AddScoped<IProductCatalogStore, EfProductCatalogStore>();
+        services.AddScoped<ICompSource, OwnSalesCompSource>();
+        services.AddScoped<ICompSource, SavedCompSource>();
+        services.AddScoped<ICompSource, WebSearchCompSource>();
+        services.AddHttpClient<EbayBrowseCompSource>(ConfigureJsonClient);
+        services.AddScoped<ICompSource>(provider => provider.GetRequiredService<EbayBrowseCompSource>());
+        services.AddHttpClient<PriceChartingMarketplaceProvider>(ConfigureJsonClient);
+        services.AddScoped<ICompSource, PriceChartingCompSource>();
 
         return services;
     }

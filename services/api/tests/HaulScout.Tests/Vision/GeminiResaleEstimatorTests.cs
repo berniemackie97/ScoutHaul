@@ -37,7 +37,7 @@ public sealed class GeminiResaleEstimatorTests
         IConfigurationRoot config = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?> { ["Gemini:ApiKey"] = "test-key" })
             .Build();
-        return new GeminiResaleEstimator(new HttpClient(handler), config, cache, NullLogger<GeminiResaleEstimator>.Instance);
+        return new GeminiResaleEstimator(new HttpClient(handler), config, cache, TimeProvider.System, NullLogger<GeminiResaleEstimator>.Instance);
     }
 
     [Fact]
@@ -79,7 +79,7 @@ public sealed class GeminiResaleEstimatorTests
     }
 
     [Fact]
-    public async Task Includes_ebay_sold_completed_search_url_in_grounded_prompt()
+    public async Task Asks_the_grounded_search_for_ebay_sold_listings_of_the_normalized_query()
     {
         CountingHandler handler = new(Envelope("""{"low":55,"high":80}"""));
         GeminiResaleEstimator sut = Build(handler, new MemoryCache(new MemoryCacheOptions()));
@@ -92,10 +92,7 @@ public sealed class GeminiResaleEstimatorTests
 
         Assert.NotNull(result);
         Assert.NotNull(handler.LastRequestBody);
-        Assert.Contains("PRIMARY SOLD-COMP SEARCH TARGETS", handler.LastRequestBody);
-        Assert.Contains("LH_Sold=1", handler.LastRequestBody);
-        Assert.Contains("LH_Complete=1", handler.LastRequestBody);
-        Assert.Contains("Pokemon%20Gardevoir%20Sylveon%20GX%20130%2F214%20Unbroken%20Bonds", handler.LastRequestBody);
+        Assert.Contains("Search eBay sold listings for: Pokemon Gardevoir Sylveon GX 130/214 Unbroken Bonds", handler.LastRequestBody);
     }
 
     [Fact]
@@ -161,7 +158,7 @@ public sealed class GeminiResaleEstimatorTests
     {
         IConfigurationRoot config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>()).Build();
         GeminiResaleEstimator sut = new(new HttpClient(new CountingHandler("{}")), config,
-            new MemoryCache(new MemoryCacheOptions()), NullLogger<GeminiResaleEstimator>.Instance);
+            new MemoryCache(new MemoryCacheOptions()), TimeProvider.System, NullLogger<GeminiResaleEstimator>.Instance);
 
         Assert.False(sut.IsConfigured);
         Assert.Null(await sut.EstimateAsync("anything", null, CancellationToken.None));

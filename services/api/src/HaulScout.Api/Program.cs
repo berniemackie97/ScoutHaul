@@ -1,3 +1,4 @@
+using HaulScout.Api.Controllers;
 using HaulScout.Infrastructure.Orders;
 using HaulScout.Infrastructure.Storefront;
 using System.Text.Json.Serialization;
@@ -85,6 +86,18 @@ builder.Services.AddRateLimiter(options =>
         factory: _ => new FixedWindowRateLimiterOptions
         {
             PermitLimit = 10,
+            Window = TimeSpan.FromMinutes(1),
+            QueueLimit = 0,
+        }));
+
+    options.AddPolicy(AppraisalsController.RateLimitPolicy, context => RateLimitPartition.GetFixedWindowLimiter(
+        partitionKey: context.User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+            ?? context.User?.FindFirst("sub")?.Value
+            ?? context.Connection.RemoteIpAddress?.ToString()
+            ?? "anonymous",
+        factory: _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = builder.Configuration.GetValue("RateLimiting:AppraisalPermitLimit", 20),
             Window = TimeSpan.FromMinutes(1),
             QueueLimit = 0,
         }));
