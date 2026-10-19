@@ -14638,6 +14638,12 @@
           "notes": {
             "type": "string",
             "nullable": true
+          },
+          "confirmedDirectSalesRecorded": {
+            "type": "boolean"
+          },
+          "confirmedUseTaxReviewed": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false
@@ -20231,6 +20237,12 @@
           "warningsAcknowledged": {
             "type": "integer",
             "format": "int32"
+          },
+          "attestedDirectSalesRecorded": {
+            "type": "boolean"
+          },
+          "attestedUseTaxReviewed": {
+            "type": "boolean"
           },
           "notes": {
             "type": "string",

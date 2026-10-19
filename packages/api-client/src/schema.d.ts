@@ -10907,6 +10907,8 @@ export interface components {
             acknowledgedWarnings?: number;
             expectedFingerprint?: string | null;
             notes?: string | null;
+            confirmedDirectSalesRecorded?: boolean;
+            confirmedUseTaxReviewed?: boolean;
         };
         /** @enum {string} */
         FulfillmentStatus: "Unfulfilled" | "Partial" | "Fulfilled";
@@ -12775,6 +12777,8 @@ export interface components {
             amountDueWithReturn?: number;
             /** Format: int32 */
             warningsAcknowledged?: number;
+            attestedDirectSalesRecorded?: boolean;
+            attestedUseTaxReviewed?: boolean;
             notes?: string | null;
             /** Format: date-time */
             recordedAt?: string;

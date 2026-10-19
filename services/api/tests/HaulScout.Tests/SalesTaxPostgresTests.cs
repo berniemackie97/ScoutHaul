@@ -114,7 +114,7 @@ public sealed class SalesTaxPostgresTests(PostgresFixture postgres)
 
         AppResult<SalesTaxWorksheetDto> filed = await service.FileAsync(q3, new FileSalesTaxReturnRequest(
             new DateOnly(2026, 10, 19), null, SalesTaxFilingMethod.Electronic, "EF123", lines.Line14, false, false,
-            worksheet.Value.Issues.Count(issue => issue.Severity == Dr15IssueSeverity.Warning), worksheet.Value.SourceFingerprint, null), CancellationToken.None);
+            worksheet.Value.Issues.Count(issue => issue.Severity == Dr15IssueSeverity.Warning), worksheet.Value.SourceFingerprint, null, true, true), CancellationToken.None);
         Assert.Equal(AppResultStatus.Ok, filed.Status);
         Assert.Equal(SalesTaxPeriodStatus.Filed, filed.Value!.Period.Status);
 

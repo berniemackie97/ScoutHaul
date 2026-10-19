@@ -233,6 +233,8 @@ public sealed record SalesTaxFiledReturnDto(
     decimal TotalTaxDue,
     decimal AmountDueWithReturn,
     int WarningsAcknowledged,
+    bool AttestedDirectSalesRecorded,
+    bool AttestedUseTaxReviewed,
     string? Notes,
     DateTimeOffset RecordedAt,
     bool Voided,
@@ -268,7 +270,9 @@ public sealed record FileSalesTaxReturnRequest(
     bool Amended,
     int AcknowledgedWarnings,
     string ExpectedFingerprint,
-    string? Notes);
+    string? Notes,
+    bool ConfirmedDirectSalesRecorded = false,
+    bool ConfirmedUseTaxReviewed = false);
 
 public sealed record VoidSalesTaxReturnRequest(string Reason);
 

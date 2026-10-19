@@ -331,6 +331,18 @@ public sealed class SalesTaxWorkflowService(
             return AppResult<SalesTaxWorksheetDto>.Validation($"Review and acknowledge the {warnings} warning(s) on the worksheet first.");
         }
 
+        if (!request.ConfirmedDirectSalesRecorded)
+        {
+            return AppResult<SalesTaxWorksheetDto>.Validation(
+                "Confirm that every sale made outside a marketplace (cash, local pickup, events, your storefront) is recorded. Those are taxable and the worksheet only sees recorded sales.");
+        }
+
+        if (!request.ConfirmedUseTaxReviewed)
+        {
+            return AppResult<SalesTaxWorksheetDto>.Validation(
+                "Confirm that business purchases made without Florida tax (equipment, supplies, inventory you kept) are entered as use tax.");
+        }
+
         if (request.Method == SalesTaxFilingMethod.Telefile && (result.Lines.Line5 != 0 || result.Lines.Line6 != 0 || result.Lines.Line8 != 0))
         {
             return AppResult<SalesTaxWorksheetDto>.Validation("Telefile is only for returns with no tax due and no deductions or credits (DR-15N).");
@@ -372,6 +384,8 @@ public sealed class SalesTaxWorkflowService(
             DeductionsCarriedOut = result.DeductionsCarriedOut,
             CreditsCarriedOut = result.CreditsCarriedOut,
             WarningsAcknowledged = warnings,
+            AttestedDirectSalesRecorded = request.ConfirmedDirectSalesRecorded,
+            AttestedUseTaxReviewed = request.ConfirmedUseTaxReviewed,
             SourceFingerprint = item.Computation.Fingerprint,
             SnapshotJson = JsonSerializer.Serialize(snapshot, SnapshotJson),
             Notes = Trim(request.Notes),
@@ -780,6 +794,8 @@ public sealed class SalesTaxWorkflowService(
                 filed.TotalTaxDue,
                 filed.AmountDueWithReturn,
                 filed.WarningsAcknowledged,
+                filed.AttestedDirectSalesRecorded,
+                filed.AttestedUseTaxReviewed,
                 filed.Notes,
                 filed.CreatedAt,
                 filed.IsVoided,

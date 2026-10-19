@@ -98,6 +98,12 @@ public sealed class SalesTaxReturn : EntityBase, IOrganizationScoped
     public decimal CreditsCarriedOut { get; set; }
 
     public int WarningsAcknowledged { get; set; }
+
+    /// <summary>The filer confirmed every sale made outside a marketplace is recorded; the app cannot see unrecorded ones.</summary>
+    public bool AttestedDirectSalesRecorded { get; set; }
+
+    /// <summary>The filer confirmed untaxed business purchases were entered as use tax.</summary>
+    public bool AttestedUseTaxReviewed { get; set; }
     public required string SourceFingerprint { get; set; }
     public required string SnapshotJson { get; set; }
     public string? Notes { get; set; }

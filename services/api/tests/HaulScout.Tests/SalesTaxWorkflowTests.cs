@@ -118,7 +118,7 @@ public class SalesTaxWorkflowTests
 
     private static FileSalesTaxReturnRequest Filing(SalesTaxWorksheetDto worksheet, bool amended = false, SalesTaxFilingMethod method = SalesTaxFilingMethod.Electronic) => new(
         new DateOnly(2026, 10, 19), null, method, "CONF-123", worksheet.Lines.Line14, false, amended,
-        worksheet.Issues.Count(issue => issue.Severity == Dr15IssueSeverity.Warning), worksheet.SourceFingerprint, null);
+        worksheet.Issues.Count(issue => issue.Severity == Dr15IssueSeverity.Warning), worksheet.SourceFingerprint, null, true, true);
 
     [Fact]
     public async Task The_overview_knows_which_returns_are_owed_and_which_is_overdue()
@@ -250,6 +250,23 @@ public class SalesTaxWorkflowTests
         Assert.Equal(SalesTaxReturnKind.AmendedReplacement, amended.Value.Filings[0].Kind);
         Assert.True(amended.Value.Filings[0].IsEffective);
         Assert.Equal(14m, amended.Value.Filings[0].TotalTaxDue);
+    }
+
+    [Fact]
+    public async Task A_filing_needs_both_attestations_and_keeps_them()
+    {
+        Harness harness = await NewAsync(nameof(A_filing_needs_both_attestations_and_keeps_them));
+        SalesTaxWorksheetDto worksheet = await Worksheet(harness, Q3);
+
+        AppResult<SalesTaxWorksheetDto> noSales = await harness.Service.FileAsync(Q3, Filing(worksheet) with { ConfirmedDirectSalesRecorded = false }, CancellationToken.None);
+        AppResult<SalesTaxWorksheetDto> noUseTax = await harness.Service.FileAsync(Q3, Filing(worksheet) with { ConfirmedUseTaxReviewed = false }, CancellationToken.None);
+        Assert.Equal(AppResultStatus.Validation, noSales.Status);
+        Assert.Equal(AppResultStatus.Validation, noUseTax.Status);
+
+        AppResult<SalesTaxWorksheetDto> filed = await harness.Service.FileAsync(Q3, Filing(worksheet), CancellationToken.None);
+        SalesTaxFiledReturnDto record = filed.Value!.Filings.Single();
+        Assert.True(record.AttestedDirectSalesRecorded);
+        Assert.True(record.AttestedUseTaxReviewed);
     }
 
     [Fact]

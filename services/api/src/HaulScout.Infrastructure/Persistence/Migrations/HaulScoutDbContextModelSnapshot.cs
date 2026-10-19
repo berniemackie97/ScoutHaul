@@ -3330,6 +3330,12 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                         .HasPrecision(12, 2)
                         .HasColumnType("numeric(12,2)");
 
+                    b.Property<bool>("AttestedDirectSalesRecorded")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("AttestedUseTaxReviewed")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("ConfirmationNumber")
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
