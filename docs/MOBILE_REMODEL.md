@@ -26,7 +26,7 @@ the rest fetch by hand in `useFocusEffect` · god screens: `inventory/edit` 1194
 ## Order
 
 1. **Appraisal** — identify, comp, price, buy check. Its own design: `APPRAISAL.md`.
-2. **Security and tenancy**
+2. **Security and tenancy** — done in `bernie/MobileSecurityTenancy`
    - Queued offline writes do not record the workspace or user they were made in, so a write made
      in one workspace replays into whichever is active when it syncs. Bind each row to both.
    - The Supabase session (refresh token included) is persisted in plain AsyncStorage. Encrypt it

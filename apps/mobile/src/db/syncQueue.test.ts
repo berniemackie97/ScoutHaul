@@ -11,6 +11,8 @@ jest.mock('../api', () => ({
 }));
 jest.mock('../utils/photos', () => ({ getPhotos: jest.fn(async () => []), deletePhoto: jest.fn() }));
 jest.mock('./database', () => ({ getDatabase: jest.fn() }));
+jest.mock('../services/auth', () => ({ authStore: { getAccount: jest.fn(() => ({ id: 'user-1' })) } }));
+jest.mock('../services/workspaceSession', () => ({ getActiveOrganizationId: jest.fn(async () => 'org-active') }));
 
 const mockRequest = apiRequest as jest.Mock;
 const mockGetDatabase = getDatabase as jest.Mock;
@@ -28,6 +30,8 @@ type Row = {
   lastError: string | null;
   attempts: number;
   nextAttemptAt: string | null;
+  organizationId: string | null;
+  userId: string | null;
 };
 
 function row(overrides: Partial<Row> = {}): Row {
@@ -42,6 +46,8 @@ function row(overrides: Partial<Row> = {}): Row {
     lastError: null,
     attempts: 0,
     nextAttemptAt: null,
+    organizationId: 'org-1',
+    userId: 'user-1',
     ...overrides,
   };
 }
@@ -55,9 +61,11 @@ function fakeDb(rows: Row[]) {
     selects,
     getAllAsync: async (sql: string, params: unknown[] = []) => {
       selects.push({ sql, params });
-      const cutoff = String(params[0] ?? '');
+      const [userId, cutoffParam] = params as [string, string];
+      const cutoff = String(cutoffParam ?? '');
       return rows.filter(
         (r) =>
+          (r.userId === null || r.userId === userId) &&
           ['pending', 'failed'].includes(r.status) &&
           (r.nextAttemptAt === null || r.nextAttemptAt <= cutoff),
       );
@@ -177,6 +185,37 @@ describe('processSyncQueue', () => {
   });
 });
 
+describe('whose write it is', () => {
+  it('sends a write to the workspace it was made in, not the active one', async () => {
+    mockGetDatabase.mockResolvedValue(fakeDb([row({ organizationId: 'org-made-in' })]));
+    mockRequest.mockResolvedValue({});
+
+    await processSyncQueue(NOW);
+
+    expect(mockRequest.mock.calls[0][1].organizationId).toBe('org-made-in');
+  });
+
+  it("never sends another person's queued write under this sign-in", async () => {
+    const db = fakeDb([row({ id: 'theirs', userId: 'user-2' }), row({ id: 'mine' })]);
+    mockGetDatabase.mockResolvedValue(db);
+    mockRequest.mockResolvedValue({});
+
+    await processSyncQueue(NOW);
+
+    expect(mockRequest).toHaveBeenCalledTimes(1);
+    expect(db.rows.find((r) => r.id === 'theirs')?.status).toBe('pending');
+  });
+
+  it('sends nothing while signed out', async () => {
+    const { authStore } = jest.requireMock('../services/auth') as { authStore: { getAccount: jest.Mock } };
+    authStore.getAccount.mockReturnValueOnce(null);
+    mockGetDatabase.mockResolvedValue(fakeDb([row()]));
+
+    await expect(processSyncQueue(NOW)).resolves.toEqual({ synced: 0, failed: 0, stuck: 0 });
+    expect(mockRequest).not.toHaveBeenCalled();
+  });
+});
+
 describe('photos held for a queued write', () => {
   const mockUpload = api.uploadInventoryPhoto as jest.Mock;
   const mockGetPhotos = getPhotos as jest.Mock;
@@ -199,8 +238,8 @@ describe('photos held for a queued write', () => {
 
     await processSyncQueue(NOW);
 
-    expect(mockUpload).toHaveBeenNthCalledWith(1, 'item-99', 'file:///a.jpg', true);
-    expect(mockUpload).toHaveBeenNthCalledWith(2, 'item-99', 'file:///b.jpg', false);
+    expect(mockUpload).toHaveBeenNthCalledWith(1, 'item-99', 'file:///a.jpg', true, 'org-1');
+    expect(mockUpload).toHaveBeenNthCalledWith(2, 'item-99', 'file:///b.jpg', false, 'org-1');
   });
 
   it('lets go of a photo only once it is uploaded', async () => {

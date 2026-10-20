@@ -27,13 +27,15 @@ type RequestOptions = {
   signal?: AbortSignal;
   /** Overrides the default deadline. */
   timeoutMs?: number;
+  /** Sends the request to this workspace instead of the active one, e.g. a write queued in another. */
+  organizationId?: string;
 };
 
 export { ApiError, REQUEST_IN_FLIGHT } from './apiError';
 export type { ApiFailureReason } from './apiError';
 
 /** The transport knobs a caller can pass through any endpoint wrapper. */
-export type CallOptions = Pick<RequestOptions, 'signal' | 'timeoutMs'>;
+export type CallOptions = Pick<RequestOptions, 'signal' | 'timeoutMs' | 'organizationId'>;
 
 // ── Retry policy ──────────────────────────────────────────────────────────────
 
@@ -139,7 +141,7 @@ async function isOnline(): Promise<boolean> {
 
 // ── Request plumbing ──────────────────────────────────────────────────────────
 
-async function buildHeaders(includeContentType = true): Promise<Record<string, string>> {
+async function buildHeaders(includeContentType = true, organizationId?: string): Promise<Record<string, string>> {
   const headers: Record<string, string> = { Accept: 'application/json' };
 
   if (includeContentType) {
@@ -147,7 +149,7 @@ async function buildHeaders(includeContentType = true): Promise<Record<string, s
   }
 
   const token = authStore.getToken();
-  const activeOrganizationId = await getActiveOrganizationId();
+  const activeOrganizationId = organizationId ?? (await getActiveOrganizationId());
 
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
@@ -292,7 +294,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
 
   const method = options.method ?? 'GET';
   const rebuildHeaders = async () => ({
-    ...(await buildHeaders()),
+    ...(await buildHeaders(true, options.organizationId)),
     ...(options.idempotencyKey ? { 'X-Idempotency-Key': options.idempotencyKey } : {}),
   });
 
@@ -316,12 +318,12 @@ export async function uploadMultipart<T>(
   path: string,
   formData: FormData,
   idempotencyKey?: string,
-  options: { signal?: AbortSignal; timeoutMs?: number } = {},
+  options: CallOptions = {},
 ): Promise<T> {
   await ensureFreshToken();
 
   const rebuildHeaders = async () => ({
-    ...(await buildHeaders(false)),
+    ...(await buildHeaders(false, options.organizationId)),
     ...(idempotencyKey ? { 'X-Idempotency-Key': idempotencyKey } : {}),
   });
 

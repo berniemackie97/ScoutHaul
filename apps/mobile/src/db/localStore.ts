@@ -17,6 +17,7 @@ export {
   enqueueOperation,
   enqueueComp,
   getPendingSyncCount,
+  countUnsyncedChanges,
   listSyncQueue,
   listStuckOperations,
   discardOperation,

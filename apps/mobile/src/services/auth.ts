@@ -1,7 +1,9 @@
 import type { Provider, Session, User } from '@supabase/supabase-js';
 import * as WebBrowser from 'expo-web-browser';
 import { makeRedirectUri } from 'expo-auth-session';
+import { clearLocalWorkspace } from '../db/localWipe';
 import { getSupabaseClient } from './supabaseClient';
+import { setActiveOrganizationId } from './workspaceSession';
 
 type AuthListener = (isAuthenticated: boolean) => void;
 
@@ -12,6 +14,7 @@ export type AuthSession = {
 };
 
 export type AuthAccount = {
+  id: string;
   email: string | null;
   displayName: string | null;
 };
@@ -140,8 +143,6 @@ export async function signInWithOAuthProvider(provider: 'google' | 'apple'): Pro
   const supabase = requireSupabaseClient();
   const redirectTo = makeRedirectUri({ scheme: 'scouthaul', path: 'auth/callback' });
 
-  console.log('[OAuth] redirectTo:', redirectTo);
-
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: provider as Provider,
     options: {
@@ -159,43 +160,28 @@ export async function signInWithOAuthProvider(provider: 'google' | 'apple'): Pro
     return null;
   }
 
-  // Extract tokens from the redirect URL fragment
-  const url = new URL(result.url);
-  // Supabase puts tokens in the hash fragment
-  const hashParams = new URLSearchParams(url.hash.substring(1));
-  const accessToken = hashParams.get('access_token');
-  const refreshToken = hashParams.get('refresh_token');
+  const code = new URL(result.url).searchParams.get('code');
+  if (!code) throw new Error('Sign-in did not return a code. Try again.');
 
-  if (!accessToken) {
-    // Try query params as fallback (some flows use code exchange)
-    const code = url.searchParams.get('code');
-    if (code) {
-      const { data: sessionData, error: exchangeError } =
-        await supabase.auth.exchangeCodeForSession(code);
-      if (exchangeError) throw new Error(exchangeError.message);
-      syncSession(sessionData.session);
-      return sessionData.session;
-    }
-    throw new Error('No authentication tokens received.');
-  }
-
-  const { data: sessionData, error: setError } = await supabase.auth.setSession({
-    access_token: accessToken,
-    refresh_token: refreshToken ?? '',
-  });
-
-  if (setError) throw new Error(setError.message);
+  const { data: sessionData, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+  if (exchangeError) throw new Error(exchangeError.message);
   syncSession(sessionData.session);
   return sessionData.session;
 }
 
+/**
+ * Signs out on this phone only (the default would end the person's admin sessions too) and clears
+ * what the phone held for them, so the next person to sign in starts clean.
+ */
 export async function signOut(): Promise<void> {
   const supabase = getSupabaseClient();
   if (supabase) {
-    await supabase.auth.signOut();
+    await supabase.auth.signOut({ scope: 'local' });
   }
 
   authStore.clear();
+  await clearLocalWorkspace();
+  await setActiveOrganizationId(null);
 }
 
 function requireSupabaseClient() {
@@ -235,6 +221,7 @@ function buildAccount(user: User | null): AuthAccount | null {
       : null;
 
   return {
+    id: user.id,
     email: user.email ?? null,
     displayName,
   };

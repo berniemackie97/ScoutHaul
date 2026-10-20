@@ -37,6 +37,8 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         backgroundColor: '#1e1b4b',
       },
       edgeToEdgeEnabled: true,
+      // Device backups would carry the local database and queued work off the phone.
+      allowBackup: false,
       package: IS_PROD
         ? 'com.scouthaul.app'
         : IS_PREVIEW
@@ -48,6 +50,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     },
     plugins: ['expo-router', 'expo-sqlite', 'expo-camera', 'expo-web-browser', 'expo-secure-store', 'expo-font'],
     extra: {
+      buildProfile: BUILD_PROFILE ?? 'development',
       apiBaseUrl,
       apiPort: Number(apiPort),
       supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL ?? '',

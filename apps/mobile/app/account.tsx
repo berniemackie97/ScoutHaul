@@ -29,6 +29,7 @@ import {
 } from '../src/services/auth';
 import { bootstrapSignedInWorkspace } from '../src/services/sessionBootstrap';
 import { setActiveOrganizationId } from '../src/services/workspaceSession';
+import { confirmSignOut } from '../src/services/confirmSignOut';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -236,6 +237,7 @@ export default function AccountScreen() {
   }
 
   async function handleSignOut() {
+    if (!(await confirmSignOut())) return;
     setIsSigningOut(true);
     try {
       await signOut();

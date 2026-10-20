@@ -101,6 +101,15 @@ export const migrations: readonly Migration[] = [
       alter table sync_queue add column nextAttemptAt text;
     `,
   },
+  {
+    // A queued write replayed into whichever workspace was active at sync time, and for whoever was
+    // signed in. Each write now remembers both, so it lands where it was made and only for its author.
+    name: '003-sync-queue-owner',
+    up: `
+      alter table sync_queue add column organizationId text;
+      alter table sync_queue add column userId text;
+    `,
+  },
 ];
 
 /** The slice of expo-sqlite this runner needs — small enough for a test to stand in for. */
