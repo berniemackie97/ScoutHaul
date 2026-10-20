@@ -1,4 +1,6 @@
 import { api, apiRequest } from '../api';
+import { authStore } from '../services/auth';
+import { getActiveOrganizationId } from '../services/workspaceSession';
 import { deletePhoto, getPhotos } from '../utils/photos';
 import { createLocalId } from '../utils/id';
 import { getDatabase } from './database';
@@ -17,10 +19,17 @@ export type SyncQueueRow = {
   attempts: number;
   /** Not retried before this time. Null means "as soon as possible". */
   nextAttemptAt: string | null;
+  /** The workspace and person the write was made by. Null on writes queued before build 003. */
+  organizationId: string | null;
+  userId: string | null;
 };
 
 /** Rows the queue still intends to send. `stuck` ones are excluded — they need a person, not a retry. */
 const RETRIABLE = `status in ('pending', 'failed')`;
+
+// Another person's writes stay on the phone untouched; they are never sent under someone else's sign-in.
+const MINE = `(userId is null or userId = ?)`;
+const currentUserId = () => authStore.getAccount()?.id ?? '';
 
 /**
  * Queues a write for later, returning the row's id.
@@ -38,9 +47,18 @@ export async function enqueueOperation(
   const db = await getDatabase();
   const id = createLocalId('sync');
   await db.runAsync(
-    `insert into sync_queue (id, operationType, endpoint, method, bodyJson, status, createdAt, lastError)
-      values (?, ?, ?, ?, ?, 'pending', ?, null)`,
-    [id, operationType, endpoint, method, JSON.stringify(body), new Date().toISOString()],
+    `insert into sync_queue (id, operationType, endpoint, method, bodyJson, status, createdAt, lastError, organizationId, userId)
+      values (?, ?, ?, ?, ?, 'pending', ?, null, ?, ?)`,
+    [
+      id,
+      operationType,
+      endpoint,
+      method,
+      JSON.stringify(body),
+      new Date().toISOString(),
+      await getActiveOrganizationId(),
+      authStore.getAccount()?.id ?? null,
+    ],
   );
   return id;
 }
@@ -59,7 +77,18 @@ export async function enqueueComp(body: unknown, draftId?: string): Promise<void
 export async function getPendingSyncCount(): Promise<number> {
   const db = await getDatabase();
   const row = await db.getFirstAsync<{ count: number }>(
-    `select count(*) as count from sync_queue where ${RETRIABLE}`,
+    `select count(*) as count from sync_queue where ${RETRIABLE} and ${MINE}`,
+    [currentUserId()],
+  );
+  return row?.count ?? 0;
+}
+
+/** Every change of this person's not yet on the server, including ones the queue gave up on. */
+export async function countUnsyncedChanges(): Promise<number> {
+  const db = await getDatabase();
+  const row = await db.getFirstAsync<{ count: number }>(
+    `select count(*) as count from sync_queue where status in ('pending', 'failed', 'stuck') and ${MINE}`,
+    [currentUserId()],
   );
   return row?.count ?? 0;
 }
@@ -68,7 +97,8 @@ export async function getPendingSyncCount(): Promise<number> {
 export async function listStuckOperations(): Promise<SyncQueueRow[]> {
   const db = await getDatabase();
   return db.getAllAsync<SyncQueueRow>(
-    `select * from sync_queue where status = 'stuck' order by createdAt asc`,
+    `select * from sync_queue where status = 'stuck' and ${MINE} order by createdAt asc`,
+    [currentUserId()],
   );
 }
 
@@ -89,19 +119,22 @@ export async function retryStuckOperation(id: string): Promise<void> {
 
 export async function listSyncQueue(): Promise<SyncQueueRow[]> {
   const db = await getDatabase();
-  return db.getAllAsync<SyncQueueRow>(`select * from sync_queue order by createdAt asc`);
+  return db.getAllAsync<SyncQueueRow>(`select * from sync_queue where ${MINE} order by createdAt asc`, [currentUserId()]);
 }
 
 export type SyncResult = { synced: number; failed: number; stuck: number };
 
 export async function processSyncQueue(now: Date = new Date()): Promise<SyncResult> {
+  const userId = authStore.getAccount()?.id;
+  if (!userId) return { synced: 0, failed: 0, stuck: 0 };
+
   const db = await getDatabase();
   // Rows still inside their backoff are skipped rather than hammered on every reconnect.
   const rows = await db.getAllAsync<SyncQueueRow>(
     `select * from sync_queue
-      where ${RETRIABLE} and (nextAttemptAt is null or nextAttemptAt <= ?)
+      where ${RETRIABLE} and ${MINE} and (nextAttemptAt is null or nextAttemptAt <= ?)
       order by createdAt asc`,
-    [now.toISOString()],
+    [userId, now.toISOString()],
   );
 
   let synced = 0;
@@ -114,12 +147,13 @@ export async function processSyncQueue(now: Date = new Date()): Promise<SyncResu
         method: row.method,
         body: JSON.parse(row.bodyJson),
         idempotencyKey: row.id,
+        organizationId: row.organizationId ?? undefined,
       });
 
       // Photos could not travel in the queued JSON — they are files, and until the write lands there
       // is no record to attach them to. They were saved against this row's id when it was queued.
       if (created?.id) {
-        await attachQueuedPhotos(row.id, created.id);
+        await attachQueuedPhotos(row.id, created.id, row.organizationId ?? undefined);
       }
 
       await db.runAsync(
@@ -166,10 +200,10 @@ export async function processSyncQueue(now: Date = new Date()): Promise<SyncResu
  *
  * A photo that fails to upload is left in place rather than deleted, so the next drain retries it.
  */
-async function attachQueuedPhotos(queueId: string, inventoryItemId: string): Promise<void> {
+async function attachQueuedPhotos(queueId: string, inventoryItemId: string, organizationId?: string): Promise<void> {
   const held = await getPhotos(queueId);
   for (const photo of held) {
-    await api.uploadInventoryPhoto(inventoryItemId, photo.localUri, photo.isHero);
+    await api.uploadInventoryPhoto(inventoryItemId, photo.localUri, photo.isHero, organizationId);
     await deletePhoto(photo.id);
   }
 }

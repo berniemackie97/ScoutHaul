@@ -1,4 +1,5 @@
-import { createContext, PropsWithChildren, useContext, useMemo, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { createContext, PropsWithChildren, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useColorScheme, ViewStyle } from 'react-native';
 import {
   buildToneColors,
@@ -22,10 +23,29 @@ type ThemeContextValue = {
 };
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
+const THEME_KEY = 'haulscout.themeMode';
+const isThemeMode = (value: string | null): value is ThemeMode => value === 'system' || value === 'light' || value === 'dark';
 
 export function ThemeProvider({ children }: PropsWithChildren) {
   const systemScheme = useColorScheme();
-  const [mode, setMode] = useState<ThemeMode>('system');
+  const [mode, setModeState] = useState<ThemeMode>('system');
+
+  useEffect(() => {
+    let active = true;
+    AsyncStorage.getItem(THEME_KEY)
+      .then((saved) => {
+        if (active && isThemeMode(saved)) setModeState(saved);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const setMode = useCallback((next: ThemeMode) => {
+    setModeState(next);
+    void AsyncStorage.setItem(THEME_KEY, next).catch(() => undefined);
+  }, []);
 
   const isDark = mode === 'dark' || (mode === 'system' && systemScheme === 'dark');
   const activeColors = isDark ? darkColors : lightColors;
@@ -41,7 +61,7 @@ export function ThemeProvider({ children }: PropsWithChildren) {
       mode,
       setMode,
     }),
-    [isDark, mode],
+    [isDark, mode, setMode],
   );
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;

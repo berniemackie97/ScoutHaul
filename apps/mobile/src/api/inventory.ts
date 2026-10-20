@@ -138,11 +138,11 @@ export const inventoryApi = {
   changeStatus: (id: string, status: InventoryStatus) =>
     apiRequest<InventoryItem>(`/api/inventory/${id}/status`, { method: 'PATCH', body: { status } }),
 
-  uploadPhoto: (id: string, uri: string, isHero: boolean) => {
+  uploadPhoto: (id: string, uri: string, isHero: boolean, organizationId?: string) => {
     const form = new FormData();
     form.append('file', { uri, name: `inventory-${Date.now()}.jpg`, type: 'image/jpeg' } as unknown as Blob);
     form.append('isHero', String(isHero));
-    return uploadMultipart<PhotoResponse>(`/api/inventory/${id}/photos`, form);
+    return uploadMultipart<PhotoResponse>(`/api/inventory/${id}/photos`, form, undefined, { organizationId });
   },
   deletePhoto: (id: string, url: string) =>
     apiRequest<PhotoResponse>(`/api/inventory/${id}/photos?url=${encodeURIComponent(url)}`, { method: 'DELETE' }),

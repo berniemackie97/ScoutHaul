@@ -12,8 +12,8 @@ export interface AppConfig {
 }
 
 function resolveEnvironment(): Environment {
-  const profile = Constants.expoConfig?.extra?.eas?.buildProfile;
-  if (profile === 'production') return 'production';
+  const profile = Constants.expoConfig?.extra?.buildProfile;
+  if (profile === 'production' || profile === 'release-apk') return 'production';
   if (profile === 'preview') return 'preview';
   return 'development';
 }

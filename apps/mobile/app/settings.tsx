@@ -15,6 +15,7 @@ import { useAppTheme } from '../src/context/ThemeContext';
 import { discardOperation, getPendingSyncCount, getWorkspaceProfile, listStuckOperations, processSyncQueue, retryStuckOperation, saveWorkspaceProfile, type AppWorkspaceProfile, type SyncQueueRow } from '../src/db/localStore';
 import { useConnectivity } from '../src/hooks/useConnectivity';
 import { signOut } from '../src/services/auth';
+import { confirmSignOut } from '../src/services/confirmSignOut';
 
 type ThemeMode = 'system' | 'light' | 'dark';
 const themeModes: { value: ThemeMode; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
@@ -85,6 +86,7 @@ export default function SettingsScreen() {
   }
 
   async function disconnectAccount() {
+    if (!(await confirmSignOut())) return;
     await signOut();
     await saveWorkspaceProfile({ accountMode: 'local', accountEmail: null, displayName: null });
     await load();
