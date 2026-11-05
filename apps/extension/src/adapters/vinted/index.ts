@@ -5,13 +5,14 @@ import {
   type MarketplaceAdapter,
   type MarketplaceContext,
   type PageKind,
+  type PageResponse,
   type SalesScan,
   type SalesWindow,
   type Session,
 } from "../types";
 import { toIngestListing, type VintedWardrobe } from "./listings";
 import { saleStamp, saleState, toIngestOrder, type VintedOrderList, type VintedOrderRow, type VintedTransaction } from "./orders";
-import { assertReadable, sessionOnPage, signedOutPage, siteChanged } from "./pages";
+import { assertReadable, lookOn, sessionOnPage, signedInPage, signedOutPage, siteChanged } from "./pages";
 
 const origin = "https://www.vinted.com";
 
@@ -31,20 +32,138 @@ interface RememberedSale {
   order: IngestOrder | null;
 }
 
+/** The cookie Vinted's pages keep the sign-in's short-lived access token in. */
+export const tokenCookie = "access_token_web";
+
+/** Memory of having seen that cookie in this browser: only then does its absence mean anything. */
+const tokenSeenKey = "token-cookie-seen";
+
+/** A token with less than this left is renewed before it is used, so no request outlives it. */
+const tokenMarginMs = 60_000;
+
+/** How long a page load is given to renew the token, looked at every half second, before the sign-in counts as lapsed. */
+const renewWaitMs = 10_000;
+
+/** The least time between two page loads made only to renew the token. */
+const renewEveryMs = 10 * 60_000;
+
+type TokenState = "valid" | "expired" | "missing" | "unknown";
+
+/** One check or scan's reading of Vinted: what it has already done to keep the sign-in fresh. */
+interface Reading {
+  renewedAt: number | null;
+  recovered: boolean;
+}
+
+const reading = (): Reading => ({ renewedAt: null, recovered: false });
+
+const signedOut = () => new AdapterError("SignedOut", "The browser is signed out of Vinted.");
+
+/** When a token (a JWT) stops working, from the token itself; null when it is not one this can read. */
+export function tokenExpiry(token: string): number | null {
+  try {
+    const payload = token.split(".")[1];
+    if (!payload) {
+      return null;
+    }
+
+    const json = JSON.parse(atob(payload.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(payload.length / 4) * 4, "="))) as { exp?: unknown };
+    return typeof json.exp === "number" ? json.exp * 1000 : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
- * Asks Vinted's API for JSON, from Vinted's own page. A lapsed sign-in answers 401 until something
- * renews it — Vinted's pages do, as they load — so on a 401 one is loaded and the question asked
- * again; still refused, or showing the signed-out page, is signed out.
+ * The sign-in's access token, from the cookie jar — no request. "unknown" when this browser cannot tell: cookies
+ * cannot be read, the cookie has never been seen here, or it is not a token this can read.
  */
-async function readJson<T>(context: MarketplaceContext, path: string, what: string): Promise<T> {
+async function accessToken(context: MarketplaceContext): Promise<TokenState> {
+  const value = await context.cookie?.(tokenCookie);
+  if (value === undefined) {
+    return "unknown";
+  }
+
+  const seen = await context.memory.get<number>(tokenSeenKey);
+  if (value === null) {
+    return seen ? "missing" : "unknown";
+  }
+
+  const now = context.now().getTime();
+  if (!seen || now - seen > 24 * 60 * 60_000) {
+    await context.memory.set<number>(tokenSeenKey, now);
+  }
+
+  const expiry = tokenExpiry(value);
+  return expiry === null ? "unknown" : expiry - tokenMarginMs > now ? "valid" : "expired";
+}
+
+/** The token as it stands once it is live, or once `ms` have gone by looking every half second — the cookie jar only. */
+async function tokenWithin(context: MarketplaceContext, ms: number): Promise<TokenState> {
+  let token = await accessToken(context);
+  for (let waited = 0; waited < ms && (token === "expired" || token === "missing") && context.sleep; waited += 500) {
+    await context.sleep(500);
+    token = await accessToken(context);
+  }
+
+  return token;
+}
+
+/**
+ * Makes sure the next request goes with a live sign-in, because a request without one is exactly what Vinted's bot
+ * protection blocks. A token about to lapse is renewed the way Vinted renews it — a page loads — and watched for in the
+ * cookie jar; one that does not come back means the sign-in has lapsed, and nothing is asked.
+ */
+async function ensureToken(context: MarketplaceContext, read: Reading): Promise<void> {
+  // A page that has only just loaded may be renewing it this moment.
+  const token = await tokenWithin(context, 2000);
+  if (token === "valid" || token === "unknown") {
+    return;
+  }
+
+  const now = context.now().getTime();
+  if (read.renewedAt !== null && now - read.renewedAt < renewEveryMs) {
+    throw signedOut();
+  }
+
+  read.renewedAt = now;
+  const page = await context.page(ordersPage);
+  assertReadable(page);
+  if (signedOutPage(page)) {
+    throw signedOut();
+  }
+
+  const renewed = await tokenWithin(context, renewWaitMs);
+  if (renewed === "valid") {
+    return;
+  }
+
+  if (renewed === "missing" && signedInPage(page)) {
+    // Signed in, by the page, with no token where one was before: Vinted keeps it elsewhere now. Stop relying on it.
+    await context.memory.set<number>(tokenSeenKey, 0);
+    return;
+  }
+
+  throw new AdapterError("SignedOut", "Vinted's sign-in has lapsed. Sign in to Vinted again in this browser.");
+}
+
+/**
+ * Asks Vinted's API for JSON, from Vinted's own page, only ever with a live sign-in. A 401 is the end of it: the
+ * question is not asked again. The one exception is a browser that cannot see the token — there, Vinted's page may
+ * still have been renewing it, so once per check or scan, a page loads, and the question is asked one more time.
+ */
+async function readJson<T>(context: MarketplaceContext, path: string, what: string, read: Reading): Promise<T> {
+  await ensureToken(context, read);
   let response = await context.request(`${origin}${path}`);
-  if (response.status === 401) {
+  if (response.status === 401 && !read.recovered && (await accessToken(context)) === "unknown") {
+    read.recovered = true;
     const page = await context.page(ordersPage);
     assertReadable(page);
     if (signedOutPage(page)) {
-      throw new AdapterError("SignedOut", "The browser is signed out of Vinted.");
+      throw signedOut();
     }
 
+    await context.sleep?.(3000);
     response = await context.request(`${origin}${path}`);
   }
 
@@ -61,7 +180,7 @@ async function readJson<T>(context: MarketplaceContext, path: string, what: stri
  * otherwise read in full. A cancelled sale needs no reading — only telling. A sale whose details
  * cannot be read is reported, and left unremembered so the next scan tries it again.
  */
-async function readSale(context: MarketplaceContext, row: VintedOrderRow): Promise<{ order: IngestOrder | null; issues: RunIssue[]; changed: boolean }> {
+async function readSale(context: MarketplaceContext, row: VintedOrderRow, read: Reading): Promise<{ order: IngestOrder | null; issues: RunIssue[]; changed: boolean }> {
   const key = `sale:${row.transaction_id}`;
   const stamp = saleStamp(row);
   const known = await context.memory.get<RememberedSale>(key);
@@ -76,7 +195,7 @@ async function readSale(context: MarketplaceContext, row: VintedOrderRow): Promi
 
   let detail: VintedTransaction;
   try {
-    detail = await readJson<VintedTransaction>(context, `/api/v2/transactions/${encodeURIComponent(String(row.transaction_id))}`, "sale details");
+    detail = await readJson<VintedTransaction>(context, `/api/v2/transactions/${encodeURIComponent(String(row.transaction_id))}`, "sale details", read);
   } catch (error) {
     // Trouble with the whole site stops the scan; trouble with this one sale only skips it.
     if (error instanceof AdapterError && error.kind === "Error") {
@@ -117,7 +236,7 @@ export const vintedAdapter: MarketplaceAdapter = {
       return "other";
     }
 
-    if (/^\/member\/(login|signup)/i.test(path)) {
+    if (/^\/member\/(login|signup|verif|two_factor|password|reset_password)/i.test(path)) {
       return "sign-in";
     }
 
@@ -125,18 +244,28 @@ export const vintedAdapter: MarketplaceAdapter = {
   },
 
   /**
-   * A page first, the way a person arrives: it renews a lapsed sign-in and says plainly when there is none. Only a
-   * signed-in browser is then asked which account it is. Vinted's API questioned without a session is exactly the
-   * pattern its bot protection blocks, so a signed-out browser is never asked anything at all.
+   * A page first, the way a person arrives — or the one the operator already has open (`shown`): it says plainly when
+   * no one is signed in. Only a page that shows a sign-in is followed by the one question of which account it is, and
+   * only with a live token. Vinted's API questioned without a session is exactly the pattern its bot protection
+   * blocks, so a signed-out browser is never asked anything at all.
    */
-  async detectSession(context: MarketplaceContext): Promise<Session> {
-    const page = await context.page(ordersPage);
+  async detectSession(context: MarketplaceContext, shown?: PageResponse): Promise<Session> {
+    const page = shown ?? (await context.page(ordersPage));
     assertReadable(page);
     if (signedOutPage(page)) {
       return { signedIn: false, username: null, marketplaceUserId: null };
     }
 
-    const current = await readJson<{ user?: { id?: number | string | null; login?: string | null } }>(context, "/api/v2/users/current", "account details");
+    if (!signedInPage(page)) {
+      // The operator's page may be one that does not say; Vinted's own orders page always has.
+      if (shown) {
+        throw new AdapterError("Interrupted", "The open Vinted page does not show the sign-in.");
+      }
+
+      throw siteChanged("sign-in state");
+    }
+
+    const current = await readJson<{ user?: { id?: number | string | null; login?: string | null } }>(context, "/api/v2/users/current", "account details", reading());
     const login = current.user?.login?.trim();
     if (!login) {
       throw siteChanged("account details");
@@ -148,6 +277,7 @@ export const vintedAdapter: MarketplaceAdapter = {
 
   // The operator's own Vinted tab says when it is signed out, so that is read for free rather than asked of Vinted.
   sessionFrom: sessionOnPage,
+  look: lookOn,
 
   async scanSales(context: MarketplaceContext, window: SalesWindow): Promise<SalesScan> {
     const now = context.now();
@@ -161,9 +291,10 @@ export const vintedAdapter: MarketplaceAdapter = {
     const issues: RunIssue[] = [];
     let newest = Date.parse(window.cursor ?? "");
     let oldest = now.getTime();
+    const read = reading();
 
     for (let page = 1; ; page++) {
-      const list = await readJson<VintedOrderList>(context, `/api/v2/my_orders?type=sold&status=all&per_page=${ordersPerPage}&page=${page}`, "orders");
+      const list = await readJson<VintedOrderList>(context, `/api/v2/my_orders?type=sold&status=all&per_page=${ordersPerPage}&page=${page}`, "orders", read);
       if (!Array.isArray(list.my_orders)) {
         throw siteChanged("orders");
       }
@@ -185,7 +316,7 @@ export const vintedAdapter: MarketplaceAdapter = {
           oldest = Math.min(oldest, at);
         }
 
-        const sale = await readSale(context, row);
+        const sale = await readSale(context, row, read);
         if (sale.changed) {
           changes++;
           if (saleState(row) === "cancelled") {
@@ -231,11 +362,13 @@ export const vintedAdapter: MarketplaceAdapter = {
     const listings = new Map<string, IngestListing>();
     const issues: RunIssue[] = [];
     let total: number | null = null;
+    const read = reading();
     for (let page = 1; page <= maxPages; page++) {
       const wardrobe = await readJson<VintedWardrobe>(
         context,
         `/api/v2/wardrobe/${encodeURIComponent(session.marketplaceUserId)}/items?page=${page}&per_page=${itemsPerPage}&order=newest_first`,
-        "listings");
+        "listings",
+        read);
       if (!Array.isArray(wardrobe.items)) {
         throw siteChanged("listings");
       }

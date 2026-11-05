@@ -40,8 +40,9 @@ export default defineBackground(() => {
   // A marketplace page finishing in one of the operator's tabs may mean they just signed in, or got
   // through a security check; the agent looks again. The browser gives the extension the address
   // only of pages it may read, so no other browsing is seen.
+  // A change of address counts too: a sign-in form can open without a page load.
   browser.tabs.onUpdated.addListener((tabId, change, tab) => {
-    if (change.status === "complete" && tab.url) {
+    if ((change.status === "complete" || change.url !== undefined) && tab.url) {
       void agent.noticePage(tabId, tab.url);
     }
   });

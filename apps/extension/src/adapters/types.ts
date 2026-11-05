@@ -38,6 +38,13 @@ export interface MarketplaceContext {
   page(url: string, read?: PageRead): Promise<PageResponse>;
   request(url: string): Promise<PageResponse>;
   now(): Date;
+  /** Waits, without asking the marketplace anything. */
+  sleep?(ms: number): Promise<void>;
+  /**
+   * One of the marketplace's cookies in this browser, read without a request: null when there is none, undefined when
+   * cookies cannot be read here at all.
+   */
+  cookie?(name: string): Promise<string | null | undefined>;
   /** What the adapter keeps between scans in this browser, so work already done is not asked for again. */
   memory: AdapterMemory;
 }
@@ -49,6 +56,14 @@ export interface MarketplaceContext {
 export interface AdapterMemory {
   get<T>(key: string): Promise<T | undefined>;
   set<T>(key: string, value: T): Promise<void>;
+}
+
+/** What one of the marketplace's own pages shows, read where it stands at no cost to anyone. */
+export interface PageLook {
+  /** A security check — a captcha, a block — rather than the page itself. */
+  challenge: boolean;
+  /** Whether someone is signed in, or null when the page does not say. */
+  signedIn: boolean | null;
 }
 
 export interface Session {
@@ -106,7 +121,10 @@ export interface MarketplaceAdapter {
   /** Whether an address is one of the marketplace's own pages — the only pages the extension reads. */
   readable(url: string): boolean;
   pageKind(url: string): PageKind;
-  detectSession(context: MarketplaceContext): Promise<Session>;
+  /** `shown`: a page already open on the marketplace, read where it stands, which the check may use instead of loading one. */
+  detectSession(context: MarketplaceContext, shown?: PageResponse): Promise<Session>;
+  /** A page as it stands: a security check, and whether someone is signed in. Without it, the address and `sessionFrom` tell. */
+  look?(page: PageResponse): PageLook;
   /**
    * Who is signed in, as any of the marketplace's own pages shows it, or null when that page cannot tell — so a
    * sign-in check can read a tab the operator already has open instead of loading one. `sessionGlobal` is the page

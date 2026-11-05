@@ -20,9 +20,12 @@ const deferred = {
   // assets with. It goes when Expo ships a Metro that asks for a patched one.
   'image-size': 'Expo/Metro releasing a build that asks for image-size >= 2.0.3',
 
-  // GHSA-vfj7-8cjw-p6xm — `braces` overflows the stack on deeply nested glob patterns. Reached only
-  // through micromatch in Jest, with patterns written in this repo's config. No release fixes it yet.
-  braces: 'braces publishing a release above 3.0.3',
+  // `decode-uri-component` 0.2.2 can be made to spin on malformed percent-encoding. Reached through
+  // expo-router's query-string 7, which decodes the app's own route and deep-link query strings, so
+  // the worst case is a crafted HaulScout link freezing the app on the phone that opens it. The fix
+  // (0.5.x) is ESM-only and query-string 7 `require`s it, so an override would break routing; expo-router
+  // 58 ships a query-string that takes the fixed one. It goes with the SDK 58 upgrade.
+  'decode-uri-component': 'the Expo SDK 58 upgrade (expo-router 58)',
 
   // GHSA-86w9-cpqp-85rv — `node-forge` accepts malformed RSA PKCS#1 v1.5 signatures. Used only by the
   // Expo CLI and expo-updates' Node tooling for code-signing certificates, which this app does not

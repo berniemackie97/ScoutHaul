@@ -9,6 +9,8 @@ export interface MarketplaceTab {
   page(url: string, read?: PageRead): Promise<PageResponse>;
   /** A request made from the marketplace's own page, for the JSON endpoints its pages call. */
   request(url: string): Promise<PageResponse>;
+  /** One of the marketplace's cookies, read without a request: null when there is none, undefined when cookies cannot be read. */
+  cookie?(name: string): Promise<string | null | undefined>;
 }
 
 /** A tab the operator has open: never navigated, but its page can be read as it stands. */
@@ -198,15 +200,26 @@ async function lookAt(tabId: number): Promise<TabLook | null> {
 
 type Injection = () => Promise<unknown[]>;
 
+/** Reads a cookie of the marketplace's from the browser's own jar — the ordinary one, never a container's. */
+export async function readCookie(home: string, name: string): Promise<string | null | undefined> {
+  try {
+    const cookie = await browser.cookies.get({ url: `${home}/`, name });
+    return cookie?.value ?? null;
+  } catch {
+    return undefined;
+  }
+}
+
 /**
  * Runs a function in a tab and returns its result. A tab caught between pages can refuse a script
- * for a moment, so a refusal is tried again briefly before it is explained in words a person can act
+ * for a moment, so a read is tried again briefly before it is explained in words a person can act
  * on — access taken away, the tab closed or moved elsewhere, or a page that did not load — rather
- * than as the browser's own message.
+ * than as the browser's own message. A request is tried once: it may have reached the marketplace
+ * before it failed, and asking twice is how a script looks.
  */
-async function inTab<T>(tabId: number, adapter: MarketplaceAdapter, clock: Clock, inject: Injection): Promise<T> {
+async function inTab<T>(tabId: number, adapter: MarketplaceAdapter, clock: Clock, inject: Injection, attempts = 3): Promise<T> {
   let failure: unknown = null;
-  for (let attempt = 0; attempt < 3; attempt++) {
+  for (let attempt = 0; attempt < attempts; attempt++) {
     if (attempt > 0) {
       await clock.sleep(400);
     }
@@ -275,8 +288,8 @@ export class SyncTabs {
   /** The marketplace's sync tab — the one already open, or a new one — loaded and ready to read through. */
   async acquire(adapter: MarketplaceAdapter): Promise<MarketplaceTab> {
     this.cancelClose(adapter.platform);
-    const tabId = (await this.reusable(adapter)) ?? (await this.create(adapter));
-    return this.reader(adapter, tabId);
+    const reused = await this.reusable(adapter);
+    return this.reader(adapter, reused ?? (await this.create(adapter)), reused === null);
   }
 
   /** Done with it for now: it closes unless more work comes along within a few seconds. */
@@ -334,10 +347,11 @@ export class SyncTabs {
     const borrowed = tab.id;
     return {
       page: async () => {
-        throw new Error("A borrowed tab is never navigated.");
+        throw new AdapterError("Interrupted", "A borrowed tab is never navigated.");
       },
       current: (global?: string) => readTab(borrowed, adapter, this.clock, global),
-      request: (url: string) => inTab<PageResponse>(borrowed, adapter, this.clock, fetchIn(borrowed, url)),
+      request: (url: string) => inTab<PageResponse>(borrowed, adapter, this.clock, fetchIn(borrowed, url), 1),
+      cookie: (name: string) => readCookie(adapter.home, name),
     };
   }
 
@@ -405,7 +419,8 @@ export class SyncTabs {
     return created?.tabs?.[0];
   }
 
-  private reader(adapter: MarketplaceAdapter, tabId: number): MarketplaceTab {
+  /** `landed`: the tab was just opened at the worker page, so the first read of that page reads it where it stands. */
+  private reader(adapter: MarketplaceAdapter, tabId: number, landed: boolean): MarketplaceTab {
     /** Navigates the tab and waits for the new page. Returns the address it left. */
     const navigate = async (url: string, read: PageRead, leaving: number | null): Promise<string | undefined> => {
       const before = (await lookAt(tabId))?.url;
@@ -450,6 +465,13 @@ export class SyncTabs {
 
     return {
       page: async (url: string, pageRead: PageRead = {}) => {
+        // The tab has only just loaded this very page: loading it again a moment later is no person's browsing.
+        const fresh = landed && url === adapter.workerUrl && pageRead.global === undefined && pageRead.until === undefined;
+        landed = false;
+        if (fresh) {
+          return read(undefined);
+        }
+
         const leaving = await documentIn(tabId);
         const before = await navigate(url, pageRead, leaving);
         const deadline = this.clock.now() + pageLoadTimeoutMs;
@@ -477,8 +499,9 @@ export class SyncTabs {
           await navigate(adapter.workerUrl, {}, await documentIn(tabId));
         }
 
-        return inTab<PageResponse>(tabId, adapter, this.clock, fetchIn(tabId, url));
+        return inTab<PageResponse>(tabId, adapter, this.clock, fetchIn(tabId, url), 1);
       },
+      cookie: (name: string) => readCookie(adapter.home, name),
     };
   }
 }

@@ -1,23 +1,26 @@
 import { browser } from "wxt/browser";
 import { adapterFor, adapters } from "../adapters/registry";
-import type { MarketplaceAdapter } from "../adapters/types";
+import { AdapterError, type MarketplaceAdapter, type PageResponse, type Session } from "../adapters/types";
 import { logActivity } from "./activity";
 import { ApiError, createAgentApi, type AgentApi } from "./api";
-import { aliveBeatMs, recheckMs, signedInFreshMs } from "./config";
+import { aliveBeatMs, recheckMs, signedInFreshMs, signInQuietMs, signInSettleMs } from "./config";
 import { describeBrowser } from "./environment";
 import { describeFailure, waitsForAPerson } from "./failures";
-import { pauseOf, resume, type GovernorPolicy } from "./governor";
+import { checkCleared, checkSlot, holdOf, initialGovernorState, maxChecksPerHour, pauseOf, quiet, recordCheck, resume, type GovernorPolicy } from "./governor";
 import { forgetAdapterMemory } from "./memory";
 import {
   checkSession,
   describeWork,
   governedContext,
   hasAccess,
+  HeldBack,
   heldBack,
   kindOf,
   learn,
   limitsFor,
+  lookOf,
   notStarted,
+  pace,
   preflight,
   rememberSession,
   runWork,
@@ -28,6 +31,7 @@ import {
   activityItem,
   aliveItem,
   authProblemItem,
+  confirmsItem,
   connectionItem,
   governorItem,
   heartbeatItem,
@@ -51,7 +55,11 @@ export interface TabSource {
   release(adapter: MarketplaceAdapter): void;
   borrow(adapter: MarketplaceAdapter, tabId?: number): Promise<BorrowedTab | null>;
   owns(tabId: number): boolean;
+  /** Closes the marketplace's sync tab now — one showing a security check is not left open in the background. */
+  close(platform: string): Promise<void>;
 }
+
+const signedOut: Session = { signedIn: false, username: null, marketplaceUserId: null };
 
 export type AgentDeps = RunnerDeps & { tabs: TabSource };
 
@@ -69,6 +77,7 @@ export class Agent {
   private turn: Promise<unknown> = Promise.resolve();
   private readonly lastChecked = new Map<string, number>();
   private readonly pendingChecks = new Map<string, ReturnType<typeof setTimeout>>();
+  private readonly confirmTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
   constructor(deps?: Partial<AgentDeps>) {
     this.api = deps?.api ?? createAgentApi(async () => (await pairingItem.getValue())?.token ?? null);
@@ -169,9 +178,10 @@ export class Agent {
   }
 
   /**
-   * A marketplace page finished loading in one of the operator's own tabs. If this browser is not
-   * known to be signed in there, or is paused for a security check, that may just have changed — they
-   * signed in, or cleared the check — so it looks again, from that very tab, once the pages settle.
+   * A marketplace page loaded in one of the operator's own tabs. On the sign-in form or a security check, the agent
+   * holds off — nothing is asked of the marketplace beside a person signing in. Otherwise, if this browser is not known
+   * to be signed in there, or is paused for a security check, that may just have changed, so it reads that very page
+   * where it stands, once it settles. Reading costs the marketplace nothing; anything that would is left to a check.
    */
   async noticePage(tabId: number, url: string): Promise<void> {
     const adapter = adapters.find((candidate) => candidate.readable(url));
@@ -181,29 +191,114 @@ export class Agent {
 
     const kind = adapter.pageKind(url);
     if (kind === "sign-in" || kind === "challenge") {
+      await this.holdOff(adapter, kind === "sign-in"
+        ? `Holding off while you sign in to ${adapter.platform}.`
+        : `Holding off while you complete ${adapter.platform}'s security check.`);
       return;
     }
 
-    const now = this.deps.now().getTime();
     const session = (await sessionsItem.getValue())[adapter.platform];
-    const pause = pauseOf((await governorItem.getValue())[adapter.platform], now);
-    const checkCleared = pause?.kind === "challenge" && kind === "seller";
-    if (!checkCleared && session?.signedIn) {
+    const pause = pauseOf((await governorItem.getValue())[adapter.platform], this.deps.now().getTime());
+    if (session?.signedIn && pause?.kind !== "challenge") {
       return;
     }
 
-    const wait = Math.max(1500, recheckMs - (now - (this.lastChecked.get(adapter.platform) ?? 0)));
     clearTimeout(this.pendingChecks.get(adapter.platform));
     this.pendingChecks.set(adapter.platform, setTimeout(() => {
       this.pendingChecks.delete(adapter.platform);
       void (async () => {
-        if (checkCleared) {
-          await this.resumePlatform(adapter.platform, `${adapter.platform}'s security check is done. Syncing picks up again.`);
+        if (await this.exclusive(() => this.watchOwnTab(adapter, tabId))) {
+          await this.checkIn();
         }
-
-        await this.checkSessions({ platform: adapter.platform, tabId, force: true });
       })().catch((error: unknown) => console.warn("HaulScout Sync could not look at the sign-in again.", error));
-    }, wait));
+    }, 1500));
+  }
+
+  /**
+   * Reads the operator's own tab where it stands — never navigating it, never asking the marketplace anything — and
+   * learns what it shows. True when HaulScout should hear about it now.
+   */
+  private async watchOwnTab(adapter: MarketplaceAdapter, tabId: number): Promise<boolean> {
+    const borrowed = await this.deps.tabs.borrow(adapter, tabId);
+    let page: PageResponse;
+    try {
+      if (!borrowed) {
+        return false;
+      }
+
+      page = await borrowed.current(adapter.sessionGlobal);
+    } catch {
+      return false;
+    }
+
+    const now = this.deps.now();
+    const look = lookOf(adapter, page);
+    if (look.challenge) {
+      return this.challengeSeen(adapter);
+    }
+
+    let tell = false;
+    if (pauseOf((await governorItem.getValue())[adapter.platform], now.getTime())?.kind === "challenge") {
+      await updateGovernor(adapter.platform, (state) => checkCleared(state, now.getTime(), adapter.platform));
+      await logActivity("info", `${adapter.platform}'s security check is done. Syncing picks up again in a few minutes.`, now);
+      tell = true;
+    }
+
+    const session = (await sessionsItem.getValue())[adapter.platform];
+    const shown = adapter.sessionFrom?.(page) ?? (look.signedIn === false ? signedOut : null);
+    if (shown) {
+      await rememberSession(adapter, shown, now);
+      if (!shown.signedIn) {
+        await this.holdOff(adapter, `Holding off while you sign in to ${adapter.platform}.`);
+      }
+
+      return tell || shown.signedIn !== session?.signedIn;
+    }
+
+    if (!session?.signedIn) {
+      // Signed in, by the page, but it does not say who: one check names the account, once the sign-in has settled.
+      await this.confirmLater(adapter, tabId);
+    }
+
+    return tell;
+  }
+
+  /** The operator's tab shows a security check: pause, unless already paused for it — a person working through it is not held against them. */
+  private async challengeSeen(adapter: MarketplaceAdapter): Promise<boolean> {
+    if (pauseOf((await governorItem.getValue())[adapter.platform], this.deps.now().getTime())?.kind === "challenge") {
+      return false;
+    }
+
+    await learn(adapter.platform, "Challenge", this.deps.now());
+    await logActivity("warning", describeFailure("Challenge", adapter.platform), this.deps.now());
+    return true;
+  }
+
+  /** Nothing is asked of the marketplace for a while: the operator is signing in, or working through a check. */
+  private async holdOff(adapter: MarketplaceAdapter, reason: string): Promise<void> {
+    await updateGovernor(adapter.platform, (state) => quiet(state, this.deps.now().getTime() + signInQuietMs, reason));
+  }
+
+  /**
+   * Makes the check that names a sign-in due once it has settled — and once any quiet spell is over — and wakes for it
+   * then. The due time survives a stopped background; the heartbeat looks for it every minute.
+   */
+  private async confirmLater(adapter: MarketplaceAdapter, tabId: number | null): Promise<void> {
+    const now = this.deps.now().getTime();
+    const confirms = await confirmsItem.getValue();
+    const hold = holdOf((await governorItem.getValue())[adapter.platform], now);
+    // The earliest stands: someone browsing on is not made to wait longer for every page they open.
+    const at = confirms[adapter.platform] ? Date.parse(confirms[adapter.platform]!.at) : Math.max(now + signInSettleMs, hold?.until ?? 0);
+    await confirmsItem.setValue({ ...confirms, [adapter.platform]: { at: new Date(at).toISOString(), tabId } });
+    this.wakeAt(adapter, at);
+  }
+
+  private wakeAt(adapter: MarketplaceAdapter, at: number): void {
+    clearTimeout(this.confirmTimers.get(adapter.platform));
+    this.confirmTimers.set(adapter.platform, setTimeout(() => {
+      this.confirmTimers.delete(adapter.platform);
+      void this.checkSessions({ platform: adapter.platform }).catch((error: unknown) => console.warn("HaulScout Sync could not confirm the sign-in.", error));
+    }, Math.max(0, at - this.deps.now().getTime()) + 50));
   }
 
   /** Lifts a pause by hand — the operator has dealt with whatever caused it. */
@@ -295,10 +390,12 @@ export class Agent {
     let tab: MarketplaceTab;
     try {
       await this.running(`Opening ${adapter.platform}`, null);
+      // Opening the sync tab loads a page, so it is paced like any other.
+      await pace(adapter.platform, limitsFor(heartbeat, adapter.platform), this.deps);
       tab = await this.deps.tabs.acquire(adapter);
     } catch (error) {
       for (const item of runnable) {
-        await this.record(item, heartbeat, await notStarted(adapter, item, kindOf(error), null, this.deps));
+        await this.record(item, heartbeat, await notStarted(adapter, item, kindOf(error), null, this.deps, error));
       }
 
       await runningItem.setValue(null);
@@ -308,6 +405,7 @@ export class Agent {
     }
 
     let tell = false;
+    let challenged = false;
     try {
       for (const item of runnable) {
         const account = heartbeat.accounts?.find((candidate) => candidate.channelAccountId === item.channelAccountId);
@@ -316,6 +414,7 @@ export class Agent {
         await this.record(item, heartbeat, result);
         if (result.status === "failed" && (waitsForAPerson(result.kind) || result.kind === "SiteChanged")) {
           // The rest would stop the same way; HaulScout holds them back once it hears why.
+          challenged = result.kind === "Challenge";
           tell = true;
           break;
         }
@@ -324,6 +423,9 @@ export class Agent {
       await runningItem.setValue(null);
       stop();
       this.deps.tabs.release(adapter);
+      if (challenged) {
+        await this.deps.tabs.close(adapter.platform).catch(() => undefined);
+      }
     }
 
     return tell;
@@ -358,10 +460,12 @@ export class Agent {
   /**
    * Looks at who this browser is signed in as. `unknownOnly` looks only where that has never been
    * read, now and then; `staleOnly` where the answer has aged, or is a problem worth a second look.
+   * A sign-in the operator's tab showed without naming is looked at whenever its check falls due.
    */
   private async refreshSessions(options: { platform?: string; tabId?: number; force?: boolean; unknownOnly?: boolean; staleOnly?: boolean }): Promise<void> {
     const heartbeat = await heartbeatItem.getValue();
     const sessions = await sessionsItem.getValue();
+    const confirms = await confirmsItem.getValue();
     for (const adapter of adapters) {
       if (options.platform && adapter.platform !== options.platform) {
         continue;
@@ -369,9 +473,12 @@ export class Agent {
 
       const now = this.deps.now().getTime();
       const session = sessions[adapter.platform];
+      const confirm = confirms[adapter.platform];
+      const confirmDue = confirm !== undefined && Date.parse(confirm.at) <= now;
       const sinceTried = now - (this.lastChecked.get(adapter.platform) ?? 0);
       const age = session ? now - Date.parse(session.checkedAt) : Number.POSITIVE_INFINITY;
       const due = options.force
+        || confirmDue
         || (options.unknownOnly ? !session && sinceTried > 10 * 60 * 1000
           : options.staleOnly ? sinceTried > recheckMs && (session?.signedIn ? age > signedInFreshMs : age > recheckMs)
             : sinceTried > recheckMs);
@@ -381,73 +488,156 @@ export class Agent {
 
       const limits = limitsFor(heartbeat, adapter.platform);
       if (await heldBack(adapter.platform, limits, this.deps.now())) {
+        // A check that fell due waits out the pause or the quiet, and is woken for when it ends.
+        const hold = holdOf((await governorItem.getValue())[adapter.platform], now);
+        if (confirmDue && hold) {
+          this.wakeAt(adapter, hold.until);
+        }
+
         continue;
       }
 
       // A browser known to be signed out is not knocked on again unprompted: the marketplace sees a stranger asking,
       // which is what bot protection is for. A tab the operator has open still tells, for free, when they sign in.
-      const ownTabOnly = !options.force && session?.signedIn === false;
-      await this.exclusive(() => this.checkSignIn(adapter, options.tabId, ownTabOnly));
+      const ownTabOnly = !options.force && !confirmDue && session?.signedIn === false;
+      await this.exclusive(() => this.checkSignIn(adapter, { tabId: options.tabId ?? confirm?.tabId ?? undefined, ownTabOnly, force: options.force === true }));
     }
   }
 
   /**
    * One sign-in check: through a tab the operator already has open on the marketplace when there
-   * is one — just after they sign in, the very tab they signed in with — or else the sync tab.
+   * is one — just after they sign in, the very tab they signed in with — or else the sync tab. Any
+   * check that asks the marketplace something counts against an hourly budget, and one that ended
+   * in trouble makes the next wait longer, so nothing ever knocks over and over.
    */
-  private async checkSignIn(adapter: MarketplaceAdapter, tabId?: number, ownTabOnly = false): Promise<void> {
+  private async checkSignIn(adapter: MarketplaceAdapter, options: { tabId?: number; ownTabOnly: boolean; force: boolean }): Promise<void> {
     this.lastChecked.set(adapter.platform, this.deps.now().getTime());
+    await this.dropConfirm(adapter.platform);
     const limits = limitsFor(await heartbeatItem.getValue(), adapter.platform);
     const stop = keepAlive();
+    let syncTab = false;
+    let challenged = false;
     try {
       await this.running(`Checking the ${adapter.platform} sign-in`, null);
-      const borrowed = await this.deps.tabs.borrow(adapter, tabId);
-      if (borrowed) {
-        try {
-          if (await this.signInFrom(adapter, borrowed, limits)) {
-            return;
-          }
-        } catch {
-          // Their tab moved on mid-check; the sync tab answers instead.
-        }
-      }
-
-      if (ownTabOnly) {
+      const borrowed = await this.deps.tabs.borrow(adapter, options.tabId);
+      if (borrowed && (await this.signInFrom(adapter, borrowed, limits, options.force))) {
         return;
       }
 
-      try {
-        await checkSession(adapter, governedContext(await this.deps.tabs.acquire(adapter), adapter.platform, limits, this.deps));
-      } finally {
-        this.deps.tabs.release(adapter);
+      if (options.ownTabOnly || !(await this.mayCheck(adapter, options.force))) {
+        return;
       }
+
+      syncTab = true;
+      await pace(adapter.platform, limits, this.deps);
+      const tab = await this.deps.tabs.acquire(adapter);
+      await this.counted(adapter, () => checkSession(adapter, governedContext(tab, adapter.platform, limits, this.deps)));
     } catch (error) {
+      if (error instanceof HeldBack) {
+        return;
+      }
+
       const kind = kindOf(error);
+      challenged = kind === "Challenge";
       await learn(adapter.platform, kind, this.deps.now());
       await logActivity(waitsForAPerson(kind) ? "warning" : "error", `Could not check the ${adapter.platform} sign-in. ${describeFailure(kind, adapter.platform)}`, this.deps.now());
     } finally {
+      if (syncTab) {
+        this.deps.tabs.release(adapter);
+        if (challenged) {
+          await this.deps.tabs.close(adapter.platform).catch(() => undefined);
+        }
+      }
+
       stop();
       await runningItem.setValue(null);
     }
   }
 
   /**
-   * The sign-in as the operator's own tab shows it: read where it stands when the page tells, or asked of the
-   * marketplace from it. False when the page cannot tell, so the sync tab answers.
+   * The sign-in as the operator's own tab shows it, read where it stands. When the page shows someone signed in but
+   * not who, the one question that names the account is asked from that tab — no page loads for it. False when only
+   * the sync tab can tell.
    */
-  private async signInFrom(adapter: MarketplaceAdapter, borrowed: BorrowedTab, limits: GovernorPolicy): Promise<boolean> {
-    if (!adapter.sessionFrom) {
-      await checkSession(adapter, governedContext(borrowed, adapter.platform, limits, this.deps));
-      return true;
-    }
-
-    const session = adapter.sessionFrom(await borrowed.current(adapter.sessionGlobal));
-    if (!session) {
+  private async signInFrom(adapter: MarketplaceAdapter, borrowed: BorrowedTab, limits: GovernorPolicy, force: boolean): Promise<boolean> {
+    let page: PageResponse;
+    try {
+      page = await borrowed.current(adapter.sessionGlobal);
+    } catch {
       return false;
     }
 
-    await rememberSession(adapter, session, this.deps.now());
-    return true;
+    const look = lookOf(adapter, page);
+    if (look.challenge) {
+      await this.challengeSeen(adapter);
+      return true;
+    }
+
+    const shown = adapter.sessionFrom?.(page) ?? (look.signedIn === false ? signedOut : null);
+    if (shown) {
+      await rememberSession(adapter, shown, this.deps.now());
+      return true;
+    }
+
+    // A page that cannot tell, on a marketplace whose pages usually do: the sync tab's own page will.
+    if ((adapter.sessionFrom || adapter.look) && look.signedIn !== true) {
+      return false;
+    }
+
+    if (!(await this.mayCheck(adapter, force))) {
+      return true;
+    }
+
+    try {
+      await this.counted(adapter, () => checkSession(adapter, governedContext(borrowed, adapter.platform, limits, this.deps), page));
+      return true;
+    } catch (error) {
+      // Their tab moved on, or cannot answer without a page load of its own: the sync tab answers instead.
+      if (error instanceof AdapterError && error.kind === "Interrupted") {
+        return false;
+      }
+
+      throw error;
+    }
+  }
+
+  /** Whether a sign-in check may ask the marketplace something now. Refused quietly — or, when a person asked, saying when. */
+  private async mayCheck(adapter: MarketplaceAdapter, force: boolean): Promise<boolean> {
+    const now = this.deps.now();
+    const slot = checkSlot((await governorItem.getValue())[adapter.platform] ?? initialGovernorState(), now.getTime(), force);
+    if (slot.allowed) {
+      return true;
+    }
+
+    if (force) {
+      const at = new Date(slot.until).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+      await logActivity("info", `The ${adapter.platform} sign-in was checked ${maxChecksPerHour} times in the last hour, so the next check waits until ${at}.`, now);
+    }
+
+    return false;
+  }
+
+  /** A sign-in check that asks the marketplace something, counted against the budget, answered or not. */
+  private async counted<T>(adapter: MarketplaceAdapter, check: () => Promise<T>): Promise<T> {
+    try {
+      const result = await check();
+      await updateGovernor(adapter.platform, (state) => recordCheck(state, this.deps.now().getTime(), true));
+      return result;
+    } catch (error) {
+      if (!(error instanceof HeldBack)) {
+        await updateGovernor(adapter.platform, (state) => recordCheck(state, this.deps.now().getTime(), false));
+      }
+
+      throw error;
+    }
+  }
+
+  private async dropConfirm(platform: string): Promise<void> {
+    const confirms = await confirmsItem.getValue();
+    if (confirms[platform]) {
+      const { [platform]: _dropped, ...rest } = confirms;
+      await confirmsItem.setValue(rest);
+    }
   }
 
   private async running(label: string, key: string | null): Promise<void> {
@@ -479,6 +669,7 @@ export class Agent {
       runningItem.setValue(null),
       queuedItem.setValue([]),
       lastRunsItem.setValue({}),
+      confirmsItem.setValue({}),
       connectionItem.setValue(null),
       activityItem.setValue([]),
       forgetAdapterMemory(),
@@ -516,7 +707,7 @@ export class Agent {
     return Promise.all(
       adapters.map(async (adapter) => {
         const session = sessions[adapter.platform];
-        const pause = pauseOf(governors[adapter.platform], now);
+        const pause = holdOf(governors[adapter.platform], now);
         return {
           platform: adapter.platform,
           accessGranted: await hasAccess(adapter),

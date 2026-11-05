@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { memoryInMap } from "../../test/memory";
 import { orderList, orderRow, transaction, vintedPage, wardrobe, wardrobeItem } from "../../test/vinted-fixtures";
 import type { MarketplaceContext, PageResponse, Session } from "../types";
-import { vintedAdapter } from ".";
+import { tokenCookie, tokenExpiry, vintedAdapter } from ".";
 import { toIngestListing } from "./listings";
 import { allocate } from "../amounts";
 import { toIngestOrder } from "./orders";
@@ -12,8 +12,20 @@ const seller: Session = { signedIn: true, username: "test_seller", marketplaceUs
 
 type Answer = PageResponse | object | undefined;
 
-/** A Vinted tab that answers from a handler, and remembers what it was asked for. */
-function vinted(answer: (url: URL) => Answer, memory = memoryInMap()) {
+/** A sign-in token as Vinted's cookie holds one: a JWT that stops working at `expiresAt`. */
+function token(expiresAt: Date): string {
+  const part = (value: object) => btoa(JSON.stringify(value)).replace(/=+$/, "").replace(/\+/g, "-").replace(/\//g, "_");
+  return `${part({ alg: "RS256" })}.${part({ sub: "5550001", exp: Math.floor(expiresAt.getTime() / 1000) })}.signature`;
+}
+
+const live = token(new Date(now.getTime() + 2 * 60 * 60_000));
+const lapsed = token(new Date(now.getTime() - 60_000));
+
+/**
+ * A Vinted tab that answers from a handler, and remembers what it was asked for. `jar` is the browser's cookie jar,
+ * when the test gives it one: a function, so a page load can renew what is in it.
+ */
+function vinted(answer: (url: URL) => Answer, memory = memoryInMap(), jar?: () => string | null) {
   const requested: string[] = [];
   const opened: string[] = [];
   const serve = async (url: string): Promise<PageResponse> => {
@@ -37,6 +49,8 @@ function vinted(answer: (url: URL) => Answer, memory = memoryInMap()) {
       requested.push(url);
       return serve(url);
     },
+    sleep: async () => undefined,
+    ...(jar ? { cookie: async (name: string) => (name === tokenCookie ? jar() : null) } : {}),
   };
   return context;
 }
@@ -275,5 +289,114 @@ describe("Vinted's pages", () => {
     expect(vintedAdapter.pageKind("https://www.vinted.com/catalog?search_text=shirt")).toBe("other");
     expect(vintedAdapter.readable("https://www.vinted.com/")).toBe(true);
     expect(vintedAdapter.readable("https://vinted.com.evil.example/")).toBe(false);
+  });
+});
+
+describe("Vinted's sign-in token", () => {
+  const current = { user: { id: 5550001, login: "test_seller" } };
+  const signedInPage = (url: URL): PageResponse => ({ status: 200, url: url.href, contentType: "text/html", body: vintedPage(true) });
+  const unauthorized = (url: URL): PageResponse => ({ status: 401, url: url.href, contentType: "application/json", body: "{}" });
+
+  it("is read from its cookie, without a request", () => {
+    expect(tokenExpiry(live)).toBe(Math.floor((now.getTime() + 2 * 60 * 60_000) / 1000) * 1000);
+    expect(tokenExpiry("not-a-token")).toBeNull();
+  });
+
+  it("asks which account with a live token, once", async () => {
+    const context = vinted((url) => (url.pathname === "/my_orders" ? signedInPage(url) : current), memoryInMap(), () => live);
+
+    expect(await vintedAdapter.detectSession(context)).toEqual(seller);
+    expect(context.requested).toEqual(["https://www.vinted.com/api/v2/users/current"]);
+  });
+
+  it("is renewed the way Vinted renews it — a page loads — before anything is asked with it", async () => {
+    let jar = lapsed;
+    let loads = 0;
+    const context = vinted((url) => {
+      if (url.pathname === "/my_orders") {
+        // The first load is the check's own; the second renews the token.
+        if (++loads === 2) {
+          jar = live;
+        }
+
+        return signedInPage(url);
+      }
+
+      return jar === live ? current : unauthorized(url);
+    }, memoryInMap(), () => jar);
+
+    expect(await vintedAdapter.detectSession(context)).toEqual(seller);
+    expect(context.opened).toHaveLength(2);
+    expect(context.requested).toEqual(["https://www.vinted.com/api/v2/users/current"]);
+  });
+
+  it("counts as signed out, asking nothing, when the page cannot renew it", async () => {
+    const context = vinted((url) => (url.pathname === "/my_orders" ? signedInPage(url) : current), memoryInMap(), () => lapsed);
+
+    await expect(vintedAdapter.detectSession(context)).rejects.toMatchObject({ kind: "SignedOut" });
+    expect(context.requested).toEqual([]);
+  });
+
+  it("is never asked about again after a 401, when it looked live", async () => {
+    const context = vinted((url) => (url.pathname === "/my_orders" ? signedInPage(url) : unauthorized(url)), memoryInMap(), () => live);
+
+    await expect(vintedAdapter.scanSales(context, { from: null, cursor: null }, seller)).rejects.toMatchObject({ kind: "SignedOut" });
+    expect(context.requested).toHaveLength(1);
+    expect(context.opened).toEqual([]);
+  });
+
+  it("without a cookie to read, gets one more try after a 401 — once per scan, not once per request", async () => {
+    let answered = 0;
+    const { pages } = history();
+    const scanning = answering(pages);
+    const context = vinted((url) => {
+      if (url.pathname === "/my_orders") {
+        return signedInPage(url);
+      }
+
+      // The page was still renewing the sign-in: the first question is refused, the rest go through, until it lapses.
+      answered++;
+      return answered === 1 || answered > 5 ? unauthorized(url) : scanning(url);
+    });
+
+    await expect(vintedAdapter.scanSales(context, { from: null, cursor: null }, seller)).rejects.toMatchObject({ kind: "SignedOut" });
+    expect(context.opened).toHaveLength(1);
+    expect(context.requested).toHaveLength(6);
+  });
+
+  it("is used from the operator's own page without loading another, and not when that page does not show the sign-in", async () => {
+    const context = vinted(() => current, memoryInMap(), () => live);
+    const shown = (body: string): PageResponse => ({ status: 200, url: "https://www.vinted.com/items/1", contentType: "text/html", body });
+
+    expect(await vintedAdapter.detectSession(context, shown(vintedPage(true)))).toEqual(seller);
+    expect(context.opened).toEqual([]);
+    await expect(vintedAdapter.detectSession(context, shown("<html></html>"))).rejects.toMatchObject({ kind: "Interrupted" });
+    expect(context.requested).toHaveLength(1);
+  });
+
+  it("calls a loaded orders page that says nothing of the sign-in a changed site, rather than asking", async () => {
+    const context = vinted((url) => ({ status: 200, url: url.href, contentType: "text/html", body: "<html></html>" }), memoryInMap(), () => live);
+
+    await expect(vintedAdapter.detectSession(context)).rejects.toMatchObject({ kind: "SiteChanged" });
+    expect(context.requested).toEqual([]);
+  });
+});
+
+describe("a Vinted page as it stands", () => {
+  const page = (status: number, body: string): PageResponse => ({ status, url: "https://www.vinted.com/", contentType: "text/html", body });
+
+  it("tells a security check, a sign-in and a sign-out apart", () => {
+    expect(vintedAdapter.look!(page(403, '<iframe src="https://geo.captcha-delivery.com/captcha/">'))).toEqual({ challenge: true, signedIn: null });
+    expect(vintedAdapter.look!(page(200, vintedPage(true)))).toEqual({ challenge: false, signedIn: true });
+    expect(vintedAdapter.look!(page(200, vintedPage(false)))).toEqual({ challenge: false, signedIn: false });
+    expect(vintedAdapter.look!(page(200, "<html></html>"))).toEqual({ challenge: false, signedIn: null });
+    // Cloudflare's check, which Vinted also sits behind — but not its script, which ordinary pages load as well.
+    expect(vintedAdapter.look!(page(403, "<html><head><title>Just a moment...</title></head><script>window._cf_chl_opt={}</script>"))).toMatchObject({ challenge: true });
+    expect(vintedAdapter.look!(page(200, `${vintedPage(true)}<script src="/cdn-cgi/challenge-platform/scripts/jsd/main.js"></script>`))).toEqual({ challenge: false, signedIn: true });
+  });
+
+  it("counts the steps of signing in as the sign-in form", () => {
+    expect(vintedAdapter.pageKind("https://www.vinted.com/member/signup/select_type?ref_url=%2F")).toBe("sign-in");
+    expect(vintedAdapter.pageKind("https://www.vinted.com/member/verification")).toBe("sign-in");
   });
 });

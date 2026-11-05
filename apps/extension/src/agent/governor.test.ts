@@ -1,5 +1,20 @@
 import { describe, expect, it } from "vitest";
-import { afterUpdate, dayKey, initialGovernorState, nextSlot, recordOutcome, recordRequest, resume, type GovernorPolicy } from "./governor";
+import {
+  afterUpdate,
+  checkCleared,
+  checkSlot,
+  dayKey,
+  holdOf,
+  initialGovernorState,
+  maxChecksPerHour,
+  nextSlot,
+  quiet,
+  recordCheck,
+  recordOutcome,
+  recordRequest,
+  resume,
+  type GovernorPolicy,
+} from "./governor";
 
 const policy: GovernorPolicy = { minSecondsBetweenRequests: 3, maxRequestsPerMinute: 4, maxRequestsPerDay: 10 };
 const start = new Date(2026, 8, 18, 12, 0, 0).getTime();
@@ -70,5 +85,54 @@ describe("the safety governor", () => {
 
     expect(afterUpdate(changed).pausedUntil).toBeNull();
     expect(afterUpdate(challenged)).toEqual(challenged);
+  });
+
+  it("holds a security check off longer each time one comes back, until a scan goes through", () => {
+    const hour = 60 * 60_000;
+    let state = recordOutcome(initialGovernorState(), "challenge", start, "Vinted");
+    expect(state.pausedUntil).toBe(start + hour);
+    state = recordOutcome(resume(state), "challenge", start, "Vinted");
+    expect(state.pausedUntil).toBe(start + 4 * hour);
+    state = recordOutcome(state, "challenge", start, "Vinted");
+    state = recordOutcome(state, "challenge", start, "Vinted");
+    state = recordOutcome(state, "challenge", start, "Vinted");
+    expect(state.pausedUntil).toBe(start + 24 * hour);
+
+    expect(recordOutcome(recordOutcome(state, "ok", start, "Vinted"), "challenge", start, "Vinted").pausedUntil).toBe(start + hour);
+  });
+
+  it("lifts a cleared security check into a few quiet minutes, not straight into requests", () => {
+    const challenged = recordOutcome(initialGovernorState(), "challenge", start, "Vinted");
+    const cleared = checkCleared(challenged, start, "Vinted");
+
+    expect(cleared.pausedUntil).toBeNull();
+    expect(cleared.challenges).toBe(1);
+    expect(nextSlot(cleared, policy, start + 60_000)).toMatchObject({ allowed: false, until: start + 3 * 60_000 });
+    expect(nextSlot(cleared, policy, start + 3 * 60_000).allowed).toBe(true);
+    expect(holdOf(cleared, start)).toMatchObject({ until: start + 3 * 60_000 });
+  });
+
+  it("keeps the longest quiet spell asked for, and a person resuming ends it", () => {
+    const held = quiet(quiet(initialGovernorState(), start + 120_000, "Signing in."), start + 30_000, "Settling.");
+
+    expect(nextSlot(held, policy, start)).toEqual({ allowed: false, until: start + 120_000, reason: "Signing in." });
+    expect(nextSlot(resume(held), policy, start).allowed).toBe(true);
+  });
+
+  it("checks a sign-in only so often an hour, and waits longer after each check that ended in trouble", () => {
+    let state = recordCheck(initialGovernorState(), start, false);
+    expect(checkSlot(state, start + 60_000)).toEqual({ allowed: false, until: start + 2 * 60_000 });
+    expect(checkSlot(state, start + 60_000, true)).toEqual({ allowed: true });
+
+    state = recordCheck(state, start + 2 * 60_000, false);
+    expect(checkSlot(state, start + 9 * 60_000)).toEqual({ allowed: false, until: start + 10 * 60_000 });
+
+    state = recordCheck(state, start + 10 * 60_000, true);
+    expect(checkSlot(state, start + 10 * 60_000 + 1).allowed).toBe(true);
+    state = recordCheck(state, start + 11 * 60_000, true);
+    expect(state.checks).toHaveLength(maxChecksPerHour);
+    // The hourly budget holds even when a person asks.
+    expect(checkSlot(state, start + 12 * 60_000, true)).toEqual({ allowed: false, until: start + 60 * 60_000 });
+    expect(checkSlot(state, start + 60 * 60_000 + 1, true).allowed).toBe(true);
   });
 });

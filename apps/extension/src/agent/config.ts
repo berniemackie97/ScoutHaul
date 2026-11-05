@@ -22,6 +22,16 @@ export const untilWaitMs = 12 * 1000;
 /** The least time between two checks of a sign-in that is not known to be good. */
 export const recheckMs = 20 * 1000;
 
+/**
+ * How long after the operator's tab first shows them signed in before the one check that names the account — a
+ * sign-in lands through redirects and token renewals, and a background tab joining in mid-way is what bot protection
+ * looks for.
+ */
+export const signInSettleMs = 30 * 1000;
+
+/** How long nothing is asked of a marketplace after the operator is seen on its sign-in form, or signed out. */
+export const signInQuietMs = 2 * 60 * 1000;
+
 /** The most activity entries the popup keeps. */
 export const activityLimit = 30;
 
