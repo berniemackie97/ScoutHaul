@@ -390,6 +390,9 @@ describe("a Vinted page as it stands", () => {
     expect(vintedAdapter.look!(page(200, vintedPage(true)))).toEqual({ challenge: false, signedIn: true });
     expect(vintedAdapter.look!(page(200, vintedPage(false)))).toEqual({ challenge: false, signedIn: false });
     expect(vintedAdapter.look!(page(200, "<html></html>"))).toEqual({ challenge: false, signedIn: null });
+    // Cloudflare's check, which Vinted also sits behind — but not its script, which ordinary pages load as well.
+    expect(vintedAdapter.look!(page(403, "<html><head><title>Just a moment...</title></head><script>window._cf_chl_opt={}</script>"))).toMatchObject({ challenge: true });
+    expect(vintedAdapter.look!(page(200, `${vintedPage(true)}<script src="/cdn-cgi/challenge-platform/scripts/jsd/main.js"></script>`))).toEqual({ challenge: false, signedIn: true });
   });
 
   it("counts the steps of signing in as the sign-in form", () => {

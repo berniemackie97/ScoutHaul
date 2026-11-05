@@ -35,9 +35,14 @@ export function assertReadable(response: PageResponse): void {
   }
 }
 
-/** Whether a response is DataDome's security check rather than what was asked for. */
+/**
+ * Whether a response is a security check rather than what was asked for: DataDome's (a pointer to its captcha page),
+ * or Cloudflare's, which Vinted also sits behind. Cloudflare's script loads on ordinary pages too, so only what its
+ * challenge page alone carries counts.
+ */
 export function challenged(response: PageResponse): boolean {
-  return /captcha-delivery\.com/i.test(response.body.slice(0, 20_000));
+  const head = response.body.slice(0, 20_000);
+  return /captcha-delivery\.com/i.test(head) || /_cf_chl_opt|cf-chl-widget|<title>Just a moment\.\.\.<\/title>/i.test(head);
 }
 
 /** A response that is not the JSON Vinted's own pages read: Vinted changed its API. */
