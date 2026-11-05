@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import type { components } from "@overhaul/api-client";
 import { getApiClient } from "@/lib/api";
 import { errorMessage } from "@/lib/api-error";
@@ -31,47 +32,27 @@ function refresh(periodKey?: string | null) {
   if (periodKey) revalidatePath(`/tax/${periodKey}`);
 }
 
-export async function saveRegistration(_previous: TaxActionResult, form: FormData): Promise<TaxActionResult> {
-  const registeredOn = text(form, "registeredOn");
-  if (!registeredOn) return { ok: false, message: "Enter the date the registration took effect." };
+export type RegistrationInput = Omit<Schemas["SaveSalesTaxProfileRequest"], "frequencies"> & {
+  frequencies: Schemas["SalesTaxFrequencyDto"][];
+};
 
-  const starts = form.getAll("frequencyFrom").map(String);
-  const kinds = form.getAll("frequency").map(String);
-  const alignments = form.getAll("alignment").map(String);
-  const frequencies: Schemas["SalesTaxFrequencyDto"][] = starts
-    .map((from, index) => ({
-      effectiveFrom: from,
-      frequency: kinds[index] as Schemas["SalesTaxFrequency"],
-      alignment: (alignments[index] || "Calendar") as Schemas["SalesTaxPeriodAlignment"],
-    }))
-    .filter((row) => row.effectiveFrom && row.frequency);
+export type SchedulePreview = Schemas["SalesTaxSchedulePreviewDto"];
 
-  const body: Schemas["SaveSalesTaxProfileRequest"] = {
-    certificateNumber: text(form, "certificateNumber"),
-    businessPartnerNumber: text(form, "businessPartnerNumber"),
-    legalName: text(form, "legalName") ?? "",
-    doingBusinessAs: text(form, "doingBusinessAs"),
-    addressLine1: text(form, "addressLine1"),
-    addressLine2: text(form, "addressLine2"),
-    city: text(form, "city"),
-    postalCode: text(form, "postalCode"),
-    county: text(form, "county") ?? "",
-    registeredOn,
-    closedOn: text(form, "closedOn"),
-    filesElectronically: checked(form, "filesElectronically"),
-    donateCollectionAllowance: checked(form, "donateCollectionAllowance"),
-    deliveryChargesOptional: checked(form, "deliveryChargesOptional"),
-    notes: text(form, "notes"),
-    frequencies,
-  };
-
+/** Saves and goes back to the overview; only a refusal comes back here. */
+export async function saveRegistration(input: RegistrationInput): Promise<TaxActionResult> {
   const api = await getApiClient();
-  const result = await api.PUT("/api/sales-tax/profile", { body });
+  const result = await api.PUT("/api/sales-tax/profile", { body: input });
   if (!result.data) return { ok: false, message: errorMessage(result.error, "The registration could not be saved.") };
 
   refresh();
   revalidatePath("/tax/settings");
-  return { ok: true, message: "Saved. Every period from the registration date is now tracked." };
+  redirect("/tax?notice=registration-saved");
+}
+
+export async function previewRegistration(input: Schemas["SalesTaxSchedulePreviewRequest"]): Promise<SchedulePreview | null> {
+  const api = await getApiClient();
+  const { data } = await api.POST("/api/sales-tax/profile/preview", { body: input });
+  return data ?? null;
 }
 
 export async function recordFiling(_previous: TaxActionResult, form: FormData): Promise<TaxActionResult> {
@@ -92,6 +73,8 @@ export async function recordFiling(_previous: TaxActionResult, form: FormData): 
     acknowledgedWarnings: checked(form, "acknowledge") ? Number(text(form, "warningCount") ?? 0) : 0,
     expectedFingerprint: text(form, "fingerprint") ?? "",
     notes: text(form, "notes"),
+    confirmedDirectSalesRecorded: checked(form, "confirmDirectSales"),
+    confirmedUseTaxReviewed: checked(form, "confirmUseTax"),
   };
 
   const api = await getApiClient();
@@ -99,7 +82,7 @@ export async function recordFiling(_previous: TaxActionResult, form: FormData): 
   if (!result.data) return { ok: false, message: errorMessage(result.error, "The filing could not be recorded.") };
 
   refresh(periodKey);
-  return { ok: true, message: body.amended ? "Amended return recorded. It replaces the earlier filing." : "Filing recorded with its snapshot." };
+  redirect(`/tax/${periodKey}?notice=${body.amended ? "amended" : "filed"}`);
 }
 
 export async function voidFiling(_previous: TaxActionResult, form: FormData): Promise<TaxActionResult> {
@@ -112,8 +95,9 @@ export async function voidFiling(_previous: TaxActionResult, form: FormData): Pr
   const result = await api.POST("/api/sales-tax/filings/{id}/void", { params: { path: { id } }, body: { reason } });
   if (refused(result)) return { ok: false, message: errorMessage(refused(result), "The filing record could not be voided.") };
 
-  refresh(text(form, "periodKey"));
-  return { ok: true, message: "Voided. The period shows as unfiled again." };
+  const periodKey = text(form, "periodKey");
+  refresh(periodKey);
+  redirect(`/tax/${periodKey}?notice=voided`);
 }
 
 export async function saveUseEntry(_previous: TaxActionResult, form: FormData): Promise<TaxActionResult> {
