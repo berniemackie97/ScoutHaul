@@ -70,6 +70,12 @@ export const heartbeatItem = storage.defineItem<(Heartbeat & { receivedAt: strin
 
 export const sessionsItem = storage.defineItem<Record<string, StoredSession>>("local:sessions", { fallback: {} });
 
+/**
+ * Sign-ins the operator's own tab showed but did not name, by marketplace: the one check that names the account is due
+ * at `at`, once the sign-in has settled. Kept here so it survives the background being stopped while it waits.
+ */
+export const confirmsItem = storage.defineItem<Record<string, { at: string; tabId: number | null }>>("local:signInConfirms", { fallback: {} });
+
 export const governorItem = storage.defineItem<Record<string, GovernorState>>("local:governor", { fallback: {} });
 
 let governorWrites: Promise<unknown> = Promise.resolve();

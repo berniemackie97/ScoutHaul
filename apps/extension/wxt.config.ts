@@ -38,7 +38,7 @@ export default defineConfig({
   manifest: ({ mode, browser }) => ({
     name: "HaulScout Sync",
     description: "Keeps HaulScout in step with your marketplace accounts, from the browser you already sell in.",
-    permissions: ["storage", "alarms", "scripting"],
+    permissions: ["storage", "alarms", "scripting", "cookies"],
     host_permissions: [`${origins(mode).api}/*`],
     optional_host_permissions: marketplaceOrigins,
     action: { default_title: "HaulScout Sync" },

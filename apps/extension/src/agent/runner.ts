@@ -1,6 +1,6 @@
 import { browser } from "wxt/browser";
 import { adapterFor } from "../adapters/registry";
-import { AdapterError, type MarketplaceAdapter, type MarketplaceContext, type PageRead, type Session } from "../adapters/types";
+import { AdapterError, type MarketplaceAdapter, type MarketplaceContext, type PageLook, type PageRead, type PageResponse, type Session } from "../adapters/types";
 import { logActivity } from "./activity";
 import { ApiError, type AgentApi } from "./api";
 import { describeFailure, waitsForAPerson } from "./failures";
@@ -66,17 +66,7 @@ export async function heldBack(platform: string, limits: GovernorPolicy, now: Da
  */
 export function governedContext(tab: MarketplaceTab, platform: string, policy: GovernorPolicy, deps: Pick<RunnerDeps, "now" | "sleep">, onRequest?: () => void): MarketplaceContext {
   const paced = async <T>(go: () => Promise<T>): Promise<T> => {
-    const states = await governorItem.getValue();
-    const slot = nextSlot(states[platform] ?? initialGovernorState(), policy, deps.now().getTime());
-    if (!slot.allowed) {
-      throw new AdapterError("RateLimited", slot.reason);
-    }
-
-    if (slot.waitMs > 0) {
-      await deps.sleep(slot.waitMs);
-    }
-
-    await updateGovernor(platform, (state) => recordRequest(state, deps.now().getTime()));
+    await pace(platform, policy, deps);
     onRequest?.();
     return go();
   };
@@ -85,8 +75,43 @@ export function governedContext(tab: MarketplaceTab, platform: string, policy: G
     now: () => deps.now(),
     page: (url: string, read?: PageRead) => paced(() => tab.page(url, read)),
     request: (url: string) => paced(() => tab.request(url)),
+    sleep: (ms: number) => deps.sleep(ms),
+    cookie: (name: string) => tab.cookie?.(name) ?? Promise.resolve(undefined),
     memory: adapterMemory(platform),
   };
+}
+
+/**
+ * Waits out the governor and counts one request against it — refusing outright while the marketplace is paused or
+ * held quiet. Every page load counts, a sync tab opening at its first page among them.
+ */
+export async function pace(platform: string, policy: GovernorPolicy, deps: Pick<RunnerDeps, "now" | "sleep">): Promise<void> {
+  const states = await governorItem.getValue();
+  const slot = nextSlot(states[platform] ?? initialGovernorState(), policy, deps.now().getTime());
+  if (!slot.allowed) {
+    throw new HeldBack(slot.reason);
+  }
+
+  if (slot.waitMs > 0) {
+    await deps.sleep(slot.waitMs);
+  }
+
+  await updateGovernor(platform, (state) => recordRequest(state, deps.now().getTime()));
+}
+
+/** What a marketplace page shows as it stands: the adapter's own reading, or else what its address and sign-in say. */
+export function lookOf(adapter: MarketplaceAdapter, page: PageResponse): PageLook {
+  return adapter.look?.(page) ?? { challenge: adapter.pageKind(page.url) === "challenge", signedIn: adapter.sessionFrom?.(page)?.signedIn ?? null };
+}
+
+/**
+ * The governor's own refusal — a pause, a quiet spell, a cap — rather than the marketplace pushing back. The
+ * marketplace was asked nothing, so there is nothing to learn from it.
+ */
+export class HeldBack extends AdapterError {
+  constructor(message: string) {
+    super("RateLimited", message);
+  }
 }
 
 /** Teaches the governor how a marketplace reacted, pausing it when it pushed back. */
@@ -163,8 +188,8 @@ export async function rememberSession(adapter: MarketplaceAdapter, session: Sess
 }
 
 /** Checks who the browser is signed in as, through a tab, and remembers it. */
-export async function checkSession(adapter: MarketplaceAdapter, context: MarketplaceContext): Promise<Session> {
-  const session = await adapter.detectSession(context);
+export async function checkSession(adapter: MarketplaceAdapter, context: MarketplaceContext, shown?: PageResponse): Promise<Session> {
+  const session = await adapter.detectSession(context, shown);
   await rememberSession(adapter, session, context.now());
   return session;
 }
@@ -199,6 +224,11 @@ export async function preflight(work: Work, heartbeat: Heartbeat, now: Date): Pr
     return { status: "failed", kind: "NoAccess", text: describeFailure("NoAccess", adapter.platform) };
   }
 
+  // Known to be signed out: a scan would only load a page to be told so again. Signing in is noticed by itself.
+  if ((await sessionsItem.getValue())[adapter.platform]?.signedIn === false) {
+    return { status: "failed", kind: "SignedOut", text: describeFailure("SignedOut", adapter.platform) };
+  }
+
   const held = await heldBack(adapter.platform, limitsFor(heartbeat, adapter.platform), now);
   return held ? { status: "failed", kind: held.kind, text: held.reason } : null;
 }
@@ -209,7 +239,11 @@ export async function preflight(work: Work, heartbeat: Heartbeat, now: Date): Pr
  * instead of being offered again every minute. A scan asked for in the popup is the popup's to
  * explain, and is not held against the account's schedule.
  */
-export async function notStarted(adapter: MarketplaceAdapter, work: Work, kind: FailureKind, detail: string | null, deps: RunnerDeps): Promise<RunResult> {
+export async function notStarted(adapter: MarketplaceAdapter, work: Work, kind: FailureKind, detail: string | null, deps: RunnerDeps, error?: unknown): Promise<RunResult> {
+  if (error instanceof HeldBack) {
+    return { status: "failed", kind, text: error.message };
+  }
+
   await learn(adapter.platform, kind, deps.now());
   if (!waitsForAPerson(kind) && work.trigger !== "Extension") {
     await deps.api
@@ -291,7 +325,7 @@ export async function runWork(work: Work, heartbeat: Heartbeat, tab: Marketplace
   try {
     session = await checkSession(adapter, context);
   } catch (error) {
-    return notStarted(adapter, work, kindOf(error), detailOf(error), deps);
+    return notStarted(adapter, work, kindOf(error), detailOf(error), deps, error);
   }
 
   if (!session.signedIn || !session.username) {
@@ -368,9 +402,12 @@ export async function runWork(work: Work, heartbeat: Heartbeat, tab: Marketplace
     }
 
     const kind = kindOf(error);
-    const detail = detailOf(error);
+    const detail = error instanceof HeldBack ? error.message : detailOf(error);
     await deps.api.fail(runId, kind, detail).catch(() => undefined);
-    await learn(adapter.platform, kind, deps.now());
+    if (!(error instanceof HeldBack)) {
+      await learn(adapter.platform, kind, deps.now());
+    }
+
     return { status: "failed", kind, text: withDetail(describeFailure(kind, adapter.platform), detail) };
   }
 }

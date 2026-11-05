@@ -1,4 +1,4 @@
-import { AdapterError, type PageResponse, type Session } from "../types";
+import { AdapterError, type PageLook, type PageResponse, type Session } from "../types";
 
 /**
  * What a Vinted response turned out to be, before anything reads it. Vinted guards itself with
@@ -10,7 +10,7 @@ export function assertReadable(response: PageResponse): void {
     throw new AdapterError("Network", "Vinted could not be reached.");
   }
 
-  if (/captcha-delivery\.com/i.test(response.body.slice(0, 20_000))) {
+  if (challenged(response)) {
     throw new AdapterError("Challenge", "Vinted showed a security check.");
   }
 
@@ -35,6 +35,11 @@ export function assertReadable(response: PageResponse): void {
   }
 }
 
+/** Whether a response is DataDome's security check rather than what was asked for. */
+export function challenged(response: PageResponse): boolean {
+  return /captcha-delivery\.com/i.test(response.body.slice(0, 20_000));
+}
+
 /** A response that is not the JSON Vinted's own pages read: Vinted changed its API. */
 export function siteChanged(what: string): AdapterError {
   return new AdapterError("SiteChanged", `Vinted's ${what} no longer come back in the shape expected.`);
@@ -44,6 +49,20 @@ export function siteChanged(what: string): AdapterError {
 export function signedOutPage(page: PageResponse): boolean {
   return /\/member\/(login|signup)/i.test(new URL(page.url, "https://www.vinted.com").pathname)
     || /\\?"isLoggedIn\\?":\s*false/.test(page.body);
+}
+
+/** Whether a loaded Vinted page shows someone signed in — it says so in the data it embeds, though not who. */
+export function signedInPage(page: PageResponse): boolean {
+  return !signedOutPage(page) && /\\?"isLoggedIn\\?":\s*true/.test(page.body);
+}
+
+/** A Vinted page as it stands, at no cost: a security check, and whether someone is signed in. */
+export function lookOn(page: PageResponse): PageLook {
+  if (challenged(page) || page.status === 403) {
+    return { challenge: true, signedIn: null };
+  }
+
+  return { challenge: false, signedIn: signedOutPage(page) ? false : signedInPage(page) ? true : null };
 }
 
 /**

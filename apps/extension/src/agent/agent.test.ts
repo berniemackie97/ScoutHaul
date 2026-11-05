@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fakeBrowser } from "wxt/testing/fake-browser";
 import { ledgerPage, listingsPage, ordersPage, profileJson } from "../test/ebay-fixtures";
 import { homePage as poshmarkHome } from "../test/poshmark-fixtures";
+import { vintedPage } from "../test/vinted-fixtures";
+import { AdapterError, type PageResponse } from "../adapters/types";
 import { fakeTabs, servedTab } from "../test/tabs";
 import { Agent } from "./agent";
 import { ApiError, type AgentApi } from "./api";
@@ -242,8 +244,11 @@ describe("noticing the operator sign in, or clear a security check", () => {
     const { agent } = agentWith(calls, tabs);
 
     await agent.noticePage(3, "https://www.ebay.com/");
-    // It waits for the pages to settle — a sign-in lands through a redirect or two — then looks.
+    // It reads the page once it settles, then waits for the sign-in to settle too — a sign-in lands through a redirect
+    // or two — before the one check that names the account.
     await vi.advanceTimersByTimeAsync(2000);
+    expect(calls.heartbeat).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(31_000);
     await vi.waitFor(async () => expect((await sessionsItem.getValue()).eBay).toMatchObject({ signedIn: true, username: "seller" }));
 
     expect(tabs.borrow).toHaveBeenCalledWith(expect.objectContaining({ platform: "eBay" }), 3);
@@ -301,7 +306,9 @@ describe("noticing the operator sign in, or clear a security check", () => {
     await vi.advanceTimersByTimeAsync(2000);
     await vi.waitFor(async () => expect((await governorItem.getValue()).eBay?.pausedUntil).toBeNull());
 
-    expect((await activityItem.getValue()).map((entry) => entry.message)).toContain("eBay's security check is done. Syncing picks up again.");
+    expect((await activityItem.getValue()).map((entry) => entry.message)).toContain("eBay's security check is done. Syncing picks up again in a few minutes.");
+    // Nothing is asked of eBay straight after the check: a request the moment a captcha clears is what a script does.
+    expect((await governorItem.getValue()).eBay?.quietUntil).toBe(now.getTime() + 3 * 60_000);
   });
 
   it("ignores pages loading once it is signed in and nothing is paused", async () => {
@@ -315,3 +322,127 @@ describe("noticing the operator sign in, or clear a security check", () => {
     expect(tabs.borrow).not.toHaveBeenCalled();
   });
 });
+
+describe("signing in to Vinted", () => {
+  const liveToken = (() => {
+    const part = (value: object) => btoa(JSON.stringify(value)).replace(/=+$/, "");
+    return `${part({ alg: "RS256" })}.${part({ exp: Math.floor(now.getTime() / 1000) + 2 * 60 * 60 })}.signature`;
+  })();
+
+  /** The operator's own Vinted tab: read where it stands, never navigated, and what it was asked. */
+  function operatorTab(shows: { signedIn: boolean; challenge?: boolean }) {
+    return {
+      shows,
+      page: vi.fn(async (): Promise<PageResponse> => {
+        throw new AdapterError("Interrupted", "A borrowed tab is never navigated.");
+      }),
+      request: vi.fn(async (url: string): Promise<PageResponse> => ({ status: 200, url, contentType: "application/json", body: JSON.stringify({ user: { id: 5550001, login: "test_seller" } }) })),
+      current: vi.fn(async (): Promise<PageResponse> => shows.challenge
+        ? { status: 403, url: "https://www.vinted.com/my_orders", contentType: "text/html", body: '<iframe src="https://geo.captcha-delivery.com/captcha/">' }
+        : { status: 200, url: "https://www.vinted.com/", contentType: "text/html", body: vintedPage(shows.signedIn) }),
+      cookie: vi.fn(async () => liveToken),
+    };
+  }
+
+  function agentOn(operator: ReturnType<typeof operatorTab> | null, sync = servedTab({ "/my_orders": vintedPage(false) })) {
+    const calls = api();
+    const tabs = fakeTabs(sync, operator);
+    // Time moves here: quiet spells and settling are waited out, not skipped.
+    const agent = new Agent({ api: calls as unknown as AgentApi, tabs, now: () => new Date(), sleep: async () => undefined });
+    return { agent, tabs, calls, sync };
+  }
+
+  beforeEach(async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(now);
+    fakeBrowser.reset();
+    fakeBrowser.permissions.contains = vi.fn(async (permissions: { origins?: string[] }) =>
+      (permissions.origins ?? []).every((origin) => origin.includes("vinted.com"))) as typeof fakeBrowser.permissions.contains;
+    fakeBrowser.runtime.getManifest = vi.fn(() => ({ manifest_version: 3 as const, name: "HaulScout Sync", version: "0.3.0" }));
+    await pairingItem.setValue(pairing);
+    await sessionsItem.setValue({ Vinted: { signedIn: false, username: null, marketplaceUserId: null, checkedAt: now.toISOString() } });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("asks Vinted nothing while the operator signs in, then names the account once, from their own tab", async () => {
+    const operator = operatorTab({ signedIn: false });
+    const { agent, tabs } = agentOn(operator);
+
+    await agent.noticePage(3, "https://www.vinted.com/member/login");
+    expect(tabs.borrow).not.toHaveBeenCalled();
+    expect((await governorItem.getValue()).Vinted?.quietReason).toBe("Holding off while you sign in to Vinted.");
+
+    operator.shows.signedIn = true;
+    await agent.noticePage(3, "https://www.vinted.com/");
+    await vi.advanceTimersByTimeAsync(60_000);
+    // Signed in by the page, but still settling: nothing has been asked of Vinted, and no tab of its own opened.
+    expect(operator.request).not.toHaveBeenCalled();
+    expect(tabs.acquire).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(70_000);
+    await vi.waitFor(async () => expect((await sessionsItem.getValue()).Vinted).toMatchObject({ signedIn: true, username: "test_seller" }));
+    expect(operator.request).toHaveBeenCalledTimes(1);
+    expect(operator.request).toHaveBeenCalledWith("https://www.vinted.com/api/v2/users/current");
+    expect(operator.page).not.toHaveBeenCalled();
+    expect(tabs.acquire).not.toHaveBeenCalled();
+  });
+
+  it("asks nothing at all while the operator's tab shows them signed out, however many pages they open", async () => {
+    const operator = operatorTab({ signedIn: false });
+    const { agent, tabs } = agentOn(operator);
+
+    for (const path of ["/", "/catalog", "/items/1", "/my_orders"]) {
+      await agent.noticePage(3, `https://www.vinted.com${path}`);
+      await vi.advanceTimersByTimeAsync(20_000);
+    }
+
+    await agent.popupOpened();
+    await agent.checkIn();
+    expect(operator.request).not.toHaveBeenCalled();
+    expect(tabs.acquire).not.toHaveBeenCalled();
+  });
+
+  it("waits out a security check the operator's tab still shows, and holds off a few minutes once it is gone", async () => {
+    await sessionsItem.setValue({ Vinted: { signedIn: true, username: "test_seller", marketplaceUserId: "5550001", checkedAt: now.toISOString() } });
+    await governorItem.setValue({ Vinted: { ...initialGovernorState(), pausedUntil: now.getTime() + 3_600_000, pauseReason: "Vinted showed a security check.", pausedFor: "challenge", strikes: 1, challenges: 1 } });
+    const operator = operatorTab({ signedIn: true, challenge: true });
+    const { agent, tabs } = agentOn(operator);
+
+    await agent.noticePage(3, "https://www.vinted.com/my_orders");
+    await vi.advanceTimersByTimeAsync(2000);
+    expect((await governorItem.getValue()).Vinted).toMatchObject({ pausedUntil: now.getTime() + 3_600_000, challenges: 1 });
+
+    operator.shows.challenge = false;
+    await agent.noticePage(3, "https://www.vinted.com/my_orders");
+    await vi.advanceTimersByTimeAsync(2000);
+    await vi.waitFor(async () => expect((await governorItem.getValue()).Vinted?.pausedUntil).toBeNull());
+    expect((await governorItem.getValue()).Vinted?.quietUntil).toBeGreaterThan(Date.now() + 2 * 60_000);
+    expect(operator.request).not.toHaveBeenCalled();
+    expect(tabs.acquire).not.toHaveBeenCalled();
+  });
+
+  it("checks no more than the hourly budget, even when asked again and again", async () => {
+    const { agent, tabs } = agentOn(null);
+
+    for (let press = 0; press < 6; press++) {
+      await agent.checkSessions({ platform: "Vinted", force: true });
+    }
+
+    expect(tabs.acquire).toHaveBeenCalledTimes(4);
+    expect((await activityItem.getValue()).map((entry) => entry.message)).toContainEqual(expect.stringContaining("checked 4 times in the last hour"));
+  });
+
+  it("closes its own tab at once when Vinted shows it a security check", async () => {
+    const blocked = servedTab({ "/my_orders": '<iframe src="https://geo.captcha-delivery.com/captcha/">' });
+    const { agent, tabs } = agentOn(null, blocked);
+
+    await agent.checkSessions({ platform: "Vinted", force: true });
+
+    expect(tabs.close).toHaveBeenCalledWith("Vinted");
+    expect((await governorItem.getValue()).Vinted).toMatchObject({ pausedFor: "challenge", challenges: 1 });
+  });
+});
+

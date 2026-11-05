@@ -214,6 +214,22 @@ Writes are commands, never side effects of a scan:
 - Per-platform minimum intervals with random jitter, request-rate caps and daily caps.
 - Backs off on 429/403 or any challenge page, pauses that platform after repeated failures, and
   raises it on the hub.
+- **Sign-in discipline** (the rules that keep bot protection — Vinted's DataDome above all — from
+  seeing a script):
+  - The operator's own marketplace tab is *read where it stands*, never navigated; reading costs
+    the marketplace nothing. Signed out, signing in, or on a security check there, the agent asks
+    the marketplace nothing and holds off for two minutes after the last such page.
+  - A sign-in the page shows but does not name is confirmed once, 30 seconds after it settles (and
+    after any quiet spell), with one request from that same tab when it is still open.
+  - No API request goes out without a live session: Vinted's access-token cookie is read from the
+    browser's jar first, renewed by a page load when it is about to lapse, and a 401 is final.
+  - Sign-in checks that reach a marketplace are budgeted: four an hour however asked for, and each
+    check that ends in trouble makes the next wait longer.
+  - A security check pauses 1 h, then 4 h, 12 h, 24 h if it keeps coming back; only a scan that
+    goes through resets that. It lifts early only when the operator's own tab shows a clean page,
+    and then nothing is asked for three minutes. A sync tab that hit a check is closed at once.
+  - Every page load counts against the caps, the sync tab's first one included, and that first
+    page is read where it landed rather than loaded twice.
 - A server-side **kill switch** per platform and per adapter version — a marketplace changes its
   site, we switch the adapter off remotely until it is fixed.
 - **Never** engagement automation (sharing, following, bumping, offers). Reads only your own

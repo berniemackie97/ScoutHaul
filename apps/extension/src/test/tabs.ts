@@ -27,6 +27,7 @@ export function fakeTabs(sync: MarketplaceTab, operator: BorrowedTab | null = nu
     release: vi.fn(),
     borrow: vi.fn(async () => operator),
     owns: vi.fn(() => false),
+    close: vi.fn(async () => undefined),
   } satisfies TabSource;
   return tabs;
 }
