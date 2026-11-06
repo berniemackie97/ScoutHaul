@@ -261,7 +261,23 @@ public sealed class OrdersWorkflowService(
         }
 
         IReadOnlyDictionary<Guid, Sale> salesByInventoryItem = await SalesByInventoryItemAsync(order.Id, cancellationToken);
-        return AppResult<OrderDetailDto>.Ok(order.ToDetailDto(salesByInventoryItem, await HasOpenReturnAsync(order.Id, cancellationToken)));
+        OrderDetailDto detail = order.ToDetailDto(salesByInventoryItem, await HasOpenReturnAsync(order.Id, cancellationToken));
+        return AppResult<OrderDetailDto>.Ok(detail with { TrackingDeliveredAt = await TrackingDeliveredAtAsync(order, cancellationToken) });
+    }
+
+    private async Task<DateTimeOffset?> TrackingDeliveredAtAsync(Order order, CancellationToken cancellationToken)
+    {
+        if (order.DeliveredAt is not null || order.ExternalOrderId is null)
+        {
+            return null;
+        }
+
+        return await db.PlatformOrders
+            .Where(platformOrder => platformOrder.OrganizationId == currentUser.OrganizationId
+                && platformOrder.Platform == order.Channel
+                && platformOrder.ExternalOrderId == order.ExternalOrderId)
+            .Select(platformOrder => platformOrder.DeliveredAt)
+            .FirstOrDefaultAsync(cancellationToken);
     }
 
     /// <summary>
@@ -418,12 +434,16 @@ public sealed class OrdersWorkflowService(
             packedAt = now;
         }
 
-        DateTimeOffset? deliveredAt = request.DeliveredAt ?? (request.MarkDelivered ? now : order.DeliveredAt);
-        DateTimeOffset? shippedAt = request.ShippedAt ?? (request.MarkShipped || request.MarkDelivered ? now : order.ShippedAt);
-        if (deliveredAt.HasValue && !shippedAt.HasValue)
-        {
-            shippedAt = deliveredAt;
-        }
+        // A step records only the stage it names, and only once: a date already on the order is history, and an
+        // earlier stage nobody recorded stays unrecorded rather than being stamped with today. Editing the dates
+        // themselves is the shipment form's job, which sends no step.
+        bool isStep = request.MarkPacked || request.MarkShipped || request.MarkDelivered;
+        DateTimeOffset? shippedAt = isStep
+            ? order.ShippedAt ?? (request.MarkShipped ? request.ShippedAt ?? now : request.ShippedAt)
+            : request.ShippedAt ?? order.ShippedAt;
+        DateTimeOffset? deliveredAt = isStep
+            ? order.DeliveredAt ?? (request.MarkDelivered ? request.DeliveredAt ?? now : request.DeliveredAt)
+            : request.DeliveredAt ?? order.DeliveredAt;
 
         if (shippedAt > now.AddMinutes(5) || deliveredAt > now.AddMinutes(5))
         {
@@ -435,9 +455,14 @@ public sealed class OrdersWorkflowService(
             return AppResult<OrderDetailDto>.Validation("Delivered time cannot be earlier than shipped time.");
         }
 
-        // Shipping implies packed. Recording a shipment for an order nobody marked packed should not
-        // leave the stage stuck behind it.
-        packedAt ??= shippedAt;
+        bool deliveredChanged = deliveredAt != order.DeliveredAt;
+
+        // Our own shipments are tracked from handover, so delivery cannot be recorded before shipping. A marketplace
+        // ships its own labels and may finish an order before anyone opens it here.
+        if (deliveredChanged && deliveredAt.HasValue && !shippedAt.HasValue && !order.IsLocalPickup && !Order.ChannelHandlesShipping(order.Channel))
+        {
+            return AppResult<OrderDetailDto>.Validation("Mark this order shipped before marking it delivered.");
+        }
 
         bool hasShippedEvidence = shippedAt.HasValue;
         bool hasDeliveredEvidence = deliveredAt.HasValue;
@@ -464,6 +489,7 @@ public sealed class OrdersWorkflowService(
             order.ShippingCarrier,
             order.TrackingNumber,
             order.TrackingUrl,
+            order.PackedAt,
             order.ShippedAt,
             order.DeliveredAt
         };
@@ -524,6 +550,7 @@ public sealed class OrdersWorkflowService(
                     order.ShippingCarrier,
                     order.TrackingNumber,
                     order.TrackingUrl,
+                    order.PackedAt,
                     order.ShippedAt,
                     order.DeliveredAt
                 }

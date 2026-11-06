@@ -28,6 +28,8 @@ export type FulfillmentOrder = {
   shippingCarrier?: string | null;
   trackingNumber?: string | null;
   trackingUrl?: string | null;
+  /** When the marketplace or carrier says the parcel arrived, if the order has not recorded it yet. */
+  trackingDeliveredAt?: string | null;
   workflow?: { stage?: string | null; availableActions?: string[] | null; blockers?: string[] | null } | null;
 };
 
@@ -45,6 +47,7 @@ export function OrderFulfillment({ order }: { order: FulfillmentOrder }) {
   const [pending, startTransition] = useTransition();
   const [result, setResult] = useState<OrderActionResult | null>(null);
   const [editing, setEditing] = useState(false);
+  const [confirmingDelivery, setConfirmingDelivery] = useState(false);
 
   // A storefront order cannot ship without tracking, so the form is the next step rather than a side panel.
   const needsTrackingToShip = stage === "ToShip" && !can("Ship") && !marketplace;
@@ -57,13 +60,18 @@ export function OrderFulfillment({ order }: { order: FulfillmentOrder }) {
   const step = (next: OrderStep) => run(() => advanceOrder(order.id, next));
 
   const paid = ["Paid", "PartiallyRefunded", "Refunded"].includes(order.paymentStatus ?? "") || Boolean(order.paidAt);
-  const steps = [
+  const recorded = [
     { label: "Placed", at: order.createdAt, done: true },
     { label: "Paid", at: order.paidAt, done: paid },
     { label: "Packed", at: order.packedAt, done: Boolean(order.packedAt) },
     ...(order.isLocalPickup ? [] : [{ label: "Shipped", at: order.shippedAt, done: Boolean(order.shippedAt) }]),
     { label: order.isLocalPickup ? "Picked up" : "Delivered", at: order.deliveredAt, done: Boolean(order.deliveredAt) },
   ];
+  // A later stage implies the earlier ones happened, but their dates stay unknown rather than borrowed.
+  const steps = recorded.map((entry, index) => ({
+    ...entry,
+    done: entry.done || recorded.slice(index + 1).some((later) => later.done),
+  }));
   const current = closed ? -1 : steps.findIndex((entry) => !entry.done);
 
   const href = trackingHref(order.shippingCarrier, order.trackingNumber, order.trackingUrl);
@@ -77,9 +85,9 @@ export function OrderFulfillment({ order }: { order: FulfillmentOrder }) {
       : can("Ship")
         ? { label: "Mark shipped", onClick: () => step("markShipped") }
         : can("MarkPickedUp")
-          ? { label: "Mark picked up", onClick: () => step("markDelivered") }
+          ? { label: "Mark picked up", onClick: () => setConfirmingDelivery(true) }
           : can("MarkDelivered")
-            ? { label: "Mark delivered", onClick: () => step("markDelivered") }
+            ? { label: "Mark delivered", onClick: () => setConfirmingDelivery(true) }
             : null;
   // Marketplace orders are often finished on the marketplace before anyone opens them here.
   const offerDelivered = marketplace && !closed && !order.deliveredAt && primary?.label !== "Mark delivered" && paid;
@@ -106,7 +114,7 @@ export function OrderFulfillment({ order }: { order: FulfillmentOrder }) {
                   <span className="truncate">{entry.label}</span>
                 </p>
                 <p className="text-muted-foreground truncate text-xs">
-                  {entry.done && entry.at ? <When value={entry.at} /> : isCurrent ? "Next" : " "}
+                  {entry.done ? entry.at ? <When value={entry.at} /> : "Date not recorded" : isCurrent ? "Next" : " "}
                 </p>
               </li>
             );
@@ -137,7 +145,7 @@ export function OrderFulfillment({ order }: { order: FulfillmentOrder }) {
               </p>
               <p className="text-muted-foreground text-xs">
                 {order.deliveredAt
-                  ? transitDays != null
+                  ? transitDays != null && order.shippedAt
                     ? `Delivered ${transitDays === 0 ? "the day it shipped" : `${transitDays} day${transitDays === 1 ? "" : "s"} after shipping`}`
                     : "Delivered"
                   : order.shippedAt
@@ -182,7 +190,19 @@ export function OrderFulfillment({ order }: { order: FulfillmentOrder }) {
           </Notice>
         )}
 
-        {!closed && !formOpen && (primary || offerDelivered || !hasShipment) && (
+        {confirmingDelivery && !closed && !formOpen && (
+          <DeliveryForm
+            order={order}
+            pickup={order.isLocalPickup}
+            onDone={(done) => {
+              setConfirmingDelivery(false);
+              setResult(done);
+            }}
+            onCancel={() => setConfirmingDelivery(false)}
+          />
+        )}
+
+        {!closed && !formOpen && !confirmingDelivery && (primary || offerDelivered || !hasShipment) && (
           <div className="flex flex-wrap items-center gap-2">
             {primary && (
               <Button disabled={pending} onClick={primary.onClick}>
@@ -191,7 +211,7 @@ export function OrderFulfillment({ order }: { order: FulfillmentOrder }) {
               </Button>
             )}
             {offerDelivered && (
-              <Button variant="outline" disabled={pending} onClick={() => step("markDelivered")}>
+              <Button variant="outline" disabled={pending} onClick={() => setConfirmingDelivery(true)}>
                 Already delivered
               </Button>
             )}
@@ -223,6 +243,76 @@ function Notice({ tone, children }: { tone: "warning" | "muted"; children: React
       {tone === "warning" && <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />}
       <div>{children}</div>
     </div>
+  );
+}
+
+/** Records delivery when it happened. Earlier stages keep whatever dates they have. */
+function DeliveryForm({
+  order,
+  pickup,
+  onDone,
+  onCancel,
+}: {
+  order: FulfillmentOrder;
+  pickup: boolean;
+  onDone: (result: OrderActionResult) => void;
+  onCancel: () => void;
+}) {
+  const [value, setValue] = useState(() => localInput(order.trackingDeliveredAt ?? new Date().toISOString()));
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+  const min = localInput(order.shippedAt ?? order.createdAt);
+  const max = localInput(new Date().toISOString());
+
+  function submit(event: React.FormEvent) {
+    event.preventDefault();
+    const parsed = new Date(value);
+    if (!value || Number.isNaN(parsed.getTime())) {
+      setError("Enter when it was delivered.");
+      return;
+    }
+    setError(null);
+    startTransition(async () => {
+      const outcome = await advanceOrder(order.id, "markDelivered", parsed.toISOString());
+      if (outcome.ok) onDone(outcome);
+      else setError(outcome.message);
+    });
+  }
+
+  return (
+    <form onSubmit={submit} className="space-y-3 rounded-lg border p-4">
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-medium">{pickup ? "When was it collected?" : "When was it delivered?"}</p>
+        <Button type="button" size="sm" variant="ghost" onClick={onCancel} aria-label="Close">
+          <X className="h-4 w-4" />
+        </Button>
+      </div>
+      <Field label={pickup ? "Picked up" : "Delivered"} id="deliveryAt">
+        <Input
+          id="deliveryAt"
+          type="datetime-local"
+          value={value}
+          min={min || undefined}
+          max={max}
+          onChange={(event) => setValue(event.target.value)}
+          required
+        />
+      </Field>
+      <p className="text-muted-foreground text-xs">
+        {order.trackingDeliveredAt
+          ? "Filled in from the tracking. Earlier stages keep the dates they already have."
+          : "Use the date on the carrier\u2019s tracking if you have it. Earlier stages keep the dates they already have."}
+      </p>
+      {error && <p className="text-destructive text-sm">{error}</p>}
+      <div className="flex flex-wrap gap-2">
+        <Button type="submit" disabled={pending}>
+          {pending ? "Saving…" : pickup ? "Mark picked up" : "Mark delivered"}
+        </Button>
+        <Button type="button" variant="ghost" onClick={onCancel} disabled={pending}>
+          Cancel
+        </Button>
+      </div>
+    </form>
   );
 }
 

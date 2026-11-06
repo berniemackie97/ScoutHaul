@@ -16993,6 +16993,11 @@
           },
           "workflow": {
             "$ref": "#/components/schemas/OrderWorkflowStateDto"
+          },
+          "trackingDeliveredAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
           }
         },
         "additionalProperties": false

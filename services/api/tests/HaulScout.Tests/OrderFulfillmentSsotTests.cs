@@ -96,23 +96,42 @@ public class OrderFulfillmentSsotTests
     }
 
     [Fact]
-    public async Task Saving_a_delivered_timestamp_marks_delivered_and_backfills_shipped_timestamp()
+    public async Task Saving_shipped_and_delivered_timestamps_marks_delivered()
     {
-        var (db, org, user) = NewContext(nameof(Saving_a_delivered_timestamp_marks_delivered_and_backfills_shipped_timestamp));
+        var (db, org, user) = NewContext(nameof(Saving_shipped_and_delivered_timestamps_marks_delivered));
         await using var _ = db;
         var (order, sale) = await SeedOrderWithSale(db, org);
+        var shippedAt = DateTimeOffset.UtcNow.AddDays(-3);
         var deliveredAt = DateTimeOffset.UtcNow.AddHours(-1);
         var controller = NewController(db, new StubCurrentUser(org, user));
 
         await controller.UpdateTracking(order.Id, new UpdateOrderTrackingRequest(
-            "USPS", "9400abc", null, null, deliveredAt, MarkShipped: false, MarkDelivered: false), CancellationToken.None);
+            "USPS", "9400abc", null, shippedAt, deliveredAt, MarkShipped: false, MarkDelivered: false), CancellationToken.None);
 
         var stored = await db.Orders.SingleAsync();
         Assert.Equal(OrderStatus.Delivered, stored.Status);
         Assert.Equal(FulfillmentStatus.Fulfilled, stored.FulfillmentStatus);
-        Assert.Equal(deliveredAt, stored.ShippedAt);
+        Assert.Equal(shippedAt, stored.ShippedAt);
         Assert.Equal(deliveredAt, stored.DeliveredAt);
         Assert.Equal(SaleStatus.Delivered, (await db.Sales.SingleAsync()).Status);
+    }
+
+    [Fact]
+    public async Task A_delivery_date_alone_does_not_invent_a_shipment()
+    {
+        var (db, org, user) = NewContext(nameof(A_delivery_date_alone_does_not_invent_a_shipment));
+        await using var _ = db;
+        var (order, sale) = await SeedOrderWithSale(db, org);
+        var controller = NewController(db, new StubCurrentUser(org, user));
+
+        await controller.UpdateTracking(order.Id, new UpdateOrderTrackingRequest(
+            "USPS", "9400abc", null, null, DateTimeOffset.UtcNow.AddHours(-1), MarkShipped: false, MarkDelivered: false), CancellationToken.None);
+
+        // A marketplace ships its own labels; delivery is recorded, the unknown ship date stays unknown.
+        var stored = await db.Orders.SingleAsync();
+        Assert.Null(stored.ShippedAt);
+        Assert.NotNull(stored.DeliveredAt);
+        Assert.Equal(OrderStatus.Delivered, stored.Status);
     }
 
     [Fact]

@@ -98,7 +98,9 @@ public sealed record OrderDetailDto(
     string? BuyerReference = null,
     // Buyer money refunded across every line of the order (item + shipping). Net received = GrandTotal − TotalRefunded.
     decimal TotalRefunded = 0,
-    OrderWorkflowStateDto? Workflow = null);
+    OrderWorkflowStateDto? Workflow = null,
+    // The marketplace's delivery date when the order has not recorded delivery: the default for marking it delivered.
+    DateTimeOffset? TrackingDeliveredAt = null);
 
 /// <param name="Stage">The workflow stage, as <c>OrderWorkflowStage</c> names it.</param>
 public sealed record OrderQueueCountDto(string Stage, int Count);

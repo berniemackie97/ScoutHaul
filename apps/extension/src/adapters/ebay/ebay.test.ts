@@ -141,6 +141,22 @@ describe("the eBay adapter", () => {
     expect(scan.orders.map((order) => order.externalOrderId)).toEqual(["26-15152-72360"]);
   });
 
+  it("reads an older order again when its parcel was delivered inside the window", async () => {
+    const delivered: FixtureOrder = { ...earlier, status: "Delivered Sep 17", subStatus: "Delivered" };
+    const stillMoving: FixtureOrder = { ...earlier, orderId: "07-15174-00001", status: "Shipped", subStatus: "Carrier scan Sep 15" };
+    const eBay = context({ "/sh/ord/": ordersPage([sold, delivered, stillMoving]), "/mes/transactionlist": ledger });
+
+    const scan = await ebayAdapter.scanSales(eBay, { from: new Date("2026-09-17T00:00:00Z"), cursor: null }, seller);
+
+    expect(scan.orders.map((order) => order.externalOrderId)).toEqual(["26-15152-72360", "07-15174-93677"]);
+    expect(scan.orders[1]).toMatchObject({ fulfillmentStage: "Delivered", deliveredAt: "2026-09-17T12:00:00.000Z" });
+    // Its fees come from the ledger, so the ledger reaches back to when it was sold.
+    expect(eBay.requested[1]).toContain(encodeURIComponent("creationDate:(2026-09-14..2026-09-19)"));
+    // The window, and where the next scan starts, are unchanged.
+    expect(scan.coversFrom).toBe("2026-09-17T00:00:00.000Z");
+    expect(scan.cursor).toBe("2026-09-18T07:48:00.000Z");
+  });
+
   it("snapshots every live listing, and says when the snapshot is complete", async () => {
     const eBay = context({
       "/sh/lst/active": listingsPage([

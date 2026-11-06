@@ -11592,6 +11592,8 @@ export interface components {
             /** Format: double */
             totalRefunded?: number;
             workflow?: components["schemas"]["OrderWorkflowStateDto"];
+            /** Format: date-time */
+            trackingDeliveredAt?: string | null;
         };
         OrderLineDto: {
             /** Format: uuid */

@@ -6,7 +6,7 @@ import { readLedgerPage, type LedgerOrder } from "./ledger";
 import { readGallery } from "./gallery";
 import { readListingsPage } from "./listings";
 import { descriptionUrl, readDescription, readSpecifics, type ListingSpecifics } from "./specifics";
-import { readOrdersPage, toIngestOrder, type EbayOrderRow } from "./orders";
+import { fulfillment, readOrdersPage, toIngestOrder, type EbayOrderRow } from "./orders";
 import { assertReadable, siteChanged, unreadable } from "./pages";
 import { isoDay, saleTime } from "./text";
 
@@ -52,6 +52,14 @@ export function salesFrom(window: SalesWindow, now: Date): Date {
   }
 
   return from < earliest ? earliest : from;
+}
+
+/** eBay reported the order shipped or delivered on or after `from`. */
+export function movedSince(row: EbayOrderRow, from: Date, now: Date): boolean {
+  const { shippedAt, deliveredAt } = fulfillment(row, now);
+  const latest = deliveredAt ?? shippedAt;
+  // Day-only dates sit at noon UTC; a day of slack keeps the window's first day.
+  return latest !== null && Date.parse(latest) >= from.getTime() - day;
 }
 
 /**
@@ -123,9 +131,19 @@ export const ebayAdapter: MarketplaceAdapter = {
       }
     }
 
+    // An older order whose parcel moved inside the window is read again, so its delivery reaches the order.
+    const wanted = rows.filter((row) => {
+      const at = saleTime(row.created, now);
+      return at === null || at >= from || movedSince(row, from, now);
+    });
+    const ledgerFrom = wanted.reduce((earliest, row) => {
+      const at = saleTime(row.created, now);
+      return at !== null && at < earliest ? at : earliest;
+    }, from);
+
     // The ledger for the same days, a day either side so nothing on the boundary is missed.
     const ledger = new Map<string, LedgerOrder>();
-    const range = encodeURIComponent(`creationDate:(${isoDay(new Date(from.getTime() - day))}..${isoDay(new Date(now.getTime() + day))})`);
+    const range = encodeURIComponent(`creationDate:(${isoDay(new Date(ledgerFrom.getTime() - day))}..${isoDay(new Date(now.getTime() + day))})`);
     for (let offset = 0; ; offset += pageSize) {
       const response = await context.page(`${origin}/mes/transactionlist?sh=true&limit=${pageSize}&offset=${offset}&filter=${range}`);
       assertReadable(response);
@@ -147,12 +165,7 @@ export const ebayAdapter: MarketplaceAdapter = {
     const orders: IngestOrder[] = [];
     const issues: RunIssue[] = [];
     let newest = Number.NEGATIVE_INFINITY;
-    for (const row of rows) {
-      const at = saleTime(row.created, now);
-      if (at !== null && at < from) {
-        continue;
-      }
-
+    for (const row of wanted) {
       const { order, issues: rowIssues } = toIngestOrder(row, ledger.get(row.orderId), now);
       issues.push(...rowIssues);
       if (order) {

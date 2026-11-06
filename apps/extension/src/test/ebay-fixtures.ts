@@ -12,6 +12,8 @@ export interface FixtureOrder {
   shipping?: string;
   total: string;
   lines: { listingId: string; title: string; quantity?: number; price: string; tracking?: string }[];
+  status?: string;
+  subStatus?: string;
 }
 
 export function orderMember(order: FixtureOrder) {
@@ -20,14 +22,14 @@ export function orderMember(order: FixtureOrder) {
     orderNumber: order.orderId,
     creationDate: { textSpans: order.created.map((part) => ({ text: part, styles: ["DEFAULT"] })) },
     paidDate: text(order.created[0]),
-    orderStatus: text("Shipped"),
+    orderStatus: text(order.status ?? "Shipped"),
     totalQuantity: text("1"),
     displayTotalPrice: text(order.total),
     postalCode: { label: text("Zip"), value: text("97477") },
     __sh: {
       soldFor: text(order.soldFor),
       shippingCost: order.shipping ? { textSpans: [{ text: order.shipping }, { text: "shipping" }] } : undefined,
-      orderSubStatus: text("Label created"),
+      orderSubStatus: text(order.subStatus ?? "Label created"),
       buyerDetails: {
         buyerid: text("test_buyer"),
         fullName: text("Test Buyer"),
