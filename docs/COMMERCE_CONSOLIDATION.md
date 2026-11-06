@@ -52,6 +52,14 @@ Fulfillment is a property of the **physical package = the Order**, never of a mo
 - **Migration:** additive + backfill. Existing `Sale.Status ∈ {Packed,Shipped,Delivered}` → set the parent
   `Order.FulfillmentStatus` accordingly, then set the sale's status to `Recorded`. Legacy `Shipment` rows → copy
   onto the `Order`.
+- **Stage dates are history.** A step ("mark packed / shipped / delivered") records only its own stage, once, and
+  never overwrites a date already recorded. An earlier stage nobody recorded stays null — the timeline shows it done
+  with "Date not recorded" rather than borrowing a later date. Marking delivered asks when, defaulting to the
+  marketplace's delivery date (`OrderDetailDto.TrackingDeliveredAt`) or now. Only the shipment form edits dates.
+- **Delivery from sync.** A marketplace scan whose only news is "delivered" is a change (`DeliveredAt` and
+  `FulfillmentStage` are in the ingest fingerprint), so it reaches the order. eBay's routine scan also re-sends
+  older orders whose parcel moved inside the window. eBay gives the delivery day only; an exact time needs a carrier
+  tracking source (not built: USPS Tracking 3.2 needs registered credentials).
 
 ## Architecture — get orchestration out of controllers
 

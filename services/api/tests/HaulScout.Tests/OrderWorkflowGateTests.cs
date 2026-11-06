@@ -181,11 +181,11 @@ public class OrderWorkflowGateTests
     }
 
     [Fact]
-    public async Task Recording_a_shipment_counts_as_packed()
+    public async Task Recording_a_shipment_moves_on_without_inventing_a_packed_date()
     {
         // Marketplace orders arrive already shipped. The stage must not stall behind a packing step
-        // nobody performed in this system.
-        (HaulScoutDbContext db, Guid org, Guid user) = NewContext(nameof(Recording_a_shipment_counts_as_packed));
+        // nobody performed in this system, and must not date that step either.
+        (HaulScoutDbContext db, Guid org, Guid user) = NewContext(nameof(Recording_a_shipment_moves_on_without_inventing_a_packed_date));
         await using HaulScoutDbContext _ = db;
         Order order = await SeedOrder(db, org);
         OrdersController controller = NewController(db, new StubCurrentUser(org, user));
@@ -196,8 +196,8 @@ public class OrderWorkflowGateTests
             CancellationToken.None);
 
         Order stored = await db.Orders.SingleAsync();
-        Assert.NotNull(stored.PackedAt);
-        Assert.Equal(stored.ShippedAt, stored.PackedAt);
+        Assert.NotNull(stored.ShippedAt);
+        Assert.Null(stored.PackedAt);
         OrderDetailDto? detail = (await controller.Get(order.Id, CancellationToken.None)).Value;
         Assert.Equal(nameof(OrderWorkflowStage.InTransit), detail?.Workflow?.Stage);
     }

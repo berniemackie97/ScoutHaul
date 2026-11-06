@@ -244,11 +244,15 @@ public sealed class PlatformOrderIngestionService(
         }).ToList();
     }
 
-    /// <summary>The order-level facts an import sets: everything ApplyImportedFields writes except evidence and timestamps.</summary>
+    /// <summary>
+    /// The order-level facts an import sets: everything ApplyImportedFields writes except evidence and scrape times.
+    /// Delivery belongs here: a scan whose only news is "delivered" must still reach the order.
+    /// </summary>
     private static string OrderFingerprint(PlatformOrder order) => ImportFingerprint.Of(
         order.ChannelAccountId, order.BuyerName, order.BuyerReference, order.BuyerEmail, order.BuyerNote,
         order.ShipToName, order.ShipToPhone, order.ShipToLine1, order.ShipToLine2, order.ShipToCity, order.ShipToRegion,
-        order.ShipToPostalCode, order.ShipToCountry, order.OrderedAt, order.PaidAt, order.ShippedAt, order.ItemsSubtotal,
+        order.ShipToPostalCode, order.ShipToCountry, order.OrderedAt, order.PaidAt, order.ShippedAt, order.DeliveredAt,
+        order.FulfillmentStage, order.ItemsSubtotal,
         order.ShippingCharged, order.TaxCollected, order.FeeTotal, order.FeesPending, order.SellerShippingCost, order.PayoutAmount,
         order.Currency, order.TaxRemittedByPlatform, ImportFingerprint.Json(order.FeeBreakdownJson), order.Carrier, order.TrackingNumber);
 

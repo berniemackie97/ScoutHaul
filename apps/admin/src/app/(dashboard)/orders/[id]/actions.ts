@@ -33,8 +33,8 @@ const STEP_DONE: Record<OrderStep, string> = {
   markDelivered: "Marked delivered.",
 };
 
-/** Moves an order one step without touching its tracking. */
-export async function advanceOrder(id: string, step: OrderStep): Promise<OrderActionResult> {
+/** Moves an order one step without touching its tracking. `at` is when the step happened, if not just now. */
+export async function advanceOrder(id: string, step: OrderStep, at?: string): Promise<OrderActionResult> {
   const api = await getApiClient();
   const result = await api.PATCH("/api/orders/{id}/tracking", {
     params: { path: { id } },
@@ -42,6 +42,8 @@ export async function advanceOrder(id: string, step: OrderStep): Promise<OrderAc
       markPacked: step === "markPacked",
       markShipped: step === "markShipped",
       markDelivered: step === "markDelivered",
+      shippedAt: step === "markShipped" ? (at ?? null) : null,
+      deliveredAt: step === "markDelivered" ? (at ?? null) : null,
     },
   });
   if (!result.data) return { ok: false, message: errorMessage(result.error, "The order could not be updated.") };

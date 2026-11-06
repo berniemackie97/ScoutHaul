@@ -169,6 +169,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
               shippingCarrier: order.shippingCarrier,
               trackingNumber: order.trackingNumber,
               trackingUrl: order.trackingUrl,
+              trackingDeliveredAt: order.trackingDeliveredAt,
               workflow: order.workflow,
             }}
           />

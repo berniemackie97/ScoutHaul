@@ -135,14 +135,28 @@ public sealed class OrderAssembler(HaulScoutDbContext db, ICurrentUserContext cu
     }
 
     /// <summary>
-    /// An order the marketplace has shipped or delivered is fulfilled. Only ever forwards: a scan cannot un-ship an
-    /// order someone has already marked as gone.
+    /// An order the marketplace has shipped or delivered is fulfilled, and its status says how far it got. Only ever
+    /// forwards: a scan cannot un-ship an order, and a cancelled or refunded order stays closed.
     /// </summary>
     private static void AdvanceFulfillment(Order order)
     {
         if (order.FulfillmentStatus != FulfillmentStatus.Fulfilled && (order.ShippedAt is not null || order.DeliveredAt is not null))
         {
             order.FulfillmentStatus = FulfillmentStatus.Fulfilled;
+        }
+
+        if (order.Status is OrderStatus.Cancelled or OrderStatus.Refunded or OrderStatus.Delivered)
+        {
+            return;
+        }
+
+        if (order.DeliveredAt is not null)
+        {
+            order.Status = OrderStatus.Delivered;
+        }
+        else if (order.ShippedAt is not null && order.Status is not OrderStatus.Shipped)
+        {
+            order.Status = OrderStatus.Shipped;
         }
     }
 
