@@ -1,0 +1,39 @@
+name: Engineering task
+description: Create a bounded, evidence-driven engineering action.
+title: "[Task] "
+labels:
+  - "type:task"
+body:
+  - type: textarea
+    id: reason
+    attributes:
+      label: Finding and evidence
+      description: Point to the actual code, failing contract, metric, test or change request.
+    validations:
+      required: true
+  - type: textarea
+    id: deliverable
+    attributes:
+      label: Work to deliver and responsibility boundary
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance and negative cases
+      description: State what can be independently checked, including failure, concurrency and rollback risks where applicable.
+    validations:
+      required: true
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Parent, dependencies and non-goals
+    validations:
+      required: true
+  - type: textarea
+    id: verification
+    attributes:
+      label: Verification plan
+      description: What will run, where, and what cannot yet be verified?
+    validations:
+      required: true

@@ -1,0 +1,48 @@
+name: Feature or user story
+description: Deliver an operator/customer outcome with testable scope.
+title: "[Feature] "
+labels:
+  - "type:feature"
+body:
+  - type: textarea
+    id: outcome
+    attributes:
+      label: User and desired outcome
+      description: Name the operator/customer problem and the observable result.
+    validations:
+      required: true
+  - type: textarea
+    id: baseline
+    attributes:
+      label: What already exists and the verified gap
+      description: Cite code, endpoint, page, test, existing issue or behavior. Avoid replacing shipped components.
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope and non-goals
+      description: State the smallest complete vertical slice and what is explicitly excluded.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance scenarios
+      description: Include permissions, bad input, retries, concurrency and actual money/inventory state where relevant.
+    validations:
+      required: true
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies and release considerations
+      description: Link the parent epic, blockers, data migration, configuration and validation required.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence to close
+      description: Tests, device/browser results, screenshots, metrics, docs and operator verification. Identify unavailable external verification.
+    validations:
+      required: true
