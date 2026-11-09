@@ -53,6 +53,7 @@ public sealed class InventoryPhotoStorageService(
             throw new InvalidOperationException("Only JPEG, PNG, and WebP photos are supported.");
         }
 
+        string uploadedContentType = upload.ContentType;
         await using MemoryStream originalStream = new();
         await upload.Content.CopyToAsync(originalStream, cancellationToken);
         originalStream.Position = 0;
@@ -71,7 +72,7 @@ public sealed class InventoryPhotoStorageService(
                 resized = true;
             }
 
-            string contentType = resized ? "image/jpeg" : upload.ContentType;
+            string contentType = resized ? "image/jpeg" : uploadedContentType;
             await using MemoryStream sanitizedStream = new();
             switch (contentType.ToLowerInvariant())
             {
@@ -110,7 +111,6 @@ public sealed class InventoryPhotoStorageService(
                 width,
                 height);
         }
-
         catch (Exception exception) when (exception is UnknownImageFormatException or InvalidImageContentException)
         {
             throw new InvalidOperationException("Photo could not be decoded. Upload a valid JPEG, PNG, or WebP image.", exception);

@@ -1,7 +1,7 @@
 import { appConfig } from '../config';
+import { isPrivateInventoryPhotoUrl } from './photoUrl';
 
 jest.mock('../config', () => ({ appConfig: { apiBaseUrl: 'https://api.test' } }));
-import { isPrivateInventoryPhotoUrl } from './photoUrl';
 
 describe('inventory photo request identity', () => {
   const origin = appConfig.apiBaseUrl.replace(/\/$/, '');
