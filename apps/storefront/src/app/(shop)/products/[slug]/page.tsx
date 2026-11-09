@@ -7,6 +7,7 @@ import { ProductCommercePanel } from "@/components/store/product-commerce-panel"
 import { Reveal } from "@/components/ui/reveal";
 import { CatalogUnavailableError, categorySlug, getListing, getRelated } from "@/lib/catalog";
 import { STORE } from "@/lib/store";
+import { serializeJsonLd } from "@/lib/json-ld";
 
 export const dynamic = "force-dynamic";
 
@@ -130,7 +131,7 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
     <div className="mx-auto max-w-7xl px-6 py-10 md:py-14">
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(productJsonLd) }}
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(productJsonLd) }}
       />
       <Link
         href="/products"
