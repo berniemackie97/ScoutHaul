@@ -40,8 +40,8 @@ async function unwrap<T>(call: Promise<{ data?: T; error?: unknown; response: Re
   let result: { data?: T; error?: unknown; response: Response };
   try {
     result = await call;
-  } catch (cause) {
-    throw new ApiError(0, "network", `HaulScout could not be reached (${cause instanceof Error ? cause.message : "network error"}).`);
+  } catch {
+    throw new ApiError(0, "network", "HaulScout could not be reached.");
   }
 
   if (!result.response.ok) {

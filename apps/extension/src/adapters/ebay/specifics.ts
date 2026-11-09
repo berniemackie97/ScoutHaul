@@ -20,9 +20,23 @@ export interface ListingSpecifics {
  * description itself, so this is the only way to read one — and it is read from the page already in hand.
  */
 export function descriptionUrl(html: string): string | null {
-  const match = /<iframe[^>]*\bid=["']?desc_ifr["']?[^>]*\bsrc=["']?(https:\/\/[^"'\s>]+)/i.exec(html)
-    ?? /\bsrc=["']?(https:\/\/[^"'\s>]*ebaydesc\.com\/[^"'\s>]+)/i.exec(html);
-  return match?.[1]?.replace(/&amp;/g, "&") ?? null;
+  const candidates = [
+    /<iframe[^>]*\bid=["\']?desc_ifr["\']?[^>]*\bsrc=["\']?(https:\/\/[^"\'\s>]+)/i.exec(html)?.[1],
+    /\bsrc=["\']?(https:\/\/[^"\'\s>]*ebaydesc\.com\/[^"\'\s>]+)/i.exec(html)?.[1],
+  ];
+  for (const candidate of candidates) {
+    if (!candidate) continue;
+    try {
+      const address = new URL(candidate.replace(/&amp;/g, "&"));
+      if (address.protocol === "https:" && !address.username && !address.password
+          && (address.hostname === "ebaydesc.com" || address.hostname.endsWith(".ebaydesc.com"))) {
+        return address.toString();
+      }
+    } catch {
+      continue;
+    }
+  }
+  return null;
 }
 
 /** The description's own words, with its markup and scripts stripped out. */

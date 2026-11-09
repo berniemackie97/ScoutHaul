@@ -198,6 +198,22 @@ async function lookAt(tabId: number): Promise<TabLook | null> {
   }
 }
 
+export function assertMarketplaceDestination(adapter: MarketplaceAdapter, address: string, action: "page" | "request"): void {
+  let target: URL;
+  try {
+    target = new URL(address);
+  } catch {
+    throw new AdapterError("SiteChanged", "A marketplace page contained an invalid destination.");
+  }
+
+  const firstParty = target.origin === new URL(adapter.home).origin;
+  const description = action === "request" && adapter.requestDomains?.some((domain) =>
+    target.hostname === domain || target.hostname.endsWith(`.${domain}`));
+  if (target.protocol !== "https:" || target.username || target.password || (!firstParty && !description)) {
+    throw new AdapterError("SiteChanged", "A marketplace page tried to read outside its permitted destinations.");
+  }
+}
+
 type Injection = () => Promise<unknown[]>;
 
 /** Reads a cookie of the marketplace's from the browser's own jar — the ordinary one, never a container's. */
@@ -218,7 +234,6 @@ export async function readCookie(home: string, name: string): Promise<string | n
  * before it failed, and asking twice is how a script looks.
  */
 async function inTab<T>(tabId: number, adapter: MarketplaceAdapter, clock: Clock, inject: Injection, attempts = 3): Promise<T> {
-  let failure: unknown = null;
   for (let attempt = 0; attempt < attempts; attempt++) {
     if (attempt > 0) {
       await clock.sleep(400);
@@ -229,15 +244,15 @@ async function inTab<T>(tabId: number, adapter: MarketplaceAdapter, clock: Clock
       if (first?.result !== undefined && first.result !== null) {
         return first.result as T;
       }
-    } catch (error) {
-      failure = error;
+    } catch {
+      continue;
     }
   }
 
-  throw await explain(failure, tabId, adapter);
+  throw await explain(tabId, adapter);
 }
 
-async function explain(error: unknown, tabId: number, adapter: MarketplaceAdapter): Promise<AdapterError> {
+async function explain(tabId: number, adapter: MarketplaceAdapter): Promise<AdapterError> {
   if (!(await browser.permissions.contains({ origins: adapter.origins }).catch(() => true))) {
     return new AdapterError("NoAccess", `HaulScout Sync is no longer allowed to reach ${adapter.platform}.`);
   }
@@ -251,7 +266,6 @@ async function explain(error: unknown, tabId: number, adapter: MarketplaceAdapte
     return new AdapterError("Interrupted", `The sync tab moved to ${hostOf(look.url)}.`);
   }
 
-  console.warn(`HaulScout Sync could not read a ${adapter.platform} page.`, error);
   return new AdapterError("Network", `${adapter.platform}'s page did not load properly.`);
 }
 
@@ -350,7 +364,10 @@ export class SyncTabs {
         throw new AdapterError("Interrupted", "A borrowed tab is never navigated.");
       },
       current: (global?: string) => readTab(borrowed, adapter, this.clock, global),
-      request: (url: string) => inTab<PageResponse>(borrowed, adapter, this.clock, fetchIn(borrowed, url), 1),
+      request: (url: string) => {
+        assertMarketplaceDestination(adapter, url, "request");
+        return inTab<PageResponse>(borrowed, adapter, this.clock, fetchIn(borrowed, url), 1);
+      },
       cookie: (name: string) => readCookie(adapter.home, name),
     };
   }
@@ -385,8 +402,8 @@ export class SyncTabs {
     const windowId = await this.windowFor();
     const tab = windowId === undefined
       ? await this.inNewWindow(adapter.workerUrl)
-      : await browser.tabs.create({ windowId, url: adapter.workerUrl, active: false, pinned: true }).catch((error: unknown) => {
-          console.warn("HaulScout Sync could not open its tab.", error);
+      : await browser.tabs.create({ windowId, url: adapter.workerUrl, active: false, pinned: true }).catch(() => {
+          console.warn("HaulScout Sync could not open its tab.");
           return undefined;
         });
     const tabId = tab?.id;
@@ -412,8 +429,8 @@ export class SyncTabs {
   private async inNewWindow(url: string) {
     const created = await browser.windows.create({ url, focused: false, state: "minimized" })
       .catch(() => browser.windows.create({ url, state: "minimized" }))
-      .catch((error: unknown) => {
-        console.warn("HaulScout Sync could not open a window.", error);
+      .catch(() => {
+        console.warn("HaulScout Sync could not open a window.");
         return undefined;
       });
     return created?.tabs?.[0];
@@ -465,6 +482,7 @@ export class SyncTabs {
 
     return {
       page: async (url: string, pageRead: PageRead = {}) => {
+        assertMarketplaceDestination(adapter, url, "page");
         // The tab has only just loaded this very page: loading it again a moment later is no person's browsing.
         const fresh = landed && url === adapter.workerUrl && pageRead.global === undefined && pageRead.until === undefined;
         landed = false;
@@ -493,6 +511,7 @@ export class SyncTabs {
         }
       },
       request: async (url: string) => {
+        assertMarketplaceDestination(adapter, url, "request");
         // A request is the site's own only from a page on the site's own origin.
         const current = (await lookAt(tabId))?.url;
         if (!current?.startsWith(`${adapter.home}/`)) {

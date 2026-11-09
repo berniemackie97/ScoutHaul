@@ -28,3 +28,40 @@ export interface BridgeStatus {
   agentName: string | null;
   organizationName: string | null;
 }
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function boundedText(value: unknown, maxLength: number): value is string {
+  return typeof value === "string" && value.length > 0 && value.length <= maxLength;
+}
+
+export function parsePopupRequest(value: unknown): PopupRequest | null {
+  if (!isRecord(value)) return null;
+  switch (value.type) {
+    case "pair":
+      return boundedText(value.code, 128) && (value.name === null || boundedText(value.name, 80))
+        ? { type: "pair", code: value.code, name: value.name } : null;
+    case "popup-opened":
+      return { type: "popup-opened" };
+    case "refresh":
+      return { type: "refresh" };
+    case "disconnect":
+      return { type: "disconnect" };
+    case "scan":
+      return boundedText(value.channelAccountId, 64) && (value.loop === "Sales" || value.loop === "Listings")
+        ? { type: "scan", channelAccountId: value.channelAccountId, loop: value.loop } : null;
+    case "resume":
+      return boundedText(value.platform, 50) ? { type: "resume", platform: value.platform } : null;
+    default:
+      return null;
+  }
+}
+
+export function parseBridgeRequest(value: unknown): BridgeRequest | null {
+  if (!isRecord(value)) return null;
+  if (value.type === "status") return { type: "status" };
+  if (value.type === "wake") return { type: "wake" };
+  return null;
+}

@@ -3,7 +3,7 @@ import { fakeBrowser } from "wxt/testing/fake-browser";
 import { ebayAdapter } from "../adapters/ebay";
 import { poshmarkAdapter } from "../adapters/poshmark";
 import { AdapterError } from "../adapters/types";
-import { judgeTab, pageSettled, SyncTabs, waitForPage, type Clock, type TabLook } from "./transport";
+import { assertMarketplaceDestination, judgeTab, pageSettled, SyncTabs, waitForPage, type Clock, type TabLook } from "./transport";
 
 const robots = "https://www.ebay.com/robots.txt";
 const readable = ebayAdapter.readable;
@@ -369,5 +369,31 @@ describe("whether a page holds what will be read", () => {
     onPage({});
     expect(pageSettled("__INITIAL_STATE__", null, null)).toMatchObject({ parsed: true, found: true });
     expect(pageSettled(null, null, null)).toMatchObject({ parsed: true, found: true });
+  });
+});
+
+describe("marketplace destination boundaries", () => {
+  it("limits page navigation to its own marketplace origin", () => {
+    expect(() => assertMarketplaceDestination(ebayAdapter, "https://www.ebay.com/sh/ord/", "page")).not.toThrow();
+    expect(() => assertMarketplaceDestination(ebayAdapter, "https://vi.vipr.ebaydesc.com/itmdesc", "page"))
+      .toThrowError(/outside its permitted destinations/);
+    expect(() => assertMarketplaceDestination(poshmarkAdapter, "https://www.ebay.com/", "page"))
+      .toThrowError(/outside its permitted destinations/);
+  });
+
+  it("permits eBay description requests but refuses untrusted request targets", () => {
+    expect(() => assertMarketplaceDestination(ebayAdapter, "https://vi.vipr.ebaydesc.com/itmdesc?item=123", "request"))
+      .not.toThrow();
+    const hostile = [
+      "https://vi.vipr.ebaydesc.com.attacker.example/collect",
+      "https://attacker.example/collect",
+      "http://vi.vipr.ebaydesc.com/itmdesc",
+      "https://user@vi.vipr.ebaydesc.com/itmdesc",
+      "https://www.ebay.com.attacker.example/collect",
+      "/relative-path",
+    ];
+    for (const destination of hostile) {
+      expect(() => assertMarketplaceDestination(ebayAdapter, destination, "request")).toThrow(AdapterError);
+    }
   });
 });

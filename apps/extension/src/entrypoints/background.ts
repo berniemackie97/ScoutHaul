@@ -2,7 +2,7 @@ import { browser, type Browser } from "wxt/browser";
 import { defineBackground } from "wxt/utils/define-background";
 import { Agent } from "../agent/agent";
 import { portalOrigins } from "../agent/config";
-import type { AgentResponse, BridgeRequest, BridgeStatus, PopupRequest } from "../agent/messages";
+import { parseBridgeRequest, parsePopupRequest, type AgentResponse, type BridgeRequest, type BridgeStatus, type PopupRequest } from "../agent/messages";
 import { afterUpdate } from "../agent/governor";
 import { pairingItem, portalItem, queuedItem, runningItem, updateGovernors } from "../agent/storage";
 import { SyncTabs } from "../agent/transport";
@@ -49,13 +49,15 @@ export default defineBackground(() => {
 
   browser.runtime.onMessage.addListener((message: unknown, sender: Browser.runtime.MessageSender) => {
     if (fromPopup(sender)) {
-      return handlePopup(agent, message as PopupRequest);
+      const request = parsePopupRequest(message);
+      return request ? handlePopup(agent, request) : Promise.resolve({ ok: false, error: "Invalid request." });
     }
 
     const portal = portalOf(sender);
     if (portal) {
       void portalItem.setValue(portal);
-      return handleBridge(agent, message as BridgeRequest);
+      const request = parseBridgeRequest(message);
+      return request ? handleBridge(agent, request) : Promise.resolve({ ok: false, error: "Invalid request." });
     }
 
     return undefined;

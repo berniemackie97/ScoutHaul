@@ -71,6 +71,7 @@ export const ebayAdapter: MarketplaceAdapter = {
   platform: "eBay",
   origins: ["https://*.ebay.com/*"],
   home: origin,
+  requestDomains: ["ebaydesc.com"],
   workerUrl: `${origin}/robots.txt`,
   signInUrl: "https://signin.ebay.com/",
   checkUrl: `${origin}/sh/ord/`,

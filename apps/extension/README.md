@@ -7,6 +7,8 @@ It sends what it reads to HaulScout, which decides what it means. Design:
 
 Firefox is the first target. The same code builds for Chrome and Edge, and Safari is planned.
 
+Security boundaries, permission rationale, credential custody and test requirements: [Extension security](../../docs/EXTENSION_SECURITY.md).
+
 ## What it does, and what it never does
 
 - **Reads only.** Adapters read the seller's own data: the order list, the transaction ledger and

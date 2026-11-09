@@ -112,6 +112,8 @@ export interface MarketplaceAdapter {
   readonly origins: string[];
   /** The origin requests are made from; a tab must be on it for them to be the site's own. */
   readonly home: string;
+  /** Additional read-only document domains for this marketplace. */
+  readonly requestDomains?: readonly string[];
   /** The page a marketplace tab is opened at when one is needed: a light one, on the site's own origin. */
   readonly workerUrl: string;
   /** Where to send the operator to sign in. */
