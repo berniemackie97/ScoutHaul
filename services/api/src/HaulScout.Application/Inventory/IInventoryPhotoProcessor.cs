@@ -28,9 +28,9 @@ public sealed record ProcessedPhoto(
 public interface IInventoryPhotoProcessor
 {
     /// <param name="maxPixels">
-    /// The longest side the stored photo is kept at, or null to keep the file exactly as it arrived. A photo
-    /// someone uploads is kept as they made it; one fetched from a listing is brought down to a size a page
-    /// actually shows, because thousands of them are kept and every one is stored.
+    /// The maximum stored width or height; null preserves dimensions. Every image is decoded and re-encoded
+    /// without metadata, including uploads that do not need resizing. Listing photos are resized to limit
+    /// the space used by galleries synced in bulk.
     /// </param>
     /// <exception cref="InvalidOperationException">The upload is unusable — too large, empty, or not an allowed image
     /// type. The message is written for the operator and is surfaced as a validation failure.</exception>
