@@ -145,6 +145,28 @@ public sealed class SyncAgentHttpTests(PostgresFixture postgres) : IAsyncLifetim
     }
 
     [Fact]
+    public async Task LegacyInventoryFilesInTheApiWebRootAreNotPublic()
+    {
+        string root = Path.Combine(Path.GetTempPath(), $"photos-web-root-{Guid.NewGuid():N}");
+        string relative = Path.Combine("uploads", "inventory", "test-image.jpg");
+        string file = Path.Combine(root, relative);
+        Directory.CreateDirectory(Path.GetDirectoryName(file)!);
+        await File.WriteAllBytesAsync(file, [0xFF, 0xD8, 0xFF, 0xD9]);
+        try
+        {
+            using WebApplicationFactory<Program> hosted = factory.WithWebHostBuilder(
+                builder => builder.UseWebRoot(root));
+            using HttpClient client = hosted.CreateClient();
+            HttpResponseMessage response = await client.GetAsync("/uploads/inventory/test-image.jpg");
+            Assert.NotEqual(HttpStatusCode.OK, response.StatusCode);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task A_code_cannot_be_used_twice_and_a_bad_one_says_so()
     {
         (_, _, string code) = await SeedAsync();

@@ -7,7 +7,6 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens;
 using HaulScout.Api;
 using HaulScout.Api.Authentication;
@@ -31,7 +30,8 @@ if (hasExplicitLocalProfile ||
     DotEnv.LoadForDevelopment(Directory.GetCurrentDirectory());
 }
 
-WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
+bool photoRepairCommand = args.Length > 0 && args[0] == "repair-photo-metadata";
+WebApplicationBuilder builder = WebApplication.CreateBuilder(photoRepairCommand ? [] : args);
 
 // ── Serialization ────────────────────────────────────────────────
 builder.Services
@@ -154,6 +154,11 @@ builder.Services.AddHostedService<PhotoObjectStorageBackfillWorker>();
 
 // ═════════════════════════════════════════════════════════════════
 WebApplication app = builder.Build();
+if (photoRepairCommand)
+{
+    await PhotoMetadataRepairCommand.RunAsync(app.Services, app.Logger, args[1..], CancellationToken.None);
+    return;
+}
 
 // ── Exception Handling ───────────────────────────────────────────
 if (!app.Environment.IsDevelopment())
@@ -165,15 +170,6 @@ if (!app.Environment.IsDevelopment())
 
 // ── Security Headers ─────────────────────────────────────────────
 app.UseSecurityHeaders();
-string webRootPath = app.Environment.WebRootPath
-    ?? Path.Combine(app.Environment.ContentRootPath, "wwwroot");
-Directory.CreateDirectory(webRootPath);
-app.UseStaticFiles(new StaticFileOptions
-{
-    FileProvider = new PhysicalFileProvider(webRootPath),
-    RequestPath = string.Empty
-});
-
 // ── Database Migration ───────────────────────────────────────────
 if (app.Configuration.GetValue("Database:ApplyMigrationsOnStartup", false))
 {

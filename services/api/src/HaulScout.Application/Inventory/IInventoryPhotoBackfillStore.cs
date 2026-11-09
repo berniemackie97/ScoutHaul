@@ -3,8 +3,8 @@ using HaulScout.Domain.Entities;
 namespace HaulScout.Application.Inventory;
 
 /// <summary>
-/// The photos whose images are still held in the database after object storage has been configured. Asked across
-/// every organization, because moving them is the service's own housekeeping rather than any one operator's request.
+/// Maintenance access to photo rows across organizations: moving database-held images and explicitly repairing
+/// existing originals. Never exposed to an HTTP operator request.
 /// </summary>
 public interface IInventoryPhotoBackfillStore
 {
@@ -13,6 +13,9 @@ public interface IInventoryPhotoBackfillStore
 
     /// <summary>How many are left to move. Logged as progress, and it is what tells the move it is finished.</summary>
     Task<int> CountHeldInDatabaseAsync(CancellationToken cancellationToken);
+
+    /// <summary>Tenant-independent keyset scan of stored photos, ordered by identifier for manual metadata repair.</summary>
+    Task<IReadOnlyList<InventoryPhoto>> ListForMetadataRepairAsync(Guid? afterPhotoId, int take, CancellationToken cancellationToken);
 
     Task SaveChangesAsync(CancellationToken cancellationToken);
 }
