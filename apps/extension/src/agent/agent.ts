@@ -210,7 +210,7 @@ export class Agent {
         if (await this.exclusive(() => this.watchOwnTab(adapter, tabId))) {
           await this.checkIn();
         }
-      })().catch((error: unknown) => console.warn("HaulScout Sync could not look at the sign-in again.", error));
+      })().catch(() => console.warn("HaulScout Sync could not look at the sign-in again."));
     }, 1500));
   }
 
@@ -297,7 +297,7 @@ export class Agent {
     clearTimeout(this.confirmTimers.get(adapter.platform));
     this.confirmTimers.set(adapter.platform, setTimeout(() => {
       this.confirmTimers.delete(adapter.platform);
-      void this.checkSessions({ platform: adapter.platform }).catch((error: unknown) => console.warn("HaulScout Sync could not confirm the sign-in.", error));
+      void this.checkSessions({ platform: adapter.platform }).catch(() => console.warn("HaulScout Sync could not confirm the sign-in."));
     }, Math.max(0, at - this.deps.now().getTime()) + 50));
   }
 
@@ -309,7 +309,11 @@ export class Agent {
 
   /** Disconnects this browser: HaulScout stops accepting its token, and it forgets everything. */
   async disconnect(): Promise<void> {
-    await this.api.disconnect().catch(() => undefined);
+    try {
+      await this.api.disconnect();
+    } catch (error) {
+      if (!(error instanceof ApiError && error.disconnected)) throw error;
+    }
     await this.forget();
   }
 

@@ -135,6 +135,34 @@ describe("checking in", () => {
   });
 });
 
+describe("disconnecting a paired browser", () => {
+  beforeEach(() => fakeBrowser.reset());
+
+  it("retains the token if server-side revocation fails so disconnect can be retried", async () => {
+    await pairingItem.setValue(pairing);
+    const calls = api();
+    calls.disconnect.mockRejectedValueOnce(new ApiError(503, "unavailable", "Not available."));
+    await expect(agentWith(calls).agent.disconnect()).rejects.toBeInstanceOf(ApiError);
+    expect(await pairingItem.getValue()).toEqual(pairing);
+  });
+
+  it("clears local credentials after the server confirms disconnection", async () => {
+    await pairingItem.setValue(pairing);
+    const calls = api();
+    await agentWith(calls).agent.disconnect();
+    expect(calls.disconnect).toHaveBeenCalledOnce();
+    expect(await pairingItem.getValue()).toBeNull();
+  });
+
+  it("clears the pairing if the server already revoked the token", async () => {
+    await pairingItem.setValue(pairing);
+    const calls = api();
+    calls.disconnect.mockRejectedValueOnce(new ApiError(401, "agent_revoked", "This browser is disconnected."));
+    await agentWith(calls).agent.disconnect();
+    expect(await pairingItem.getValue()).toBeNull();
+  });
+});
+
 describe("running the work a check-in hands out", () => {
   beforeEach(async () => {
     fakeBrowser.reset();

@@ -37,6 +37,14 @@ describe("an eBay listing's description", () => {
     expect(descriptionUrl(itemPage(["AAA111"]))).toBeNull();
   });
 
+  it("rejects description links to unrelated and lookalike hosts", () => {
+    expect(descriptionUrl(`<iframe id="desc_ifr" src="https://attacker.example/collect"></iframe>`)).toBeNull();
+    expect(descriptionUrl(`<iframe id="desc_ifr" src="https://vi.vipr.ebaydesc.com.attacker.example/"></iframe>`)).toBeNull();
+    expect(descriptionUrl(`<iframe id="desc_ifr" src="https://user@vi.vipr.ebaydesc.com/"></iframe>`)).toBeNull();
+    expect(descriptionUrl(`<iframe id="desc_ifr" src="https://attacker.example/"></iframe><iframe src="https://vi.vipr.ebaydesc.com/itmdesc"></iframe>`))
+      .toBe("https://vi.vipr.ebaydesc.com/itmdesc");
+  });
+
   it("keeps the words and drops the markup", () => {
     const document = `<html><head><style>.x{color:red}</style></head><body>
       <script>trackView()</script>

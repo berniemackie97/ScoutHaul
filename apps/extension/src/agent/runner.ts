@@ -156,7 +156,7 @@ export function kindOf(error: unknown): FailureKind {
     return error.status === 0 ? "Network" : "Error";
   }
 
-  console.error("HaulScout Sync hit an unexpected error.", error);
+  console.error("HaulScout Sync hit an unexpected error.");
   return "Error";
 }
 
