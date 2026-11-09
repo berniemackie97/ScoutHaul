@@ -1,0 +1,32 @@
+name: Research or design spike
+description: Resolve a specific unknown before committing to implementation.
+title: "[Spike] "
+labels:
+  - "type:spike"
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: Decision to resolve
+    validations:
+      required: true
+  - type: textarea
+    id: known
+    attributes:
+      label: Known evidence and unknowns
+    validations:
+      required: true
+  - type: textarea
+    id: methods
+    attributes:
+      label: Evidence to collect
+      description: Source, prototype, benchmark, threat model or fixture; state what would falsify each option.
+    validations:
+      required: true
+  - type: textarea
+    id: decision
+    attributes:
+      label: Required output and stop condition
+      description: Record the chosen approach, rejected alternatives, measurable consequences and follow-up issue(s). Spikes do not silently become feature implementations.
+    validations:
+      required: true

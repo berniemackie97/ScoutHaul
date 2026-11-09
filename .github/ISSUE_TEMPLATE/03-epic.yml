@@ -1,0 +1,40 @@
+name: Epic
+description: Define a measurable business or engineering outcome spanning delivery issues.
+title: "[Epic] "
+labels:
+  - "type:epic"
+body:
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Outcome and release horizon
+      description: Explain what becomes possible, why it matters, and the earliest horizon without inventing a due date.
+    validations:
+      required: true
+  - type: textarea
+    id: existing
+    attributes:
+      label: Existing capability and evidence
+      description: What is already shipped, how was it verified, and what remains?
+    validations:
+      required: true
+  - type: textarea
+    id: child
+    attributes:
+      label: Child issues and sequencing
+      description: Link existing issues first. Use GitHub sub-issues when available; avoid duplicate tickets.
+    validations:
+      required: true
+  - type: textarea
+    id: exit
+    attributes:
+      label: Epic exit gate
+      description: End-to-end proof and risk acceptance, not just implementation completion.
+    validations:
+      required: true
+  - type: textarea
+    id: bounds
+    attributes:
+      label: Non-goals and cross-cutting dependencies
+    validations:
+      required: true
