@@ -50,7 +50,7 @@ public sealed class PhotoMetadataRepairTests
         OrganizationId = Guid.NewGuid(),
         InventoryItemId = Guid.NewGuid(),
         ContentType = "image/jpeg",
-        OriginalBytes = original ?? [1, 2, 3],
+        OriginalBytes = original ?? new byte[] { 1, 2, 3 },
         ThumbnailBytes = [4, 5],
         OriginalByteSize = 3,
         ThumbnailByteSize = 2,
@@ -68,7 +68,7 @@ public sealed class PhotoMetadataRepairTests
         Store store = new(photo);
         Processor processor = new();
         PhotoMetadataRepairPass result = await NewRepair(store, new DatabaseInventoryPhotoBlobStore(), processor)
-            .RepairAsync(null, 20, false, CancellationToken.None);
+            .RepairAsync(null, 10, false, CancellationToken.None);
 
         Assert.Equal(1, result.Scanned);
         Assert.Equal(0, result.Reencoded);
@@ -76,6 +76,17 @@ public sealed class PhotoMetadataRepairTests
         Assert.Equal(0, store.Saves);
         Assert.Equal(0, processor.Calls);
         Assert.Equal(new byte[] { 1, 2, 3 }, photo.OriginalBytes);
+    }
+
+    [Fact]
+    public async Task OversizedMaintenanceBatchIsRejectedBeforeReading()
+    {
+        Store store = new(Photo());
+        Processor processor = new();
+        var repair = NewRepair(store, new DatabaseInventoryPhotoBlobStore(), processor);
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => repair.RepairAsync(null, 11, true, CancellationToken.None));
+        Assert.Equal(0, processor.Calls);
+        Assert.Equal(0, store.Saves);
     }
 
     [Fact]
