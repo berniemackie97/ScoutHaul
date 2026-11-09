@@ -24,6 +24,10 @@ The upload processor decodes and auto-orients JPEG, PNG and WebP, then always re
 
 **Not yet complete:** previously stored originals may still contain EXIF/XMP/GPS or other metadata, including objects already served or cached externally before this change. An audited in-place remediation is still required for both database and object-storage photos. Preserve photo IDs and references, verify the new bytes, update the recorded media/size/dimensions, then replace old objects with bounded batches, resumability and failure reporting. Never declare the old set scrubbed merely because this upload path is fixed. Public storefront originals must not be considered fully remediated until historic bytes are processed.
 
+## Legacy public file paths
+
+The API still has a web-root static-file middleware before authentication, while the historical photo deletion path refers to `/uploads/inventory/{organizationId}/{itemId}/...`. No legacy web-root assets are committed, but a mounted or retained `wwwroot/uploads/inventory` directory would be served anonymously unless those assets are migrated or blocked. Audit the actual deployed filesystem/storage volume and migrate historical references before claiming all photo URLs are private. Do not assume the protected database endpoints cover static files.
+
 ## Deployment and acceptance
 
 The admin and mobile readers must be deployed together with the API authorization change. A backend-only deploy would make existing image tags for private items stop working; verify cross-surface rendering in staging before production.
@@ -33,7 +37,7 @@ The admin and mobile readers must be deployed together with the API authorizatio
 - [ ] Mobile Jest, type-check, lint and device preview after sign-in/token refresh/organization switch; sign-out cannot show a cached private image.
 - [ ] Admin type-check/build and private-photo previews in inventory table, picker and detail, plus proper 401 after sign-out.
 - [ ] Public product images stay accessible without tokens, and disappear after listing visibility is revoked; verify caches and hosting image proxies.
-- [ ] Remediate pre-existing photos (database and object storage), including corrupt-item handling, batch restart and audit of output bytes.
+- [ ] Remediate pre-existing photos (database, object storage and any deployed web-root files), including legacy URL references, corrupt-item handling, batch restart and audit of output bytes.
 - [ ] Review PR diff, run CI, verify deployment sequencing and capture staging evidence before closing #283.
 
 Parent issue: [#283](https://github.com/berniemackie97/ScoutHaul/issues/283). Follow-on storage/upload resilience is [#284](https://github.com/berniemackie97/ScoutHaul/issues/284).
