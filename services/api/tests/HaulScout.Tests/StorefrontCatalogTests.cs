@@ -122,6 +122,44 @@ public class StorefrontCatalogTests
     }
 
     [Fact]
+    public async Task PublicPhotoRouteServesListedItemsButNotPrivateInventory()
+    {
+        Guid org = Guid.NewGuid();
+        DbContextOptions<HaulScoutDbContext> options = new DbContextOptionsBuilder<HaulScoutDbContext>()
+            .UseInMemoryDatabase(nameof(PublicPhotoRouteServesListedItemsButNotPrivateInventory))
+            .Options;
+        Guid publicId;
+        Guid privateId;
+        TenantContext seedTenant = new();
+        seedTenant.SetOrganization(org);
+        await using (HaulScoutDbContext seed = new(options, seedTenant))
+        {
+            seed.Organizations.Add(new Organization { Id = org, Name = "Store", StoreDomain = "shop.example.com" });
+            InventoryItem listed = new()
+            {
+                Title = "Published", Status = InventoryStatus.Listed, Quantity = 1, EstimatedSalePrice = 20m,
+                Photos = { new InventoryPhoto { ContentType = "image/jpeg", OriginalBytes = [1, 2], ThumbnailBytes = [3, 4] } }
+            };
+            InventoryItem draft = new()
+            {
+                Title = "Private", Status = InventoryStatus.Draft, Quantity = 1,
+                Photos = { new InventoryPhoto { ContentType = "image/jpeg", OriginalBytes = [5], ThumbnailBytes = [6] } }
+            };
+            seed.InventoryItems.AddRange(listed, draft);
+            await seed.SaveChangesAsync();
+            publicId = listed.Photos.Single().Id;
+            privateId = draft.Photos.Single().Id;
+        }
+
+        TenantContext anonymous = new();
+        await using HaulScoutDbContext db = new(options, anonymous);
+        StorefrontController controller = NewController(db, anonymous, null);
+        Assert.IsType<FileContentResult>(await controller.Photo(publicId, null, CancellationToken.None));
+        ObjectResult hidden = Assert.IsType<ObjectResult>(await controller.Photo(privateId, null, CancellationToken.None));
+        Assert.Equal(StatusCodes.Status404NotFound, hidden.StatusCode);
+    }
+
+    [Fact]
     public async Task Browse_rejects_an_unknown_store()
     {
         DbContextOptions<HaulScoutDbContext> options = new DbContextOptionsBuilder<HaulScoutDbContext>()

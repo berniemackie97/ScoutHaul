@@ -70,7 +70,7 @@ public sealed class StorefrontController(StorefrontStoreResolver resolver, Store
             return Missing();
         }
 
-        Response.Headers.CacheControl = "public, max-age=31536000, immutable";
+        Response.Headers.CacheControl = "no-store";
         return File(photo.Bytes, photo.ContentType);
     }
 }

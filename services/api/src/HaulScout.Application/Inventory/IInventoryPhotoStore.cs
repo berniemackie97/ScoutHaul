@@ -8,11 +8,7 @@ public interface IInventoryPhotoStore
     /// ordering are properties of the set rather than of one row.</summary>
     Task<InventoryItem?> FindItemWithPhotosAsync(Guid organizationId, Guid id, CancellationToken cancellationToken);
 
-    /// <summary>
-    /// A photo looked up without the organization filter, for serving its bytes. The caller has already proven access
-    /// to the item; this exists because the file endpoints are reached with the item and photo ids alone.
-    /// </summary>
-    Task<InventoryPhoto?> FindPhotoUnscopedAsync(Guid inventoryItemId, Guid photoId, CancellationToken cancellationToken);
+    Task<InventoryPhoto?> FindPhotoForOrganizationAsync(Guid organizationId, Guid inventoryItemId, Guid photoId, CancellationToken cancellationToken);
 
     Task AddAsync(InventoryPhoto photo, CancellationToken cancellationToken);
 

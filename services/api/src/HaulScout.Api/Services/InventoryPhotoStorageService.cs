@@ -53,37 +53,43 @@ public sealed class InventoryPhotoStorageService(
             throw new InvalidOperationException("Only JPEG, PNG, and WebP photos are supported.");
         }
 
+        string uploadedContentType = upload.ContentType;
         await using MemoryStream originalStream = new();
         await upload.Content.CopyToAsync(originalStream, cancellationToken);
-        byte[] originalBytes = originalStream.ToArray();
-        string contentType = upload.ContentType;
-
         originalStream.Position = 0;
         try
         {
             using Image image = await Image.LoadAsync(Decoding, originalStream, cancellationToken);
-            int width = image.Width;
-            int height = image.Height;
-
             image.Mutate(operation => operation.AutoOrient());
-            if (maxPixels is int ceiling && (width > ceiling || height > ceiling))
+            bool resized = false;
+            if (maxPixels is int ceiling && (image.Width > ceiling || image.Height > ceiling))
             {
-                // Kept at a size a product page actually shows. The stored file becomes this, not the original:
-                // photos fetched from listings are kept in their thousands, and a marketplace's originals are
-                // several megabytes each.
-                using Image display = image.Clone(operation => operation.Resize(new ResizeOptions
+                image.Mutate(operation => operation.Resize(new ResizeOptions
                 {
                     Mode = ResizeMode.Max,
-                    Size = new Size(ceiling, ceiling),
+                    Size = new Size(ceiling, ceiling)
                 }));
-                await using MemoryStream displayStream = new();
-                await display.SaveAsJpegAsync(displayStream, new JpegEncoder { Quality = 82 }, cancellationToken);
-                originalBytes = displayStream.ToArray();
-                // The stored file is now that JPEG, whatever the marketplace served.
-                contentType = "image/jpeg";
-                width = display.Width;
-                height = display.Height;
+                resized = true;
             }
+
+            string contentType = resized ? "image/jpeg" : uploadedContentType;
+            await using MemoryStream sanitizedStream = new();
+            switch (contentType.ToLowerInvariant())
+            {
+                case "image/png":
+                    await image.SaveAsPngAsync(sanitizedStream, new PngEncoder { SkipMetadata = true }, cancellationToken);
+                    break;
+                case "image/webp":
+                    await image.SaveAsWebpAsync(sanitizedStream, new WebpEncoder { Quality = 82, SkipMetadata = true }, cancellationToken);
+                    break;
+                default:
+                    await image.SaveAsJpegAsync(sanitizedStream, new JpegEncoder { Quality = 82, SkipMetadata = true }, cancellationToken);
+                    contentType = "image/jpeg";
+                    break;
+            }
+            byte[] originalBytes = sanitizedStream.ToArray();
+            int width = image.Width;
+            int height = image.Height;
 
             image.Mutate(operation => operation.Resize(new ResizeOptions
             {
@@ -92,7 +98,7 @@ public sealed class InventoryPhotoStorageService(
             }));
 
             await using MemoryStream thumbnailStream = new();
-            await image.SaveAsJpegAsync(thumbnailStream, new JpegEncoder { Quality = 74 }, cancellationToken);
+            await image.SaveAsJpegAsync(thumbnailStream, new JpegEncoder { Quality = 74, SkipMetadata = true }, cancellationToken);
             byte[] thumbnailBytes = thumbnailStream.ToArray();
 
             return new ProcessedPhoto(

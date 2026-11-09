@@ -279,21 +279,18 @@ public sealed class InventoryPhotoWorkflowService(
 
     public async Task<PhotoBytes?> GetThumbnailAsync(Guid itemId, Guid photoId, CancellationToken cancellationToken)
     {
-        InventoryPhoto? photo = await FindPhotoUnscopedAsync(itemId, photoId, cancellationToken);
+        InventoryPhoto? photo = await photos.FindPhotoForOrganizationAsync(currentUser.OrganizationId, itemId, photoId, cancellationToken);
         return photo is null ? null : await blobs.ReadThumbnailAsync(photo, cancellationToken);
     }
 
     public async Task<PhotoBytes?> GetOriginalAsync(Guid itemId, Guid photoId, CancellationToken cancellationToken)
     {
-        InventoryPhoto? photo = await FindPhotoUnscopedAsync(itemId, photoId, cancellationToken);
+        InventoryPhoto? photo = await photos.FindPhotoForOrganizationAsync(currentUser.OrganizationId, itemId, photoId, cancellationToken);
         return photo is null ? null : await blobs.ReadOriginalAsync(photo, cancellationToken);
     }
 
     private Task<InventoryItem?> FindItemAsync(Guid id, CancellationToken cancellationToken) =>
         photos.FindItemWithPhotosAsync(currentUser.OrganizationId, id, cancellationToken);
-
-    private Task<InventoryPhoto?> FindPhotoUnscopedAsync(Guid itemId, Guid photoId, CancellationToken cancellationToken) =>
-        photos.FindPhotoUnscopedAsync(itemId, photoId, cancellationToken);
 
     private static InventoryPhoto? ResolvePhotoByUrl(InventoryItem item, string url)
     {
