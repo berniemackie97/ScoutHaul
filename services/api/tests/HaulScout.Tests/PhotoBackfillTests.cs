@@ -24,6 +24,13 @@ public sealed class PhotoBackfillTests
         public Task<int> CountHeldInDatabaseAsync(CancellationToken cancellationToken) =>
             Task.FromResult(Held().Count());
 
+        public Task<IReadOnlyList<InventoryPhoto>> ListForMetadataRepairAsync(Guid? afterPhotoId, int take, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<InventoryPhoto>>(photos
+                .Where(photo => afterPhotoId is null || photo.Id.CompareTo(afterPhotoId.Value) > 0)
+                .OrderBy(photo => photo.Id)
+                .Take(take)
+                .ToArray());
+
         public Task SaveChangesAsync(CancellationToken cancellationToken)
         {
             Saves++;

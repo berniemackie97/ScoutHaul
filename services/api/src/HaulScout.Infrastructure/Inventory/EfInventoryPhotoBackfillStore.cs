@@ -6,8 +6,8 @@ using HaulScout.Infrastructure.Persistence;
 namespace HaulScout.Infrastructure.Inventory;
 
 /// <summary>
-/// Photos still holding their images in their own columns. The filters are ignored deliberately: this runs for the
-/// whole service rather than inside one operator's request, and every organization's photos are moved the same way.
+/// Maintenance reads span every organization, independently of the operator's tenant filter. The storage move
+/// selects database-held photos; the metadata repair command keyset-scans all photo rows.
 /// </summary>
 public sealed class EfInventoryPhotoBackfillStore(HaulScoutDbContext db) : IInventoryPhotoBackfillStore
 {
@@ -20,6 +20,18 @@ public sealed class EfInventoryPhotoBackfillStore(HaulScoutDbContext db) : IInve
 
     public Task<int> CountHeldInDatabaseAsync(CancellationToken cancellationToken) =>
         HeldInDatabase().CountAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<InventoryPhoto>> ListForMetadataRepairAsync(Guid? afterPhotoId, int take, CancellationToken cancellationToken)
+    {
+        IQueryable<InventoryPhoto> photos = afterPhotoId is Guid cursor
+            ? db.InventoryPhotos.FromSqlInterpolated($@"SELECT * FROM ""InventoryPhotos"" WHERE ""Id"" > {cursor}")
+            : db.InventoryPhotos;
+
+        return await photos.IgnoreQueryFilters()
+            .OrderBy(photo => photo.Id)
+            .Take(take)
+            .ToListAsync(cancellationToken);
+    }
 
     public Task SaveChangesAsync(CancellationToken cancellationToken) => db.SaveChangesAsync(cancellationToken);
 

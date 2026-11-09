@@ -22,11 +22,41 @@ The public route is independent of the operator inventory route. It does not aut
 
 The upload processor decodes and auto-orients JPEG, PNG and WebP, then always re-encodes originals and thumbnails using encoders that omit metadata. The original extension format is preserved unless the existing imported-photo resize rule converts it to JPEG; transparent PNG pixels remain supported. This prevents new uploads from passing GPS EXIF and related metadata through as original bytes.
 
-**Not yet complete:** previously stored originals may still contain EXIF/XMP/GPS or other metadata, including objects already served or cached externally before this change. An audited in-place remediation is still required for both database and object-storage photos. Preserve photo IDs and references, verify the new bytes, update the recorded media/size/dimensions, then replace old objects with bounded batches, resumability and failure reporting. Never declare the old set scrubbed merely because this upload path is fixed. Public storefront originals must not be considered fully remediated until historic bytes are processed.
+**Not yet complete:** historical originals may still contain EXIF/XMP/GPS until the explicit repair command below has been executed, audited and its failures resolved. Publicly cached or previously downloaded copies cannot be recalled. New-upload sanitation alone is not acceptance of historical privacy.
 
-## Legacy public file paths
+## Historical-photo repair
 
-The API still has a web-root static-file middleware before authentication, while the historical photo deletion path refers to `/uploads/inventory/{organizationId}/{itemId}/...`. No legacy web-root assets are committed, but a mounted or retained `wwwroot/uploads/inventory` directory would be served anonymously unless those assets are migrated or blocked. Audit the actual deployed filesystem/storage volume and migrate historical references before claiming all photo URLs are private. Do not assume the protected database endpoints cover static files.
+The API no longer serves its web root. This blocks direct access to any old `/uploads/inventory/...` files through the API even if deployed volumes still contain them; Swagger's own development UI continues through its mapped middleware. Existing references to those legacy file paths may stop displaying and need a separate inventory audit, migration or removal.
+
+A manual metadata-repair command uses the same image decoder and metadata-free encoders as new uploads. It visits all organizations (including unpublished items) by photo ID, re-encodes the original and thumbnail, updates dimensions/content type/sizes, and saves **one photo at a time**. Database blobs and configured object-storage blobs use the same storage abstraction; image IDs remain stable. The command is never scheduled or run automatically.
+
+Before changing any images:
+
+1. Back up the PostgreSQL database **and** the object bucket, including keys and versions. Verify that you can restore both.
+2. Take a maintenance window: stop API writes, marketplace photo sync, and the existing object-storage backfill worker on **all instances**. Do not run a second metadata repair process concurrently.
+3. Use the environment's normal API database and object-storage credentials. Ensure the schema is up to date. Run a read-only preview:
+
+```bash
+dotnet run --project services/api/src/HaulScout.Api -- repair-photo-metadata --dry-run 10
+```
+
+To process the first batch deliberately:
+
+```bash
+dotnet run --project services/api/src/HaulScout.Api -- repair-photo-metadata --apply 10
+```
+
+Each successfully committed photo emits its ID to the operator log. The final line includes `Scanned`, `Reencoded`, and `NextAfter`. Repeat with the **last successfully saved photo ID**:
+
+```bash
+dotnet run --project services/api/src/HaulScout.Api -- repair-photo-metadata --apply 10 <last-saved-photo-id-N>
+```
+
+`--dry-run` never saves bytes or metadata and its cursor **must not** be used to resume `--apply`. A batch with `Scanned=0` has reached the end of the current photo-ID range. The limit is 1–10, bounding tracked photos and in-memory encoded copies. Keep a durable maintenance record of the applied cursor and check resulting bytes. Do not rerun successfully processed ranges casually: lossy encodings would be re-encoded.
+
+**Failure policy:** A missing/corrupted/unsupported/oversize original or a bucket/database error aborts the pass at that photo. Already committed photos remain fixed; resume from the last success after fixing or restoring the failed record. Never skip an image without recording an explicit incident and disposition. If object storage accepts a write but the row save fails, retrying the same photo is supported; inspect the two object keys and row afterward. A changed media extension can leave an old, unreferenced object that needs separate cleanup after verification.
+
+The command does **not** reach external CDN/Next.js caches or legacy web-root files and cannot revoke previously downloaded copies. It does not change links that reference obsolete `/uploads/inventory` paths. Inspect deployed mounts, old URLs and media caches before closing #283.
 
 ## Deployment and acceptance
 
@@ -37,7 +67,7 @@ The admin and mobile readers must be deployed together with the API authorizatio
 - [ ] Mobile Jest, type-check, lint and device preview after sign-in/token refresh/organization switch; sign-out cannot show a cached private image.
 - [ ] Admin type-check/build and private-photo previews in inventory table, picker and detail, plus proper 401 after sign-out.
 - [ ] Public product images stay accessible without tokens, and disappear after listing visibility is revoked; verify caches and hosting image proxies.
-- [ ] Remediate pre-existing photos (database, object storage and any deployed web-root files), including legacy URL references, corrupt-item handling, batch restart and audit of output bytes.
+- [ ] Execute and audit metadata repair across database/object-storage photos in maintenance windows, resolve failures, inventory legacy web-root files/links and verify the output bytes.
 - [ ] Review PR diff, run CI, verify deployment sequencing and capture staging evidence before closing #283.
 
 Parent issue: [#283](https://github.com/berniemackie97/ScoutHaul/issues/283). Follow-on storage/upload resilience is [#284](https://github.com/berniemackie97/ScoutHaul/issues/284).
