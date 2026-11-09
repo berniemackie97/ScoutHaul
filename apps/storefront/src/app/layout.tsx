@@ -3,6 +3,7 @@ import localFont from "next/font/local";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { STORE } from "@/lib/store";
+import { serializeJsonLd } from "@/lib/json-ld";
 import "@overhaul/ui/globals.css";
 
 // Served from this app, not from Google: a build that reaches a third party's CDN fails when that CDN does, and
@@ -108,7 +109,7 @@ export default function RootLayout({
       <body className="min-h-screen bg-background font-sans text-foreground antialiased">
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }}
+          dangerouslySetInnerHTML={{ __html: serializeJsonLd(organizationJsonLd) }}
         />
         {children}
         <Analytics />
