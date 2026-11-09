@@ -131,9 +131,11 @@ public sealed class EfStorefrontCatalogStore(HaulScoutDbContext db) : IStorefron
         db.InventoryPhotos
             .IgnoreQueryFilters()
             .Where(photo => photo.Id == photoId
-                && photo.InventoryItem!.Organization!.StoreDomain != null
+                && photo.InventoryItem!.OrganizationId == photo.OrganizationId
+                && photo.InventoryItem.Organization!.StoreDomain != null
                 && db.StoreListings.IgnoreQueryFilters().Any(listing =>
                     listing.InventoryItemId == photo.InventoryItemId
+                    && listing.OrganizationId == photo.OrganizationId
                     && listing.Status != StoreListingStatus.Draft
                     && listing.Status != StoreListingStatus.Archived))
             .FirstOrDefaultAsync(cancellationToken);

@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Image } from 'expo-image';
+import { PhotoImage } from './PhotoImage';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from './Text';
 import { radius, spacing } from './theme';
@@ -30,8 +30,8 @@ export function PhotoThumbnail({ uri, size = 56, onPress, placeholder }: PhotoTh
 
   return (
     <Pressable onPress={onPress} accessibilityLabel="Item photo" accessibilityRole="image">
-      <Image
-        source={{ uri }}
+      <PhotoImage
+        uri={uri}
         style={[styles.image, { width: size, height: size }]}
         contentFit="cover"
         cachePolicy="disk"

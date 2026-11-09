@@ -17,15 +17,14 @@ public sealed class EfInventoryPhotoStore(HaulScoutDbContext db) : IInventoryPho
                 .ThenInclude(item => item.ComponentInventoryItem)
             .SingleOrDefaultAsync(item => item.Id == id && item.OrganizationId == organizationId, cancellationToken);
 
-    /// <summary>
-    /// Deliberately bypasses the organization query filter. The photo endpoints serve bytes addressed by item and
-    /// photo id, and the request's tenant is not always resolved on that path; the ids are unguessable and the row is
-    /// only ever returned as image bytes. Preserved exactly as it was — narrowing it here would break photo serving.
-    /// </summary>
-    public Task<InventoryPhoto?> FindPhotoUnscopedAsync(Guid inventoryItemId, Guid photoId, CancellationToken cancellationToken) =>
+    public Task<InventoryPhoto?> FindPhotoForOrganizationAsync(Guid organizationId, Guid inventoryItemId, Guid photoId, CancellationToken cancellationToken) =>
         db.InventoryPhotos
-            .IgnoreQueryFilters()
-            .SingleOrDefaultAsync(item => item.Id == photoId && item.InventoryItemId == inventoryItemId, cancellationToken);
+            .SingleOrDefaultAsync(photo =>
+                photo.Id == photoId
+                && photo.InventoryItemId == inventoryItemId
+                && photo.OrganizationId == organizationId
+                && photo.InventoryItem!.OrganizationId == organizationId,
+                cancellationToken);
 
     public async Task AddAsync(InventoryPhoto photo, CancellationToken cancellationToken) =>
         await db.InventoryPhotos.AddAsync(photo, cancellationToken);

@@ -1,129 +1,114 @@
-using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
-using Microsoft.EntityFrameworkCore;
 using HaulScout.Api.Controllers;
-using HaulScout.Api.Services;
-using HaulScout.Application.Common;
 using HaulScout.Application.Inventory;
+using HaulScout.Application.Security;
 using HaulScout.Domain.Entities;
-using HaulScout.Infrastructure.Persistence;
 using HaulScout.Infrastructure.Inventory;
+using HaulScout.Infrastructure.Persistence;
 
 namespace HaulScout.Tests;
 
-public class InventoryPhotoServingTests
+public sealed class InventoryPhotoServingTests
 {
     [Fact]
-    public async Task Photo_thumbnail_is_served_to_anonymous_requests_without_a_tenant()
+    public void InventoryPhotoEndpointsRequireAuthorization()
     {
-        Guid org = Guid.NewGuid();
-        DbContextOptions<HaulScoutDbContext> options = new DbContextOptionsBuilder<HaulScoutDbContext>()
-            .UseInMemoryDatabase(nameof(Photo_thumbnail_is_served_to_anonymous_requests_without_a_tenant))
-            .Options;
-
-        Guid itemId, photoId;
-        TenantContext seedTenant = new();
-        seedTenant.SetOrganization(org);
-        await using (HaulScoutDbContext seed = new(options, seedTenant))
+        foreach (string name in new[] { nameof(InventoryController.GetPhotoThumbnail), nameof(InventoryController.GetPhotoOriginal) })
         {
-            InventoryItem item = new() { Title = "Reshiram" };
-            seed.InventoryItems.Add(item);
-            InventoryPhoto photo = new()
-            {
-                InventoryItemId = item.Id,
-                ContentType = "image/jpeg",
-                OriginalBytes = [1, 2, 3],
-                ThumbnailBytes = [4, 5, 6],
-            };
-            seed.InventoryPhotos.Add(photo);
-            await seed.SaveChangesAsync();
-            itemId = item.Id;
-            photoId = photo.Id;
+            var method = typeof(InventoryController).GetMethod(name)!;
+            Assert.Empty(method.GetCustomAttributes(typeof(AllowAnonymousAttribute), inherit: true));
         }
-
-        // Anonymous request: no organization resolved on the tenant — exactly like an <img>/Image
-        // fetching the photo URL with no bearer token. Must still resolve via IgnoreQueryFilters.
-        TenantContext anonTenant = new();
-        await using HaulScoutDbContext db = new(options, anonTenant);
-        InventoryController controller = new(
-            null!,
-            null!,
-            null!,
-            null!,
-            null!,
-            new InventoryPhotoWorkflowService(new EfInventoryPhotoStore(db), null!, null!, new DatabaseInventoryPhotoBlobStore(), null!),
-            null!,
-            null!,
-            null!);
-
-        IActionResult result = await controller.GetPhotoThumbnail(itemId, photoId, CancellationToken.None);
-
-        FileContentResult file = Assert.IsType<FileContentResult>(result);
-        Assert.Equal("image/jpeg", file.ContentType);
-        Assert.Equal(new byte[] { 4, 5, 6 }, file.FileContents);
     }
 
     [Fact]
-    public async Task A_photo_whose_images_live_in_object_storage_is_served_the_same_way()
+    public async Task InventoryPhotoIsAvailableOnlyWithinItsOrganization()
     {
-        Guid org = Guid.NewGuid();
+        Guid owner = Guid.NewGuid();
+        Guid other = Guid.NewGuid();
         DbContextOptions<HaulScoutDbContext> options = new DbContextOptionsBuilder<HaulScoutDbContext>()
-            .UseInMemoryDatabase(nameof(A_photo_whose_images_live_in_object_storage_is_served_the_same_way))
-            .Options;
-
-        FakePhotoObjects objects = new();
-        Guid itemId, photoId;
+            .UseInMemoryDatabase(nameof(InventoryPhotoIsAvailableOnlyWithinItsOrganization)).Options;
+        Guid itemId;
+        Guid photoId;
         TenantContext seedTenant = new();
-        seedTenant.SetOrganization(org);
+        seedTenant.SetOrganization(owner);
         await using (HaulScoutDbContext seed = new(options, seedTenant))
         {
-            InventoryItem item = new() { Title = "Zekrom" };
-            seed.InventoryItems.Add(item);
+            InventoryItem item = new() { OrganizationId = owner, Title = "Private item" };
             InventoryPhoto photo = new()
             {
-                InventoryItemId = item.Id,
-                ContentType = "image/webp",
-                // Moved: the row holds keys, not images.
-                OriginalObjectKey = "org/photo/original.webp",
-                ThumbnailObjectKey = "org/photo/thumbnail.jpg",
+                OrganizationId = owner, InventoryItemId = item.Id, ContentType = "image/jpeg",
+                OriginalBytes = [1, 2, 3], ThumbnailBytes = [4, 5, 6],
             };
+            seed.InventoryItems.Add(item);
             seed.InventoryPhotos.Add(photo);
             await seed.SaveChangesAsync();
             itemId = item.Id;
             photoId = photo.Id;
         }
 
+        TenantContext ownerTenant = new();
+        ownerTenant.SetOrganization(owner);
+        await using HaulScoutDbContext ownerDb = new(options, ownerTenant);
+        var ownerPhotos = Workflow(ownerDb, owner, new DatabaseInventoryPhotoBlobStore());
+        Assert.Equal(new byte[] { 4, 5, 6 }, (await ownerPhotos.GetThumbnailAsync(itemId, photoId, CancellationToken.None))?.Bytes);
+        Assert.Equal(new byte[] { 1, 2, 3 }, (await ownerPhotos.GetOriginalAsync(itemId, photoId, CancellationToken.None))?.Bytes);
+
+        TenantContext foreignTenant = new();
+        foreignTenant.SetOrganization(other);
+        await using HaulScoutDbContext foreignDb = new(options, foreignTenant);
+        var foreignPhotos = Workflow(foreignDb, other, new DatabaseInventoryPhotoBlobStore());
+        Assert.Null(await foreignPhotos.GetThumbnailAsync(itemId, photoId, CancellationToken.None));
+        Assert.Null(await foreignPhotos.GetOriginalAsync(itemId, photoId, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task ScopedPhotoStoredInObjectStorageIsServedToItsOwner()
+    {
+        Guid org = Guid.NewGuid();
+        DbContextOptions<HaulScoutDbContext> options = new DbContextOptionsBuilder<HaulScoutDbContext>()
+            .UseInMemoryDatabase(nameof(ScopedPhotoStoredInObjectStorageIsServedToItsOwner)).Options;
+        Guid itemId;
+        Guid photoId;
+        TenantContext tenant = new();
+        tenant.SetOrganization(org);
+        await using (HaulScoutDbContext seed = new(options, tenant))
+        {
+            InventoryItem item = new() { OrganizationId = org, Title = "Object photo" };
+            InventoryPhoto photo = new()
+            {
+                OrganizationId = org, InventoryItemId = item.Id, ContentType = "image/webp",
+                OriginalObjectKey = "org/photo/original.webp", ThumbnailObjectKey = "org/photo/thumbnail.jpg",
+            };
+            seed.InventoryItems.Add(item);
+            seed.InventoryPhotos.Add(photo);
+            await seed.SaveChangesAsync();
+            itemId = item.Id;
+            photoId = photo.Id;
+        }
+
+        FakePhotoObjects objects = new();
         await objects.PutAsync("org/photo/original.webp", [7, 7, 7], "image/webp", CancellationToken.None);
         await objects.PutAsync("org/photo/thumbnail.jpg", [8, 8], "image/jpeg", CancellationToken.None);
+        await using HaulScoutDbContext db = new(options, tenant);
+        var blobs = new ObjectStoreInventoryPhotoBlobStore(objects,
+            Options.Create(new PhotoObjectStorageOptions { Bucket = "photos" }),
+            NullLogger<ObjectStoreInventoryPhotoBlobStore>.Instance);
+        var photos = Workflow(db, org, blobs);
+        Assert.Equal(new byte[] { 8, 8 }, (await photos.GetThumbnailAsync(itemId, photoId, CancellationToken.None))?.Bytes);
+        Assert.Equal(new byte[] { 7, 7, 7 }, (await photos.GetOriginalAsync(itemId, photoId, CancellationToken.None))?.Bytes);
+    }
 
-        TenantContext anonTenant = new();
-        await using HaulScoutDbContext db = new(options, anonTenant);
-        InventoryController controller = new(
-            null!,
-            null!,
-            null!,
-            null!,
-            null!,
-            new InventoryPhotoWorkflowService(
-                new EfInventoryPhotoStore(db),
-                null!,
-                null!,
-                new ObjectStoreInventoryPhotoBlobStore(
-                    objects,
-                    Options.Create(new PhotoObjectStorageOptions { Bucket = "photos" }),
-                    NullLogger<ObjectStoreInventoryPhotoBlobStore>.Instance),
-                null!),
-            null!,
-            null!,
-            null!);
+    private static InventoryPhotoWorkflowService Workflow(HaulScoutDbContext db, Guid org, IInventoryPhotoBlobStore blobs) =>
+        new(new EfInventoryPhotoStore(db), new KnownUser(org), null!, blobs, null!);
 
-        FileContentResult thumbnail = Assert.IsType<FileContentResult>(await controller.GetPhotoThumbnail(itemId, photoId, CancellationToken.None));
-        FileContentResult original = Assert.IsType<FileContentResult>(await controller.GetPhotoOriginal(itemId, photoId, CancellationToken.None));
-
-        Assert.Equal(new byte[] { 8, 8 }, thumbnail.FileContents);
-        Assert.Equal("image/jpeg", thumbnail.ContentType);
-        Assert.Equal(new byte[] { 7, 7, 7 }, original.FileContents);
-        Assert.Equal("image/webp", original.ContentType);
+    private sealed class KnownUser(Guid organizationId) : ICurrentUserContext
+    {
+        public Guid OrganizationId => organizationId;
+        public Guid? ActiveOrganizationId => organizationId;
+        public Guid UserId => Guid.Empty;
+        public Task ResolveAsync() => Task.CompletedTask;
     }
 }

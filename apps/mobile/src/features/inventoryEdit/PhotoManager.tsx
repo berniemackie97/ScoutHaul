@@ -1,10 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Image } from 'expo-image';
+import { PhotoImage } from '../../components/PhotoImage';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Text } from '../../components/Text';
 import { radius, spacing } from '../../components/theme';
 import { useAppTheme } from '../../context/ThemeContext';
-import { resolvePhotoUrl } from '../../utils/photoUrl';
 
 /** A photo on the form: either already on the server, or just taken and not yet uploaded. */
 export type LocalPhoto = {
@@ -87,8 +86,8 @@ export function PhotoManager({
         {photos.map((photo, i) => (
           <View key={photo.remoteId ?? photo.uri} style={styles.photoWrapper}>
             <Pressable onPress={() => onSetHero(i)} style={styles.photoTouch}>
-              <Image
-                source={{ uri: resolvePhotoUrl(photo.thumbnailUri ?? photo.uri) ?? photo.thumbnailUri ?? photo.uri }}
+              <PhotoImage
+                uri={photo.thumbnailUri ?? photo.uri}
                 style={styles.photoThumb}
                 contentFit="cover"
                 cachePolicy="disk"

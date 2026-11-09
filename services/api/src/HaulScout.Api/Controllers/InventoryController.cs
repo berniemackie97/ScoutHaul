@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using HaulScout.Api.Authorization;
 using HaulScout.Api.Services;
@@ -118,8 +117,7 @@ public sealed class InventoryController(
     }
 
     [HttpGet("{id:guid}/photos/{photoId:guid}/thumbnail")]
-    [AllowAnonymous]
-    [ResponseCache(Duration = 86400, Location = ResponseCacheLocation.Client)]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     public async Task<IActionResult> GetPhotoThumbnail(Guid id, Guid photoId, CancellationToken cancellationToken)
     {
         PhotoBytes? photo = await photos.GetThumbnailAsync(id, photoId, cancellationToken);
@@ -127,8 +125,7 @@ public sealed class InventoryController(
     }
 
     [HttpGet("{id:guid}/photos/{photoId:guid}/original")]
-    [AllowAnonymous]
-    [ResponseCache(Duration = 86400, Location = ResponseCacheLocation.Client)]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     public async Task<IActionResult> GetPhotoOriginal(Guid id, Guid photoId, CancellationToken cancellationToken)
     {
         PhotoBytes? photo = await photos.GetOriginalAsync(id, photoId, cancellationToken);
