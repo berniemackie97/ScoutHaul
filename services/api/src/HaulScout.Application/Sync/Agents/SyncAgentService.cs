@@ -430,6 +430,14 @@ public sealed class SyncAgentService(
         run.IsCompleteSnapshot = run.Loop == SyncLoopKind.Listings && request.CompleteSnapshot;
         run.Status = issueCount > 0 ? SyncRunStatus.CompletedWithIssues : SyncRunStatus.Succeeded;
         run.Summary = Summary(run);
+
+        // A scan that read every live listing also says which ones are gone: they are ended or sold, not left looking live.
+        if (run.IsCompleteSnapshot)
+        {
+            ListingEndings endings = await listingIngestion.EndUnseenAsync(run.Platform, run.ChannelAccountId, run.StartedAt, cancellationToken);
+            run.Summary = endings.AppendedTo(run.Summary);
+        }
+
         run.FinishedAt = now;
 
         loop!.Cursor = Text.Fit(request.Cursor, 400) ?? loop.Cursor;

@@ -223,7 +223,9 @@ export const ebayAdapter: MarketplaceAdapter = {
     }
 
     await readGalleries(context, [...listings.values()], issues);
-    const complete = issues.every((issue) => !issue.rejected) && (total === null || listings.size === total);
+    // Complete is a claim that every live listing was read, and the server ends whatever a complete scan did not see,
+    // so it needs eBay's own count to hold it to: a page that gives none proves nothing.
+    const complete = issues.every((issue) => !issue.rejected) && total !== null && listings.size === total;
     return { listings: [...listings.values()], issues, complete };
   },
 };

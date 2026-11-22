@@ -224,6 +224,14 @@ describe("the eBay adapter", () => {
     expect(eBay.requested.filter((url) => url.includes("/itm/"))).toHaveLength(25);
   });
 
+  it("does not call a snapshot complete when the page gives no count to hold it to", async () => {
+    const page = listingsPage([{ id: "1", title: "One", price: 5 }]).replace("(1)", "");
+    const eBay = context({ "/sh/lst/active": page });
+    const snapshot = await ebayAdapter.snapshotListings(eBay, seller);
+    expect(snapshot.listings).toHaveLength(1);
+    expect(snapshot.complete).toBe(false);
+  });
+
   it("does not call a partial snapshot complete", async () => {
     const eBay = context({ "/sh/lst/active": listingsPage([{ id: "1", title: "One", price: 5 }], 130) });
     expect((await ebayAdapter.snapshotListings(eBay, seller)).complete).toBe(false);
