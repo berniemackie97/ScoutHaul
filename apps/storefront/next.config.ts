@@ -30,6 +30,10 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   images: {
+    // The API already serves each photo at the size the page wants (a small JPEG thumbnail, or `?size=full` for the
+    // original) with a year-long immutable cache. Running them through Vercel's optimizer added nothing, and when the
+    // account's optimization quota ran out it answered 402 and every photo not already cached went blank.
+    unoptimized: true,
     remotePatterns: [
       { protocol: "https", hostname: apiHost },
       { protocol: "https", hostname: "**.r2.cloudflarestorage.com" },
