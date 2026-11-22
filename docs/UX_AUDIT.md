@@ -67,6 +67,18 @@ The API has `StoreCategory` (name, slug, description, parent, sort order, active
 - There is a command palette (`components/search/command-palette.tsx`) but no keyboard path for the frequent item jobs
   (price, relist, mark sold).
 
+## Tracking
+
+| Epic | Issues |
+|---|---|
+| #351 One item workspace and cross-marketplace coverage | #354 shell, #355 create/edit flow, #356 Marketplaces section, #357 adopt listing data, #358 coverage view, #359 to-list queue, #360 mobile editor, #361 mobile marketplace status, #362 photo sync state |
+| #352 Storefront CMS | #363 categories as records, #364 category tree, #365 listings overview, #366 collections, #367 content model, #368 content editor and preview, #369 storefront renders from CMS, #370 SEO |
+| #353 Sync accuracy | #371 verify ended-listing detection, #372 listings batch rejection, #373 Poshmark gallery, #374 eBay gallery budget, #375 Depop removed-listing response, #376 accuracy panel, #377 guided order-report import |
+| Cross-cutting | #378 screen-by-screen evidence pass, #379 two failing non-Docker tests, #380 pre-push hook and compiling `main`, #342 CI billing (existing) |
+
+Existing polish tasks #300-#305 stay the home for general accessibility, tokens, states and per-surface polish; the epics
+above add the structural work they depend on.
+
 ## The plan
 
 Each slice ships on its own, behind no flags. Design before code for 1, 3 and 4: a one-page layout sketch checked
