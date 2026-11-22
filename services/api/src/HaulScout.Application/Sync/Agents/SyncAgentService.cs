@@ -362,10 +362,12 @@ public sealed class SyncAgentService(
         }
 
         int created = 0, updated = 0, unchanged = 0;
+        List<IngestRejection> setAside = [];
         if (orders.Count > 0)
         {
+            // An order the landing cannot take is reported and set aside; the rest of the batch still lands.
             (IngestPlatformOrdersResultDto? result, string? error) =
-                await orderIngestion.IngestAsync(run.Platform, orders, run.ChannelAccountId, cancellationToken);
+                await orderIngestion.IngestAsync(run.Platform, orders, run.ChannelAccountId, cancellationToken, setAside);
             if (error is not null)
             {
                 return AppResult<AgentRunBatchResultDto>.Validation(error);
@@ -387,6 +389,7 @@ public sealed class SyncAgentService(
         }
 
         List<AgentRunIssueInput> raised = [.. issues];
+        raised.AddRange(setAside.Select(rejection => new AgentRunIssueInput(rejection.Message, rejection.ExternalReference, Rejected: true)));
         if (cancelled.Count > 0)
         {
             PlatformOrderCancellations applied = await orderIngestion.ApplyCancellationsAsync(run.Platform, cancelled, cancellationToken);
@@ -399,7 +402,7 @@ public sealed class SyncAgentService(
         run.Created += created;
         run.Updated += updated;
         run.Unchanged += unchanged;
-        run.Rejected += issues.Count(issue => issue.Rejected);
+        run.Rejected += issues.Count(issue => issue.Rejected) + setAside.Count;
         runs.AddIssues(raised.Select(issue => new SyncRunIssue
         {
             OrganizationId = organizationId,
@@ -410,7 +413,7 @@ public sealed class SyncAgentService(
         }));
         await store.SaveChangesAsync(cancellationToken);
 
-        return AppResult<AgentRunBatchResultDto>.Ok(new AgentRunBatchResultDto(created, updated, unchanged, loop.LeaseExpiresAt.Value));
+        return AppResult<AgentRunBatchResultDto>.Ok(new AgentRunBatchResultDto(created, updated, unchanged, loop.LeaseExpiresAt.Value, setAside.Count));
     }
 
     /// <summary>Closes a run that read everything it set out to, and records where the loop got to.</summary>

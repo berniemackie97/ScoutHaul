@@ -152,6 +152,31 @@ describe("the eBay adapter", () => {
     expect(eBay.opened).toEqual(eBay.requested);
   });
 
+  it("keeps the loop's place at an order it refused, so that order is read again", async () => {
+    const unreadable: FixtureOrder = { ...earlier, orderId: "99-00000-11111", created: ["Sep 16", "9:00am PDT"], soldFor: "TBD", total: "TBD", lines: [{ listingId: "1", title: "Odd", price: "TBD" }] };
+    const eBay = context({ "/sh/ord/": ordersPage([sold, unreadable]), "/mes/transactionlist": ledger });
+
+    const scan = await ebayAdapter.scanSales(eBay, { from: null, cursor: null }, seller);
+
+    expect(scan.orders.map((order) => order.externalOrderId)).toEqual(["26-15152-72360"]);
+    expect(scan.issues.filter((issue) => issue.rejected)).toHaveLength(1);
+    expect(scan.cursor).toBe("2026-09-16T16:00:00.000Z");
+  });
+
+  it("says plainly when the last scan is older than eBay's history reaches", async () => {
+    const eBay = context({ "/sh/ord/": ordersPage([sold]), "/mes/transactionlist": ledger });
+
+    const scan = await ebayAdapter.scanSales(eBay, { from: null, cursor: "2026-06-01T00:00:00Z" }, seller);
+
+    const gap = scan.issues.find((issue) => /keeps only 90 days/.test(issue.message ?? ""));
+    expect(gap).toMatchObject({ rejected: false });
+    expect(gap?.message).toContain("2026-06-01");
+    expect(gap?.message).toContain("order report");
+    // A scan inside eBay's reach says nothing of the kind.
+    const near = await ebayAdapter.scanSales(context({ "/sh/ord/": ordersPage([sold]), "/mes/transactionlist": ledger }), { from: null, cursor: "2026-09-10T00:00:00Z" }, seller);
+    expect(near.issues.some((issue) => /keeps only/.test(issue.message ?? ""))).toBe(false);
+  });
+
   it("reaches back to where the last scan stopped after days with every browser off", () => {
     expect(salesFrom({ from: null, cursor: "2026-08-20T00:00:00Z" }, now).toISOString()).toBe("2026-08-19T00:00:00.000Z");
     expect(salesFrom({ from: new Date("2026-01-01T00:00:00Z"), cursor: null }, now).toISOString()).toBe("2026-06-20T20:00:00.000Z");

@@ -373,11 +373,14 @@ export async function runWork(work: Work, heartbeat: Heartbeat, tab: Marketplace
       const run = await adapter.scanSales(reading, { from: from ? new Date(from) : null, cursor }, session);
       const orders = chunks(run.orders, ordersPerBatch);
       const cancelled = chunks(run.cancelledOrderIds, ordersPerBatch);
+      // An order the server set aside is read again next time: the loop's place stays where it was until none is.
+      let setAside = false;
       for (let index = 0; index < Math.max(orders.length, cancelled.length); index++) {
-        await deps.api.addBatch(runId, { orders: orders[index] ?? [], cancelledOrderIds: cancelled[index] ?? [], issues: index === 0 ? run.issues : [] });
+        const landed = await deps.api.addBatch(runId, { orders: orders[index] ?? [], cancelledOrderIds: cancelled[index] ?? [], issues: index === 0 ? run.issues : [] });
+        setAside ||= (landed.rejected ?? 0) > 0;
       }
 
-      done = await deps.api.complete(runId, { cursor: run.cursor, coversFrom: run.coversFrom, coversTo: run.coversTo });
+      done = await deps.api.complete(runId, { cursor: setAside ? cursor : run.cursor, coversFrom: run.coversFrom, coversTo: run.coversTo });
     } else {
       const snapshot = await adapter.snapshotListings(reading, session);
       let first = true;

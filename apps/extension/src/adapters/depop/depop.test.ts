@@ -111,6 +111,43 @@ describe("a Depop scan", () => {
     expect(snapshot.complete).toBe(false);
   });
 
+  it("ends a listing that dropped out of the shop only when its own page says it is gone", async () => {
+    const memory = memoryInMap();
+    await depopAdapter.snapshotListings(depop(shop(["a-1", "b-2"]), memory), seller);
+
+    // b-2 is no longer on the shop page, and its own page is gone too.
+    const gone = depop((url) => (url.pathname === "/overhaultrading/" ? shopPage(["a-1"]) : /a-1/.test(url.pathname) ? productPage({ slug: "a-1", title: "Item a-1", price: "10.00" }) : undefined), memory);
+    const snapshot = await depopAdapter.snapshotListings(gone, seller);
+
+    expect(snapshot.listings.find((listing) => listing.externalListingId === "b-2")).toMatchObject({ status: "Ended", quantity: 0 });
+    expect(snapshot.complete).toBe(false);
+
+    // Once ended it is not asked about again.
+    const later = depop((url) => (url.pathname === "/overhaultrading/" ? shopPage(["a-1"]) : undefined), memory);
+    await depopAdapter.snapshotListings(later, seller);
+    expect(later.read).not.toContain("https://www.depop.com/products/b-2/");
+  });
+
+  it("keeps a listing live that is merely further down than the shop reveals, and one whose page cannot be read", async () => {
+    const memory = memoryInMap();
+    await depopAdapter.snapshotListings(depop(shop(["a-1", "b-2", "c-3"]), memory), seller);
+
+    const next = depop((url) => {
+      if (url.pathname === "/overhaultrading/") return shopPage(["a-1"]);
+      if (/b-2/.test(url.pathname)) return productPage({ slug: "b-2", title: "Item b-2", price: "10.00" });
+      if (/c-3/.test(url.pathname)) return { status: 500, url: url.href, contentType: "text/html", body: "" };
+      return undefined;
+    }, memory);
+    const snapshot = await depopAdapter.snapshotListings(next, seller);
+
+    expect(snapshot.listings.filter((listing) => listing.status === "Ended")).toEqual([]);
+    expect(snapshot.issues.map((issue) => issue.externalReference)).toEqual(["c-3"]);
+    // Both are still known live, so both are looked at again next time.
+    const again = depop(shop(["a-1"]), memory);
+    await depopAdapter.snapshotListings(again, seller);
+    expect(again.read).toEqual(expect.arrayContaining(["https://www.depop.com/products/b-2/", "https://www.depop.com/products/c-3/"]));
+  });
+
   it("reads a listing once and remembers it, so an unchanged shop costs one page", async () => {
     const memory = memoryInMap();
     const first = depop(shop(["a-1", "b-2"]), memory);
