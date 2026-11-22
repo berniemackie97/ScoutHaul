@@ -138,7 +138,12 @@ public sealed class InventoryPhotoSyncService(
 
         bool rearranged = !before.Where(photo => !letGo.Contains(photo)).SequenceEqual(ordered);
         InventoryPhotoSet.Arrange(item, ordered);
-        item.PhotoSourceKey = ListingPhotoRules.SourceKey(listing.Platform, listing.ExternalListingId, listing.PhotoUrlsKey);
+        if (unreachable == 0)
+        {
+            // Only a complete hand-over is remembered as done; with photos missing, the next try must not skip it.
+            item.PhotoSourceKey = ListingPhotoRules.SourceKey(listing.Platform, listing.ExternalListingId, listing.PhotoUrlsKey);
+        }
+
         string? partly = unreachable == 0 ? null : $"{unreachable} of {wanted.Count} photos could not be fetched.";
         await FinishAsync(listing, now, partly, cancellationToken);
         bool changed = fetched > 0 || letGo.Count > 0 || rearranged;
@@ -186,7 +191,9 @@ public sealed class InventoryPhotoSyncService(
 
     private async Task<PhotoSyncStep> FinishAsync(PlatformListing listing, DateTimeOffset now, string? error, CancellationToken cancellationToken)
     {
-        listing.PhotoSyncedKey = listing.PhotoUrlsKey;
+        // A listing with photos still owed is not marked as handed over, so it comes round again after the retry wait.
+        // Photos already held are kept by address, so a retry fetches only the ones that failed.
+        listing.PhotoSyncedKey = error is null ? listing.PhotoUrlsKey : listing.PhotoSyncedKey;
         listing.PhotosSyncedAt = now;
         listing.PhotoSyncError = error;
         await store.SaveChangesAsync(cancellationToken);
