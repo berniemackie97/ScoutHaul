@@ -165,10 +165,22 @@ export function toIngestOrder(row: EbayOrderRow, ledger: LedgerOrder | undefined
     tax = 0;
   }
 
-  const posted = ledger?.gross !== null && ledger?.gross !== undefined && ledger.net !== null;
+  // The landing refuses negative money outright, and one refused order would sink the whole batch. These are never
+  // negative on a real sale, so a negative one is a misread: reject this order and let the rest land.
+  if (subtotal < 0 || shipping < 0 || lines.some((item) => (item.unitPrice ?? 0) < 0)) {
+    return reject("The order's items or shipping read as less than nothing.");
+  }
+
   const labels = ledger ? cents(ledger.labels.reduce((sum, label) => sum + label, 0)) : 0;
   const adFees = ledger ? cents(ledger.adFees.reduce((sum, fee) => sum + fee, 0)) : 0;
-  const transactionFees = posted ? cents(ledger!.gross! - ledger!.net!) : null;
+  let posted = ledger?.gross !== null && ledger?.gross !== undefined && ledger.net !== null;
+  let transactionFees = posted ? cents(ledger!.gross! - ledger!.net!) : null;
+  if (transactionFees !== null && transactionFees < 0) {
+    // A fee credit, or a ledger row misread. Neither is a fee of less than nothing, so the fees wait for a person.
+    issues.push({ message: "eBay's ledger shows fees below nothing for this order, so its fees are left pending.", externalReference: row.orderId, rejected: false });
+    posted = false;
+    transactionFees = null;
+  }
 
   const stage = fulfillment(row, now);
   const order: IngestOrder = {

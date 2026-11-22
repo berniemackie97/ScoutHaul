@@ -54,7 +54,6 @@ public sealed class PlatformOrderIngestionService(
 
             if (new[] { input.ItemsSubtotal, input.ShippingCharged, input.TaxCollected ?? 0, input.FeeTotal ?? 0 }.Any(value => value < 0)
                 || (input.ShippingCost.HasValue && input.ShippingCost.Value < 0)
-                || (input.PayoutAmount.HasValue && input.PayoutAmount.Value < 0)
                 || input.Lines.Any(line => line.UnitPrice < 0 || line.Quantity <= 0))
             {
                 return (null, $"Order {externalOrderId} has negative money or a non-positive quantity.");

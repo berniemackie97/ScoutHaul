@@ -106,6 +106,28 @@ describe("turning an order into the landing shape", () => {
     expect(order).toMatchObject({ feeTotal: null, feesPending: true, payoutAmount: null, shippingCost: null });
   });
 
+  it("keeps a sale whose label and ad fee cost more than it paid, with the payout below nothing", () => {
+    const cheap = { ...row, soldFor: 3, shipping: 0, total: 3, lines: [{ ...row.lines[0]!, unitPrice: 3 }] };
+    const loss = { gross: 3, net: 2.5, labels: [6.99], adFees: [0.52], refunds: [], carrier: "USPS" };
+    const { order, issues } = toIngestOrder(cheap, loss, now);
+    expect(issues).toEqual([]);
+    expect(order).toMatchObject({ feeTotal: 1.02, feesPending: false, payoutAmount: -5.01 });
+  });
+
+  it("leaves fees pending rather than sending fees below nothing", () => {
+    const credit = { gross: 26.99, net: 27.5, labels: [], adFees: [], refunds: [], carrier: null };
+    const { order, issues } = toIngestOrder(row, credit, now);
+    expect(order).toMatchObject({ feeTotal: null, feesPending: true, payoutAmount: null });
+    expect(issues).toHaveLength(1);
+    expect(issues[0]?.rejected).toBe(false);
+  });
+
+  it("rejects an order whose money reads below nothing, so the rest of the scan still lands", () => {
+    const { order, issues } = toIngestOrder({ ...row, shipping: -6.99 }, undefined, now);
+    expect(order).toBeUndefined();
+    expect(issues[0]).toMatchObject({ externalReference: "26-15152-72360", rejected: true });
+  });
+
   it("rejects an order whose sale time it cannot read, naming the order", () => {
     const unreadable = { ...row, created: "Sep 18" };
     expect(toIngestOrder(unreadable, undefined, now)).toEqual({
