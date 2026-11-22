@@ -1077,6 +1077,21 @@ Brass Lamp,377251318593,1,$0.00,$0.00,$0.00,$0.00,$0.00,$12.34,$0.00,$0.00,$16.9
     }
 
     [Fact]
+    public async Task Ingest_keeps_a_sale_that_lost_money()
+    {
+        var (db, org, user) = NewContext(nameof(Ingest_keeps_a_sale_that_lost_money));
+        await using var _ = db;
+        var controller = NewController(db, org, user);
+
+        // The label and the ad fee cost more than the buyer paid: the payout is below zero, and the sale is still real.
+        IngestPlatformOrderLineInput[] lines = [new("Item", 3m)];
+        ActionResult<IngestPlatformOrdersResultDto> result = await controller.Ingest(new IngestPlatformOrdersRequest("eBay", [Order("ORD-LOSS", lines, fee: 1m, payout: -4.5m)]), CancellationToken.None);
+
+        Assert.Equal(1, result.Value!.Created);
+        Assert.Equal(-4.5m, (await db.PlatformOrders.SingleAsync()).PayoutAmount);
+    }
+
+    [Fact]
     public async Task A_line_matching_a_channel_listing_external_id_is_settled_not_merely_suggested()
     {
         var (db, org, user) = NewContext(nameof(A_line_matching_a_channel_listing_external_id_is_settled_not_merely_suggested));
