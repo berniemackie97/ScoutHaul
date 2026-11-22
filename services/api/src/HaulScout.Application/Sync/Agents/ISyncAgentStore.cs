@@ -88,4 +88,26 @@ public interface ISyncAgentContext
 public interface IPlatformListingIngestion
 {
     Task<AppResult<IngestPlatformListingsResultDto>> IngestAsync(IngestPlatformListingsRequest request, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// After a scan that read every live listing: the account's listings still marked live that this scan did not
+    /// touch (<paramref name="readSince"/>) are no longer on the marketplace. They are marked sold when a sale of
+    /// them is on file and ended otherwise, and their presence on the channel follows. Reversible: a listing that
+    /// reappears is read as live again.
+    /// </summary>
+    Task<ListingEndings> EndUnseenAsync(string platform, Guid? channelAccountId, DateTimeOffset readSince, CancellationToken cancellationToken);
+}
+
+/// <param name="Ended">Listings marked ended.</param>
+/// <param name="Sold">Listings marked sold, because a sale of them is on file.</param>
+/// <param name="Held">Why nothing was ended, when a scan that read no live listing at all cannot be told from a failed one.</param>
+public sealed record ListingEndings(int Ended, int Sold, string? Held = null)
+{
+    public int Total => Ended + Sold;
+
+    /// <summary>A run's summary, with what the scan found to be no longer live said after it.</summary>
+    public string AppendedTo(string summary) =>
+        Held is not null ? $"{summary} {Held}"
+        : Total == 0 ? summary
+        : $"{summary} {Total} listing{(Total == 1 ? "" : "s")} no longer live: {Ended} ended, {Sold} sold.";
 }

@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using HaulScout.Api.Controllers;
+using HaulScout.Application.Common;
 using HaulScout.Application.Inventory;
 using HaulScout.Application.Security;
 using HaulScout.Domain.Entities;

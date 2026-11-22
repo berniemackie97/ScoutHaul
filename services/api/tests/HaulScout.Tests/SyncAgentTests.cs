@@ -669,6 +669,41 @@ public sealed class SyncAgentTests
         Assert.Equal((harness.Clock.GetUtcNow(), (string?)null, false), (listings.LastSucceededAt, listings.LastError, listings.Running));
     }
 
+    [Fact]
+    public async Task A_listing_a_complete_scan_no_longer_sees_is_ended_and_its_summary_says_so()
+    {
+        Harness harness = NewHarness();
+        Guid agent = await harness.ReadyAgentAsync();
+        IngestPlatformListingInput[] both =
+        [
+            new("377296454991", "Gucci Oxford Shirt", 249.99m, PlatformListingStatus.Active),
+            new("377296454992", "Levi's 501", 45m, PlatformListingStatus.Active),
+        ];
+        AgentRunDto first = (await harness.StartAsync(agent, SyncLoopKind.Listings)).Value!;
+        await harness.As(agent).AddBatchAsync(first.RunId, new AgentRunBatchRequest(Listings: both), CancellationToken.None);
+        await harness.As(agent).CompleteRunAsync(first.RunId, new CompleteAgentRunRequest(CompleteSnapshot: true), CancellationToken.None);
+
+        // Real time passes between the scans, as it does in life; the second one sees only the shirt.
+        await Task.Delay(30);
+        harness.Clock.SetUtcNow(DateTimeOffset.UtcNow);
+        AgentRunDto second = (await harness.StartAsync(agent, SyncLoopKind.Listings)).Value!;
+        await Task.Delay(30);
+        await harness.As(agent).AddBatchAsync(second.RunId, new AgentRunBatchRequest(Listings: [both[0]]), CancellationToken.None);
+        SyncRunDto done = (await harness.As(agent).CompleteRunAsync(second.RunId, new CompleteAgentRunRequest(CompleteSnapshot: true), CancellationToken.None)).Value!;
+
+        Assert.Contains("1 listing no longer live: 1 ended, 0 sold.", done.Summary);
+        Assert.Equal(PlatformListingStatus.Ended, (await harness.Db.PlatformListings.SingleAsync(listing => listing.ExternalListingId == "377296454992")).Status);
+        Assert.Equal(PlatformListingStatus.Active, (await harness.Db.PlatformListings.SingleAsync(listing => listing.ExternalListingId == "377296454991")).Status);
+
+        // A partial snapshot, which is not a claim that everything was read, ends nothing.
+        await Task.Delay(30);
+        harness.Clock.SetUtcNow(DateTimeOffset.UtcNow);
+        AgentRunDto third = (await harness.StartAsync(agent, SyncLoopKind.Listings)).Value!;
+        await harness.As(agent).AddBatchAsync(third.RunId, new AgentRunBatchRequest(Listings: [both[1]]), CancellationToken.None);
+        await harness.As(agent).CompleteRunAsync(third.RunId, new CompleteAgentRunRequest(CompleteSnapshot: false), CancellationToken.None);
+        Assert.Equal(PlatformListingStatus.Active, (await harness.Db.PlatformListings.SingleAsync(listing => listing.ExternalListingId == "377296454991")).Status);
+    }
+
     // ── Browsers ────────────────────────────────────────────────────────────────
 
     [Fact]

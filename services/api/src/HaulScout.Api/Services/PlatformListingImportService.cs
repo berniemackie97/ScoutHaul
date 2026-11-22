@@ -139,6 +139,8 @@ public sealed class PlatformListingImportService(HaulScoutDbContext db, ICurrent
             }
         }
 
+        // What the marketplace now says reaches the listing's presence on that channel, not only the imported copy.
+        filled |= await CarryToChannelListings(refreshed, cancellationToken);
         if (filled)
         {
             await db.SaveChangesAsync(cancellationToken);
@@ -147,6 +149,92 @@ public sealed class PlatformListingImportService(HaulScoutDbContext db, ICurrent
         Dictionary<Guid, (Guid Id, string Title, bool AlreadySold)> suggestions = await BuildSuggestions(refreshed, cancellationToken);
         List<PlatformListingDto> dtos = refreshed.Select(listing => listing.ToDto(Suggestion(suggestions, listing))).ToList();
         return AppResult<IngestPlatformListingsResultDto>.Ok(new IngestPlatformListingsResultDto(created, updated, skipped, dtos, unchanged));
+    }
+
+    public async Task<ListingEndings> EndUnseenAsync(string platform, Guid? channelAccountId, DateTimeOffset readSince, CancellationToken cancellationToken)
+    {
+        List<string> existingChannels = await ExistingChannels(cancellationToken);
+        string channel = SalesChannelCatalog.CanonicalValue(platform, existingChannels) ?? platform;
+        Guid organizationId = currentUser.OrganizationId;
+
+        // Listings an import brought in with no account belong to this one when it is the only account on the channel.
+        bool soleAccount = channelAccountId is not null
+            && await db.ChannelAccounts.CountAsync(account => account.OrganizationId == organizationId && account.Channel == channel, cancellationToken) == 1;
+        IQueryable<PlatformListing> live = db.PlatformListings.Where(listing =>
+            listing.OrganizationId == organizationId
+            && listing.Platform == channel
+            && listing.Status == PlatformListingStatus.Active
+            && (channelAccountId == null || listing.ChannelAccountId == channelAccountId || (soleAccount && listing.ChannelAccountId == null)));
+
+        // A scan that read nothing at all cannot be told from one that was blocked, so it ends nothing.
+        if (!await live.AnyAsync(listing => listing.ScrapedAt >= readSince, cancellationToken))
+        {
+            return new ListingEndings(0, 0, "The scan read no live listings, so none were marked ended.");
+        }
+
+        List<PlatformListing> unseen = await live.Where(listing => listing.ScrapedAt < readSince).ToListAsync(cancellationToken);
+        if (unseen.Count == 0)
+        {
+            return new ListingEndings(0, 0);
+        }
+
+        List<string> ids = unseen.Select(listing => listing.ExternalListingId).ToList();
+        HashSet<string> withASale = (await db.PlatformOrderLines
+                .Where(line => line.OrganizationId == organizationId
+                    && line.PlatformOrder!.Platform == channel
+                    && line.ExternalItemId != null && ids.Contains(line.ExternalItemId))
+                .Select(line => line.ExternalItemId!)
+                .Distinct()
+                .ToListAsync(cancellationToken))
+            .ToHashSet();
+
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        int sold = 0;
+        foreach (PlatformListing listing in unseen)
+        {
+            if (withASale.Contains(listing.ExternalListingId))
+            {
+                listing.Status = PlatformListingStatus.Sold;
+                listing.MarkedSoldAt ??= now;
+                sold++;
+            }
+            else
+            {
+                listing.Status = PlatformListingStatus.Ended;
+            }
+        }
+
+        await CarryToChannelListings(unseen, cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
+        return new ListingEndings(unseen.Count - sold, sold);
+    }
+
+    /// <summary>Puts what the marketplace says about each linked listing onto its presence on the channel. True when any changed.</summary>
+    private async Task<bool> CarryToChannelListings(IReadOnlyCollection<PlatformListing> listings, CancellationToken cancellationToken)
+    {
+        List<Guid> channelIds = listings.Where(listing => listing.ReconciledChannelListingId != null)
+            .Select(listing => listing.ReconciledChannelListingId!.Value).Distinct().ToList();
+        if (channelIds.Count == 0)
+        {
+            return false;
+        }
+
+        Dictionary<Guid, ChannelListing> channels = await db.ChannelListings
+            .Where(channel => channel.OrganizationId == currentUser.OrganizationId && channelIds.Contains(channel.Id))
+            .ToDictionaryAsync(channel => channel.Id, cancellationToken);
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        bool changed = false;
+        foreach (PlatformListing listing in listings)
+        {
+            if (listing.ReconciledChannelListingId is Guid id && channels.TryGetValue(id, out ChannelListing? channel))
+            {
+                (ChannelListingStatus status, decimal? price, int? quantity) before = (channel.Status, channel.ListedPrice, channel.Quantity);
+                ChannelListingSync.ApplyPlatformListing(channel, listing, now);
+                changed |= before != (channel.Status, channel.ListedPrice, channel.Quantity);
+            }
+        }
+
+        return changed;
     }
 
     /// <summary>Import eBay's Listing Quality workbook (.xlsx). eBay stores item ids in title hyperlinks, so rows
