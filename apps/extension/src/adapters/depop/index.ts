@@ -22,6 +22,12 @@ const listingsPerScan = 20;
 /** A listing is read again only when it has not been read for this long. */
 const staleDays = 7;
 
+/** How many listings the shop no longer shows are looked up on their own pages in one scan. */
+const goneChecksPerScan = 5;
+
+/** The listings this browser last knew to be live, so one that drops out of the shop view can be looked for by name. */
+const liveKey = "shop:live";
+
 const soldPage = `${origin}/sellinghub/sold-items/`;
 
 /** How many receipts one scan reads. Each is a page of its own; the rest are read on the scans after. */
@@ -242,10 +248,62 @@ export const depopAdapter: MarketplaceAdapter = {
       }
     }
 
+    await checkWhatLeftTheShop(context, slugs, listings, issues);
+
     // Never complete: the shop reveals its listings as a person scrolls, so nothing here proves the rest are gone.
+    // A listing is ended only by its own page saying it is gone, below, never by its absence from this one.
     return { listings, issues, complete: false };
   },
 };
+
+/**
+ * A listing this browser knew to be live that the shop page no longer shows may be gone — or just further down than the
+ * page reveals. Its own page settles it: Depop answering "not found" ends it, a page that still shows it keeps it live,
+ * and a page that cannot be read changes nothing. A few are looked up each scan, so a missing listing is found within
+ * a few scans and the shop is never hit in a burst.
+ */
+async function checkWhatLeftTheShop(context: MarketplaceContext, shown: string[], listings: IngestListing[], issues: RunIssue[]): Promise<void> {
+  const known = (await context.memory.get<string[]>(liveKey)) ?? [];
+  const live = new Set(shown);
+  let checks = goneChecksPerScan;
+  for (const slug of known.filter((candidate) => !live.has(candidate))) {
+    if (checks === 0) {
+      live.add(slug);
+      continue;
+    }
+
+    checks--;
+    try {
+      const page = await context.page(`${origin}/products/${slug}/`);
+      if (page.status === 404 || page.status === 410) {
+        const remembered = await context.memory.get<ListingMemory>(`listing:${slug}`);
+        if (remembered) {
+          listings.push({ ...remembered.listing, status: "Ended", quantity: 0 });
+        }
+
+        continue;
+      }
+
+      assertReadable(page);
+      const listing = readProduct(slug, page.body);
+      listings.push(listing);
+      await context.memory.set<ListingMemory>(`listing:${slug}`, { at: context.now().getTime(), listing });
+      if (listing.status === "Active") {
+        live.add(slug);
+      }
+    } catch (error) {
+      if (error instanceof AdapterError && (error.kind === "Challenge" || error.kind === "RateLimited" || error.kind === "SignedOut")) {
+        throw error;
+      }
+
+      // Not knowing is not a reason to end anything: it stays on the list to be looked at again.
+      live.add(slug);
+      issues.push({ message: "This listing is no longer in the shop view and its page could not be read.", externalReference: slug, rejected: false });
+    }
+  }
+
+  await context.memory.set<string[]>(liveKey, [...live]);
+}
 
 /** Every listing a shop page names, in the order it shows them. */
 export function readShop(html: string): string[] {

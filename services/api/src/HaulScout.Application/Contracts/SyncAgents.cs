@@ -118,7 +118,8 @@ public sealed record AgentRunBatchRequest(
     IReadOnlyList<AgentRunIssueInput>? Issues = null,
     IReadOnlyList<string>? CancelledOrderIds = null);
 
-public sealed record AgentRunBatchResultDto(int Created, int Updated, int Unchanged, DateTimeOffset LeaseExpiresAt);
+/// <param name="Rejected">Orders in this batch the landing set aside; the agent holds its cursor back so they are read again.</param>
+public sealed record AgentRunBatchResultDto(int Created, int Updated, int Unchanged, DateTimeOffset LeaseExpiresAt, int Rejected = 0);
 
 /// <param name="CompleteSnapshot">For a listings run: every live listing was read, so any listing seen before and now absent is no longer live.</param>
 public sealed record CompleteAgentRunRequest(

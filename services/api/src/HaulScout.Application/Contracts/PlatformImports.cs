@@ -178,7 +178,11 @@ public sealed record IngestPlatformOrdersResultDto(
     int Skipped,
     int AutoReconciled,
     IReadOnlyList<PlatformOrderDto> Orders,
-    int Unchanged = 0);
+    int Unchanged = 0,
+    IReadOnlyList<IngestRejection>? Rejections = null);
+
+/// <summary>An order set aside from a batch, with the reason, so the rest of the batch could still land.</summary>
+public sealed record IngestRejection(string ExternalReference, string Message);
 
 /// <summary>Import a marketplace's own CSV export (e.g. eBay Seller Hub → Performance → Sales report) — the
 /// authoritative fee source. Parsed server-side into the same idempotent ingest path as manual JSON.</summary>

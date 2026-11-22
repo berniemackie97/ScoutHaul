@@ -638,6 +638,26 @@ public sealed class SyncAgentTests
     }
 
     [Fact]
+    public async Task One_order_the_landing_cannot_take_is_set_aside_and_the_rest_of_the_batch_lands()
+    {
+        Harness harness = NewHarness();
+        Guid agent = await harness.ReadyAgentAsync();
+        AgentRunDto run = (await harness.StartAsync(agent, SyncLoopKind.Sales)).Value!;
+        IngestPlatformOrderInput broken = EbayOrder("07-15174-93677", "377251512872") with { ShippingCharged = -4m };
+
+        AppResult<AgentRunBatchResultDto> result = await harness.As(agent).AddBatchAsync(run.RunId,
+            new AgentRunBatchRequest(Orders: [EbayOrder("26-15152-72360", "377273002938"), broken]), CancellationToken.None);
+
+        Assert.Equal(AppResultStatus.Ok, result.Status);
+        Assert.Equal((1, 1), (result.Value!.Created, result.Value.Rejected));
+        Assert.Equal("26-15152-72360", (await harness.Db.PlatformOrders.SingleAsync()).ExternalOrderId);
+        SyncRunIssue issue = await harness.Db.SyncRunIssues.SingleAsync();
+        Assert.Equal(("07-15174-93677", SyncIssueSeverity.Error), (issue.ExternalReference, issue.Severity));
+        Assert.Contains("negative money", issue.Message);
+        Assert.Equal(1, (await harness.Db.SyncRuns.SingleAsync()).Rejected);
+    }
+
+    [Fact]
     public async Task A_complete_listings_snapshot_is_recorded_as_one()
     {
         Harness harness = NewHarness();

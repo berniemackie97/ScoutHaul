@@ -111,6 +111,17 @@ export const ebayAdapter: MarketplaceAdapter = {
   async scanSales(context: MarketplaceContext, window: SalesWindow): Promise<SalesScan> {
     const now = context.now();
     const from = salesFrom(window, now);
+    const gaps: RunIssue[] = [];
+    const reach = now.getTime() - historyDays * day;
+    const last = window.cursor ? Date.parse(window.cursor) : Number.NaN;
+    if (!window.from && !Number.isNaN(last) && last - day < reach) {
+      // eBay's order list and ledger go back 90 days and no further, so what happened between is out of this scan's reach.
+      gaps.push({
+        message: `The last sales scan reached ${isoDay(new Date(last))}, but eBay keeps only ${historyDays} days. Sales from ${isoDay(new Date(last))} to ${isoDay(new Date(reach))} cannot be read by a scan; bring them in with eBay's order report.`,
+        externalReference: null,
+        rejected: false,
+      });
+    }
 
     // Newest first, until the list reaches sales older than the window.
     const rows: EbayOrderRow[] = [];
@@ -164,11 +175,25 @@ export const ebayAdapter: MarketplaceAdapter = {
     }
 
     const orders: IngestOrder[] = [];
-    const issues: RunIssue[] = [];
+    const issues: RunIssue[] = [...gaps];
     let newest = Number.NEGATIVE_INFINITY;
+    // The loop's place must not move past an order that was refused, or it would never be read again.
+    let oldestRefused = Number.POSITIVE_INFINITY;
+    let refused = false;
+    let timeless = false;
     for (const row of wanted) {
       const { order, issues: rowIssues } = toIngestOrder(row, ledger.get(row.orderId), now);
       issues.push(...rowIssues);
+      if (rowIssues.some((issue) => issue.rejected)) {
+        refused = true;
+        const at = saleTime(row.created, now);
+        if (at) {
+          oldestRefused = Math.min(oldestRefused, at.getTime());
+        } else {
+          timeless = true;
+        }
+      }
+
       if (order) {
         orders.push(order);
         newest = Math.max(newest, Date.parse(order.orderedAt!));
@@ -189,7 +214,7 @@ export const ebayAdapter: MarketplaceAdapter = {
       // Not read from eBay's scan yet; its refunds reach the books through the order report import.
       cancelledOrderIds: [],
       issues,
-      cursor: Number.isFinite(newest) ? new Date(newest).toISOString() : window.cursor,
+      cursor: timeless ? window.cursor : refused ? held(window.cursor, newest, oldestRefused) : Number.isFinite(newest) ? new Date(newest).toISOString() : window.cursor,
       coversFrom: from.toISOString(),
       coversTo: now.toISOString(),
     };
@@ -336,6 +361,12 @@ async function readDescriptionFor(context: MarketplaceContext, page: string): Pr
     // A description is the least of what this scan is for; losing one costs the listing nothing.
     return null;
   }
+}
+
+/** Where the loop stands after a refused order: no later than the order, and never later than what was read. */
+function held(previous: string | null | undefined, newest: number, oldestRefused: number): string | null {
+  const place = Math.min(Number.isFinite(newest) ? newest : Number.POSITIVE_INFINITY, oldestRefused);
+  return Number.isFinite(place) ? new Date(place).toISOString() : previous ?? null;
 }
 
 function merge(left: LedgerOrder, right: LedgerOrder): LedgerOrder {

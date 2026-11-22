@@ -52,6 +52,20 @@ describe("running one piece of work", () => {
     fakeBrowser.permissions.contains = vi.fn(async () => true) as typeof fakeBrowser.permissions.contains;
   });
 
+  it("keeps the loop's place where it was when the server set an order aside, so the order is read again", async () => {
+    const { api, deps, tab } = harness({
+      ...signedIn,
+      "/sh/ord/": ordersPage([{ orderId: "26-15152-72360", created: ["Sep 18", "12:48am PDT"], soldFor: "$20.00", total: "$20.00", lines: [{ listingId: "1", title: "Lamp", price: "$20.00" }] }]),
+      "/mes/transactionlist": ledgerPage([]),
+    });
+    api.startRun.mockResolvedValue({ runId: "run-1", leaseExpiresAt: now.toISOString(), cursor: "2026-09-10T00:00:00.000Z", from: null } as never);
+    api.addBatch.mockResolvedValue({ created: 0, updated: 0, unchanged: 0, rejected: 1 } as never);
+
+    await runWork(sales, heartbeat, tab, deps);
+
+    expect(api.complete).toHaveBeenCalledWith("run-1", expect.objectContaining({ cursor: "2026-09-10T00:00:00.000Z" }));
+  });
+
   it("checks who is signed in, takes the run, delivers the sales and says what came of it", async () => {
     const { api, deps, tab } = harness({
       ...signedIn,
