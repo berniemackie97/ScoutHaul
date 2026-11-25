@@ -24,3 +24,35 @@ export async function bringBackTask(taskKey: string): Promise<WorkActionResult> 
   revalidatePath("/work");
   return { ok: true, message: "Back in its lane." };
 }
+
+function refreshWork() {
+  revalidatePath("/work");
+  revalidatePath("/");
+}
+
+/** Records that the listing was ended on the marketplace. Nothing is changed on the marketplace itself. */
+export async function confirmDelisted(channelListingId: string): Promise<WorkActionResult> {
+  const api = await getApiClient();
+  const result = await api.POST("/api/channel-listings/{channelListingId}/delisted", { params: { path: { channelListingId } } });
+  if (!result.data) return { ok: false, message: errorMessage(result.error, "That listing could not be updated.") };
+  refreshWork();
+  return { ok: true, message: "Marked as taken down." };
+}
+
+/** Keeps the listing up on purpose; it is not asked about again. */
+export async function keepListing(channelListingId: string): Promise<WorkActionResult> {
+  const api = await getApiClient();
+  const result = await api.POST("/api/channel-listings/{channelListingId}/keep-listed", { params: { path: { channelListingId } } });
+  if (!result.data) return { ok: false, message: errorMessage(result.error, "That listing could not be updated.") };
+  refreshWork();
+  return { ok: true, message: "Left listed — not asked about again." };
+}
+
+/** Clears a sold listing with no sale recorded for it — a sale recorded some other way, or one that fell through. */
+export async function clearSoldListing(platformListingId: string): Promise<WorkActionResult> {
+  const api = await getApiClient();
+  const result = await api.POST("/api/platform-listings/{id}/sold-acknowledged", { params: { path: { id: platformListingId } } });
+  if (!result.data) return { ok: false, message: errorMessage(result.error, "That listing could not be updated.") };
+  refreshWork();
+  return { ok: true, message: "Cleared — no sale recorded for it." };
+}

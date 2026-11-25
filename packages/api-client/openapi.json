@@ -25450,6 +25450,23 @@
           "count": {
             "type": "integer",
             "format": "int32"
+          },
+          "type": {
+            "type": "string",
+            "nullable": true
+          },
+          "entityId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "externalUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "platform": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false

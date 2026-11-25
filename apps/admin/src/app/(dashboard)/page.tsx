@@ -13,14 +13,15 @@ export const dynamic = "force-dynamic";
  */
 export default async function CommandCenterPage() {
   const api = await getApiClient();
-  const [session, { data: overview, error }] = await Promise.all([
+  const [session, { data: overview, error }, { data: work }] = await Promise.all([
     getSession(),
     api.GET("/api/dashboard/console", {}),
+    api.GET("/api/work", {}),
   ]);
 
   // Throw rather than render zeros: a home page that reads "nothing to do" because the request
   // failed is worse than one that says it failed. The segment's boundary keeps the shell alive.
   if (!overview) throw new Error(`The operator console could not be loaded (${JSON.stringify(error ?? "no response")}).`);
 
-  return <CommandCenter overview={overview} operator={operatorFrom(session)} />;
+  return <CommandCenter overview={overview} work={work ?? null} operator={operatorFrom(session)} />;
 }

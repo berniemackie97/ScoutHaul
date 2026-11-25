@@ -62,6 +62,7 @@ public sealed class WorkInboxServiceTests
             new SyncIssueService(new EfSyncIssueStore(db), null!, user, clock),
             new EfWorkSnoozeStore(db),
             new EfListingMatchStore(db),
+            new HaulScout.Infrastructure.Storefront.EfStorefrontOfferStore(db),
             clock);
         return (work, db, org);
     }
@@ -136,5 +137,20 @@ public sealed class WorkInboxServiceTests
 
         Assert.Contains(inbox.Lanes.Single(lane => lane.Key == WorkInboxService.List).Tasks, task => task.Title.Contains("Carhartt"));
         Assert.Contains(inbox.Lanes.Single(lane => lane.Key == WorkInboxService.FollowUp).Tasks, task => task.Kind == "Sync issue" && task.Title.Contains("Vinted"));
+    }
+
+    [Fact]
+    public async Task Records_with_gaps_land_in_tidy_as_one_task_per_kind()
+    {
+        (WorkInboxService work, HaulScoutDbContext db, Guid org) = Harness();
+        db.InventoryItems.AddRange(
+            new InventoryItem { OrganizationId = org, Title = "No cost one", Status = InventoryStatus.ReadyToList, StorageLocation = "A1", PurchasedAt = Now.AddDays(-2) },
+            new InventoryItem { OrganizationId = org, Title = "No cost two", Status = InventoryStatus.ReadyToList, StorageLocation = "A2", PurchasedAt = Now.AddDays(-2) });
+        await db.SaveChangesAsync();
+
+        WorkTaskDto cost = Assert.Single((await work.BuildAsync(CancellationToken.None)).Lanes.Single(lane => lane.Key == WorkInboxService.Tidy).Tasks, task => task.Key == "tidy:MissingCost");
+
+        Assert.Equal(2, cost.Count);
+        Assert.Equal("/inventory?lifecycle=Active&attention=MissingCost", cost.ActionHref);
     }
 }

@@ -31,6 +31,9 @@ const nextConfig: NextConfig = {
       // The per-sale page folded into the order line; both old routes now resolve to Orders.
       { source: "/finance/:id", destination: "/orders", permanent: true },
       { source: "/orders/sales/:id", destination: "/orders", permanent: true },
+      // The delist and sold-not-recorded queues live in Work, where each task is done in place.
+      { source: "/channels/delist", destination: "/work?lane=follow", permanent: true },
+      { source: "/channels/sold", destination: "/work?lane=reconcile", permanent: true },
     ];
   },
 };

@@ -1,12 +1,13 @@
 "use client";
 
-import Link from "next/link";
 import { useState, useTransition } from "react";
 import { Check } from "lucide-react";
 import type { components } from "@overhaul/api-client";
 import { Button, Card, Notice } from "@overhaul/ui";
 import { When } from "@/components/when";
+import { safely } from "@/lib/safe-action";
 import { setAsideTask, type WorkActionResult } from "./actions";
+import { TaskActions } from "./task-actions";
 
 type Task = components["schemas"]["WorkTaskDto"];
 type WorkWait = components["schemas"]["WorkWait"];
@@ -26,15 +27,17 @@ function dayFromNow(days: number): string {
 }
 
 /** The open task: why it matters, where its sale stands, and the one thing to do — or set it aside with a reason. */
-export function TaskDetail({ task }: { task: Task }) {
+export function TaskDetail({ task, onDone }: { task: Task; onDone: (message: string) => void }) {
   const [mode, setMode] = useState<"none" | "snooze" | "wait">("none");
   const [note, setNote] = useState("");
   const [result, setResult] = useState<WorkActionResult | null>(null);
   const [pending, startTransition] = useTransition();
   const steps = task.steps ?? [];
 
+  // A task that is finished or set aside leaves the list at once; a failure stays here to be read.
+  const settle = (outcome: WorkActionResult) => (outcome.ok ? onDone(outcome.message) : setResult(outcome));
   const aside = (wait: WorkWait, until: string | null) =>
-    startTransition(async () => setResult(await setAsideTask(task.key ?? "", task.title ?? "", wait, until, note)));
+    startTransition(async () => settle(await safely(() => setAsideTask(task.key ?? "", task.title ?? "", wait, until, note))));
 
   return (
     <Card className="space-y-4 p-5">
@@ -76,9 +79,7 @@ export function TaskDetail({ task }: { task: Task }) {
       )}
 
       <div className="flex flex-wrap items-center gap-2 border-t pt-4">
-        <Button asChild>
-          <Link href={task.actionHref ?? "/"}>{task.actionLabel}</Link>
-        </Button>
+        <TaskActions task={task} onResult={settle} />
         <Button type="button" variant="outline" size="sm" aria-expanded={mode === "snooze"} onClick={() => setMode(mode === "snooze" ? "none" : "snooze")}>
           Snooze…
         </Button>

@@ -43,7 +43,7 @@ export function MatchPanel({
     const timer = setTimeout(
       () =>
         startTransition(async () => {
-          const result = await loadMatchCandidates(listingId, search);
+          const result = await loadMatchCandidates(listingId, search).catch(() => ({ ok: false, message: "Could not load matches. Check the connection and try again.", candidates: [] }));
           if (request !== latest.current) return;
           setCandidates(result.candidates);
           setMessage(result.message);
