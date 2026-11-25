@@ -61,6 +61,7 @@ public sealed class InventoryPhotoStorageService(
         {
             using Image image = await Image.LoadAsync(Decoding, originalStream, cancellationToken);
             image.Mutate(operation => operation.AutoOrient());
+            StripMetadata(image);
             bool resized = false;
             if (maxPixels is int ceiling && (image.Width > ceiling || image.Height > ceiling))
             {
@@ -146,5 +147,19 @@ public sealed class InventoryPhotoStorageService(
         string fallback = Path.Combine(environment.ContentRootPath, "wwwroot");
         Directory.CreateDirectory(fallback);
         return fallback;
+    }
+
+    // Encoders' SkipMetadata alone has let EXIF (GPS included) through; drop the profiles themselves.
+    private static void StripMetadata(Image image)
+    {
+        image.Metadata.ExifProfile = null;
+        image.Metadata.XmpProfile = null;
+        image.Metadata.IptcProfile = null;
+        foreach (ImageFrame frame in image.Frames)
+        {
+            frame.Metadata.ExifProfile = null;
+            frame.Metadata.XmpProfile = null;
+            frame.Metadata.IptcProfile = null;
+        }
     }
 }

@@ -86,7 +86,7 @@ public sealed class OperatorConsoleTests
 
         StubCurrentUser currentUser = new(org);
         OrderAssembler assembler = new(db, currentUser);
-        InventoryQueryService inventory = new(new EfInventoryStore(db), currentUser);
+        InventoryQueryService inventory = new(new EfInventoryStore(db, new FakeTimeProvider(Now)), currentUser);
         OperatorConsoleService console = new(
             db,
             currentUser,
