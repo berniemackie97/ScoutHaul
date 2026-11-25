@@ -96,3 +96,20 @@ public sealed class SyncIssueServiceTests
         Assert.NotNull(stored.ResolvedByUserId);
     }
 }
+
+public sealed class SyncIssueCodesTests
+{
+    [Theory]
+    [InlineData("This listing's pictures could not be read from its page.", false, "PHOTO_FETCH")]
+    [InlineData("Poshmark lists more sales than one scan reads; the next scan carries on from where this one stopped.", false, "PARTIAL_SCAN")]
+    [InlineData("This sale's receipt did not load in time; the next scan reads it.", false, "PARTIAL_SCAN")]
+    [InlineData("A listing's id or price could not be read.", true, "REJECTED")]
+    [InlineData("A sale in Vinted's order list has no id.", false, "FIELD_MISSING")]
+    [InlineData("Something odd.", false, "OTHER")]
+    public void Older_agents_issues_get_a_kind_from_their_wording(string message, bool rejected, string expected) =>
+        Assert.Equal(expected, SyncIssueCodes.Classify(null, message, rejected));
+
+    [Fact]
+    public void A_kind_the_agent_sent_wins() =>
+        Assert.Equal("NETWORK", SyncIssueCodes.Classify("network", "pictures", false));
+}

@@ -411,8 +411,8 @@ public sealed class SyncAgentService(
             Severity = issue.Rejected ? SyncIssueSeverity.Error : SyncIssueSeverity.Warning,
             ExternalReference = Text.Fit(issue.ExternalReference, 200),
             Message = Text.Fit(issue.Message, 1000) ?? "No detail given.",
-            Code = Text.Fit(issue.Code ?? (issue.Rejected ? SyncIssueCodes.Rejected : null), 64),
-            Step = Text.Fit(issue.Step, 200),
+            Code = Text.Fit(SyncIssueCodes.Classify(issue.Code, issue.Message, issue.Rejected), 64),
+            Step = Text.Fit(issue.Step ?? (run.Loop == SyncLoopKind.Listings ? "Listings scan" : "Sales scan"), 200),
             Attempts = Math.Clamp(issue.Attempts ?? 1, 1, 100),
             Detail = Text.Fit(issue.Detail, SyncIssueCodes.DetailLimit),
             Snapshot = Text.Fit(issue.Snapshot, SyncIssueCodes.SnapshotLimit),
@@ -477,6 +477,19 @@ public sealed class SyncAgentService(
         }
 
         string summary = Text.Clip(FailureSummary(run!.Platform, request.Kind, request.Message), 500)!;
+        // A failed scan is an issue someone can open, retry and close, not only a line in the history.
+        runs.AddIssues([new SyncRunIssue
+        {
+            OrganizationId = organizationId,
+            SyncRunId = run.Id,
+            Severity = SyncIssueSeverity.Error,
+            Code = request.Kind == SyncFailureKind.SiteChanged ? SyncIssueCodes.SiteChanged
+                : request.Kind == SyncFailureKind.Network ? SyncIssueCodes.Network
+                : SyncIssueCodes.RunFailed,
+            Step = run.Loop == SyncLoopKind.Listings ? "Listings scan" : "Sales scan",
+            Message = Text.Fit(summary, 1000)!,
+            Detail = Text.Fit(request.Message, SyncIssueCodes.DetailLimit),
+        }]);
         run.Status = SyncRunStatus.Failed;
         run.Summary = summary;
         run.FinishedAt = now;
@@ -667,7 +680,7 @@ public sealed class SyncAgentService(
         HashSet<string> recurring = raisedHere.Select(issue => $"{issue.Code}\u001f{issue.ExternalReference}").ToHashSet(StringComparer.OrdinalIgnoreCase);
         foreach (SyncRunIssue earlier in await runs.ListOpenIssuesForLoopAsync(organizationId, run.ChannelAccountId, run.Loop, run.Id, cancellationToken))
         {
-            bool transient = earlier.Code is SyncIssueCodes.PhotoFetch or SyncIssueCodes.Network;
+            bool transient = earlier.Code is SyncIssueCodes.PhotoFetch or SyncIssueCodes.Network or SyncIssueCodes.RunFailed or SyncIssueCodes.SiteChanged or SyncIssueCodes.PartialScan;
             if ((run.IsCompleteSnapshot || transient) && !recurring.Contains($"{earlier.Code}\u001f{earlier.ExternalReference}"))
             {
                 earlier.State = SyncIssueState.Resolved;

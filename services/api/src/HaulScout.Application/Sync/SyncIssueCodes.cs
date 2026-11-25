@@ -10,6 +10,8 @@ public static class SyncIssueCodes
     public const string Network = "NETWORK";
     public const string Challenge = "CHALLENGE";
     public const string CancelledAfterSale = "CANCELLED_AFTER_SALE";
+    public const string PartialScan = "PARTIAL_SCAN";
+    public const string RunFailed = "RUN_FAILED";
     public const string Other = "OTHER";
 
     public const int DetailLimit = 4000;
@@ -24,6 +26,40 @@ public static class SyncIssueCodes
         Network => ("Could not reach the marketplace", "Retry; it backs off on its own."),
         Challenge => ("Security check", "Open the marketplace in this browser, complete the check, then resume."),
         CancelledAfterSale => ("Cancelled after it was recorded", "Correct the sale in HaulScout; sales are never undone automatically."),
+        PartialScan => ("Scan stopped early by design", "Nothing to do: the next scan carries on from here."),
+        RunFailed => ("Scan failed", "Retry. If it fails the same way again, the detail below says where."),
         _ => ("Sync issue", null),
     };
+
+    /// <summary>A kind for an issue an older agent sent without one, read from its wording.</summary>
+    public static string Classify(string? code, string message, bool rejected)
+    {
+        if (!string.IsNullOrWhiteSpace(code))
+        {
+            return code.Trim().ToUpperInvariant();
+        }
+
+        string text = message.ToLowerInvariant();
+        if (text.Contains("picture") || text.Contains("photo"))
+        {
+            return PhotoFetch;
+        }
+
+        if (text.Contains("next scan") || text.Contains("next time") || text.Contains("than one scan reads"))
+        {
+            return PartialScan;
+        }
+
+        if (text.Contains("in time") || text.Contains("could not be reached") || text.Contains("timed out"))
+        {
+            return Network;
+        }
+
+        if (text.Contains("cancelled") && text.Contains("recorded"))
+        {
+            return CancelledAfterSale;
+        }
+
+        return rejected ? Rejected : text.Contains("could not be read") || text.Contains("no id") ? FieldMissing : Other;
+    }
 }
