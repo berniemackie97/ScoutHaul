@@ -9,7 +9,10 @@ import { profileFor } from "@/features/inventory/item-profiles";
 import { CREATE_STAGE_OPTIONS, readinessBlockers, type InventoryReadinessFacts } from "@/features/inventory/lifecycle-readiness";
 import { ReadinessChecklist } from "@/features/inventory/readiness-checklist";
 import { matchOption, NotesField, OptionField, SelectField, TextField } from "@/features/inventory/item-form/controls";
+import { ConditionField } from "@/features/inventory/item-form/condition-field";
+import { KindPicker } from "@/features/inventory/item-form/kind-picker";
 import { ItemDetails } from "@/features/inventory/item-form/item-details";
+import { MeasurementsField } from "@/features/inventory/item-form/measurements-field";
 import { OWNERSHIP, WEIGHT_UNITS } from "@/features/inventory/item-form/options";
 import { createInventoryItem, type NewInventoryResult } from "./actions";
 
@@ -79,11 +82,12 @@ export function ItemCreator({ referenceData }: { referenceData: ReferenceData })
           </CardHeader>
           <CardContent className="space-y-4">
             <TextField label="Title" name="title" defaultValue={values?.title} placeholder="e.g. Super Mario 64, N64, complete in box" error={errors.title} formKey={formKey} />
-            <div className="grid gap-4 sm:grid-cols-3">
+            <KindPicker profiles={referenceData.profiles ?? []} categories={referenceData.categories ?? []} category={category} onCategory={setCategory} />
+            <div className="grid gap-4 sm:grid-cols-2">
               <OptionField label="Category" name="category" value={matchOption(category, referenceData.categories ?? [])} options={referenceData.categories ?? []} onChange={setCategory} error={errors.category} />
-              <OptionField label="Condition" name="condition" value={matchOption(condition, referenceData.conditions ?? [])} options={referenceData.conditions ?? []} onChange={setCondition} error={errors.condition} />
               <SelectField label="Starting stage" name="status" choices={STAGES} defaultValue={values?.status ?? "Draft"} error={errors.status} formKey={formKey} />
             </div>
+            <ConditionField profile={profile} options={referenceData.conditions ?? []} value={condition} onChange={setCondition} error={errors.condition} />
             <NotesField label="Description" name="description" defaultValue={values?.description} placeholder="Condition detail, provenance, measurements…" formKey={formKey} />
           </CardContent>
         </Card>
@@ -104,6 +108,18 @@ export function ItemCreator({ referenceData }: { referenceData: ReferenceData })
             />
           </CardContent>
         </Card>
+
+        {(profile.measurements?.length ?? 0) > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Measurements</CardTitle>
+              <CardDescription>Measured flat. Optional now; buyers filter on these.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <MeasurementsField measurements={profile.measurements ?? []} initial={values?.measurementsJson} formKey={formKey} />
+            </CardContent>
+          </Card>
+        )}
 
         <Card>
           <CardHeader>

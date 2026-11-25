@@ -20,10 +20,24 @@ public sealed class PhotoMetadataRepairQueryTests(PostgresFixture postgres)
             InventoryItem item = new() { OrganizationId = organizationId, Title = "Legacy photo test" };
             seed.InventoryItems.Add(item);
             seed.InventoryPhotos.AddRange(
-                new InventoryPhoto { Id = second, OrganizationId = organizationId, InventoryItemId = item.Id,
-                    ContentType = "image/jpeg", OriginalBytes = [2], ThumbnailBytes = [2] },
-                new InventoryPhoto { Id = first, OrganizationId = organizationId, InventoryItemId = item.Id,
-                    ContentType = "image/jpeg", OriginalBytes = [1], ThumbnailBytes = [1] });
+                new InventoryPhoto
+                {
+                    Id = second,
+                    OrganizationId = organizationId,
+                    InventoryItemId = item.Id,
+                    ContentType = "image/jpeg",
+                    OriginalBytes = [2],
+                    ThumbnailBytes = [2]
+                },
+                new InventoryPhoto
+                {
+                    Id = first,
+                    OrganizationId = organizationId,
+                    InventoryItemId = item.Id,
+                    ContentType = "image/jpeg",
+                    OriginalBytes = [1],
+                    ThumbnailBytes = [1]
+                });
             await seed.SaveChangesAsync();
         }
 

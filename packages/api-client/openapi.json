@@ -2883,6 +2883,121 @@
         }
       }
     },
+    "/api/inventory/{id}/listing-differences": {
+      "get": {
+        "tags": [
+          "Inventory"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ListingDifferenceDto"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ListingDifferenceDto"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ListingDifferenceDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Inventory"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApplyListingDifferenceRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApplyListingDifferenceRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApplyListingDifferenceRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ListingDifferenceDto"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ListingDifferenceDto"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ListingDifferenceDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/inventory/location": {
       "post": {
         "tags": [
@@ -12700,6 +12815,19 @@
         },
         "additionalProperties": false
       },
+      "ApplyListingDifferenceRequest": {
+        "type": "object",
+        "properties": {
+          "listingId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "field": {
+            "$ref": "#/components/schemas/ListingDetailField"
+          }
+        },
+        "additionalProperties": false
+      },
       "AppraisalDto": {
         "type": "object",
         "properties": {
@@ -16072,6 +16200,10 @@
           },
           "isLegacy": {
             "type": "boolean"
+          },
+          "hint": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -16261,6 +16393,20 @@
         },
         "additionalProperties": false
       },
+      "ItemMeasurementDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "nullable": true
+          },
+          "label": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "ItemProfileDto": {
         "type": "object",
         "properties": {
@@ -16301,6 +16447,63 @@
             "nullable": true
           },
           "brandLabel": {
+            "type": "string",
+            "nullable": true
+          },
+          "conditions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "measurements": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ItemMeasurementDto"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ListingDetailField": {
+        "enum": [
+          "Category",
+          "Condition",
+          "Brand",
+          "Colors",
+          "Size"
+        ],
+        "type": "string"
+      },
+      "ListingDifferenceDto": {
+        "type": "object",
+        "properties": {
+          "listingId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "platform": {
+            "type": "string",
+            "nullable": true
+          },
+          "listingUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "field": {
+            "$ref": "#/components/schemas/ListingDetailField"
+          },
+          "current": {
+            "type": "string",
+            "nullable": true
+          },
+          "incoming": {
+            "type": "string",
+            "nullable": true
+          },
+          "raw": {
             "type": "string",
             "nullable": true
           }

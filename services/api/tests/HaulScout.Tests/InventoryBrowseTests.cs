@@ -49,6 +49,7 @@ public class InventoryBrowseTests
             null!,
             new InventoryIssueWorkflowService(new EfInventoryStore(db), new EfInventoryIssueStore(db), currentUser),
             new InventoryStatusWorkflowService(new EfInventoryStore(db), currentUser, TimeProvider.System),
+            null!,
             null!);
     }
 

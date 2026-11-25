@@ -18,24 +18,24 @@ public static class ListingDetailFill
     public static bool Apply(InventoryItem item, PlatformListing listing)
     {
         bool changed = false;
-        changed |= Fill(listing.Description, value => item.Description = value, item.Description);
-        changed |= Fill(listing.Brand, value => item.Brand = value, item.Brand);
-        changed |= FillColors(item, listing.Color);
-        changed |= Fill(ItemConditions.Standard.Canonical(listing.Condition), value => item.Condition = value, item.Condition);
-        changed |= Fill(ItemCategories.Canonical(ItemCategories.Standard, listing.CategoryName), value => item.Category = value, item.Category);
-        changed |= FillSize(item, listing.Size);
+        changed |= Fill(ListingDetailReading.Description(listing), value => item.Description = value, item.Description);
+        changed |= Fill(ListingDetailReading.Brand(listing), value => item.Brand = value, item.Brand);
+        changed |= FillColors(item, listing);
+        changed |= Fill(ListingDetailReading.Condition(listing), value => item.Condition = value, item.Condition);
+        changed |= Fill(ListingDetailReading.Category(listing), value => item.Category = value, item.Category);
+        changed |= FillSize(item, listing);
         return changed;
     }
 
     /// <summary>A listing names colors its own way ("Grey, Off-White"); the item takes them in the standard list.</summary>
-    private static bool FillColors(InventoryItem item, string? offered)
+    private static bool FillColors(InventoryItem item, PlatformListing listing)
     {
         if (item.Colors.Count > 0)
         {
             return false;
         }
 
-        IReadOnlyList<string> colors = ItemColors.Standard.CanonicalList([offered], ItemColors.Max);
+        IReadOnlyList<string> colors = ListingDetailReading.Colors(listing);
         if (colors.Count == 0)
         {
             return false;
@@ -46,10 +46,10 @@ public static class ListingDetailFill
     }
 
     /// <summary>A size goes in only with the system it is measured in, read against the item's (just filled) category.</summary>
-    private static bool FillSize(InventoryItem item, string? offered)
+    private static bool FillSize(InventoryItem item, PlatformListing listing)
     {
         if (!string.IsNullOrWhiteSpace(item.SizeSystem) || !string.IsNullOrWhiteSpace(item.SizeValue)
-            || ItemSizes.Read(offered, ItemProfiles.For(item.Category)) is not { } size)
+            || ListingDetailReading.Size(listing, ItemProfiles.For(item.Category)) is not { } size)
         {
             return false;
         }

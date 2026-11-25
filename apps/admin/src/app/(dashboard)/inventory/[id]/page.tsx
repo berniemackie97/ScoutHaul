@@ -19,6 +19,8 @@ import { getSession, storeUrlFrom } from "@/lib/session";
 import { When } from "@/components/when";
 import { ItemFacts } from "./item-facts";
 import { profileFor } from "@/features/inventory/item-profiles";
+import { ItemTabs, readItemTab } from "./item-tabs";
+import { ListingDifferences } from "./listing-differences";
 
 export const dynamic = "force-dynamic";
 
@@ -52,6 +54,7 @@ export default async function InventoryDetailPage({
     { data: salesReference },
     { data: storeListing },
     { data: itemSales },
+    { data: listingDifferences },
   ] = await Promise.all([
     api.GET("/api/inventory/{id}", { params: { path: { id } } }),
     api.GET("/api/inventory/reference-data"),
@@ -60,7 +63,9 @@ export default async function InventoryDetailPage({
     api.GET("/api/sales/reference-data", {}),
     api.GET("/api/store/listings/by-item/{inventoryItemId}", { params: { path: { inventoryItemId: id } } }),
     api.GET("/api/sales/by-item/{inventoryItemId}", { params: { path: { inventoryItemId: id } } }),
+    api.GET("/api/inventory/{id}/listing-differences", { params: { path: { id } } }),
   ]);
+  const tab = readItemTab(one(query.tab));
   // The sale that made this item sold — the newest one that still stands.
   const sale = (itemSales ?? []).find((entry) => entry.status !== "Cancelled");
   const inventoryItem = item as InventoryItem | undefined;
@@ -113,47 +118,79 @@ export default async function InventoryDetailPage({
 
       <StatusConflictNotice conflicts={statusConflicts} />
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
-        <InventoryEditor item={inventoryItem} referenceData={referenceData} />
+      <ItemTabs
+        id={inventoryItem.id}
+        active={tab}
+        counts={{ photos: photos.length, channels: (channelListings?.length ?? 0) + (listingDifferences?.length ?? 0) }}
+      />
 
-        <aside className="space-y-6">
-          <StatusControl item={inventoryItem} sale={sale} profile={profileFor(referenceData.profiles, inventoryItem.category)} />
-          {!inventoryItem.isSold && (
-            <RecordSaleCard itemId={inventoryItem.id} cost={cost ?? 0} channels={salesReference?.channels ?? []} prefill={prefill} />
-          )}
+      {tab === "details" && (
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
+          <InventoryEditor item={inventoryItem} referenceData={referenceData} />
+
+          <aside className="space-y-6">
+            {(listingDifferences?.length ?? 0) > 0 && (
+              <Link
+                href={`/inventory/${inventoryItem.id}?tab=channels#listing-differences`}
+                className="block rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 hover:bg-amber-100 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200"
+              >
+                <span className="block font-semibold">
+                  {listingDifferences!.length} {listingDifferences!.length === 1 ? "detail differs" : "details differ"} on linked listings
+                </span>
+                <span>Review before you list again.</span>
+              </Link>
+            )}
+            <StatusControl item={inventoryItem} sale={sale} profile={profileFor(referenceData.profiles, inventoryItem.category)} />
+            {!inventoryItem.isSold && (
+              <RecordSaleCard itemId={inventoryItem.id} cost={cost ?? 0} channels={salesReference?.channels ?? []} prefill={prefill} />
+            )}
+            {inventoryItem.isBundle && (inventoryItem.bundleComponents?.length ?? 0) > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Bundle components</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3 text-sm">
+                  {inventoryItem.bundleComponents!.map((component) => (
+                    <div key={component.id} className="flex items-start justify-between gap-4 border-b pb-3 last:border-0 last:pb-0">
+                      <div>
+                        <Link href={`/inventory/${component.componentInventoryItemId}`} className="font-medium hover:underline">
+                          {component.componentTitle}
+                        </Link>
+                        <p className="text-muted-foreground text-xs">{inventoryStatusLabel(component.componentStatus)}</p>
+                      </div>
+                      <span className="tabular-nums">{formatCurrency(component.costSnapshot)}</span>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
+            <DeleteInventoryCard id={inventoryItem.id} title={inventoryItem.title ?? ""} />
+          </aside>
+        </div>
+      )}
+
+      {tab === "photos" && (
+        <div className="max-w-3xl">
+          <PhotoManager id={inventoryItem.id} photos={photos} />
+        </div>
+      )}
+
+      {tab === "channels" && (
+        <div className="grid gap-6 lg:grid-cols-2">
+          <div className="space-y-6 lg:col-span-2">
+            <ListingDifferences itemId={inventoryItem.id} initial={listingDifferences ?? []} />
+          </div>
           <ChannelPresencePanel
             itemId={inventoryItem.id}
             accounts={(channelAccounts ?? []).filter((account) => account.isActive)}
             listings={channelListings ?? []}
           />
-          <PhotoManager id={inventoryItem.id} photos={photos} />
-          <StorefrontCard itemId={inventoryItem.id} listing={storeListing} storeUrl={storeUrl} />
-          <ListingGenerator item={inventoryItem} />
-
-          {inventoryItem.isBundle && (inventoryItem.bundleComponents?.length ?? 0) > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Bundle components</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3 text-sm">
-                {inventoryItem.bundleComponents!.map((component) => (
-                  <div key={component.id} className="flex items-start justify-between gap-4 border-b pb-3 last:border-0 last:pb-0">
-                    <div>
-                      <Link href={`/inventory/${component.componentInventoryItemId}`} className="font-medium hover:underline">
-                        {component.componentTitle}
-                      </Link>
-                      <p className="text-muted-foreground text-xs">{inventoryStatusLabel(component.componentStatus)}</p>
-                    </div>
-                    <span className="tabular-nums">{formatCurrency(component.costSnapshot)}</span>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          )}
-
-          <DeleteInventoryCard id={inventoryItem.id} title={inventoryItem.title ?? ""} />
-        </aside>
-      </div>
+          <div className="space-y-6">
+            <StorefrontCard itemId={inventoryItem.id} listing={storeListing} storeUrl={storeUrl} />
+            <ListingGenerator item={inventoryItem} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

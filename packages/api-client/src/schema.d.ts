@@ -2363,6 +2363,74 @@ export interface paths {
         };
         trace?: never;
     };
+    "/api/inventory/{id}/listing-differences": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ListingDifferenceDto"][];
+                        "application/json": components["schemas"]["ListingDifferenceDto"][];
+                        "text/json": components["schemas"]["ListingDifferenceDto"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["ApplyListingDifferenceRequest"];
+                    "text/json": components["schemas"]["ApplyListingDifferenceRequest"];
+                    "application/*+json": components["schemas"]["ApplyListingDifferenceRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ListingDifferenceDto"][];
+                        "application/json": components["schemas"]["ListingDifferenceDto"][];
+                        "text/json": components["schemas"]["ListingDifferenceDto"][];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/inventory/location": {
         parameters: {
             query?: never;
@@ -10211,6 +10279,11 @@ export interface components {
             /** Format: uuid */
             scanRequestId?: string | null;
         };
+        ApplyListingDifferenceRequest: {
+            /** Format: uuid */
+            listingId?: string;
+            field?: components["schemas"]["ListingDetailField"];
+        };
         AppraisalDto: {
             searchText?: string | null;
             price?: components["schemas"]["PriceDto"];
@@ -11309,6 +11382,7 @@ export interface components {
             group?: string | null;
             parentValue?: string | null;
             isLegacy?: boolean;
+            hint?: string | null;
         };
         InventoryRowFactsDto: {
             /** Format: uuid */
@@ -11369,6 +11443,10 @@ export interface components {
             label?: string | null;
             readiness?: components["schemas"]["ListingReadiness"];
         };
+        ItemMeasurementDto: {
+            key?: string | null;
+            label?: string | null;
+        };
         ItemProfileDto: {
             key?: string | null;
             label?: string | null;
@@ -11377,6 +11455,20 @@ export interface components {
             attributes?: components["schemas"]["ItemAttributeDto"][] | null;
             sizeSystems?: string[] | null;
             brandLabel?: string | null;
+            conditions?: string[] | null;
+            measurements?: components["schemas"]["ItemMeasurementDto"][] | null;
+        };
+        /** @enum {string} */
+        ListingDetailField: "Category" | "Condition" | "Brand" | "Colors" | "Size";
+        ListingDifferenceDto: {
+            /** Format: uuid */
+            listingId?: string;
+            platform?: string | null;
+            listingUrl?: string | null;
+            field?: components["schemas"]["ListingDetailField"];
+            current?: string | null;
+            incoming?: string | null;
+            raw?: string | null;
         };
         ListingDto: {
             /** Format: uuid */

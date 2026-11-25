@@ -323,7 +323,8 @@ public sealed class InventoryUpsertWorkflowService(
         if (request.Weight.HasValue) item.Weight = request.Weight;
         item.WeightUnit = request.WeightUnit ?? item.WeightUnit;
         item.AttributesJson = NormalizeJsonObject(request.AttributesJson);
-        item.MeasurementsJson = NormalizeJsonObject(request.MeasurementsJson);
+        // Left out (older mobile builds send null) keeps what is stored; an empty object clears it.
+        if (request.MeasurementsJson is not null) item.MeasurementsJson = NormalizeJsonObject(request.MeasurementsJson);
         item.StorageLocation = controlled.StorageLocation;
         item.Accessories = TrimToNull(request.Accessories);
         item.MissingParts = TrimToNull(request.MissingParts);

@@ -44,7 +44,9 @@ public sealed class InventoryReferenceDataService(IInventoryReferenceDataStore r
             profile.Fields.Select(field => new ItemFieldDto(field.Field, field.Label, field.Readiness)).ToArray(),
             profile.Attributes.Select(attribute => new ItemAttributeDto(attribute.Key, attribute.Label, attribute.Options, attribute.MaxValues)).ToArray(),
             profile.SizeSystems,
-            profile.BrandLabel))
+            profile.BrandLabel,
+            profile.Conditions,
+            profile.Measurements.Select(measurement => new ItemMeasurementDto(measurement.Key, measurement.Label)).ToArray()))
         .ToArray();
 
     private static string OverrideKey(string? value, string? parent) =>
