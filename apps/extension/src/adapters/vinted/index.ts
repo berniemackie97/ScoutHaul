@@ -212,7 +212,7 @@ async function readSale(context: MarketplaceContext, row: VintedOrderRow, read: 
 export const vintedAdapter: MarketplaceAdapter = {
   platform: "Vinted",
   origins: ["https://*.vinted.com/*"],
-  requestOrigins: [apiOrigin],
+  apiRequests: { [apiOrigin]: { "X-Next-App": "marketplace-web" } },
   home: origin,
   workerUrl: ordersPage,
   signInUrl: `${origin}/member/login`,

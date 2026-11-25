@@ -197,6 +197,23 @@ describe("the sync tab", () => {
     expect(update).not.toHaveBeenCalled();
   });
 
+  it("passes Vinted's routing header only to its API origin", async () => {
+    fakeBrowser.tabs.query = vi.fn(async () => [
+      { id: 8, status: "complete", url: vintedAdapter.workerUrl, incognito: false },
+    ]) as unknown as typeof fakeBrowser.tabs.query;
+    const execute = vi.fn(async () => [{ frameId: 0, result: { status: 200 } }]);
+    fakeBrowser.scripting.executeScript = execute as unknown as typeof fakeBrowser.scripting.executeScript;
+
+    const tab = await new SyncTabs(fakeClock()).borrow(vintedAdapter);
+    const orders = "https://api.www.vinted.com/escrow-orders/api/v2/current-user/escrow-orders";
+    const account = "https://www.vinted.com/api/v2/users/current";
+    await tab!.request(orders);
+    await tab!.request(account);
+
+    expect(execute).toHaveBeenNthCalledWith(1, expect.objectContaining({ args: [orders, { "X-Next-App": "marketplace-web" }] }));
+    expect(execute).toHaveBeenNthCalledWith(2, expect.objectContaining({ args: [account, {}] }));
+  });
+
   it("reads a page that has settled without waiting for a load that may never finish, and never waits for the page to idle", async () => {
     const orders = "https://www.ebay.com/sh/ord/?offset=0";
     fakeBrowser.tabs.create = vi.fn(async () => ({ id: 9 })) as unknown as typeof fakeBrowser.tabs.create;
