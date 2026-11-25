@@ -2560,6 +2560,47 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/platform-listings/{id}/match-candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    search?: string;
+                };
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ListingMatchDto"];
+                        "application/json": components["schemas"]["ListingMatchDto"];
+                        "text/json": components["schemas"]["ListingMatchDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/listings": {
         parameters: {
             query?: never;
@@ -11497,6 +11538,32 @@ export interface components {
             title?: string | null;
             description?: string | null;
         };
+        ListingMatchCandidateDto: {
+            /** Format: uuid */
+            inventoryItemId?: string;
+            title?: string | null;
+            status?: components["schemas"]["InventoryStatus"];
+            brand?: string | null;
+            category?: string | null;
+            size?: string | null;
+            storageLocation?: string | null;
+            barcode?: string | null;
+            thumbnailUrl?: string | null;
+            /** Format: int32 */
+            score?: number;
+            confidence?: string | null;
+            signals?: components["schemas"]["ListingMatchSignalDto"][] | null;
+        };
+        ListingMatchDto: {
+            /** Format: uuid */
+            listingId?: string;
+            candidates?: components["schemas"]["ListingMatchCandidateDto"][] | null;
+        };
+        ListingMatchSignalDto: {
+            kind?: string | null;
+            verdict?: components["schemas"]["MatchVerdict"];
+            text?: string | null;
+        };
         /** @enum {string} */
         ListingReadiness: "Optional" | "Recommended" | "Required";
         /** @enum {string} */
@@ -11591,6 +11658,8 @@ export interface components {
             query?: string | null;
             links?: components["schemas"]["MarketplaceSearchLinkDto"][] | null;
         };
+        /** @enum {string} */
+        MatchVerdict: "Agrees" | "Partial" | "Disagrees";
         MergeInventoryItemsRequest: {
             /** Format: uuid */
             keepId?: string;

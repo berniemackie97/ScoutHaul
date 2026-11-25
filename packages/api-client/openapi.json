@@ -3142,6 +3142,53 @@
         }
       }
     },
+    "/api/platform-listings/{id}/match-candidates": {
+      "get": {
+        "tags": [
+          "ListingMatches"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListingMatchDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListingMatchDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListingMatchDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/listings": {
       "post": {
         "tags": [
@@ -16593,6 +16640,96 @@
         },
         "additionalProperties": false
       },
+      "ListingMatchCandidateDto": {
+        "type": "object",
+        "properties": {
+          "inventoryItemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "$ref": "#/components/schemas/InventoryStatus"
+          },
+          "brand": {
+            "type": "string",
+            "nullable": true
+          },
+          "category": {
+            "type": "string",
+            "nullable": true
+          },
+          "size": {
+            "type": "string",
+            "nullable": true
+          },
+          "storageLocation": {
+            "type": "string",
+            "nullable": true
+          },
+          "barcode": {
+            "type": "string",
+            "nullable": true
+          },
+          "thumbnailUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "score": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "confidence": {
+            "type": "string",
+            "nullable": true
+          },
+          "signals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ListingMatchSignalDto"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ListingMatchDto": {
+        "type": "object",
+        "properties": {
+          "listingId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "candidates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ListingMatchCandidateDto"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ListingMatchSignalDto": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "nullable": true
+          },
+          "verdict": {
+            "$ref": "#/components/schemas/MatchVerdict"
+          },
+          "text": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "ListingReadiness": {
         "enum": [
           "Optional",
@@ -16913,6 +17050,14 @@
           }
         },
         "additionalProperties": false
+      },
+      "MatchVerdict": {
+        "enum": [
+          "Agrees",
+          "Partial",
+          "Disagrees"
+        ],
+        "type": "string"
       },
       "MergeInventoryItemsRequest": {
         "type": "object",
@@ -24707,6 +24852,9 @@
     },
     {
       "name": "Listing"
+    },
+    {
+      "name": "ListingMatches"
     },
     {
       "name": "Listings"

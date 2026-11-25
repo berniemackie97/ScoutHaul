@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ArrowLeft, FileSpreadsheet } from "lucide-react";
 import { getApiClient } from "@/lib/api";
-import { ListingsBoard, type ListingMatchTarget } from "./listings-board";
+import { ListingsBoard } from "./listings-board";
 import { refusal } from "@/lib/page-access";
 
 export const dynamic = "force-dynamic";
@@ -25,11 +25,10 @@ export default async function ListingsPage({
   const activeView = safeView(rawView);
 
   const api = await getApiClient();
-  const [pendingResult, linkedResult, ignoredResult, inventoryResult] = await Promise.all([
+  const [pendingResult, linkedResult, ignoredResult] = await Promise.all([
     api.GET("/api/platform-listings", { params: { query: { reconcileStatus: "Pending" } } }),
     api.GET("/api/platform-listings", { params: { query: { reconcileStatus: "Linked" } } }),
     api.GET("/api/platform-listings", { params: { query: { reconcileStatus: "Ignored" } } }),
-    api.GET("/api/inventory", { params: { query: { includeArchived: false } } }),
   ]);
 
   const byView = {
@@ -37,15 +36,6 @@ export default async function ListingsPage({
     Linked: linkedResult.data ?? [],
     Ignored: ignoredResult.data ?? [],
   } satisfies Record<View, NonNullable<typeof pendingResult.data>>;
-
-  const targets: ListingMatchTarget[] = (inventoryResult.data ?? [])
-    .filter((item) => item.id && (!item.isBundle || item.bundleComponentCount === 0))
-    .map((item) => ({
-      id: item.id as string,
-      title: item.title ?? "Untitled item",
-      category: item.category,
-      isSold: item.isSold ?? false,
-    }));
 
   return (
     <div className="space-y-6">
@@ -93,7 +83,6 @@ export default async function ListingsPage({
 
       <ListingsBoard
         listings={byView[activeView]}
-        targets={targets}
         emptyMessage={
           activeView === "Pending"
             ? "Nothing to decide. Import an eBay Active Listings report from the Imports page."

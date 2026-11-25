@@ -320,7 +320,7 @@ public sealed class PlatformListingImportService(HaulScoutDbContext db, ICurrent
     }
 
     /// <summary>Best-effort auto-match of unlinked listings to inventory — by the platform's own id (via an existing
-    /// <see cref="ChannelListing.ExternalListingId"/>), then by <see cref="TitleMatch"/>. Suggestions only.</summary>
+    /// <see cref="ChannelListing.ExternalListingId"/>), then by <see cref="ListingMatchScorer"/> (Likely or better). Suggestions only.</summary>
     public async Task<Dictionary<Guid, (Guid Id, string Title, bool AlreadySold)>> BuildSuggestions(IReadOnlyList<PlatformListing> listings, CancellationToken cancellationToken)
     {
         Dictionary<Guid, (Guid, string, bool)> suggestions = new();
@@ -333,12 +333,16 @@ public sealed class PlatformListingImportService(HaulScoutDbContext db, ICurrent
         var inventory = await db.InventoryItems
             .Where(item => item.OrganizationId == currentUser.OrganizationId && !item.IsArchived)
             .OrderByDescending(item => item.UpdatedAt)
-            .Select(item => new { item.Id, item.Title, item.Status })
+            .Select(item => new { item.Id, item.Title, item.Status, item.Brand, item.Category, item.Colors, item.SizeSystem, item.SizeValue, item.EstimatedSalePrice })
             .Take(2000)
             .ToListAsync(cancellationToken);
         Dictionary<Guid, string> titleById = inventory.ToDictionary(item => item.Id, item => item.Title);
         Dictionary<Guid, bool> soldById = inventory.ToDictionary(item => item.Id, item => InventoryLifecycle.IsSold(item.Status));
-        List<(Guid Id, string Title)> titleCandidates = inventory.Select(item => (item.Id, item.Title)).ToList();
+        List<MatchCandidate> candidates = inventory
+            .Select(item => new MatchCandidate(
+                item.Id, item.Title, item.Brand, item.Category, item.Colors, item.SizeSystem, item.SizeValue, item.EstimatedSalePrice,
+                InventoryLifecycle.IsSold(item.Status), ListedOnThisChannel: false, SameListing: false))
+            .ToList();
 
         List<string> externalIds = openListings.Select(listing => listing.ExternalListingId).Distinct().ToList();
         var byExternalId = await db.ChannelListings
@@ -350,7 +354,9 @@ public sealed class PlatformListingImportService(HaulScoutDbContext db, ICurrent
         foreach (PlatformListing listing in openListings)
         {
             Guid? matchId = byExternalId.FirstOrDefault(candidate => candidate.ExternalListingId == listing.ExternalListingId)?.InventoryItemId;
-            matchId ??= TitleMatch.Best(listing.Title, titleCandidates);
+            matchId ??= ListingMatchScorer
+                .Rank(new MatchListing(listing.Title, listing.Brand, listing.Size, listing.Color, listing.CategoryName, listing.Price, listing.ExternalListingId, listing.Status == PlatformListingStatus.Active), candidates, take: 1)
+                .FirstOrDefault(scored => scored.Score >= ListingMatchScorer.Likely)?.Candidate.Id;
             if (matchId is Guid resolved && titleById.TryGetValue(resolved, out string? title))
             {
                 suggestions[listing.Id] = (resolved, title, soldById.GetValueOrDefault(resolved));
