@@ -3,6 +3,7 @@ import {
   FileSpreadsheet,
   Handshake,
   HandCoins,
+  Inbox,
   Landmark,
   LayoutDashboard,
   Package,
@@ -37,6 +38,7 @@ export const navGroups: NavGroup[] = [
     label: "Control",
     items: [
       { name: "Command Center", href: "/", icon: LayoutDashboard, keywords: ["home", "dashboard", "overview"] },
+      { name: "Work", href: "/work", icon: Inbox, keywords: ["inbox", "tasks", "to do", "queue", "pack", "ship", "delist", "reconcile"] },
       { name: "Inventory", href: "/inventory", icon: Package, keywords: ["items", "stock", "products"], requires: needs(permission.inventory) },
     ],
   },

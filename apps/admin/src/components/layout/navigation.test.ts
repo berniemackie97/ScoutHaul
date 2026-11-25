@@ -25,7 +25,7 @@ describe("what a role is offered", () => {
   it("leaves out what the role cannot open, and a group with nothing left in it", () => {
     const groups = visibleGroups(new Set([permission.orders]));
 
-    expect(groups.flatMap((group) => group.items.map((item) => item.name))).toEqual(["Command Center", "Orders", "Offers", "Customers", "Imports"]);
+    expect(groups.flatMap((group) => group.items.map((item) => item.name))).toEqual(["Command Center", "Work", "Orders", "Offers", "Customers", "Imports"]);
     expect(groups.map((group) => group.label)).not.toContain("Operations");
   });
 
