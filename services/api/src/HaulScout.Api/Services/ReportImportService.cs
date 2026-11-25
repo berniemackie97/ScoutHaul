@@ -5,6 +5,7 @@ using HaulScout.Application.Organizations;
 using HaulScout.Application.PlatformOrders;
 using HaulScout.Application.Security;
 using HaulScout.Application.Sync;
+using HaulScout.Application.Sync.Agents;
 using HaulScout.Domain;
 using HaulScout.Domain.Entities;
 
@@ -333,6 +334,7 @@ public sealed class ReportImportService(
 
         if (format == ReportFormats.EbayActiveListings || format == ReportFormats.PoshmarkInventory)
         {
+            DateTimeOffset readSince = DateTimeOffset.UtcNow;
             AppResult<IngestPlatformListingsResultDto> result = await listings.IngestAsync(
                 new IngestPlatformListingsRequest(format.Platform, report.Listings, accountId), cancellationToken);
             if (result.Status != AppResultStatus.Ok || result.Value is null)
@@ -340,8 +342,10 @@ public sealed class ReportImportService(
                 return Outcome.Fail(result.Message ?? "The listings could not be imported.");
             }
 
-            return new Outcome(result.Value.Created, result.Value.Updated, result.Value.Unchanged,
-                SyncText.Counted(result.Value.Created, result.Value.Updated, result.Value.Unchanged, "listing"));
+            string counted = SyncText.Counted(result.Value.Created, result.Value.Updated, result.Value.Unchanged, "listing");
+            // Both reports list every live listing, so a listing missing from one is no longer live.
+            ListingEndings endings = await listings.EndUnseenAsync(format.Platform, accountId, readSince, cancellationToken);
+            return new Outcome(result.Value.Created, result.Value.Updated, result.Value.Unchanged, endings.AppendedTo(counted));
         }
 
         if (format == ReportFormats.EbayListingQuality)

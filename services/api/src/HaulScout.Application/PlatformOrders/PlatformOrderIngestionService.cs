@@ -18,11 +18,16 @@ public sealed class PlatformOrderIngestionService(
     PlatformOrderWorkflowService reconciliation,
     PlatformOrderAutoMatchService autoMatch)
 {
+    /// <param name="rejections">
+    /// When given, an order that cannot be taken is set aside here with its reason and the rest are ingested, so one
+    /// bad order never sinks a batch. When null, the first such order refuses the whole call, as a file import does.
+    /// </param>
     public async Task<(IngestPlatformOrdersResultDto? Result, string? Error)> IngestAsync(
         string? defaultPlatform,
         IReadOnlyList<IngestPlatformOrderInput> orders,
         Guid? channelAccountId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        List<IngestRejection>? rejections = null)
     {
         List<string> existingChannels = await ExistingChannels(cancellationToken);
         string? defaultChannel = SalesChannelCatalog.CanonicalValue(defaultPlatform, existingChannels);
@@ -31,35 +36,20 @@ public sealed class PlatformOrderIngestionService(
         foreach (IngestPlatformOrderInput input in orders)
         {
             string externalOrderId = (input.ExternalOrderId ?? string.Empty).Trim();
-            if (externalOrderId.Length == 0)
-            {
-                return (null, "Every order needs an external order id.");
-            }
-
             string? channel = SalesChannelCatalog.CanonicalValue(input.Platform, existingChannels) ?? defaultChannel;
-            if (channel is null)
+            string? problem = Problem(input, externalOrderId, channel);
+            if (problem is not null)
             {
-                return (null, $"Order {externalOrderId} has no recognized sales channel.");
+                if (rejections is null)
+                {
+                    return (null, problem);
+                }
+
+                rejections.Add(new IngestRejection(externalOrderId.Length == 0 ? "(no order id)" : Text.Clip(externalOrderId, 200), problem));
+                continue;
             }
 
-            if (input.Lines is null || input.Lines.Count == 0)
-            {
-                return (null, $"Order {externalOrderId} has no line items.");
-            }
-
-            if (Oversized(input) is string oversized)
-            {
-                return (null, $"Order {Text.Clip(externalOrderId, 40)} has {oversized}.");
-            }
-
-            if (new[] { input.ItemsSubtotal, input.ShippingCharged, input.TaxCollected ?? 0, input.FeeTotal ?? 0 }.Any(value => value < 0)
-                || (input.ShippingCost.HasValue && input.ShippingCost.Value < 0)
-                || input.Lines.Any(line => line.UnitPrice < 0 || line.Quantity <= 0))
-            {
-                return (null, $"Order {externalOrderId} has negative money or a non-positive quantity.");
-            }
-
-            normalized.Add((input, channel, externalOrderId));
+            normalized.Add((input, channel!, externalOrderId));
         }
 
         HashSet<string> keys = normalized.Select(entry => entry.ExternalOrderId).ToHashSet();
@@ -186,7 +176,40 @@ public sealed class PlatformOrderIngestionService(
         Dictionary<Guid, PlatformLineSuggestion> suggestions =
             await suggestionService.BuildSuggestionsAsync(refreshed, cancellationToken);
         List<PlatformOrderDto> dtos = refreshed.Select(order => PlatformOrderDtoFactory.ToPlatformOrderDto(order, suggestions)).ToList();
-        return (new IngestPlatformOrdersResultDto(created, updated, skipped, autoReconciled, dtos, unchanged), null);
+        return (new IngestPlatformOrdersResultDto(created, updated, skipped, autoReconciled, dtos, unchanged, rejections), null);
+    }
+
+    /// <summary>Why one order cannot be taken, or null when it can.</summary>
+    private static string? Problem(IngestPlatformOrderInput input, string externalOrderId, string? channel)
+    {
+        if (externalOrderId.Length == 0)
+        {
+            return "Every order needs an external order id.";
+        }
+
+        if (channel is null)
+        {
+            return $"Order {externalOrderId} has no recognized sales channel.";
+        }
+
+        if (input.Lines is null || input.Lines.Count == 0)
+        {
+            return $"Order {externalOrderId} has no line items.";
+        }
+
+        if (Oversized(input) is string oversized)
+        {
+            return $"Order {Text.Clip(externalOrderId, 40)} has {oversized}.";
+        }
+
+        if (new[] { input.ItemsSubtotal, input.ShippingCharged, input.TaxCollected ?? 0, input.FeeTotal ?? 0 }.Any(value => value < 0)
+            || (input.ShippingCost.HasValue && input.ShippingCost.Value < 0)
+            || input.Lines.Any(line => line.UnitPrice < 0 || line.Quantity <= 0))
+        {
+            return $"Order {externalOrderId} has negative money or a non-positive quantity.";
+        }
+
+        return null;
     }
 
     /// <summary>A line as it will be written. <see cref="RawJson"/> is evidence, so it never counts as a change.</summary>

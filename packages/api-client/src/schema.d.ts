@@ -10244,6 +10244,8 @@ export interface components {
             unchanged?: number;
             /** Format: date-time */
             leaseExpiresAt?: string;
+            /** Format: int32 */
+            rejected?: number;
         };
         AgentRunDto: {
             /** Format: uuid */
@@ -11182,6 +11184,11 @@ export interface components {
             orders?: components["schemas"]["PlatformOrderDto"][] | null;
             /** Format: int32 */
             unchanged?: number;
+            rejections?: components["schemas"]["IngestRejection"][] | null;
+        };
+        IngestRejection: {
+            externalReference?: string | null;
+            message?: string | null;
         };
         /** @enum {string} */
         InventoryAttention: "Unlisted" | "Aged" | "MissingPhotos" | "MissingCost" | "MissingValue" | "MissingLocation";

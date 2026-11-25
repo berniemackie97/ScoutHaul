@@ -12716,6 +12716,10 @@
           "leaseExpiresAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "rejected": {
+            "type": "integer",
+            "format": "int32"
           }
         },
         "additionalProperties": false
@@ -15525,6 +15529,27 @@
           "unchanged": {
             "type": "integer",
             "format": "int32"
+          },
+          "rejections": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IngestRejection"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "IngestRejection": {
+        "type": "object",
+        "properties": {
+          "externalReference": {
+            "type": "string",
+            "nullable": true
+          },
+          "message": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false

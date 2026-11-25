@@ -232,6 +232,37 @@ public sealed class ListingPhotoSyncTests
     }
 
     [Fact]
+    public async Task A_photo_that_failed_is_fetched_again_after_the_wait_and_only_that_one()
+    {
+        await using Harness harness = NewHarness();
+        InventoryItem item = harness.Item();
+        PlatformListing listing = harness.Listing(item, [First, Second]);
+        harness.Images.Unreachable.Add(Second);
+        await harness.Db.SaveChangesAsync();
+
+        Assert.Contains("1 of 2 photos could not be fetched", Assert.Single((await harness.Sync.SyncPendingAsync(10, CancellationToken.None)).Failures));
+
+        // Still inside the wait: nothing is tried again.
+        harness.Images.Fetched.Clear();
+        Assert.Equal(0, (await harness.Sync.SyncPendingAsync(10, CancellationToken.None)).Listings);
+
+        // After the wait, with the host back, only the missing photo is fetched and the listing is done.
+        harness.Images.Unreachable.Clear();
+        listing.PhotosSyncedAt = DateTimeOffset.UtcNow.AddHours(-2);
+        await harness.Db.SaveChangesAsync();
+        PhotoSyncOutcome retry = await harness.Sync.SyncPendingAsync(10, CancellationToken.None);
+
+        Assert.Equal([Second], harness.Images.Fetched);
+        Assert.Empty(retry.Failures);
+        InventoryItem whole = await harness.Reload(item.Id);
+        Assert.Equal([First, Second], whole.Photos.OrderBy(photo => photo.SortOrder).Select(photo => photo.SourceUrl));
+        PlatformListing done = await harness.Db.PlatformListings.SingleAsync();
+        Assert.Equal(done.PhotoUrlsKey, done.PhotoSyncedKey);
+        Assert.Null(done.PhotoSyncError);
+        Assert.Equal(0, (await harness.Sync.SyncPendingAsync(10, CancellationToken.None)).Listings);
+    }
+
+    [Fact]
     public async Task Only_the_marketplaces_own_image_addresses_are_followed()
     {
         await using Harness harness = NewHarness();
