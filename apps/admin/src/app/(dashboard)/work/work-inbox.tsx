@@ -19,7 +19,10 @@ export function WorkInbox({ inbox, initialLane }: { inbox: Inbox; initialLane?: 
   const firstBusy = lanes.find((lane) => (lane.tasks?.length ?? 0) > 0)?.key ?? lanes[0]?.key ?? "";
   const [laneKey, setLaneKey] = useState(lanes.some((lane) => lane.key === initialLane) ? initialLane! : firstBusy);
   const lane = lanes.find((entry) => entry.key === laneKey) ?? lanes[0];
-  const tasks = useMemo(() => lane?.tasks ?? [], [lane]);
+  // Finished here, so gone from the list before the server's refresh lands.
+  const [done, setDone] = useState<Set<string>>(new Set());
+  const [toast, setToast] = useState<string | null>(null);
+  const tasks = useMemo(() => (lane?.tasks ?? []).filter((task) => !done.has(task.key ?? "")), [lane, done]);
   const [selectedKey, setSelectedKey] = useState<string | null>(tasks[0]?.key ?? null);
   const selected: Task | undefined = tasks.find((task) => task.key === selectedKey) ?? tasks[0];
 
@@ -35,7 +38,7 @@ export function WorkInbox({ inbox, initialLane }: { inbox: Inbox; initialLane?: 
       } else if (event.key === "k" || event.key === "ArrowUp") {
         const previous = tasks[Math.max(0, index - 1)];
         if (previous) setSelectedKey(previous.key ?? null);
-      } else if (event.key === "Enter" && selected?.actionHref) {
+      } else if (event.key === "Enter" && selected?.actionHref && selected.type !== "delist") {
         window.location.assign(selected.actionHref);
       } else {
         return;
@@ -67,8 +70,9 @@ export function WorkInbox({ inbox, initialLane }: { inbox: Inbox; initialLane?: 
         <nav aria-label="Lanes" className="space-y-1">
           {lanes.map((entry) => {
             const active = entry.key === lane?.key;
-            const count = (entry.tasks ?? []).reduce((total, task) => total + (task.count ?? 1), 0);
-            const late = (entry.tasks ?? []).some((task) => task.isLate);
+            const remaining = (entry.tasks ?? []).filter((task) => !done.has(task.key ?? ""));
+            const count = remaining.reduce((total, task) => total + (task.count ?? 1), 0);
+            const late = remaining.some((task) => task.isLate);
             return (
               <button
                 key={entry.key}
@@ -127,7 +131,26 @@ export function WorkInbox({ inbox, initialLane }: { inbox: Inbox; initialLane?: 
           )}
         </section>
 
-        <aside aria-label="Task">{selected ? <TaskDetail key={selected.key} task={selected} /> : null}</aside>
+        <aside aria-label="Task" className="space-y-3">
+          {toast && (
+            <p role="status" className="bg-primary text-primary-foreground rounded-md px-3 py-2 text-sm">
+              {toast}
+            </p>
+          )}
+          {selected ? (
+            <TaskDetail
+              key={selected.key}
+              task={selected}
+              onDone={(message) => {
+                const index = tasks.findIndex((task) => task.key === selected.key);
+                const next = tasks[index + 1] ?? tasks[index - 1];
+                setDone(new Set(done).add(selected.key ?? ""));
+                setSelectedKey(next?.key ?? null);
+                setToast(message);
+              }}
+            />
+          ) : null}
+        </aside>
       </div>
     </div>
   );

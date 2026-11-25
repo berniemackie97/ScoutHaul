@@ -27,7 +27,13 @@ public sealed record WorkTaskDto(
     bool IsLate,
     IReadOnlyList<WorkStepDto> Steps,
     // The task stands for this many records of the same kind (a queue rather than one thing).
-    int Count = 1);
+    int Count = 1,
+    // What the task is about, so the inbox can offer its actions in place: sold, delist, order, issue, item, queue.
+    string Type = "queue",
+    Guid? EntityId = null,
+    // The marketplace's own page for it, opened in a new tab.
+    string? ExternalUrl = null,
+    string? Platform = null);
 
 public sealed record WorkLaneDto(string Key, string Label, string Hint, IReadOnlyList<WorkTaskDto> Tasks);
 

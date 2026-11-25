@@ -30,6 +30,7 @@ public sealed class WorkInboxService(
     SyncIssueService syncIssues,
     IWorkSnoozeStore snoozes,
     IListingMatchStore listings,
+    HaulScout.Application.Storefront.IStorefrontOfferStore offers,
     TimeProvider clock)
 {
     private const int PerLane = 50;
@@ -39,6 +40,7 @@ public sealed class WorkInboxService(
     public const string Pack = "pack";
     public const string Ship = "ship";
     public const string FollowUp = "follow";
+    public const string Tidy = "tidy";
 
     private static readonly TimeSpan PackWithin = TimeSpan.FromDays(2);
     private static readonly TimeSpan ShipWithin = TimeSpan.FromDays(1);
@@ -67,11 +69,15 @@ public sealed class WorkInboxService(
                 $"{sold.Platform} · {sold.ListedPrice:C}",
                 $"{sold.Platform} says it sold. Until the sale is recorded, profit, tax and stock are wrong.",
                 "Record sale",
-                "/channels/sold",
+                RecordSaleHref(sold),
                 sold.MarkedSoldAt,
                 sold.MarkedSoldAt + ReconcileWithin,
                 Late(sold.MarkedSoldAt, ReconcileWithin, now),
-                [])));
+                [],
+                Type: "sold",
+                EntityId: sold.PlatformListingId,
+                ExternalUrl: sold.ListingUrl,
+                Platform: sold.Platform)));
 
             int pendingMatches = await listings.CountPendingAsync(organizationId, cancellationToken);
             if (pendingMatches > 0)
@@ -106,7 +112,9 @@ public sealed class WorkInboxService(
                 null,
                 group.Severity == SyncIssueSeverity.Error && now - group.LatestAt > ReconcileWithin,
                 [],
-                group.Count)));
+                group.Count,
+                Type: "issue",
+                Platform: group.Platform)));
 
             tasks.AddRange((await delisting.ListAsync(cancellationToken)).Select(delist => new WorkTaskDto(
                 $"delist:{delist.ChannelListingId}",
@@ -114,13 +122,17 @@ public sealed class WorkInboxService(
                 "Pending delist",
                 $"Delist from {delist.Channel} — {delist.ItemTitle}",
                 delist.SoldOnChannel is null ? delist.AccountName : $"Sold on {delist.SoldOnChannel} · still live on {delist.Channel}",
-                "A sold item still live elsewhere can sell twice.",
-                "Mark delisted",
-                "/channels/delist",
+                "A sold item still live elsewhere can sell twice. End it on the marketplace, then confirm here.",
+                $"Open on {delist.Channel}",
+                delist.ExternalUrl ?? $"/inventory/{delist.InventoryItemId}?tab=channels",
                 delist.SoldAt,
                 delist.SoldAt + DelistWithin,
                 Late(delist.SoldAt, DelistWithin, now),
-                [])));
+                [],
+                Type: "delist",
+                EntityId: delist.ChannelListingId,
+                ExternalUrl: delist.ExternalUrl,
+                Platform: delist.Channel)));
         }
 
         if (canFinance)
@@ -161,11 +173,60 @@ public sealed class WorkInboxService(
                 item.UpdatedAt,
                 null,
                 false,
-                [])));
+                [],
+                Type: "item",
+                EntityId: item.Id)));
+        }
+
+        if (canInventory)
+        {
+            // Gaps that quietly make the figures wrong. One task per kind, linking to the list that holds them.
+            (InventoryAttention Attention, string Title, string Why)[] gaps =
+            [
+                (InventoryAttention.MissingCost, "Record a cost", "Profit on these is wrong until a cost is recorded."),
+                (InventoryAttention.MissingPhotos, "Photograph", "Cannot be listed until it is photographed."),
+                (InventoryAttention.MissingLocation, "Give a shelf location", "Somebody will have to hunt for it when it sells."),
+                (InventoryAttention.Aged, "Review aged stock", "Unlisted for 60 days or more: list it, reprice it or let it go."),
+            ];
+            foreach ((InventoryAttention attention, string title, string why) in gaps)
+            {
+                int count = await inventory.CountAsync(new InventoryFilter(Lifecycle: InventoryLifecycleGroup.Active, Attention: attention), cancellationToken);
+                if (count > 0)
+                {
+                    tasks.Add(new WorkTaskDto(
+                        $"tidy:{attention}",
+                        Tidy,
+                        "Records to tidy",
+                        $"{title} — {count} {(count == 1 ? "item" : "items")}",
+                        null,
+                        why,
+                        "Open list",
+                        $"/inventory?lifecycle=Active&attention={attention}",
+                        null,
+                        null,
+                        false,
+                        [],
+                        count));
+                }
+            }
+
+            int bench = await inventory.CountAsync(new InventoryFilter(NeedsBenchWork: true), cancellationToken);
+            if (bench > 0)
+            {
+                tasks.Add(new WorkTaskDto("tidy:bench", Tidy, "Repair bench", $"Test or repair — {bench} {(bench == 1 ? "item" : "items")}", null,
+                    "Untested or not fully working; it cannot be listed as it is.", "Open repairs", "/repairs", null, null, false, [], bench));
+            }
         }
 
         if (canOrders)
         {
+            int newOffers = (await offers.CountByStatusAsync(organizationId, cancellationToken)).GetValueOrDefault(StorefrontOfferStatus.New);
+            if (newOffers > 0)
+            {
+                tasks.Add(new WorkTaskDto("offers:new", FollowUp, "Offers", $"Answer {newOffers} {(newOffers == 1 ? "offer" : "offers")}", null,
+                    "Buyers are waiting, and unanswered offers expire.", "Open offers", "/offers?status=New", null, null, false, [], newOffers));
+            }
+
             foreach (OrderSummaryDto order in await OrdersAsync(OrderWorkflowStage.ToPack, cancellationToken))
             {
                 DateTimeOffset? since = order.PaidAt ?? order.CreatedAt;
@@ -215,7 +276,8 @@ public sealed class WorkInboxService(
             Lane(List, "List", "Ready items not yet listed", open),
             Lane(Pack, "Pack", "Paid, not packed", open),
             Lane(Ship, "Ship", "Packed, not handed to a carrier", open),
-            Lane(FollowUp, "Follow up", "Delists, problems, unpaid orders, sync issues", open),
+            Lane(FollowUp, "Follow up", "Delists, offers, problems, unpaid orders, sync issues", open),
+            Lane(Tidy, "Tidy", "Gaps that make the figures wrong", open),
         ];
 
         return new WorkInboxDto(
@@ -300,7 +362,10 @@ public sealed class WorkInboxService(
             since,
             since + within,
             Late(since, within, now),
-            Thread(order));
+            Thread(order),
+            Type: "order",
+            EntityId: order.Id,
+            Platform: order.Channel);
     }
 
     /// <summary>Where the sale stands: each step done with its date, the first undone one is now.</summary>
@@ -325,6 +390,18 @@ public sealed class WorkInboxService(
                 step.At,
                 firstUndone < 0 || index < firstUndone ? WorkStepState.Done : index == firstUndone ? WorkStepState.Now : WorkStepState.Later)),
         ];
+    }
+
+    /// <summary>The item, with the sale form opened and filled from what the marketplace said.</summary>
+    private static string RecordSaleHref(SoldNotRecordedDto sold)
+    {
+        List<string> query = [$"soldOn={Uri.EscapeDataString(sold.Platform)}", $"price={sold.ListedPrice.ToString(System.Globalization.CultureInfo.InvariantCulture)}"];
+        if (sold.MarkedSoldAt is DateTimeOffset at)
+        {
+            query.Add($"soldAt={Uri.EscapeDataString(at.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture))}");
+        }
+
+        return $"/inventory/{sold.InventoryItemId}?{string.Join("&", query)}";
     }
 
     private static bool Late(DateTimeOffset? since, TimeSpan within, DateTimeOffset now) => since is not null && now - since > within;

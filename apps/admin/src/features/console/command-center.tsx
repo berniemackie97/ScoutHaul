@@ -1,113 +1,47 @@
 import Link from "next/link";
 import {
-  AlertTriangle,
-  ArrowRight,
   ArrowDownRight,
+  ArrowRight,
   ArrowUpRight,
   Boxes,
   CheckCircle2,
   CircleDollarSign,
-  ClipboardList,
+  Inbox,
   Minus,
-  Package,
-  PackageCheck,
   Receipt,
-  Sparkles,
   TrendingUp,
   Wallet,
-  Wrench,
   type LucideIcon,
 } from "lucide-react";
+import type { components } from "@overhaul/api-client";
 import { Card, formatCurrency } from "@overhaul/ui";
-import {
-  changeTone,
-  describeChange,
-  presentQueues,
-  type OperatorConsole,
-  type PresentedQueue,
-} from "./queues";
 import { LocalDate } from "@/components/local-date";
 import type { Operator } from "@/lib/session";
-import type { components } from "@overhaul/api-client";
+import { changeTone, describeChange, type OperatorConsole } from "./trading";
 
 type ReportChange = components["schemas"]["ReportChangeDto"];
+type WorkInbox = components["schemas"]["WorkInboxDto"];
 
 // Whole dollars on the tiles, and $0 rather than a dash: an aggregate of nothing really is nought.
 const money = (value: number | null | undefined) => formatCurrency(value ?? 0, { maximumFractionDigits: 0 });
 
-const QUEUE_ICONS: Record<string, LucideIcon> = {
-  "orders.toPack": Package,
-  "orders.toShip": PackageCheck,
-  "orders.readyForPickup": PackageCheck,
-  "orders.awaitingPayment": Wallet,
-  "inventory.readyToList": Sparkles,
-  "inventory.benchWork": Wrench,
-};
-
 /**
- * The first screen of the day: what is waiting, how trading is going, and what the stock is worth.
- *
- * Pure presentation — the page fetches, this renders — so it can be exercised with any console the
- * API might return, including the partial ones a narrower role receives.
- *
- * What a caller may not open is absent, not zero: a packer's home page is the packing queue.
+ * The first screen of the day: how much work is waiting, where, and how trading is going. The work itself lives in
+ * Work — this page only points at its lanes, so no queue is counted or linked in two places.
  */
-export function CommandCenter({ overview, operator }: { overview: OperatorConsole; operator: Operator | null }) {
-  const { byTier, clear } = presentQueues(overview.queues);
-  const attentionCount = byTier.attention.reduce((sum, queue) => sum + (queue.count ?? 0), 0);
-  const workCount = byTier.work.reduce((sum, queue) => sum + (queue.count ?? 0), 0);
-  const hasQueues = (overview.queues?.length ?? 0) > 0;
-
+export function CommandCenter({ overview, work, operator }: { overview: OperatorConsole; work: WorkInbox | null; operator: Operator | null }) {
   return (
     <div className="space-y-8">
       <header className="flex flex-col justify-between gap-2 sm:flex-row sm:items-end">
         <div>
           <p className="text-muted-foreground text-sm">{operator?.organization ?? "Operator workspace"}</p>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight">Command center</h1>
-          {hasQueues ? (
-            <p className="text-muted-foreground mt-1 text-sm">{headline(attentionCount, workCount)}</p>
-          ) : null}
+          {work ? <p className="text-muted-foreground mt-1 text-sm">{headline(work)}</p> : null}
         </div>
         <LocalDate className="text-muted-foreground text-xs" />
       </header>
 
-      {byTier.attention.length > 0 ? (
-        <section aria-labelledby="attention-heading" className="space-y-3">
-          <SectionHeading id="attention-heading" icon={AlertTriangle} tone="warning">
-            Needs attention
-          </SectionHeading>
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {byTier.attention.map((queue) => (
-              <AttentionCard key={queue.key} queue={queue} />
-            ))}
-          </div>
-        </section>
-      ) : null}
-
-      {byTier.work.length > 0 || clear.length > 0 ? (
-        <section aria-labelledby="work-heading" className="space-y-3">
-          <SectionHeading id="work-heading" icon={ClipboardList}>
-            Today&rsquo;s work
-          </SectionHeading>
-          {byTier.work.length > 0 ? (
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              {byTier.work.map((queue) => (
-                <WorkCard key={queue.key} queue={queue} />
-              ))}
-            </div>
-          ) : (
-            <Card className="flex items-center gap-3 p-5 text-sm">
-              <CheckCircle2 className="h-5 w-5 text-success" aria-hidden />
-              Nothing waiting on you right now.
-            </Card>
-          )}
-          {clear.length > 0 ? (
-            <p className="text-muted-foreground text-xs">
-              All clear: {clear.map((queue) => queue.label.toLowerCase()).join(" · ")}
-            </p>
-          ) : null}
-        </section>
-      ) : null}
+      {work ? <WorkSummary work={work} /> : null}
 
       {overview.money || overview.inventory ? (
         <div className="grid gap-6 lg:grid-cols-2">
@@ -115,109 +49,58 @@ export function CommandCenter({ overview, operator }: { overview: OperatorConsol
           {overview.inventory ? <StockCard inventory={overview.inventory} /> : null}
         </div>
       ) : null}
-
-      {byTier.hygiene.length > 0 ? (
-        <section aria-labelledby="hygiene-heading" className="space-y-3">
-          <SectionHeading id="hygiene-heading" icon={Receipt}>
-            Records to tidy
-          </SectionHeading>
-          <p className="text-muted-foreground -mt-1 text-xs">
-            Gaps in the data that quietly make the figures above less accurate.
-          </p>
-          <Card className="divide-y p-0">
-            {byTier.hygiene.map((queue) => (
-              <HygieneRow key={queue.key} queue={queue} />
-            ))}
-          </Card>
-        </section>
-      ) : null}
-
-      {!hasQueues && !overview.money && !overview.inventory ? (
-        <Card className="text-muted-foreground p-8 text-center text-sm">
-          Your role does not include any of the areas this page reports on. Ask an owner if you expected to see
-          orders, inventory or the books here.
-        </Card>
-      ) : null}
     </div>
   );
 }
 
-/**
- * One line that says what the day looks like. The counts mix orders and items, so it talks about
- * what is waiting rather than calling fourteen listable items fourteen "tasks".
- */
-function headline(attention: number, work: number): string {
-  if (attention === 0 && work === 0) return "Nothing needs you right now.";
-  const parts: string[] = [];
-  if (attention > 0) parts.push(`${attention} ${attention === 1 ? "needs" : "need"} attention`);
-  if (work > 0) parts.push(`${work} waiting in today’s work`);
-  return `${parts.join(" · ")}.`;
+function headline(work: WorkInbox): string {
+  const open = work.openCount ?? 0;
+  if (open === 0) return "Nothing waiting on you right now.";
+  const late = work.lateCount ?? 0;
+  return `${open} open${late > 0 ? ` · ${late} past due` : ""} · ${work.inTransit ?? 0} with a carrier.`;
 }
 
-function SectionHeading({
-  id,
-  icon: Icon,
-  tone = "default",
-  children,
-}: {
-  id: string;
-  icon: LucideIcon;
-  tone?: "default" | "warning";
-  children: React.ReactNode;
-}) {
+/** One tile per lane of Work with its count, how many are late, and the first thing in it. */
+function WorkSummary({ work }: { work: WorkInbox }) {
+  const lanes = work.lanes ?? [];
+  const busy = lanes.filter((lane) => (lane.tasks?.length ?? 0) > 0);
   return (
-    <h2 id={id} className="flex items-center gap-2 text-sm font-semibold">
-      <Icon className={tone === "warning" ? "h-4 w-4 text-warning" : "text-muted-foreground h-4 w-4"} aria-hidden />
-      {children}
-    </h2>
-  );
-}
-
-function AttentionCard({ queue }: { queue: PresentedQueue }) {
-  return (
-    <Link
-      href={queue.href}
-      className="group rounded-xl border border-warning-border bg-warning-surface p-5 transition-colors hover:border-warning-border"
-    >
-      <div className="flex items-start justify-between gap-3">
-        <p className="text-3xl font-semibold tabular-nums">{queue.count}</p>
-        <ArrowRight className="text-muted-foreground h-4 w-4 transition-transform group-hover:translate-x-0.5" aria-hidden />
+    <section aria-labelledby="work-heading" className="space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        <h2 id="work-heading" className="flex items-center gap-2 text-base font-semibold">
+          <Inbox className="text-muted-foreground h-4 w-4" aria-hidden /> Work
+        </h2>
+        <Link href="/work" className="text-copper inline-flex items-center gap-1 text-sm font-medium hover:underline">
+          Open Work <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+        </Link>
       </div>
-      <p className="mt-2 text-sm font-medium">{queue.label}</p>
-      <p className="text-muted-foreground mt-1 text-xs">{queue.why}</p>
-    </Link>
-  );
-}
-
-function WorkCard({ queue }: { queue: PresentedQueue }) {
-  const Icon = QUEUE_ICONS[queue.key ?? ""] ?? ClipboardList;
-  return (
-    <Link href={queue.href} className="group hover:border-brand-300 bg-card flex items-center gap-4 rounded-xl border p-4 transition-colors">
-      <div className="bg-brand-50 text-brand-700 dark:bg-brand-900 dark:text-brand-100 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg">
-        <Icon className="h-5 w-5" aria-hidden />
-      </div>
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium">{queue.label}</p>
-        <p className="text-muted-foreground truncate text-xs">{queue.why}</p>
-      </div>
-      <p className="text-2xl font-semibold tabular-nums">{queue.count}</p>
-    </Link>
-  );
-}
-
-function HygieneRow({ queue }: { queue: PresentedQueue }) {
-  return (
-    <Link href={queue.href} className="hover:bg-muted/40 flex items-center gap-4 px-5 py-3 transition-colors">
-      <span className="w-12 shrink-0 text-right text-lg font-semibold tabular-nums">{queue.count}</span>
-      <span className="min-w-0 flex-1">
-        <span className="block text-sm font-medium">{queue.label}</span>
-        <span className="text-muted-foreground block text-xs">
-          {queue.why}
-          {queue.amount ? ` ${money(queue.amount)} not yet on any item.` : ""}
-        </span>
-      </span>
-      <ArrowRight className="text-muted-foreground h-4 w-4 shrink-0" aria-hidden />
-    </Link>
+      {busy.length === 0 ? (
+        <Card className="flex items-center gap-3 p-5 text-sm">
+          <CheckCircle2 className="text-success h-5 w-5" aria-hidden /> Every lane is clear.
+        </Card>
+      ) : (
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {busy.map((lane) => {
+            const tasks = lane.tasks ?? [];
+            const count = tasks.reduce((total, task) => total + (task.count ?? 1), 0);
+            const late = tasks.filter((task) => task.isLate).length;
+            return (
+              <Link key={lane.key} href={`/work?lane=${lane.key}`} className="group">
+                <Card className={`h-full p-5 transition-colors group-hover:border-copper/50 ${late > 0 ? "border-warning-border" : ""}`}>
+                  <div className="flex items-baseline justify-between gap-3">
+                    <span className="font-semibold">{lane.label}</span>
+                    <span className="text-2xl font-semibold tabular-nums">{count}</span>
+                  </div>
+                  <p className="text-muted-foreground mt-1 text-xs">{lane.hint}</p>
+                  {late > 0 && <p className="text-destructive mt-2 text-xs font-medium">{late} past due</p>}
+                  <p className="mt-3 truncate text-sm">{tasks[0]?.title}</p>
+                </Card>
+              </Link>
+            );
+          })}
+        </div>
+      )}
+    </section>
   );
 }
 

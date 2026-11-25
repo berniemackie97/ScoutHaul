@@ -5,6 +5,7 @@ import { useState, useTransition } from "react";
 import { Check, ImageIcon, ScanLine } from "lucide-react";
 import { Button, Card, Input, Notice, formatCurrency } from "@overhaul/ui";
 import { advanceOrder } from "../../orders/[id]/actions";
+import { safely } from "@/lib/safe-action";
 import { scanMatches } from "./pack-scan";
 
 export type PackLine = {
@@ -35,8 +36,8 @@ type PackOrder = {
 const STEPS = ["Pick", "Check", "Pack", "Done"] as const;
 
 /**
- * Packing one order, a step at a time. Pick confirms each item by its tag so the wrong one never ships; Check walks
- * what the listing promised; Pack records the order packed, which moves its thread to Ship.
+ * Packing one order, a step at a time. Pick confirms each item, by hand or by scanning its tag when there is a scanner;
+ * Check walks what the listing promised; Pack records the order packed, which moves its thread to Ship.
  */
 export function PackStation({ order, lines, run }: { order: PackOrder; lines: PackLine[]; run: { position: number; total: number; nextOrderId: string | null } }) {
   const [step, setStep] = useState(0);
@@ -73,7 +74,7 @@ export function PackStation({ order, lines, run }: { order: PackOrder; lines: Pa
 
   function markPacked() {
     startTransition(async () => {
-      const result = await advanceOrder(order.id, "markPacked");
+      const result = await safely(() => advanceOrder(order.id, "markPacked"));
       setMessage({ ok: result.ok, text: result.message });
       if (result.ok) setStep(3);
     });
@@ -129,29 +130,49 @@ export function PackStation({ order, lines, run }: { order: PackOrder; lines: Pa
                         <span className="block font-medium">{line.title}</span>
                         <span className="text-muted-foreground block text-xs">{[line.sku, line.quantity > 1 ? `×${line.quantity}` : null].filter(Boolean).join(" · ")}</span>
                       </span>
-                      <span className="text-right">
+                      <span className="shrink-0 text-right">
                         <span className="text-muted-foreground block text-[11px] uppercase tracking-wide">Bin</span>
-                        <span className="bg-primary text-primary-foreground rounded px-2 py-0.5 font-mono text-sm font-semibold">{line.bin ?? "—"}</span>
+                        {line.bin ? (
+                          <span className="bg-primary text-primary-foreground rounded px-2 py-0.5 font-mono text-sm font-semibold">{line.bin}</span>
+                        ) : (
+                          <span className="text-muted-foreground text-sm">No bin set</span>
+                        )}
                       </span>
-                      {done ? (
-                        <Check className="text-success h-5 w-5" aria-label="Picked" />
-                      ) : (
-                        <button type="button" onClick={() => setPicked(new Set(picked).add(line.lineId))} className="text-muted-foreground text-xs underline">
-                          No tag
-                        </button>
-                      )}
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={done ? "secondary" : "default"}
+                        aria-pressed={done}
+                        onClick={() => {
+                          const next = new Set(picked);
+                          if (done) next.delete(line.lineId);
+                          else next.add(line.lineId);
+                          setPicked(next);
+                        }}
+                      >
+                        {done ? (
+                          <>
+                            <Check className="mr-1.5 h-4 w-4" aria-hidden /> Picked
+                          </>
+                        ) : (
+                          "Mark picked"
+                        )}
+                      </Button>
                     </li>
                   );
                 })}
               </ul>
               {!allPicked && (
-                <form onSubmit={submitScan} className="space-y-2">
-                  <label htmlFor="scan" className="flex items-center gap-2 text-sm font-medium">
-                    <ScanLine className="h-4 w-4" aria-hidden /> Scan each tag to confirm
-                  </label>
-                  <Input id="scan" autoFocus value={scan} onChange={(event) => setScan(event.target.value)} placeholder="Barcode, SKU or tag code" className="h-12 text-lg" />
-                  {scanError && <p className="text-destructive text-sm">{scanError}</p>}
-                </form>
+                <details className="rounded-md border px-3 py-2 text-sm">
+                  <summary className="flex cursor-pointer items-center gap-2 font-medium">
+                    <ScanLine className="h-4 w-4" aria-hidden /> Have a scanner? Scan tags instead
+                  </summary>
+                  <form onSubmit={submitScan} className="mt-3 space-y-2">
+                    <Input aria-label="Scan a tag" value={scan} onChange={(event) => setScan(event.target.value)} placeholder="Barcode, SKU or tag code" className="h-11" />
+                    <p className="text-muted-foreground text-xs">A scan picks the matching item and stops a wrong one. Optional — Mark picked works the same.</p>
+                    {scanError && <p className="text-destructive text-sm">{scanError}</p>}
+                  </form>
+                </details>
               )}
             </>
           )}

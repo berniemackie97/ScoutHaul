@@ -84,7 +84,7 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                 name: "IX_SyncRunIssues_OrganizationId_State",
                 table: "SyncRunIssues",
                 columns: new[] { "OrganizationId", "State" });
-        
+
             // Issues raised before they could be closed would otherwise all open at once. Recent ones stay open;
             // older ones are history and close with that said.
             migrationBuilder.Sql("""

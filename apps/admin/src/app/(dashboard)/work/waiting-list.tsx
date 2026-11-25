@@ -3,6 +3,7 @@
 import { useTransition } from "react";
 import type { components } from "@overhaul/api-client";
 import { When } from "@/components/when";
+import { safely } from "@/lib/safe-action";
 import { bringBackTask } from "./actions";
 
 type Wait = components["schemas"]["WorkWaitDto"];
@@ -29,7 +30,7 @@ export function WaitingList({ waiting }: { waiting: Wait[] }) {
               <button
                 type="button"
                 disabled={pending}
-                onClick={() => startTransition(async () => void (await bringBackTask(entry.key ?? "")))}
+                onClick={() => startTransition(async () => void (await safely(() => bringBackTask(entry.key ?? ""))))}
                 className="text-copper ml-auto font-medium hover:underline"
               >
                 Bring back

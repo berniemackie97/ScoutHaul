@@ -5,6 +5,7 @@ import { AlertTriangle, CheckCircle2, RotateCcw } from "lucide-react";
 import type { components } from "@overhaul/api-client";
 import { Badge, Button, Card, Notice } from "@overhaul/ui";
 import { When } from "@/components/when";
+import { safely } from "@/lib/safe-action";
 import { loadIssueSnapshot, resolveIssue, resolveIssueGroup, retryIssue, type IssueActionResult } from "./issue-actions";
 
 type IssueGroup = components["schemas"]["SyncIssueGroupDto"];
@@ -35,7 +36,7 @@ export function SyncIssues({ groups }: { groups: IssueGroup[] }) {
 
   const run = (action: () => Promise<IssueActionResult>) =>
     startTransition(async () => {
-      setResult(await action());
+      setResult(await safely(action));
     });
 
   return (
@@ -145,7 +146,7 @@ function IssueDetail({
 
       {(issue.detail || issue.hasSnapshot) && (
         <details className="rounded-md border px-3 py-2 text-sm" onToggle={(event) => {
-          if ((event.target as HTMLDetailsElement).open && !kept) startLoading(async () => setKept(await loadIssueSnapshot(issue.id!)));
+          if ((event.target as HTMLDetailsElement).open && !kept) startLoading(async () => setKept(await loadIssueSnapshot(issue.id!).catch(() => ({ detail: "Could not load the detail. Try again.", snapshot: null }))));
         }}>
           <summary className="cursor-pointer font-medium">Technical detail{issue.hasSnapshot ? " and what was read" : ""}</summary>
           {loading && <p className="text-muted-foreground mt-2 text-xs">Loading…</p>}

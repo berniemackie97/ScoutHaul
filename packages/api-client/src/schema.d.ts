@@ -14721,6 +14721,11 @@ export interface components {
             steps?: components["schemas"]["WorkStepDto"][] | null;
             /** Format: int32 */
             count?: number;
+            type?: string | null;
+            /** Format: uuid */
+            entityId?: string | null;
+            externalUrl?: string | null;
+            platform?: string | null;
         };
         /** @enum {string} */
         WorkTaskStatus: "Open" | "InProgress" | "Blocked" | "Completed" | "Cancelled";
