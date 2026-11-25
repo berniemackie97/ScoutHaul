@@ -48,6 +48,7 @@ public static class DependencyInjection
         services.AddScoped<InventoryMergeService>();
         services.AddScoped<InventoryListingDifferencesService>();
         services.AddScoped<ListingMatchService>();
+        services.AddScoped<HaulScout.Application.Sync.SyncIssueService>();
         services.AddScoped<InventoryIssueWorkflowService>();
         services.AddScoped<OrganizationInviteCodeWorkflowService>();
         services.AddScoped<OrganizationMemberWorkflowService>();

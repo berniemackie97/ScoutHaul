@@ -9842,6 +9842,205 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/sync/issues": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SyncIssueGroupDto"][];
+                        "application/json": components["schemas"]["SyncIssueGroupDto"][];
+                        "text/json": components["schemas"]["SyncIssueGroupDto"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sync/issues/{id}/snapshot": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SyncIssueSnapshotDto"];
+                        "application/json": components["schemas"]["SyncIssueSnapshotDto"];
+                        "text/json": components["schemas"]["SyncIssueSnapshotDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sync/issues/{id}/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["ResolveSyncIssueRequest"];
+                    "text/json": components["schemas"]["ResolveSyncIssueRequest"];
+                    "application/*+json": components["schemas"]["ResolveSyncIssueRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sync/issues/resolve-group": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["ResolveSyncIssueGroupRequest"];
+                    "text/json": components["schemas"]["ResolveSyncIssueGroupRequest"];
+                    "application/*+json": components["schemas"]["ResolveSyncIssueGroupRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": number;
+                        "application/json": number;
+                        "text/json": number;
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sync/issues/{id}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["RequestScanResultDto"];
+                        "application/json": components["schemas"]["RequestScanResultDto"];
+                        "text/json": components["schemas"]["RequestScanResultDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/tasks": {
         parameters: {
             query?: never;
@@ -10301,6 +10500,13 @@ export interface components {
             message?: string | null;
             externalReference?: string | null;
             rejected?: boolean;
+            code?: string | null;
+            step?: string | null;
+            /** Format: int32 */
+            attempts?: number | null;
+            detail?: string | null;
+            snapshot?: string | null;
+            fix?: string | null;
         };
         AgentWorkDto: {
             /** Format: uuid */
@@ -12646,6 +12852,16 @@ export interface components {
             reason?: string | null;
             notes?: string | null;
         };
+        ResolveSyncIssueGroupRequest: {
+            platform?: string | null;
+            code?: string | null;
+            note?: string | null;
+            dismiss?: boolean;
+        };
+        ResolveSyncIssueRequest: {
+            note?: string | null;
+            dismiss?: boolean;
+        };
         ReturnDto: {
             /** Format: uuid */
             id?: string;
@@ -13797,6 +14013,46 @@ export interface components {
         };
         /** @enum {string} */
         SyncFailureKind: "SignedOut" | "WrongAccount" | "RateLimited" | "Challenge" | "SiteChanged" | "Network" | "NoAccess" | "Interrupted" | "Error";
+        SyncIssueDto: {
+            /** Format: uuid */
+            id?: string;
+            /** Format: uuid */
+            runId?: string;
+            accountName?: string | null;
+            loop?: components["schemas"]["SyncLoopKind"];
+            severity?: components["schemas"]["SyncIssueSeverity"];
+            externalReference?: string | null;
+            message?: string | null;
+            step?: string | null;
+            /** Format: int32 */
+            attempts?: number;
+            detail?: string | null;
+            hasSnapshot?: boolean;
+            fix?: string | null;
+            note?: string | null;
+            /** Format: date-time */
+            createdAt?: string;
+        };
+        SyncIssueGroupDto: {
+            platform?: string | null;
+            code?: string | null;
+            title?: string | null;
+            fix?: string | null;
+            severity?: components["schemas"]["SyncIssueSeverity"];
+            /** Format: int32 */
+            count?: number;
+            /** Format: date-time */
+            latestAt?: string;
+            issues?: components["schemas"]["SyncIssueDto"][] | null;
+        };
+        /** @enum {string} */
+        SyncIssueSeverity: "Warning" | "Error";
+        SyncIssueSnapshotDto: {
+            /** Format: uuid */
+            id?: string;
+            detail?: string | null;
+            snapshot?: string | null;
+        };
         SyncLoopDto: {
             loop?: components["schemas"]["SyncLoopKind"];
             /** Format: int32 */

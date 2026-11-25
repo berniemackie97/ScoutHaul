@@ -1,3 +1,5 @@
+using HaulScout.Domain.Entities;
+
 namespace HaulScout.Application.Contracts;
 
 public sealed record SyncRunIssueDto(string Severity, int? RowNumber, string? ExternalReference, string Message);
@@ -64,3 +66,36 @@ public sealed record ImportResultDto(IReadOnlyList<ImportFileOutcomeDto> Files);
 /// A count is null when the caller's role cannot act on that queue.
 /// </summary>
 public sealed record ImportQueuesDto(int? OrdersToMatch, int? ListingsToMatch);
+
+public sealed record SyncIssueDto(
+    Guid Id,
+    Guid RunId,
+    string? AccountName,
+    SyncLoopKind? Loop,
+    SyncIssueSeverity Severity,
+    string? ExternalReference,
+    string Message,
+    string? Step,
+    int Attempts,
+    string? Detail,
+    bool HasSnapshot,
+    string? Fix,
+    // Set while open only when a retry was asked for.
+    string? Note,
+    DateTimeOffset CreatedAt);
+
+public sealed record SyncIssueGroupDto(
+    string Platform,
+    string Code,
+    string Title,
+    string? Fix,
+    SyncIssueSeverity Severity,
+    int Count,
+    DateTimeOffset LatestAt,
+    IReadOnlyList<SyncIssueDto> Issues);
+
+public sealed record SyncIssueSnapshotDto(Guid Id, string? Detail, string? Snapshot);
+
+public sealed record ResolveSyncIssueRequest(string? Note = null, bool Dismiss = false);
+
+public sealed record ResolveSyncIssueGroupRequest(string Platform, string Code, string? Note = null, bool Dismiss = false);

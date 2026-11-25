@@ -107,4 +107,19 @@ public sealed class EfSyncRunStore(HaulScoutDbContext db) : ISyncRunStore
         run.FinishedAt = finishedAt;
         await db.SaveChangesAsync(cancellationToken);
     }
+
+    public async Task<IReadOnlyList<SyncRunIssue>> ListOpenIssuesForLoopAsync(
+        Guid organizationId,
+        Guid? channelAccountId,
+        SyncLoopKind? loop,
+        Guid exceptRunId,
+        CancellationToken cancellationToken) =>
+        await db.SyncRunIssues
+            .Where(issue => issue.OrganizationId == organizationId
+                && issue.State == SyncIssueState.Open
+                && issue.SyncRunId != exceptRunId
+                && issue.SyncRun != null
+                && issue.SyncRun.ChannelAccountId == channelAccountId
+                && issue.SyncRun.Loop == loop)
+            .ToListAsync(cancellationToken);
 }
