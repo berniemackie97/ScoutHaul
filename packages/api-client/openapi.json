@@ -12363,6 +12363,87 @@
           }
         }
       }
+    },
+    "/api/work": {
+      "get": {
+        "tags": [
+          "Work"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkInboxDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkInboxDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkInboxDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/work/set-aside": {
+      "post": {
+        "tags": [
+          "Work"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetAsideWorkTaskRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetAsideWorkTaskRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetAsideWorkTaskRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/work/bring-back": {
+      "post": {
+        "tags": [
+          "Work"
+        ],
+        "parameters": [
+          {
+            "name": "key",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -21980,6 +22061,32 @@
         },
         "additionalProperties": false
       },
+      "SetAsideWorkTaskRequest": {
+        "type": "object",
+        "properties": {
+          "taskKey": {
+            "type": "string",
+            "nullable": true
+          },
+          "wait": {
+            "$ref": "#/components/schemas/WorkWait"
+          },
+          "until": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "SetExpectedPriceRequest": {
         "type": "object",
         "properties": {
@@ -25198,6 +25305,155 @@
         ],
         "type": "string"
       },
+      "WorkInboxDto": {
+        "type": "object",
+        "properties": {
+          "lanes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkLaneDto"
+            },
+            "nullable": true
+          },
+          "waiting": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkWaitDto"
+            },
+            "nullable": true
+          },
+          "inTransit": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "openCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "lateCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "WorkLaneDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "nullable": true
+          },
+          "label": {
+            "type": "string",
+            "nullable": true
+          },
+          "hint": {
+            "type": "string",
+            "nullable": true
+          },
+          "tasks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkTaskDto"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "WorkStepDto": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string",
+            "nullable": true
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "state": {
+            "$ref": "#/components/schemas/WorkStepState"
+          }
+        },
+        "additionalProperties": false
+      },
+      "WorkStepState": {
+        "enum": [
+          "Done",
+          "Now",
+          "Later"
+        ],
+        "type": "string"
+      },
+      "WorkTaskDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "nullable": true
+          },
+          "lane": {
+            "type": "string",
+            "nullable": true
+          },
+          "kind": {
+            "type": "string",
+            "nullable": true
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "detail": {
+            "type": "string",
+            "nullable": true
+          },
+          "why": {
+            "type": "string",
+            "nullable": true
+          },
+          "actionLabel": {
+            "type": "string",
+            "nullable": true
+          },
+          "actionHref": {
+            "type": "string",
+            "nullable": true
+          },
+          "since": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "dueBy": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "isLate": {
+            "type": "boolean"
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkStepDto"
+            },
+            "nullable": true
+          },
+          "count": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
       "WorkTaskStatus": {
         "enum": [
           "Open",
@@ -25207,6 +25463,42 @@
           "Cancelled"
         ],
         "type": "string"
+      },
+      "WorkWait": {
+        "enum": [
+          "Snoozed",
+          "Buyer",
+          "Carrier",
+          "Marketplace",
+          "Payout"
+        ],
+        "type": "string"
+      },
+      "WorkWaitDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "nullable": true
+          },
+          "wait": {
+            "$ref": "#/components/schemas/WorkWait"
+          },
+          "until": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
       }
     }
   },
@@ -25336,6 +25628,9 @@
     },
     {
       "name": "Vision"
+    },
+    {
+      "name": "Work"
     }
   ]
 }

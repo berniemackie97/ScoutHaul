@@ -10273,6 +10273,117 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/work": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["WorkInboxDto"];
+                        "application/json": components["schemas"]["WorkInboxDto"];
+                        "text/json": components["schemas"]["WorkInboxDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/work/set-aside": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["SetAsideWorkTaskRequest"];
+                    "text/json": components["schemas"]["SetAsideWorkTaskRequest"];
+                    "application/*+json": components["schemas"]["SetAsideWorkTaskRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/work/bring-back": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: {
+                    key?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -13492,6 +13603,14 @@ export interface components {
             email?: string | null;
             displayName?: string | null;
         };
+        SetAsideWorkTaskRequest: {
+            taskKey?: string | null;
+            wait?: components["schemas"]["WorkWait"];
+            /** Format: date-time */
+            until?: string | null;
+            note?: string | null;
+            title?: string | null;
+        };
         SetExpectedPriceRequest: {
             /** Format: double */
             estimatedSalePrice?: number;
@@ -14559,8 +14678,62 @@ export interface components {
         };
         /** @enum {string} */
         WeightUnit: "Ounces" | "Pounds" | "Grams" | "Kilograms";
+        WorkInboxDto: {
+            lanes?: components["schemas"]["WorkLaneDto"][] | null;
+            waiting?: components["schemas"]["WorkWaitDto"][] | null;
+            /** Format: int32 */
+            inTransit?: number;
+            /** Format: int32 */
+            openCount?: number;
+            /** Format: int32 */
+            lateCount?: number;
+            /** Format: date-time */
+            generatedAt?: string;
+        };
+        WorkLaneDto: {
+            key?: string | null;
+            label?: string | null;
+            hint?: string | null;
+            tasks?: components["schemas"]["WorkTaskDto"][] | null;
+        };
+        WorkStepDto: {
+            label?: string | null;
+            /** Format: date-time */
+            at?: string | null;
+            state?: components["schemas"]["WorkStepState"];
+        };
+        /** @enum {string} */
+        WorkStepState: "Done" | "Now" | "Later";
+        WorkTaskDto: {
+            key?: string | null;
+            lane?: string | null;
+            kind?: string | null;
+            title?: string | null;
+            detail?: string | null;
+            why?: string | null;
+            actionLabel?: string | null;
+            actionHref?: string | null;
+            /** Format: date-time */
+            since?: string | null;
+            /** Format: date-time */
+            dueBy?: string | null;
+            isLate?: boolean;
+            steps?: components["schemas"]["WorkStepDto"][] | null;
+            /** Format: int32 */
+            count?: number;
+        };
         /** @enum {string} */
         WorkTaskStatus: "Open" | "InProgress" | "Blocked" | "Completed" | "Cancelled";
+        /** @enum {string} */
+        WorkWait: "Snoozed" | "Buyer" | "Carrier" | "Marketplace" | "Payout";
+        WorkWaitDto: {
+            key?: string | null;
+            wait?: components["schemas"]["WorkWait"];
+            /** Format: date-time */
+            until?: string | null;
+            note?: string | null;
+            title?: string | null;
+        };
     };
     responses: never;
     parameters: never;
