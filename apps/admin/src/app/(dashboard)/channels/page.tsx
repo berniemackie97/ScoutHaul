@@ -56,10 +56,10 @@ export default async function ChannelsPage() {
       </div>
 
       {pendingDelist.length > 0 && (
-        <Card className="border-amber-300 p-5">
+        <Card className="border-warning-border p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <div className="flex items-center gap-2 text-sm font-semibold text-amber-700">
+              <div className="flex items-center gap-2 text-sm font-semibold text-warning">
                 <AlertTriangle className="h-4 w-4" /> Still for sale after selling ({pendingDelist.length})
               </div>
               <p className="text-muted-foreground mt-1 text-xs">
@@ -77,10 +77,10 @@ export default async function ChannelsPage() {
       )}
 
       {soldNotRecorded.length > 0 && (
-        <Card className="border-amber-300 p-5">
+        <Card className="border-warning-border p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <div className="flex items-center gap-2 text-sm font-semibold text-amber-700">
+              <div className="flex items-center gap-2 text-sm font-semibold text-warning">
                 <AlertTriangle className="h-4 w-4" /> Sold, but not on the books ({soldNotRecorded.length})
               </div>
               <p className="text-muted-foreground mt-1 text-xs">

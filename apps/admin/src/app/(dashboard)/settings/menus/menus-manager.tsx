@@ -70,7 +70,7 @@ export function MenusManager({ referenceData, overrides }: { referenceData: Refe
           <Input value={value} onChange={(event) => setValue(event.target.value)} placeholder={`Add a ${active.label.toLowerCase().replace(/s$/, "")}…`} className="h-9 max-w-xs" />
           <Button type="submit" disabled={pending || !value.trim()} className="h-9"><Plus className="h-4 w-4" /> Add</Button>
         </form>
-        {message && <p className={`text-xs ${message.ok ? "text-green-700" : "text-destructive"}`}>{message.message}</p>}
+        {message && <p className={`text-xs ${message.ok ? "text-success" : "text-destructive"}`}>{message.message}</p>}
 
         <div className="grid gap-2 sm:grid-cols-2">
           {options.map((option) => {

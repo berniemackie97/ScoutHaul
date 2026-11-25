@@ -61,7 +61,7 @@ export function OrderActionsMenu({ id, orderNumber, canCancel }: { id: string; o
         </DropdownMenuContent>
       </DropdownMenu>
       {result && !result.ok && <p className="text-destructive max-w-xs text-right text-xs">{result.message}</p>}
-      {result?.ok && <p className="text-xs text-emerald-700">{result.message}</p>}
+      {result?.ok && <p className="text-xs text-success">{result.message}</p>}
     </div>
   );
 }

@@ -138,7 +138,7 @@ export function RegistrationForm({ profile }: { profile: Profile }) {
       <div className="flex items-center gap-4">
         <SaveButton />
         {state.message ? (
-          <p role="status" className={`text-sm ${state.ok ? "text-green-700 dark:text-green-400" : "text-destructive"}`}>
+          <p role="status" className={`text-sm ${state.ok ? "text-success" : "text-destructive"}`}>
             {state.message}
           </p>
         ) : null}

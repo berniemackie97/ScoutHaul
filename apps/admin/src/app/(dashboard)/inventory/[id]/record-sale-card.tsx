@@ -142,7 +142,7 @@ export function RecordSaleCard({
             <span className={`font-semibold tabular-nums ${net < 0 ? "text-destructive" : ""}`}>{currency(net)}</span>
           </div>
 
-          {state.message && <p className={`text-xs ${state.ok ? "text-green-700" : "text-destructive"}`}>{state.message}</p>}
+          {state.message && <p className={`text-xs ${state.ok ? "text-success" : "text-destructive"}`}>{state.message}</p>}
           <div className="flex gap-2">
             <SaveButton />
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>

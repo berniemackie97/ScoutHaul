@@ -100,7 +100,7 @@ export function LineItems({
                   </td>
                   {anyRefund && (
                     <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums">
-                      {refunded > 0 ? <span className="text-amber-700">{minus(refunded)}</span> : <span className="text-muted-foreground">—</span>}
+                      {refunded > 0 ? <span className="text-warning">{minus(refunded)}</span> : <span className="text-muted-foreground">—</span>}
                     </td>
                   )}
                   <td

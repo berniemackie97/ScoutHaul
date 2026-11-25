@@ -47,7 +47,7 @@ export function CustomerEditor({ customer }: { customer: EditableCustomer }) {
           <Pencil className="h-3.5 w-3.5" /> Edit details
         </button>
         {state.message && (
-          <span className={`text-xs ${state.ok ? "text-green-700" : "text-destructive"}`}>{state.message}</span>
+          <span className={`text-xs ${state.ok ? "text-success" : "text-destructive"}`}>{state.message}</span>
         )}
       </div>
     );

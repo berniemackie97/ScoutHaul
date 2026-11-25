@@ -80,8 +80,8 @@ function Message({ state }: { state: ListingActionResult }) {
     <p
       className={`rounded-lg border px-3 py-2 text-xs ${
         state.ok
-          ? "border-emerald-500/30 bg-emerald-500/5 text-emerald-700"
-          : "border-destructive/30 bg-destructive/5 text-destructive"
+          ? "border-success-border bg-success-surface text-success"
+          : "border-destructive-border bg-destructive-surface text-destructive"
       }`}
     >
       {state.message}
@@ -153,7 +153,7 @@ function ListingRow({
             {listing.quantitySold ? ` · ${listing.quantitySold} sold` : ""}
           </p>
           {linked && (
-            <p className="mt-2 text-sm text-emerald-700">
+            <p className="mt-2 text-sm text-success">
               Linked to {listing.reconciledInventoryItemTitle || "inventory item"}
             </p>
           )}
@@ -208,7 +208,7 @@ function ListingRow({
                 </select>
                 {selectedTarget && (
                   <p
-                    className={`text-xs ${selectedTarget.isSold ? "text-amber-700" : "text-emerald-700"}`}
+                    className={`text-xs ${selectedTarget.isSold ? "text-warning" : "text-success"}`}
                   >
                     {selectedTarget.isSold
                       ? "This links to an already-sold/recorded item. Use this only to fix a historical listing link."

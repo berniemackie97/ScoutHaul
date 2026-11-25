@@ -386,7 +386,7 @@ export function SaleCreator({ channels }: { channels: Channel[] }) {
             {(Number(salesTax) || 0) > 0 && (
               <div className="flex justify-between border-t border-dashed pt-2">
                 <span className="text-muted-foreground">Sales tax {taxRemitted ? "(pass-through)" : "(you owe)"}</span>
-                <span className={taxOwed > 0 ? "text-amber-700" : "text-muted-foreground"}>{currency(taxRemitted ? Number(salesTax) || 0 : taxOwed)}</span>
+                <span className={taxOwed > 0 ? "text-warning" : "text-muted-foreground"}>{currency(taxRemitted ? Number(salesTax) || 0 : taxOwed)}</span>
               </div>
             )}
           </div>
@@ -397,7 +397,7 @@ export function SaleCreator({ channels }: { channels: Channel[] }) {
           )}
         </Card>
         {state.message && (
-          <div className="border-destructive/30 bg-destructive/5 text-destructive rounded-lg border p-3 text-sm">{state.message}</div>
+          <div className="border-destructive-border bg-destructive-surface text-destructive rounded-lg border p-3 text-sm">{state.message}</div>
         )}
         <SaveButton />
       </aside>

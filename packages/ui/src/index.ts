@@ -4,6 +4,7 @@ export { Input } from "./components/input";
 export { Textarea } from "./components/textarea";
 export { Label } from "./components/label";
 export { Badge, badgeVariants, type BadgeProps } from "./components/badge";
+export { Notice, noticeVariants, type NoticeProps } from "./components/notice";
 export { Separator } from "./components/separator";
 export { Avatar, AvatarImage, AvatarFallback } from "./components/avatar";
 export { Tabs, TabsList, TabsTrigger, TabsContent } from "./components/tabs";

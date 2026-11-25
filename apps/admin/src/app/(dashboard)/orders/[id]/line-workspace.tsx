@@ -307,7 +307,7 @@ function ReturnFlow({
               <span
                 className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold ${
                   done
-                    ? "bg-emerald-600 text-white"
+                    ? "bg-success text-white"
                     : active
                       ? "bg-brand-600 text-white"
                       : "bg-muted text-muted-foreground"

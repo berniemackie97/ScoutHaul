@@ -80,7 +80,7 @@ function PendingListing({ listing }: { listing: Pending }) {
       </div>
 
       {state.message ? (
-        <p className={`text-xs ${state.ok ? "text-emerald-700" : "text-amber-700"}`} aria-live="polite">
+        <p className={`text-xs ${state.ok ? "text-success" : "text-warning"}`} aria-live="polite">
           {state.message}
         </p>
       ) : null}

@@ -27,7 +27,7 @@ export default async function SalesTaxSettingsPage() {
       {profile ? (
         <RegistrationForm profile={profile} />
       ) : (
-        <div className="border-destructive/30 bg-destructive/5 text-destructive rounded-xl border p-6 text-sm">The registration could not be loaded.</div>
+        <div className="border-destructive-border bg-destructive-surface text-destructive rounded-xl border p-6 text-sm">The registration could not be loaded.</div>
       )}
     </div>
   );

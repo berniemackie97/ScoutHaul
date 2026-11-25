@@ -106,11 +106,11 @@ export function OrderFulfillment({ order }: { order: FulfillmentOrder }) {
             return (
               <li key={entry.label} className="min-w-0">
                 <div
-                  className={`h-1.5 rounded-full ${entry.done ? "bg-emerald-500" : isCurrent ? "bg-brand-500" : "bg-muted"}`}
+                  className={`h-1.5 rounded-full ${entry.done ? "bg-success" : isCurrent ? "bg-brand-500" : "bg-muted"}`}
                   aria-hidden
                 />
                 <p className={`mt-2 flex items-center gap-1 text-xs font-medium ${entry.done || isCurrent ? "text-foreground" : "text-muted-foreground"}`}>
-                  {entry.done && <Check className="h-3 w-3 shrink-0 text-emerald-600" aria-hidden />}
+                  {entry.done && <Check className="h-3 w-3 shrink-0 text-success" aria-hidden />}
                   <span className="truncate">{entry.label}</span>
                 </p>
                 <p className="text-muted-foreground truncate text-xs">
@@ -224,7 +224,7 @@ export function OrderFulfillment({ order }: { order: FulfillmentOrder }) {
         )}
 
         {result?.message && (
-          <p className={`text-sm ${result.ok ? "text-emerald-700" : "text-destructive"}`} role="status">
+          <p className={`text-sm ${result.ok ? "text-success" : "text-destructive"}`} role="status">
             {result.message}
           </p>
         )}
@@ -236,7 +236,7 @@ export function OrderFulfillment({ order }: { order: FulfillmentOrder }) {
 function Notice({ tone, children }: { tone: "warning" | "muted"; children: React.ReactNode }) {
   const styles =
     tone === "warning"
-      ? "border-amber-500/30 bg-amber-500/5 text-amber-900 dark:text-amber-200"
+      ? "border-warning-border bg-warning-surface text-warning"
       : "bg-muted/40 text-muted-foreground";
   return (
     <div className={`flex gap-2 rounded-lg border p-3 text-sm ${styles}`}>

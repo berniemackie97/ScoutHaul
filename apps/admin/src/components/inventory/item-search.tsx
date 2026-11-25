@@ -102,7 +102,7 @@ export function ItemSearch<T>(props: {
             </li>
           ))}
           {loading && matches.length === 0 ? <li className="text-muted-foreground px-3 py-2 text-xs">Searching…</li> : null}
-          {failed ? <li className="px-3 py-2 text-xs text-red-700">Inventory could not be searched. Try again.</li> : null}
+          {failed ? <li className="px-3 py-2 text-xs text-destructive">Inventory could not be searched. Try again.</li> : null}
           {!loading && !failed && matches.length === 0 ? (
             <li className="text-muted-foreground px-3 py-2 text-xs">
               {query.trim() ? `Nothing that can be added here matches “${query.trim()}”.` : "Nothing left that can be added here."}

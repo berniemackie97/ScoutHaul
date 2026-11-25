@@ -195,8 +195,8 @@ export function BundleCreator({ candidates }: { candidates: InventoryItem[] }) {
           </div>
         </Card>
         <ReadinessChecklist targetStatus={status} facts={readinessFacts} compact />
-        {disabledReason && <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">{disabledReason}</div>}
-        {state.message && <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{state.message}</div>}
+        {disabledReason && <div className="rounded-lg border border-warning-border bg-warning-surface p-3 text-sm text-warning">{disabledReason}</div>}
+        {state.message && <div className="rounded-lg border border-destructive-border bg-destructive-surface p-3 text-sm text-destructive">{state.message}</div>}
         <SubmitButton disabledReason={disabledReason} />
       </aside>
     </form>

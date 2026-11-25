@@ -32,7 +32,7 @@ export function BrowserList({ agents }: { agents: SyncAgent[] }) {
     <section aria-labelledby="browsers-heading" className="space-y-3">
       <h2 id="browsers-heading" className="text-sm font-semibold">Paired browsers</h2>
       <div aria-live="polite">
-        {message ? <p className={`text-sm ${message.ok ? "text-emerald-700" : "text-red-700"}`}>{message.message}</p> : null}
+        {message ? <p className={`text-sm ${message.ok ? "text-success" : "text-destructive"}`}>{message.message}</p> : null}
       </div>
 
       {live.length === 0 ? (
@@ -107,7 +107,7 @@ export function BrowserList({ agents }: { agents: SyncAgent[] }) {
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="text-red-700"
+                    className="text-destructive"
                     disabled={pending}
                     onClick={() => {
                       if (window.confirm(`Disconnect ${agent.name}? Its token stops working immediately, and anything it is running stops.`)) {

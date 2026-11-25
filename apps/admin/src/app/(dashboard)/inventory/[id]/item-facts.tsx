@@ -69,7 +69,7 @@ export function ItemFacts({ item, sale, listings, storeListing }: { item: Invent
           <dt className="text-muted-foreground text-xs">{fact.label}</dt>
           <dd
             className={`mt-1 truncate text-lg font-semibold ${
-              fact.tone === "bad" ? "text-destructive" : fact.tone === "warning" ? "text-amber-700 dark:text-amber-400" : ""
+              fact.tone === "bad" ? "text-destructive" : fact.tone === "warning" ? "text-warning" : ""
             }`}
           >
             {fact.value}

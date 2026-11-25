@@ -23,7 +23,7 @@ export function ReadinessChecklist({
         {blockers.length > 0 ? (
           <span className="text-destructive text-xs">{blockers.length} blocker{blockers.length === 1 ? "" : "s"}</span>
         ) : (
-          <span className="text-green-700 text-xs">No blockers</span>
+          <span className="text-success text-xs">No blockers</span>
         )}
       </div>
       <ul className={compact ? "space-y-1" : "space-y-2"}>
@@ -33,7 +33,7 @@ export function ReadinessChecklist({
             <li key={requirement.id} className="flex items-start gap-2">
               <Icon
                 className={`mt-0.5 h-4 w-4 shrink-0 ${
-                  requirement.met ? "text-green-600" : requirement.severity === "blocker" ? "text-destructive" : "text-amber-600"
+                  requirement.met ? "text-success" : requirement.severity === "blocker" ? "text-destructive" : "text-warning"
                 }`}
               />
               <span className={requirement.met ? "text-muted-foreground" : ""}>{requirement.label}</span>

@@ -129,7 +129,7 @@ export function ChannelManager({ accounts, channels }: { accounts: Account[]; ch
                 </button>
               )}
               {state.message && (
-                <span className={`text-sm ${state.ok ? "text-green-700" : "text-destructive"}`}>{state.message}</span>
+                <span className={`text-sm ${state.ok ? "text-success" : "text-destructive"}`}>{state.message}</span>
               )}
             </div>
           </form>
@@ -138,7 +138,7 @@ export function ChannelManager({ accounts, channels }: { accounts: Account[]; ch
 
       <div className="space-y-3">
         <h2 className="text-lg font-semibold">Connected channels</h2>
-        {rowMessage && <p className={`text-sm ${rowMessage.ok ? "text-green-700" : "text-destructive"}`}>{rowMessage.message}</p>}
+        {rowMessage && <p className={`text-sm ${rowMessage.ok ? "text-success" : "text-destructive"}`}>{rowMessage.message}</p>}
         {accounts.length === 0 ? (
           <div className="bg-muted/20 text-muted-foreground rounded-xl border border-dashed p-10 text-center text-sm">
             <Plug className="mx-auto mb-2 h-5 w-5" /> No channels connected yet. Add your storefront and marketplaces above.

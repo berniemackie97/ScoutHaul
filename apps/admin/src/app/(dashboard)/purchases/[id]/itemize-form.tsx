@@ -124,7 +124,7 @@ export function ItemizeForm({ lotId, allocationMethod }: { lotId: string; alloca
             <SubmitButton count={payload.length} />
           </div>
           {state.message && (
-            <div className={`rounded-lg border p-3 text-sm ${state.ok ? "border-green-200 bg-green-50 text-green-800" : "border-destructive/30 bg-destructive/5 text-destructive"}`}>
+            <div className={`rounded-lg border p-3 text-sm ${state.ok ? "border-success-border bg-success-surface text-success" : "border-destructive-border bg-destructive-surface text-destructive"}`}>
               {state.message}
             </div>
           )}

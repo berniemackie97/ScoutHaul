@@ -225,7 +225,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                 </div>
                 <div className="mt-3 flex items-baseline justify-between border-t pt-3">
                   <span className="font-semibold">True net profit</span>
-                  <span className={`text-lg font-semibold tabular-nums ${saleFinancials.netProfit < 0 ? "text-destructive" : "text-emerald-700 dark:text-emerald-400"}`}>
+                  <span className={`text-lg font-semibold tabular-nums ${saleFinancials.netProfit < 0 ? "text-destructive" : "text-success"}`}>
                     {formatCurrency(saleFinancials.netProfit)}
                   </span>
                 </div>
@@ -292,7 +292,7 @@ function MoneyRow({
   warn?: boolean;
 }) {
   return (
-    <div className={`flex justify-between gap-4 ${strong ? "border-t pt-1.5 font-semibold" : ""} ${warn ? "text-amber-700" : ""}`}>
+    <div className={`flex justify-between gap-4 ${strong ? "border-t pt-1.5 font-semibold" : ""} ${warn ? "text-warning" : ""}`}>
       <span className={strong || warn ? "" : "text-muted-foreground"}>{label}</span>
       <span className="tabular-nums whitespace-nowrap">
         {negative && value > 0 ? "−" : ""}

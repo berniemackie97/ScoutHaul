@@ -59,7 +59,7 @@ export function TeamAccess({ orgId, members, roles, permissions, codes }: { orgI
 
   return (
     <div className="space-y-6">
-      {rowMsg && <p className={`text-sm ${rowMsg.ok ? "text-green-700" : "text-destructive"}`}>{rowMsg.message}</p>}
+      {rowMsg && <p className={`text-sm ${rowMsg.ok ? "text-success" : "text-destructive"}`}>{rowMsg.message}</p>}
 
       {/* Members */}
       <Card>
@@ -159,7 +159,7 @@ export function TeamAccess({ orgId, members, roles, permissions, codes }: { orgI
               <FieldError message={inviteErrors.roleId} />
             </div>
             <div className="self-start"><Submit label="Invite" /></div>
-            {inviteState.message && <p className={`text-xs sm:col-span-4 ${inviteState.ok ? "text-green-700" : "text-destructive"}`}>{inviteState.message}</p>}
+            {inviteState.message && <p className={`text-xs sm:col-span-4 ${inviteState.ok ? "text-success" : "text-destructive"}`}>{inviteState.message}</p>}
           </form>
         </CardContent>
       </Card>
@@ -225,7 +225,7 @@ export function TeamAccess({ orgId, members, roles, permissions, codes }: { orgI
                 <FieldError message={roleErrors.permissions} />
               </div>
               <p className="text-muted-foreground text-xs">Owner-level access stays system-governed. Custom roles must grant explicit permissions.</p>
-              <div className="flex items-center gap-3"><Submit label="Create role" />{roleState.message && <span className={`text-xs ${roleState.ok ? "text-green-700" : "text-destructive"}`}>{roleState.message}</span>}</div>
+              <div className="flex items-center gap-3"><Submit label="Create role" />{roleState.message && <span className={`text-xs ${roleState.ok ? "text-success" : "text-destructive"}`}>{roleState.message}</span>}</div>
             </form>
           </details>
         </CardContent>
@@ -251,9 +251,9 @@ export function TeamAccess({ orgId, members, roles, permissions, codes }: { orgI
             </div>
           )}
           {codeState.code && (
-            <div className="flex items-center justify-between rounded-lg border border-green-300 bg-green-50 p-2 text-sm">
+            <div className="flex items-center justify-between rounded-lg border border-success-border bg-success-surface p-2 text-sm">
               <span className="font-mono">{codeState.code}</span>
-              <button type="button" onClick={() => navigator.clipboard?.writeText(codeState.code!)} className="text-green-800 inline-flex items-center gap-1 text-xs"><Copy className="h-3 w-3" /> Copy</button>
+              <button type="button" onClick={() => navigator.clipboard?.writeText(codeState.code!)} className="text-success inline-flex items-center gap-1 text-xs"><Copy className="h-3 w-3" /> Copy</button>
             </div>
           )}
           <form action={codeAction} className="grid gap-2 rounded-lg border bg-muted/20 p-3 sm:grid-cols-[1fr_160px_120px_auto]">
@@ -291,7 +291,7 @@ export function TeamAccess({ orgId, members, roles, permissions, codes }: { orgI
               <FieldError message={codeErrors.maxUses} />
             </div>
             <div className="self-start"><Submit label="Create code" /></div>
-            {codeState.message && !codeState.code && <p className={`text-xs sm:col-span-4 ${codeState.ok ? "text-green-700" : "text-destructive"}`}>{codeState.message}</p>}
+            {codeState.message && !codeState.code && <p className={`text-xs sm:col-span-4 ${codeState.ok ? "text-success" : "text-destructive"}`}>{codeState.message}</p>}
           </form>
         </CardContent>
       </Card>
@@ -361,7 +361,7 @@ function RoleCard({ orgId, role, permissions, onDone }: { orgId: string; role: R
       </div>
       <div className="flex items-center gap-3">
         <Submit label="Save changes" />
-        {state.message && <span className={`text-xs ${state.ok ? "text-green-700" : "text-destructive"}`}>{state.message}</span>}
+        {state.message && <span className={`text-xs ${state.ok ? "text-success" : "text-destructive"}`}>{state.message}</span>}
       </div>
     </form>
   );

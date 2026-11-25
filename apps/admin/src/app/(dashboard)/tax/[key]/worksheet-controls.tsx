@@ -36,7 +36,7 @@ export function CopyValue({ value, label }: { value: string; label: string }) {
       aria-label={`Copy ${label}`}
       title={`Copy ${value}`}
     >
-      {copied ? <Check className="h-3.5 w-3.5 text-green-600" aria-hidden /> : <Copy className="h-3.5 w-3.5" aria-hidden />}
+      {copied ? <Check className="h-3.5 w-3.5 text-success" aria-hidden /> : <Copy className="h-3.5 w-3.5" aria-hidden />}
     </button>
   );
 }
@@ -75,7 +75,7 @@ function ActionForm({ action, children, className, hidden }: { action: Action; c
       ))}
       {children}
       {state.message ? (
-        <p role="status" className={`mt-2 text-xs ${state.ok ? "text-green-700 dark:text-green-400" : "text-destructive"}`}>
+        <p role="status" className={`mt-2 text-xs ${state.ok ? "text-success" : "text-destructive"}`}>
           {state.message}
         </p>
       ) : null}
@@ -136,7 +136,7 @@ export function FilingForm({
         </label>
       </div>
       {warningCount > 0 ? (
-        <label className="flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-100">
+        <label className="flex items-start gap-3 rounded-lg border border-warning-border bg-warning-surface p-3 text-sm text-warning">
           <input type="checkbox" name="acknowledge" required className="mt-1 h-4 w-4" />
           <span>I reviewed the {warningCount} warning{warningCount === 1 ? "" : "s"} above and the return is right as it stands.</span>
         </label>

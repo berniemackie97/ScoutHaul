@@ -28,7 +28,7 @@ export function StatCard({
   tone?: "default" | "warning" | "danger";
 }) {
   const valueTone =
-    tone === "danger" ? "text-destructive" : tone === "warning" ? "text-amber-600 dark:text-amber-500" : "";
+    tone === "danger" ? "text-destructive" : tone === "warning" ? "text-warning" : "";
 
   const body = (
     <>
