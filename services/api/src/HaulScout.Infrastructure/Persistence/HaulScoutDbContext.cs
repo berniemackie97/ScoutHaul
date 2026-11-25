@@ -77,6 +77,7 @@ public sealed class HaulScoutDbContext(
     public DbSet<OrgReferenceOverride> OrgReferenceOverrides => Set<OrgReferenceOverride>();
     public DbSet<PlatformOrder> PlatformOrders => Set<PlatformOrder>();
     public DbSet<PlatformListing> PlatformListings => Set<PlatformListing>();
+    public DbSet<WorkSnooze> WorkSnoozes => Set<WorkSnooze>();
     public DbSet<SyncRun> SyncRuns => Set<SyncRun>();
     public DbSet<SyncRunIssue> SyncRunIssues => Set<SyncRunIssue>();
     public DbSet<SyncArtifact> SyncArtifacts => Set<SyncArtifact>();
@@ -1058,6 +1059,16 @@ public sealed class HaulScoutDbContext(
             entity.HasIndex(item => new { item.OrganizationId, item.Status });
             entity.HasIndex(item => new { item.ChannelAccountId, item.Loop, item.Status });
             entity.HasOne(item => item.ChannelAccount).WithMany().HasForeignKey(item => item.ChannelAccountId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<WorkSnooze>(entity =>
+        {
+            entity.ToTable("WorkSnoozes");
+            entity.Property(item => item.TaskKey).HasMaxLength(200).IsRequired();
+            entity.Property(item => item.Wait).HasConversion<string>().HasMaxLength(16);
+            entity.Property(item => item.Note).HasMaxLength(500);
+            entity.Property(item => item.Title).HasMaxLength(300);
+            entity.HasIndex(item => new { item.OrganizationId, item.TaskKey }).IsUnique();
         });
 
         modelBuilder.Entity<SyncRunIssue>(entity =>

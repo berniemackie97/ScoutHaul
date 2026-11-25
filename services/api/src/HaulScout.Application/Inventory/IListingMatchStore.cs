@@ -20,6 +20,9 @@ public sealed record MatchPoolItem(
 
 public interface IListingMatchStore
 {
+    /// <summary>Imported listings still waiting to be matched to an item.</summary>
+    Task<int> CountPendingAsync(Guid organizationId, CancellationToken cancellationToken);
+
     Task<PlatformListing?> FindListingAsync(Guid organizationId, Guid listingId, CancellationToken cancellationToken);
 
     /// <summary>

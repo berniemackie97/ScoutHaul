@@ -4690,6 +4690,53 @@ namespace HaulScout.Infrastructure.Persistence.Migrations
                     b.ToTable("WishlistItems", (string)null);
                 });
 
+            modelBuilder.Entity("HaulScout.Domain.Entities.WorkSnooze", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("TaskKey")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Title")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<DateTimeOffset?>("Until")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Wait")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrganizationId", "TaskKey")
+                        .IsUnique();
+
+                    b.ToTable("WorkSnoozes", (string)null);
+                });
+
             modelBuilder.Entity("HaulScout.Domain.Entities.AcquisitionLot", b =>
                 {
                     b.HasOne("HaulScout.Domain.Entities.Organization", "Organization")

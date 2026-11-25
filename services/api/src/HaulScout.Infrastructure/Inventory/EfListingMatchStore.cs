@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using HaulScout.Application.Inventory;
+using HaulScout.Domain;
 using HaulScout.Domain.Entities;
 using HaulScout.Infrastructure.Persistence;
 
@@ -7,6 +8,9 @@ namespace HaulScout.Infrastructure.Inventory;
 
 public sealed class EfListingMatchStore(HaulScoutDbContext db) : IListingMatchStore
 {
+    public Task<int> CountPendingAsync(Guid organizationId, CancellationToken cancellationToken) =>
+        db.PlatformListings.CountAsync(listing => listing.OrganizationId == organizationId && listing.ReconcileStatus == PlatformListingReconcileStatus.Pending, cancellationToken);
+
     public Task<PlatformListing?> FindListingAsync(Guid organizationId, Guid listingId, CancellationToken cancellationToken) =>
         db.PlatformListings.AsNoTracking().FirstOrDefaultAsync(listing => listing.OrganizationId == organizationId && listing.Id == listingId, cancellationToken);
 

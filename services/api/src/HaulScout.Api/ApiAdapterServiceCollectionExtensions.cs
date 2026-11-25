@@ -30,6 +30,7 @@ public static class ApiAdapterServiceCollectionExtensions
         services.AddScoped<OrdersWorkflowService>();
         services.AddScoped<BusinessReportService>();
         services.AddScoped<OperatorConsoleService>();
+        services.AddScoped<WorkInboxService>();
         services.AddScoped<PlatformListingImportService>();
         services.AddScoped<IPlatformListingIngestion>(provider => provider.GetRequiredService<PlatformListingImportService>());
         services.AddScoped<ReportImportService>();
