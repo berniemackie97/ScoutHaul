@@ -229,6 +229,7 @@ public sealed class EfPlatformOrderStore(
         await db.PlatformOrders
             .Include(order => order.Lines).ThenInclude(line => line.InventoryItem)
             .Where(order => order.OrganizationId == organizationId
+                && order.Status == PlatformOrderStatus.Reconciled
                 && order.CancelledOnPlatformAt != null
                 && order.CancellationOutcome == PlatformOrderCancellationOutcome.None)
             .OrderBy(order => order.CancelledOnPlatformAt)

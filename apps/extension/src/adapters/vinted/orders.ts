@@ -7,9 +7,10 @@ export interface VintedMoney {
   currency_code?: string | null;
 }
 
-/** One sale in the seller's order list (`/api/v2/my_orders?type=sold`). */
+/** One sale in the seller's escrow-orders list. */
 export interface VintedOrderRow {
   transaction_id?: number | string;
+  escrow_order_id?: number | string;
   date?: string;
   price?: VintedMoney;
   status?: string;
@@ -22,23 +23,19 @@ export interface VintedOrderList {
   pagination?: { current_page?: number; total_pages?: number; total_entries?: number };
 }
 
-/** The parts of a transaction (`/api/v2/transactions/{id}`) a sale is recorded from. */
-export interface VintedTransaction {
-  transaction?: {
+/** The fields read from the seller's escrow receipt. */
+export interface VintedEscrowReceipt {
+  escrow_order?: {
     id?: number | string;
-    item_id?: number | string | null;
-    item_title?: string | null;
-    title?: string | null;
-    debit_processed_at?: string | null;
+    current_user_side?: string;
+    seller_id?: number | string;
+    is_seller_business?: boolean | null;
+    created_at?: string | null;
     buyer?: { login?: string | null } | null;
-    seller?: { business?: boolean | null } | null;
-    offer?: { price?: VintedMoney | null } | null;
-    service_fee?: VintedMoney | null;
-    shipment?: { status_title?: string | null } | null;
-    order?: {
-      custom_shipment?: boolean | null;
-      custom_shipment_price?: VintedMoney | string | number | null;
-      items?: { id?: number | string; title?: string | null; price?: VintedMoney | null }[] | null;
+    items?: { item_id?: number | string | null; title?: string | null }[] | null;
+    payment_data?: {
+      items_price?: { price?: VintedMoney | null } | null;
+      service_fee_price?: { price?: VintedMoney | null } | null;
     } | null;
   };
 }
@@ -74,16 +71,15 @@ export function fulfillment(row: VintedOrderRow, shipment: string | null): { sta
 /** Where a sale stands: under way, done and paid out, or called off. */
 export type SaleState = "open" | "completed" | "cancelled";
 
-/** `transaction_user_status` from the seller's side: `completed`; `failed` for a cancelled or refunded sale; otherwise still under way. */
+/** Vinted also shows terminal outcomes in the order's display status. */
 export function saleState(row: VintedOrderRow): SaleState {
-  switch (row.transaction_user_status) {
-    case "completed":
-      return "completed";
-    case "failed":
-      return "cancelled";
-    default:
-      return "open";
+  const status = row.status?.trim() ?? "";
+  if (row.transaction_user_status === "failed"
+    || /^(?:(?:order )?cancell?ed|(?:payment (?:was )?)?(?:fully )?refunded|refund processed)(?:[.!]|$)/i.test(status)) {
+    return "cancelled";
   }
+
+  return row.transaction_user_status === "completed" ? "completed" : "open";
 }
 
 /** Everything about a sale in the list that, when it changes, means the sale must be read again. */
@@ -101,74 +97,76 @@ export function amount(value: VintedMoney | string | number | null | undefined):
 /**
  * One Vinted sale, as HaulScout records it. On Vinted the buyer pays the fee — Buyer Protection —
  * and the shipping, on a label Vinted prepays; an individual seller pays neither and receives the
- * price agreed. So the fees are none, the label costs the seller nothing, and the payout is that
- * price once the sale completes — before then it is not the seller's yet. A seller's own shipping,
- * where Vinted allows it, is what the buyer paid for it, and costs what the seller paid, unknown here.
+ * price agreed. The receipt names the items and sale price. For a US consumer sale, Vinted
+ * collects shipping and Buyer Protection from the buyer.
  */
-export function toIngestOrder(row: VintedOrderRow, detail: VintedTransaction): { order: IngestOrder | null; issues: RunIssue[] } {
+export function toIngestOrder(row: VintedOrderRow, detail: VintedEscrowReceipt, sellerId: string | null): { order: IngestOrder | null; issues: RunIssue[] } {
   const id = String(row.transaction_id);
   const reject = (message: string) => ({ order: null, issues: [{ message, externalReference: id, rejected: true }] });
-  const transaction = detail.transaction;
-  if (!transaction) {
-    return reject("Vinted did not return this sale's details.");
+  const receipt = detail.escrow_order;
+  if (!receipt || String(receipt.id) !== String(row.escrow_order_id ?? row.transaction_id)
+    || receipt.current_user_side !== "seller" || (sellerId !== null && String(receipt.seller_id) !== sellerId)) {
+    return reject("Vinted did not return the matching seller receipt.");
   }
 
-  const price = amount(transaction.offer?.price) ?? amount(row.price);
+  const itemPrice = receipt.payment_data?.items_price?.price;
+  const price = amount(itemPrice) ?? amount(row.price);
   if (price === null) {
     return reject("The sale price could not be read.");
   }
 
-  const paidAt = Date.parse(transaction.debit_processed_at ?? "");
-  const orderedAt = Number.isFinite(paidAt) ? paidAt : Date.parse(row.date ?? "");
+  const orderedAt = Date.parse(receipt.created_at ?? "");
   if (!Number.isFinite(orderedAt)) {
-    return reject(`The sale time "${row.date ?? ""}" could not be read.`);
+    return reject("The receipt's order time could not be read.");
   }
 
-  const items = transaction.order?.items?.length
-    ? transaction.order.items.map((item) => ({ id: item.id, title: item.title, listed: amount(item.price) }))
-    : [{ id: transaction.item_id, title: transaction.item_title ?? transaction.title, listed: null }];
-  const shares = allocate(price, items.map((item) => item.listed));
+  const items = receipt.items;
+  if (!items?.length) {
+    return reject("The receipt did not list any items.");
+  }
+
+  const shares = allocate(price, items.map(() => null));
   const lines: IngestOrderLine[] = items.map((item, index) => ({
     title: item.title?.trim() || row.title?.trim() || "Untitled Vinted item",
     unitPrice: shares[index]!,
     quantity: 1,
-    externalItemId: item.id === null || item.id === undefined ? null : String(item.id),
+    externalItemId: item.item_id === null || item.item_id === undefined ? null : String(item.item_id),
   }));
 
   const issues: RunIssue[] = [];
-  if (transaction.seller?.business) {
+  const business = receipt.is_seller_business === true;
+  if (business) {
     issues.push({
-      message: "This Vinted account sells as a business. Vinted's business fees are not read, so this sale's fees are recorded as none.",
+      message: "This Vinted account sells as a business. Its seller fees and payout need review.",
       externalReference: id,
       rejected: false,
     });
   }
 
-  const ownShipping = transaction.order?.custom_shipment === true;
-  const shipping = ownShipping ? amount(transaction.order?.custom_shipment_price) ?? 0 : 0;
   const completed = saleState(row) === "completed";
-  const stage = fulfillment(row, transaction.shipment?.status_title || null);
+  const stage = fulfillment(row, null);
   return {
     order: {
       externalOrderId: id,
       orderedAt: new Date(orderedAt).toISOString(),
-      paidAt: Number.isFinite(paidAt) ? new Date(paidAt).toISOString() : null,
+      paidAt: null,
       itemsSubtotal: price,
-      shippingCharged: shipping,
+      shippingCharged: 0,
       // Vinted collects and remits US sales tax; none of it passes through the seller.
       taxCollected: 0,
       taxRemittedByPlatform: true,
-      feeTotal: 0,
-      shippingCost: ownShipping ? null : 0,
-      payoutAmount: completed ? cents(price + shipping) : null,
-      feeBreakdownJson: JSON.stringify({ source: "Vinted transaction", paidByBuyer: { buyerProtection: amount(transaction.service_fee) } }),
-      currency: (row.price?.currency_code ?? "USD").toUpperCase(),
+      feeTotal: business ? null : 0,
+      feesPending: business,
+      shippingCost: business ? null : 0,
+      payoutAmount: completed && !business ? price : null,
+      feeBreakdownJson: JSON.stringify({ source: "Vinted escrow order", paidByBuyer: { buyerProtection: amount(receipt.payment_data?.service_fee_price?.price) } }),
+      currency: (itemPrice?.currency_code ?? row.price?.currency_code ?? "USD").toUpperCase(),
       platform: "Vinted",
       lines,
-      buyerReference: transaction.buyer?.login ?? null,
+      buyerReference: receipt.buyer?.login ?? null,
       fulfillmentStage: stage.stage,
       fulfillmentDetail: stage.detail,
-      rawJson: JSON.stringify({ status: row.status ?? null, sellerStatus: row.transaction_user_status ?? null, shipment: transaction.shipment?.status_title || null }),
+      rawJson: JSON.stringify({ status: row.status ?? null, sellerStatus: row.transaction_user_status ?? null }),
     },
     issues,
   };

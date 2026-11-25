@@ -1,5 +1,5 @@
 import type { VintedWardrobe, VintedWardrobeItem } from "../adapters/vinted/listings";
-import type { VintedOrderList, VintedOrderRow, VintedTransaction } from "../adapters/vinted/orders";
+import type { VintedEscrowReceipt, VintedOrderList, VintedOrderRow } from "../adapters/vinted/orders";
 
 /**
  * Synthetic Vinted API responses with the same shape as the real ones, and made-up values. No real
@@ -12,6 +12,7 @@ const statusText = { open: "Payment successful!", completed: "Order completed su
 export function orderRow(id: number, date: string, price: string, state: keyof typeof userStatus = "completed"): VintedOrderRow {
   return {
     transaction_id: id,
+    escrow_order_id: id,
     date,
     price: { amount: price, currency_code: "USD" },
     status: statusText[state],
@@ -26,29 +27,25 @@ export function orderList(rows: VintedOrderRow[], page: number, totalPages: numb
 
 export interface FixtureSale {
   price: string;
-  items?: { id: number; title: string; listed: string }[];
-  paidAt?: string;
+  items?: { id: number; title: string }[];
+  createdAt?: string;
   business?: boolean;
-  ownShipping?: string;
 }
 
-export function transaction(id: number, sale: FixtureSale): VintedTransaction {
-  const items = sale.items ?? [{ id: id * 10, title: `Test item ${id}`, listed: sale.price }];
+export function escrowReceipt(id: number, sale: FixtureSale): VintedEscrowReceipt {
+  const items = sale.items ?? [{ id: id * 10, title: `Test item ${id}` }];
   return {
-    transaction: {
+    escrow_order: {
       id,
-      item_id: items[0]!.id,
-      title: items[0]!.title,
-      debit_processed_at: sale.paidAt ?? "2026-09-15T03:45:17-06:00",
+      current_user_side: "seller",
+      seller_id: 5550001,
+      created_at: sale.createdAt ?? "2026-09-15T03:45:17-06:00",
       buyer: { login: "test_buyer" },
-      seller: { business: sale.business ?? false },
-      offer: { price: { amount: sale.price, currency_code: "USD" } },
-      service_fee: { amount: "1.13", currency_code: "USD" },
-      shipment: { status_title: "Package delivered." },
-      order: {
-        custom_shipment: sale.ownShipping !== undefined,
-        custom_shipment_price: sale.ownShipping ?? null,
-        items: items.map((item) => ({ id: item.id, title: item.title, price: { amount: item.listed, currency_code: "USD" } })),
+      is_seller_business: sale.business ?? false,
+      items: items.map((item) => ({ item_id: item.id, title: item.title })),
+      payment_data: {
+        items_price: { price: { amount: sale.price, currency_code: "USD" } },
+        service_fee_price: { price: { amount: "1.13", currency_code: "USD" } },
       },
     },
   };

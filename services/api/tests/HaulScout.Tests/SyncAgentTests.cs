@@ -520,12 +520,23 @@ public sealed class SyncAgentTests
         SyncRunDto done = (await harness.As(agent).CompleteRunAsync(next.RunId, new CompleteAgentRunRequest(), CancellationToken.None)).Value!;
 
         Assert.Equal(1, batch.Updated);
-        Assert.Equal(PlatformOrderStatus.Ignored, (await harness.Db.PlatformOrders.SingleAsync(order => order.ExternalOrderId == "26-15152-72360")).Status);
+        PlatformOrder setAside = await harness.Db.PlatformOrders.SingleAsync(order => order.ExternalOrderId == "26-15152-72360");
+        Assert.Equal(PlatformOrderStatus.Ignored, setAside.Status);
+        Assert.NotNull(setAside.CancelledOnPlatformAt);
+        Assert.False(setAside.AwaitingCancellationDecision);
         Assert.Equal(PlatformOrderStatus.Reconciled, (await harness.Db.PlatformOrders.SingleAsync(order => order.ExternalOrderId == "07-15174-93677")).Status);
+        Assert.False(await harness.Db.PlatformOrders.AnyAsync(order => order.ExternalOrderId == "11-11111-11111"));
         SyncRunIssue issue = Assert.Single(await harness.Db.SyncRunIssues.Where(candidate => candidate.SyncRunId == next.RunId).ToListAsync());
         Assert.Equal("07-15174-93677", issue.ExternalReference);
         Assert.StartsWith("eBay cancelled this order after it was recorded as a sale.", issue.Message);
         Assert.Equal("CompletedWithIssues", done.Status);
+
+        AgentRunDto retry = (await harness.StartAsync(agent, SyncLoopKind.Sales)).Value!;
+        AgentRunBatchResultDto repeated = (await harness.As(agent).AddBatchAsync(retry.RunId,
+            new AgentRunBatchRequest(CancelledOrderIds: ["26-15152-72360", "07-15174-93677"]), CancellationToken.None)).Value!;
+        Assert.Equal(0, repeated.Updated);
+        Assert.False(await harness.Db.SyncRunIssues.AnyAsync(candidate => candidate.SyncRunId == retry.RunId));
+        await harness.As(agent).CompleteRunAsync(retry.RunId, new CompleteAgentRunRequest(), CancellationToken.None);
 
         // Cancellations are a sales run's to deliver.
         AgentRunDto listings = (await harness.StartAsync(agent, SyncLoopKind.Listings)).Value!;

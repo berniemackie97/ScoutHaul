@@ -30,9 +30,13 @@ const realClock: Clock = { now: () => Date.now(), sleep: (ms) => new Promise((re
  * Runs inside the marketplace's own page, so a request is the site's own — same origin, its own
  * first-party cookies. Must stay self-contained: the browser copies this function into the page.
  */
-async function pageFetch(url: string): Promise<PageResponse> {
+async function pageFetch(url: string, headers: Readonly<Record<string, string>>): Promise<PageResponse> {
   try {
-    const response = await fetch(url, { credentials: "include", redirect: "follow", headers: { Accept: "application/json, text/plain, */*" } });
+    const response = await fetch(url, {
+      credentials: "include",
+      redirect: "follow",
+      headers: { Accept: "application/json, text/plain, */*", ...headers },
+    });
     return { status: response.status, url: response.url, contentType: response.headers.get("content-type"), body: await response.text() };
   } catch (error) {
     return { status: 0, url, contentType: null, body: error instanceof Error ? error.message : String(error) };
@@ -207,9 +211,10 @@ export function assertMarketplaceDestination(adapter: MarketplaceAdapter, addres
   }
 
   const firstParty = target.origin === new URL(adapter.home).origin;
-  const description = action === "request" && adapter.requestDomains?.some((domain) =>
-    target.hostname === domain || target.hostname.endsWith(`.${domain}`));
-  if (target.protocol !== "https:" || target.username || target.password || (!firstParty && !description)) {
+  const api = adapter.apiRequests !== undefined && Object.hasOwn(adapter.apiRequests, target.origin);
+  const extraRequest = action === "request" && (api || adapter.requestDomains?.some((domain) =>
+    target.hostname === domain || target.hostname.endsWith(`.${domain}`)));
+  if (target.protocol !== "https:" || target.username || target.password || (!firstParty && !extraRequest)) {
     throw new AdapterError("SiteChanged", "A marketplace page tried to read outside its permitted destinations.");
   }
 }
@@ -276,8 +281,9 @@ function readTab(tabId: number, adapter: MarketplaceAdapter, clock: Clock, globa
       : browser.scripting.executeScript({ target: { tabId }, world: "MAIN", func: readLoadedPage, args: [global], injectImmediately: true }));
 }
 
-function fetchIn(tabId: number, url: string): Injection {
-  return () => browser.scripting.executeScript({ target: { tabId }, world: "MAIN", func: pageFetch, args: [url], injectImmediately: true });
+function fetchIn(tabId: number, adapter: MarketplaceAdapter, url: string): Injection {
+  const headers = adapter.apiRequests?.[new URL(url).origin] ?? {};
+  return () => browser.scripting.executeScript({ target: { tabId }, world: "MAIN", func: pageFetch, args: [url, headers], injectImmediately: true });
 }
 
 /**
@@ -366,7 +372,7 @@ export class SyncTabs {
       current: (global?: string) => readTab(borrowed, adapter, this.clock, global),
       request: (url: string) => {
         assertMarketplaceDestination(adapter, url, "request");
-        return inTab<PageResponse>(borrowed, adapter, this.clock, fetchIn(borrowed, url), 1);
+        return inTab<PageResponse>(borrowed, adapter, this.clock, fetchIn(borrowed, adapter, url), 1);
       },
       cookie: (name: string) => readCookie(adapter.home, name),
     };
@@ -518,7 +524,7 @@ export class SyncTabs {
           await navigate(adapter.workerUrl, {}, await documentIn(tabId));
         }
 
-        return inTab<PageResponse>(tabId, adapter, this.clock, fetchIn(tabId, url), 1);
+        return inTab<PageResponse>(tabId, adapter, this.clock, fetchIn(tabId, adapter, url), 1);
       },
       cookie: (name: string) => readCookie(adapter.home, name),
     };

@@ -130,17 +130,17 @@ after any gap — so nothing sold while every computer was off is lost. Every ad
 `backfillSales`; for Vinted it is the only route to history.
 
 *As built (Vinted):*
-- **Where the data comes from.** The adapter reads the JSON API Vinted's own pages call: `users/current`,
-  `my_orders?type=sold`, `transactions/{id}` and `wardrobe/{userId}/items`. It reads from a
-  Vinted page, which renews an expired sign-in as it loads.
+- **Where the data comes from.** The adapter reads account and wardrobe data from Vinted and
+  paginates the sold list and receipts through the escrow-orders service used by My orders.
+  It makes those requests from the signed-in Vinted page.
 - **Money.** Each sale lands at the agreed price, with no seller fees; the buyer pays Buyer
   Protection and the prepaid label. It is paid out once the sale completes.
 - **History.** The first scan is the backfill: it reads the whole order history.
 - **Routine scans.** Vinted lists the sales with the latest activity first. The adapter remembers
   each sale it has read (`context.memory`), so a routine scan reads again only what changed.
-- **Cancellations** travel beside the orders (`cancelledOrderIds`). A cancelled order not yet
-  settled is ignored; a settled one is flagged for a person, because sales are never undone
-  automatically.
+- **Cancellations and full refunds** travel beside the orders (`cancelledOrderIds`). HaulScout
+  sets aside imported orders that have not been posted to sales. A cancellation on a posted sale
+  goes to the reconciliation review.
 
 How an adapter reads a marketplace is decided per platform at build time by inspecting that
 marketplace's own web app in our logged-in browser: its **own JSON endpoints** where they exist

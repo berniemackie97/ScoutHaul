@@ -390,9 +390,8 @@ public sealed class PlatformOrderIngestionService(
 
     /// <summary>
     /// Orders a marketplace shows as cancelled. One not yet turned into sales is set aside, as a
-    /// person pressing Ignore would; one already turned into sales cannot be — sales are money, and
-    /// are never undone automatically — so its id comes back for a person to correct. An id never
-    /// imported is nothing to do.
+    /// person pressing Ignore would, with a cancellation recorded for the portal. One already posted
+    /// to sales comes back for a person to review. An id never imported requires no ledger entry.
     /// </summary>
     public async Task<PlatformOrderCancellations> ApplyCancellationsAsync(
         string platform,
@@ -415,16 +414,18 @@ public sealed class PlatformOrderIngestionService(
                 continue;
             }
 
-            if (order.Status == PlatformOrderStatus.Imported)
+            if (order.Status == PlatformOrderStatus.Imported
+                || (order.Status == PlatformOrderStatus.Ignored && order.CancelledOnPlatformAt is null))
             {
                 order.Status = PlatformOrderStatus.Ignored;
+                order.CancelledOnPlatformAt ??= DateTimeOffset.UtcNow;
                 setAside++;
             }
-            else if (order.Status == PlatformOrderStatus.Reconciled)
+            else if (order.Status == PlatformOrderStatus.Reconciled && order.CancelledOnPlatformAt is null)
             {
                 // Recorded as a sale already. Undoing one moves stock and money, so it is written down and put in
                 // front of a person instead of being reversed behind their back.
-                order.CancelledOnPlatformAt ??= DateTimeOffset.UtcNow;
+                order.CancelledOnPlatformAt = DateTimeOffset.UtcNow;
                 stillRecorded.Add(order.ExternalOrderId);
             }
         }
