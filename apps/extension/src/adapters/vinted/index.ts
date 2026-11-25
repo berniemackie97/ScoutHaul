@@ -11,13 +11,16 @@ import {
   type Session,
 } from "../types";
 import { toIngestListing, type VintedWardrobe } from "./listings";
-import { saleStamp, saleState, toIngestOrder, type VintedOrderList, type VintedOrderRow, type VintedTransaction } from "./orders";
-import { assertReadable, lookOn, sessionOnPage, signedInPage, signedOutPage, siteChanged } from "./pages";
+import { saleStamp, saleState, toIngestOrder, type VintedOrderList, type VintedOrderRow, type VintedEscrowReceipt } from "./orders";
+import { assertReadable, lookOn, sessionOnPage, signedInPage, signInPath, signedOut, signedOutPage, siteChanged, type MissingResource } from "./pages";
 
 const origin = "https://www.vinted.com";
+const apiOrigin = "https://api.www.vinted.com";
+const escrowOrders = `${apiOrigin}/escrow-orders/api/v2`;
 
 /** The seller's sold orders — an ordinary Vinted page, and loading one renews a lapsed sign-in. */
 const ordersPage = `${origin}/my_orders?order_type=sold`;
+const ordersPageName = "the sold-orders page";
 
 /** As Vinted's own orders page asks for them. */
 const ordersPerPage = 20;
@@ -52,12 +55,9 @@ type TokenState = "valid" | "expired" | "missing" | "unknown";
 /** One check or scan's reading of Vinted: what it has already done to keep the sign-in fresh. */
 interface Reading {
   renewedAt: number | null;
-  recovered: boolean;
 }
 
-const reading = (): Reading => ({ renewedAt: null, recovered: false });
-
-const signedOut = () => new AdapterError("SignedOut", "The browser is signed out of Vinted.");
+const reading = (): Reading => ({ renewedAt: null });
 
 /** When a token (a JWT) stops working, from the token itself; null when it is not one this can read. */
 export function tokenExpiry(token: string): number | null {
@@ -109,11 +109,7 @@ async function tokenWithin(context: MarketplaceContext, ms: number): Promise<Tok
   return token;
 }
 
-/**
- * Makes sure the next request goes with a live sign-in, because a request without one is exactly what Vinted's bot
- * protection blocks. A token about to lapse is renewed the way Vinted renews it — a page loads — and watched for in the
- * cookie jar; one that does not come back means the sign-in has lapsed, and nothing is asked.
- */
+/** Gives Vinted's page time to refresh its session before issuing a read with an expired or missing token. */
 async function ensureToken(context: MarketplaceContext, read: Reading): Promise<void> {
   // A page that has only just loaded may be renewing it this moment.
   const token = await tokenWithin(context, 2000);
@@ -128,7 +124,7 @@ async function ensureToken(context: MarketplaceContext, read: Reading): Promise<
 
   read.renewedAt = now;
   const page = await context.page(ordersPage);
-  assertReadable(page);
+  assertReadable(page, ordersPageName);
   if (signedOutPage(page)) {
     throw signedOut();
   }
@@ -147,32 +143,26 @@ async function ensureToken(context: MarketplaceContext, read: Reading): Promise<
   throw new AdapterError("SignedOut", "Vinted's sign-in has lapsed. Sign in to Vinted again in this browser.");
 }
 
-/**
- * Asks Vinted's API for JSON, from Vinted's own page, only ever with a live sign-in. A 401 is the end of it: the
- * question is not asked again. The one exception is a browser that cannot see the token — there, Vinted's page may
- * still have been renewing it, so once per check or scan, a page loads, and the question is asked one more time.
- */
-async function readJson<T>(context: MarketplaceContext, path: string, what: string, read: Reading): Promise<T> {
+async function readJson<T>(context: MarketplaceContext, url: string, what: string, read: Reading, missing?: MissingResource): Promise<T> {
   await ensureToken(context, read);
-  let response = await context.request(`${origin}${path}`);
-  if (response.status === 401 && !read.recovered && (await accessToken(context)) === "unknown") {
-    read.recovered = true;
-    const page = await context.page(ordersPage);
-    assertReadable(page);
-    if (signedOutPage(page)) {
-      throw signedOut();
-    }
-
-    await context.sleep?.(3000);
-    response = await context.request(`${origin}${path}`);
+  const response = await context.request(url);
+  assertReadable(response, what, missing);
+  if (signInPath(new URL(response.url).pathname)) {
+    throw signedOut();
   }
 
-  assertReadable(response);
+  let data: unknown;
   try {
-    return JSON.parse(response.body) as T;
+    data = JSON.parse(response.body);
   } catch {
     throw siteChanged(what);
   }
+
+  if (!data || typeof data !== "object" || Array.isArray(data)) {
+    throw siteChanged(what);
+  }
+
+  return data as T;
 }
 
 /**
@@ -180,7 +170,7 @@ async function readJson<T>(context: MarketplaceContext, path: string, what: stri
  * otherwise read in full. A cancelled sale needs no reading — only telling. A sale whose details
  * cannot be read is reported, and left unremembered so the next scan tries it again.
  */
-async function readSale(context: MarketplaceContext, row: VintedOrderRow, read: Reading): Promise<{ order: IngestOrder | null; issues: RunIssue[]; changed: boolean }> {
+async function readSale(context: MarketplaceContext, row: VintedOrderRow, read: Reading, session: Session): Promise<{ order: IngestOrder | null; issues: RunIssue[]; changed: boolean }> {
   const key = `sale:${row.transaction_id}`;
   const stamp = saleStamp(row);
   const known = await context.memory.get<RememberedSale>(key);
@@ -193,9 +183,10 @@ async function readSale(context: MarketplaceContext, row: VintedOrderRow, read: 
     return { order: null, issues: [], changed: true };
   }
 
-  let detail: VintedTransaction;
+  let detail: VintedEscrowReceipt;
   try {
-    detail = await readJson<VintedTransaction>(context, `/api/v2/transactions/${encodeURIComponent(String(row.transaction_id))}`, "sale details", read);
+    const id = encodeURIComponent(String(row.escrow_order_id ?? row.transaction_id));
+    detail = await readJson<VintedEscrowReceipt>(context, `${escrowOrders}/escrow-orders/${id}`, "sale details", read, "Error");
   } catch (error) {
     // Trouble with the whole site stops the scan; trouble with this one sale only skips it.
     if (error instanceof AdapterError && error.kind === "Error") {
@@ -205,7 +196,7 @@ async function readSale(context: MarketplaceContext, row: VintedOrderRow, read: 
     throw error;
   }
 
-  const { order, issues } = toIngestOrder(row, detail);
+  const { order, issues } = toIngestOrder(row, detail, session.marketplaceUserId);
   if (order) {
     await context.memory.set<RememberedSale>(key, { stamp, order });
   }
@@ -221,6 +212,7 @@ async function readSale(context: MarketplaceContext, row: VintedOrderRow, read: 
 export const vintedAdapter: MarketplaceAdapter = {
   platform: "Vinted",
   origins: ["https://*.vinted.com/*"],
+  requestOrigins: [apiOrigin],
   home: origin,
   workerUrl: ordersPage,
   signInUrl: `${origin}/member/login`,
@@ -236,7 +228,7 @@ export const vintedAdapter: MarketplaceAdapter = {
       return "other";
     }
 
-    if (/^\/member\/(login|signup|verif|two_factor|password|reset_password)/i.test(path)) {
+    if (signInPath(path)) {
       return "sign-in";
     }
 
@@ -251,7 +243,7 @@ export const vintedAdapter: MarketplaceAdapter = {
    */
   async detectSession(context: MarketplaceContext, shown?: PageResponse): Promise<Session> {
     const page = shown ?? (await context.page(ordersPage));
-    assertReadable(page);
+    assertReadable(page, shown ? "the open page" : ordersPageName);
     if (signedOutPage(page)) {
       return { signedIn: false, username: null, marketplaceUserId: null };
     }
@@ -265,7 +257,7 @@ export const vintedAdapter: MarketplaceAdapter = {
       throw siteChanged("sign-in state");
     }
 
-    const current = await readJson<{ user?: { id?: number | string | null; login?: string | null } }>(context, "/api/v2/users/current", "account details", reading());
+    const current = await readJson<{ user?: { id?: number | string | null; login?: string | null } }>(context, `${origin}/api/v2/users/current`, "account details", reading());
     const login = current.user?.login?.trim();
     if (!login) {
       throw siteChanged("account details");
@@ -279,7 +271,7 @@ export const vintedAdapter: MarketplaceAdapter = {
   sessionFrom: sessionOnPage,
   look: lookOn,
 
-  async scanSales(context: MarketplaceContext, window: SalesWindow): Promise<SalesScan> {
+  async scanSales(context: MarketplaceContext, window: SalesWindow, session: Session): Promise<SalesScan> {
     const now = context.now();
     const since = window.from?.getTime() ?? null;
     // The first scan, and a history scan, read the whole list. After that a routine scan stops at
@@ -294,9 +286,10 @@ export const vintedAdapter: MarketplaceAdapter = {
     const read = reading();
 
     for (let page = 1; ; page++) {
-      const list = await readJson<VintedOrderList>(context, `/api/v2/my_orders?type=sold&status=all&per_page=${ordersPerPage}&page=${page}`, "orders", read);
+      const what = `the sold-orders list (page ${page})`;
+      const list = await readJson<VintedOrderList>(context, `${escrowOrders}/current-user/escrow-orders?page=${page}&per_page=${ordersPerPage}&type=sold`, what, read);
       if (!Array.isArray(list.my_orders)) {
-        throw siteChanged("orders");
+        throw siteChanged(what);
       }
 
       let changes = 0;
@@ -316,12 +309,14 @@ export const vintedAdapter: MarketplaceAdapter = {
           oldest = Math.min(oldest, at);
         }
 
-        const sale = await readSale(context, row, read);
+        const sale = await readSale(context, row, read, session);
         if (sale.changed) {
           changes++;
-          if (saleState(row) === "cancelled") {
-            cancelledOrderIds.push(String(row.transaction_id));
-          }
+        }
+
+        // The scan may have read this cancellation before HaulScout received its batch.
+        if (saleState(row) === "cancelled") {
+          cancelledOrderIds.push(String(row.transaction_id));
         }
 
         if (sale.order) {
@@ -366,7 +361,7 @@ export const vintedAdapter: MarketplaceAdapter = {
     for (let page = 1; page <= maxPages; page++) {
       const wardrobe = await readJson<VintedWardrobe>(
         context,
-        `/api/v2/wardrobe/${encodeURIComponent(session.marketplaceUserId)}/items?page=${page}&per_page=${itemsPerPage}&order=newest_first`,
+        `${origin}/api/v2/wardrobe/${encodeURIComponent(session.marketplaceUserId)}/items?page=${page}&per_page=${itemsPerPage}&order=newest_first`,
         "listings",
         read);
       if (!Array.isArray(wardrobe.items)) {

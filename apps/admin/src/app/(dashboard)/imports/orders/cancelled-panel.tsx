@@ -25,8 +25,9 @@ export function CancelledAfterSalePanel({ orders }: { orders: PlatformOrder[] })
         Cancelled after they were recorded as sales
       </h2>
       <p className="text-muted-foreground text-sm">
-        The marketplace says these orders were cancelled, but they are already on the books. Reversing one puts its
-        item back in stock and takes the money off; keeping one leaves the sale exactly as it is.
+        The marketplace reported a cancellation or full refund on these sales. Reverse a sale that never settled when
+        its items are back in stock. If you received a payout, record the refund against the original sale before
+        closing the review.
       </p>
       <div className="grid gap-3">
         {orders.map((order) => (
@@ -55,7 +56,7 @@ function CancelledOrder({ order }: { order: PlatformOrder }) {
               {formatCurrency(order.itemsSubtotal)}
             </p>
             <p className="text-muted-foreground mt-1 text-xs">
-              Cancelled on {order.platform} {order.cancelledOnPlatformAt ? formatDate(order.cancelledOnPlatformAt) : ""}
+              Reported by {order.platform} {order.cancelledOnPlatformAt ? formatDate(order.cancelledOnPlatformAt) : ""}
             </p>
           </div>
         </div>

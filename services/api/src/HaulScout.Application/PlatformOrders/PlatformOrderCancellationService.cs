@@ -46,6 +46,11 @@ public sealed class PlatformOrderCancellationService(
             return AppResult<PlatformOrderDto>.Ok(PlatformOrderDtoFactory.ToPlatformOrderDto(order));
         }
 
+        if (!order.AwaitingCancellationDecision)
+        {
+            return AppResult<PlatformOrderDto>.Validation("This order was set aside before it was posted to sales.");
+        }
+
         if (request.Outcome == PlatformOrderCancellationOutcome.Kept && string.IsNullOrWhiteSpace(request.Note))
         {
             return AppResult<PlatformOrderDto>.Validation("Keeping a cancelled sale needs a reason.");

@@ -15,12 +15,13 @@ export default async function PlatformOrdersPage() {
   if (refused) return refused;
 
   const api = await getApiClient();
-  const [openResult, reconciledResult, cancelledResult, autoMatchResult] = await Promise.all([
+  const [openResult, reconciledResult, cancelledResult, ignoredResult, autoMatchResult] = await Promise.all([
     api.GET("/api/platform-orders", { params: { query: { status: "Imported" } } }),
     api.GET("/api/platform-orders", { params: { query: { status: "Reconciled" } } }),
     // Asked for on its own: the reconciled list is capped, and a cancellation that falls off the end of it is a
     // question nobody could answer.
     api.GET("/api/platform-orders/cancellations", {}),
+    api.GET("/api/platform-orders", { params: { query: { status: "Ignored" } } }),
     // A preview only — it reports what could be settled and writes nothing.
     api.GET("/api/platform-orders/auto-match/preview", {}),
   ]);
@@ -28,6 +29,9 @@ export default async function PlatformOrdersPage() {
   const openOrders = openResult.data ?? [];
   const reconciled = reconciledResult.data ?? [];
   const cancelled = cancelledResult.data ?? [];
+  const setAside = (ignoredResult.data ?? [])
+    .filter((order) => order.cancelledOnPlatformAt)
+    .sort((a, b) => Date.parse(b.cancelledOnPlatformAt!) - Date.parse(a.cancelledOnPlatformAt!));
   const flagged = openOrders.filter(
     (order) => typeof order.payoutAmount === "number" && Math.abs(order.payoutVariance ?? 0) >= 0.01
   ).length;
@@ -111,6 +115,26 @@ export default async function PlatformOrdersPage() {
         <h2 className="text-sm font-semibold">Needs your decision</h2>
         <PlatformOrderReconciler orders={openOrders} />
       </section>
+
+      {setAside.length > 0 && (
+        <section className="space-y-3" aria-labelledby="set-aside-heading">
+          <h2 id="set-aside-heading" className="text-sm font-semibold">Cancelled before reconciliation</h2>
+          <p className="text-muted-foreground text-sm">
+            The marketplace reported a cancellation or full refund. These orders were set aside before posting to sales.
+          </p>
+          <ul className="bg-card divide-y rounded-xl border">
+            {setAside.map((order) => (
+              <li key={order.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm">
+                <div>
+                  <p className="font-medium">{order.platform} order {order.externalOrderId}</p>
+                  <p className="text-muted-foreground text-xs">Seen {formatDate(order.cancelledOnPlatformAt)}</p>
+                </div>
+                <Badge variant="secondary">Set aside</Badge>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {reconciled.length > 0 && (
         <section className="space-y-3">

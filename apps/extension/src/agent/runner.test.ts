@@ -8,7 +8,7 @@ import { keepingLease, preflight, runWork, type RunnerDeps } from "./runner";
 import { activityItem, governorItem, sessionsItem } from "./storage";
 import type { MarketplaceTab } from "./transport";
 import { servedTab, type Route } from "../test/tabs";
-import { orderList, orderRow, transaction, vintedPage } from "../test/vinted-fixtures";
+import { escrowReceipt, orderList, orderRow, vintedPage } from "../test/vinted-fixtures";
 import type { Heartbeat, Work } from "./types";
 
 const account = "3f2b8c1e-0000-4000-8000-000000000001";
@@ -181,9 +181,9 @@ describe("running one piece of work", () => {
     const { api, deps, tab } = harness({
       "/my_orders": vintedPage(true),
       "/api/v2/users/current": JSON.stringify({ user: { id: 5550001, login: "test_seller" } }),
-      "/api/v2/my_orders": JSON.stringify(orderList(rows, 1, 1)),
-      "/api/v2/transactions/1000": JSON.stringify(transaction(1000, { price: "8.5" })),
-      "/api/v2/transactions/1002": JSON.stringify(transaction(1002, { price: "4.0" })),
+      "/escrow-orders/api/v2/current-user/escrow-orders": JSON.stringify(orderList(rows, 1, 1)),
+      "/escrow-orders/api/v2/escrow-orders/1000": JSON.stringify(escrowReceipt(1000, { price: "8.5" })),
+      "/escrow-orders/api/v2/escrow-orders/1002": JSON.stringify(escrowReceipt(1002, { price: "4.0" })),
     });
 
     await runWork({ ...sales, platform: "Vinted" }, vinted, tab, deps);

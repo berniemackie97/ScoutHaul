@@ -3,6 +3,7 @@ import { fakeBrowser } from "wxt/testing/fake-browser";
 import { ebayAdapter } from "../adapters/ebay";
 import { poshmarkAdapter } from "../adapters/poshmark";
 import { AdapterError } from "../adapters/types";
+import { vintedAdapter } from "../adapters/vinted";
 import { assertMarketplaceDestination, judgeTab, pageSettled, SyncTabs, waitForPage, type Clock, type TabLook } from "./transport";
 
 const robots = "https://www.ebay.com/robots.txt";
@@ -379,6 +380,14 @@ describe("marketplace destination boundaries", () => {
       .toThrowError(/outside its permitted destinations/);
     expect(() => assertMarketplaceDestination(poshmarkAdapter, "https://www.ebay.com/", "page"))
       .toThrowError(/outside its permitted destinations/);
+  });
+
+  it("permits requests to Vinted's exact API origin", () => {
+    const api = "https://api.www.vinted.com";
+    expect(() => assertMarketplaceDestination(vintedAdapter, `${api}/escrow-orders`, "request")).not.toThrow();
+    expect(() => assertMarketplaceDestination(vintedAdapter, `${api}/escrow-orders`, "page")).toThrow(AdapterError);
+    expect(() => assertMarketplaceDestination(vintedAdapter, `${api}:444/escrow-orders`, "request")).toThrow(AdapterError);
+    expect(() => assertMarketplaceDestination(vintedAdapter, "https://other.api.www.vinted.com/escrow-orders", "request")).toThrow(AdapterError);
   });
 
   it("permits eBay description requests but refuses untrusted request targets", () => {

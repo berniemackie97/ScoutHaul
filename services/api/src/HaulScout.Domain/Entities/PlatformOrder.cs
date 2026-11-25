@@ -119,7 +119,9 @@ public sealed class PlatformOrder : EntityBase, IOrganizationScoped
 
     /// <summary>A cancelled sale nobody has ruled on yet: the books still say it happened.</summary>
     public bool AwaitingCancellationDecision =>
-        CancelledOnPlatformAt is not null && CancellationOutcome == PlatformOrderCancellationOutcome.None;
+        Status == PlatformOrderStatus.Reconciled
+        && CancelledOnPlatformAt is not null
+        && CancellationOutcome == PlatformOrderCancellationOutcome.None;
 
     /// <summary>Links to the sale group created when this order was reconciled.</summary>
     public Guid? ReconciledSaleGroupId { get; set; }

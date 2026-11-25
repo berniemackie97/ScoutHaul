@@ -114,6 +114,8 @@ export interface MarketplaceAdapter {
   readonly home: string;
   /** Additional read-only document domains for this marketplace. */
   readonly requestDomains?: readonly string[];
+  /** First-party API origins used by the marketplace's pages. */
+  readonly requestOrigins?: readonly string[];
   /** The page a marketplace tab is opened at when one is needed: a light one, on the site's own origin. */
   readonly workerUrl: string;
   /** Where to send the operator to sign in. */

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { memoryInMap } from "../../test/memory";
-import { orderList, orderRow, transaction, vintedPage, wardrobe, wardrobeItem } from "../../test/vinted-fixtures";
+import { escrowReceipt, orderList, orderRow, vintedPage, wardrobe, wardrobeItem } from "../../test/vinted-fixtures";
 import type { MarketplaceContext, PageResponse, Session } from "../types";
 import { tokenCookie, tokenExpiry, vintedAdapter } from ".";
 import { toIngestListing } from "./listings";
@@ -9,6 +9,9 @@ import { toIngestOrder } from "./orders";
 
 const now = new Date("2026-09-19T12:00:00Z");
 const seller: Session = { signedIn: true, username: "test_seller", marketplaceUserId: "5550001" };
+const api = "https://api.www.vinted.com";
+const ordersPath = "/escrow-orders/api/v2/current-user/escrow-orders";
+const receiptPath = "/escrow-orders/api/v2/escrow-orders";
 
 type Answer = PageResponse | object | undefined;
 
@@ -68,30 +71,33 @@ function history() {
 
 function answering(pages: ReturnType<typeof orderRow>[][]) {
   return (url: URL): Answer => {
-    if (url.pathname === "/api/v2/my_orders") {
+    if (url.origin === api && url.pathname === ordersPath && url.searchParams.get("type") === "sold" && !url.searchParams.has("status")) {
       const page = Number(url.searchParams.get("page"));
       return orderList(pages[page - 1] ?? [], page, pages.length);
     }
 
-    const sale = /^\/api\/v2\/transactions\/(\d+)$/.exec(url.pathname);
-    return sale ? transaction(Number(sale[1]), { price: "8.5" }) : undefined;
+    const id = url.pathname.slice(receiptPath.length + 1);
+    return url.origin === api && url.pathname.startsWith(`${receiptPath}/`) && /^\d+$/.test(id)
+      ? escrowReceipt(Number(id), { price: "8.5" })
+      : undefined;
   };
 }
 
-const transactionsRead = (context: { requested: string[] }) => context.requested.filter((url) => url.includes("/transactions/")).length;
+const transactionsRead = (context: { requested: string[] }) => context.requested.filter((url) => url.startsWith(`${api}${receiptPath}/`)).length;
 
 describe("a Vinted sale", () => {
   it("is recorded at the price agreed, with no seller fees, and paid out once complete", () => {
-    const { order, issues } = toIngestOrder(orderRow(22309513974, "2026-09-18T09:50:48-06:00", "8.5"), transaction(22309513974, {
+    const { order, issues } = toIngestOrder(orderRow(22309513974, "2026-09-18T09:50:48-06:00", "8.5"), escrowReceipt(22309513974, {
       price: "8.5",
-      items: [{ id: 9482228763, title: "Plaid Dress Shirt", listed: "12.0" }],
-      paidAt: "2026-09-15T03:45:17-06:00",
-    }));
+      items: [{ id: 9482228763, title: "Plaid Dress Shirt" }],
+      createdAt: "2026-09-15T03:45:17-06:00",
+    }), seller.marketplaceUserId);
 
     expect(issues).toEqual([]);
     expect(order).toMatchObject({
       externalOrderId: "22309513974",
       orderedAt: "2026-09-15T09:45:17.000Z",
+      paidAt: null,
       itemsSubtotal: 8.5,
       shippingCharged: 0,
       taxCollected: 0,
@@ -102,36 +108,40 @@ describe("a Vinted sale", () => {
       buyerReference: "test_buyer",
       lines: [{ title: "Plaid Dress Shirt", unitPrice: 8.5, quantity: 1, externalItemId: "9482228763" }],
     });
-    expect(JSON.parse(order!.feeBreakdownJson!)).toEqual({ source: "Vinted transaction", paidByBuyer: { buyerProtection: 1.13 } });
+    expect(JSON.parse(order!.feeBreakdownJson!)).toEqual({ source: "Vinted escrow order", paidByBuyer: { buyerProtection: 1.13 } });
   });
 
   it("is not paid out while still under way", () => {
-    expect(toIngestOrder(orderRow(1, "2026-09-18T10:00:00-06:00", "8.0", "open"), transaction(1, { price: "8.0" })).order?.payoutAmount).toBeNull();
+    expect(toIngestOrder(orderRow(1, "2026-09-18T10:00:00-06:00", "8.0", "open"), escrowReceipt(1, { price: "8.0" }), seller.marketplaceUserId).order?.payoutAmount).toBeNull();
   });
 
-  it("splits a bundle's price across its items by what they were listed at", () => {
+  it("preserves the bundle total when the receipt has no per-item prices", () => {
     expect(allocate(30, [10, 30])).toEqual([7.5, 22.5]);
     expect(allocate(10, [null, null, null])).toEqual([3.33, 3.33, 3.34]);
 
-    const { order } = toIngestOrder(orderRow(2, "2026-09-18T10:00:00-06:00", "30.0"), transaction(2, {
+    const { order } = toIngestOrder(orderRow(2, "2026-09-18T10:00:00-06:00", "30.0"), escrowReceipt(2, {
       price: "30.0",
-      items: [{ id: 21, title: "Shirt", listed: "10.0" }, { id: 22, title: "Jacket", listed: "30.0" }],
-    }));
-    expect(order!.lines!.map((line) => [line.externalItemId, line.unitPrice])).toEqual([["21", 7.5], ["22", 22.5]]);
+      items: [{ id: 21, title: "Shirt" }, { id: 22, title: "Jacket" }],
+    }), seller.marketplaceUserId);
+    expect(order!.lines!.map((line) => [line.externalItemId, line.unitPrice])).toEqual([["21", 15], ["22", 15]]);
   });
 
-  it("records the seller's own shipping as charged to the buyer, at a cost it cannot know", () => {
-    const { order } = toIngestOrder(orderRow(3, "2026-09-18T10:00:00-06:00", "20.0"), transaction(3, { price: "20.0", ownShipping: "5.0" }));
-    expect(order).toMatchObject({ shippingCharged: 5, shippingCost: null, payoutAmount: 25 });
+  it("matches the escrow receipt by its own ID while preserving the existing sale ID", () => {
+    const row = { ...orderRow(3, "2026-09-18T10:00:00-06:00", "20.0"), escrow_order_id: 30 };
+    const receipt = escrowReceipt(30, { price: "20.0" });
+    expect(toIngestOrder(row, receipt, seller.marketplaceUserId).order?.externalOrderId).toBe("3");
+    expect(toIngestOrder(row, receipt, "5550002").order).toBeNull();
+    expect(toIngestOrder(row, escrowReceipt(31, { price: "20.0" }), seller.marketplaceUserId).order).toBeNull();
   });
 
   it("says when a business account's fees are not read, and refuses a sale with no price", () => {
-    expect(toIngestOrder(orderRow(4, "2026-09-18T10:00:00-06:00", "8.0"), transaction(4, { price: "8.0", business: true })).issues)
-      .toEqual([expect.objectContaining({ rejected: false, message: expect.stringContaining("business") })]);
+    const business = toIngestOrder(orderRow(4, "2026-09-18T10:00:00-06:00", "8.0"), escrowReceipt(4, { price: "8.0", business: true }), seller.marketplaceUserId);
+    expect(business.issues).toEqual([expect.objectContaining({ rejected: false, message: expect.stringContaining("business") })]);
+    expect(business.order).toMatchObject({ feeTotal: null, feesPending: true, payoutAmount: null });
 
-    const priceless = transaction(5, { price: "8.0" });
-    priceless.transaction!.offer = null;
-    expect(toIngestOrder({ ...orderRow(5, "2026-09-18T10:00:00-06:00", "8.0"), price: undefined }, priceless))
+    const priceless = escrowReceipt(5, { price: "8.0" });
+    priceless.escrow_order!.payment_data = null;
+    expect(toIngestOrder({ ...orderRow(5, "2026-09-18T10:00:00-06:00", "8.0"), price: undefined }, priceless, seller.marketplaceUserId))
       .toEqual({ order: null, issues: [{ message: "The sale price could not be read.", externalReference: "5", rejected: true }] });
   });
 });
@@ -194,8 +204,8 @@ describe("scanning Vinted sales", () => {
     const quiet = vinted(answering(pages), memory);
     const again = await vintedAdapter.scanSales(quiet, { from: null, cursor: first.cursor }, seller);
     expect(transactionsRead(quiet)).toBe(0);
-    expect(quiet.requested.filter((url) => url.includes("/my_orders"))).toHaveLength(1);
-    expect(again.cancelledOrderIds).toEqual([]);
+    expect(quiet.requested.filter((url) => url.startsWith(`${api}${ordersPath}?`))).toHaveLength(1);
+    expect(again.cancelledOrderIds).toEqual(["1007", "1013"]);
     expect(again.orders).toHaveLength(18);
 
     // The open sale completes: it alone is read again, now with its payout.
@@ -212,14 +222,74 @@ describe("scanning Vinted sales", () => {
 
     const scan = await vintedAdapter.scanSales(context, { from: new Date("2026-08-20T00:00:00Z"), cursor: "2026-08-28T16:00:00.000Z" }, seller);
 
-    expect(context.requested.filter((url) => url.includes("/my_orders"))).toHaveLength(2);
+    expect(context.requested.filter((url) => url.startsWith(`${api}${ordersPath}?`))).toHaveLength(2);
     expect(scan.orders.map((order) => order.externalOrderId)).toEqual(["1000", "1001", "1002", "1003", "1004", "1005", "1006", "1008"]);
     expect(scan.cancelledOrderIds).toEqual(["1007"]);
   });
 
+  it("passes terminal cancellation and full-refund states to HaulScout without reading their receipts", async () => {
+    const { rows } = history();
+    const context = vinted(answering([[
+      { ...rows[0]!, status: "Canceled. Refund processed." },
+      { ...rows[1]!, status: "Payment refunded" },
+      { ...rows[2]!, status: "Partial refund processed." },
+      { ...rows[3]!, status: "Refund requested." },
+    ]]));
+
+    const scan = await vintedAdapter.scanSales(context, { from: null, cursor: null }, seller);
+
+    expect(scan.cancelledOrderIds).toEqual(["1000", "1001"]);
+    expect(scan.orders.map((order) => order.externalOrderId)).toEqual(["1002", "1003"]);
+    expect(transactionsRead(context)).toBe(2);
+  });
+
   it("stops for a security check rather than reading past it", async () => {
-    const context = vinted(() => ({ status: 403, url: "https://www.vinted.com/api/v2/my_orders", contentType: "application/json", body: '{"url":"https://geo.captcha-delivery.com/captcha/?initialCid=x"}' }));
+    const context = vinted((url) => ({ status: 403, url: url.href, contentType: "application/json", body: '{"url":"https://geo.captcha-delivery.com/captcha/?initialCid=x"}' }));
     await expect(vintedAdapter.scanSales(context, { from: null, cursor: null }, seller)).rejects.toMatchObject({ kind: "Challenge" });
+  });
+
+  it("stops when an orders page is missing and reports which page failed", async () => {
+    const context = vinted((url) => url.searchParams.get("page") === "1"
+      ? orderList([], 1, 2)
+      : { status: 404, url: url.href, contentType: "application/json", body: "{}" });
+
+    await expect(vintedAdapter.scanSales(context, { from: null, cursor: null }, seller)).rejects.toMatchObject({
+      kind: "SiteChanged",
+      message: "Vinted returned HTTP 404 while reading the sold-orders list (page 2).",
+    });
+    expect(context.requested).toHaveLength(2);
+    expect(context.opened).toEqual([]);
+  });
+
+  it("reports a missing transaction on its own and continues reading the other sales", async () => {
+    const { rows } = history();
+    const answer = answering([rows.slice(0, 2)]);
+    const context = vinted((url) => url.pathname === `${receiptPath}/1000`
+      ? { status: 404, url: url.href, contentType: "application/json", body: "{}" }
+      : answer(url));
+
+    const scan = await vintedAdapter.scanSales(context, { from: null, cursor: null }, seller);
+
+    expect(scan.orders.map((order) => order.externalOrderId)).toEqual(["1001"]);
+    expect(scan.issues).toEqual([{
+      externalReference: "1000",
+      message: "This sale could not be read. Vinted returned HTTP 404 while reading sale details.",
+      rejected: true,
+    }]);
+    expect(transactionsRead(context)).toBe(2);
+  });
+
+  it("stops when the orders request lands on the sign-in form", async () => {
+    const context = vinted(() => ({
+      status: 200,
+      url: "https://www.vinted.com/member/register/select_type",
+      contentType: "text/html",
+      body: "<html></html>",
+    }));
+
+    await expect(vintedAdapter.scanSales(context, { from: null, cursor: null }, seller)).rejects.toMatchObject({ kind: "SignedOut" });
+    expect(context.requested).toHaveLength(1);
+    expect(context.opened).toEqual([]);
   });
 });
 
@@ -237,11 +307,40 @@ describe("who is signed in to Vinted", () => {
   });
 
   it("asks Vinted nothing when the page shows no one is signed in", async () => {
-    // A question to the API without a session is what Vinted's bot protection blocks.
     const context = vinted(page(false));
 
     expect(await vintedAdapter.detectSession(context)).toEqual({ signedIn: false, username: null, marketplaceUserId: null });
     expect(context.requested).toEqual([]);
+  });
+
+  it("recognizes Vinted's registration redirect even when the page has no session marker", async () => {
+    const redirect: PageResponse = {
+      status: 200,
+      url: "https://www.vinted.com/member/register/select_type?ref_url=%2Fmy_orders%3Forder_type%3Dsold",
+      contentType: "text/html",
+      body: "<html></html>",
+    };
+    const context = vinted(() => redirect);
+    const signedOut = { signedIn: false, username: null, marketplaceUserId: null };
+
+    expect(vintedAdapter.pageKind(redirect.url)).toBe("sign-in");
+    expect(vintedAdapter.sessionFrom!(redirect)).toEqual(signedOut);
+    expect(await vintedAdapter.detectSession(context)).toEqual(signedOut);
+    expect(context.requested).toEqual([]);
+  });
+
+  it.each([
+    ["/my_orders", "the sold-orders page"],
+    ["/api/v2/users/current", "account details"],
+  ])("identifies a 404 from %s during the sign-in check", async (path, resource) => {
+    const context = vinted((url) => url.pathname === path
+      ? { status: 404, url: url.href, contentType: "text/html", body: "<html></html>" }
+      : page(true)(url));
+
+    await expect(vintedAdapter.detectSession(context)).rejects.toMatchObject({
+      kind: "SiteChanged",
+      message: `Vinted returned HTTP 404 while reading ${resource}.`,
+    });
   });
 
   it("stops at a security check on the page", async () => {
@@ -345,23 +444,12 @@ describe("Vinted's sign-in token", () => {
     expect(context.opened).toEqual([]);
   });
 
-  it("without a cookie to read, gets one more try after a 401 — once per scan, not once per request", async () => {
-    let answered = 0;
-    const { pages } = history();
-    const scanning = answering(pages);
-    const context = vinted((url) => {
-      if (url.pathname === "/my_orders") {
-        return signedInPage(url);
-      }
-
-      // The page was still renewing the sign-in: the first question is refused, the rest go through, until it lapses.
-      answered++;
-      return answered === 1 || answered > 5 ? unauthorized(url) : scanning(url);
-    });
+  it("also stops after a 401 when the cookie cannot be read", async () => {
+    const context = vinted(unauthorized);
 
     await expect(vintedAdapter.scanSales(context, { from: null, cursor: null }, seller)).rejects.toMatchObject({ kind: "SignedOut" });
-    expect(context.opened).toHaveLength(1);
-    expect(context.requested).toHaveLength(6);
+    expect(context.opened).toEqual([]);
+    expect(context.requested).toHaveLength(1);
   });
 
   it("is used from the operator's own page without loading another, and not when that page does not show the sign-in", async () => {

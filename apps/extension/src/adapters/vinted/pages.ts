@@ -1,21 +1,23 @@
 import { AdapterError, type PageLook, type PageResponse, type Session } from "../types";
 
+export function signInPath(path: string): boolean {
+  return /^\/member\/(?:login|signup|register|verif[^/]*|two_factor|password|reset_password)(?:\/|$)/i.test(path);
+}
+
+export type MissingResource = "SiteChanged" | "Error";
+
 /**
  * What a Vinted response turned out to be, before anything reads it. Vinted guards itself with
  * DataDome: a request it blocks answers 403 with a pointer to its captcha page — the only place
  * `captcha-delivery.com` appears, since every ordinary page loads DataDome's own script too.
  */
-export function assertReadable(response: PageResponse): void {
+export function assertReadable(response: PageResponse, what: string, missing: MissingResource = "SiteChanged"): void {
   if (response.status === 0) {
     throw new AdapterError("Network", "Vinted could not be reached.");
   }
 
   if (challenged(response)) {
     throw new AdapterError("Challenge", "Vinted showed a security check.");
-  }
-
-  if (response.status === 401) {
-    throw new AdapterError("SignedOut", "The browser is signed out of Vinted.");
   }
 
   if (response.status === 429) {
@@ -26,12 +28,17 @@ export function assertReadable(response: PageResponse): void {
     throw new AdapterError("Challenge", "Vinted refused the request.");
   }
 
+  if (response.status === 401) {
+    throw signedOut();
+  }
+
   if (response.status >= 500) {
-    throw new AdapterError("Network", `Vinted had a problem (${response.status}).`);
+    throw new AdapterError("Network", `Vinted returned HTTP ${response.status} while reading ${what}.`);
   }
 
   if (response.status !== 200) {
-    throw new AdapterError("Error", `Vinted answered ${response.status}.`);
+    const kind = response.status === 404 || response.status === 410 ? missing : "Error";
+    throw new AdapterError(kind, `Vinted returned HTTP ${response.status} while reading ${what}.`);
   }
 }
 
@@ -47,12 +54,16 @@ export function challenged(response: PageResponse): boolean {
 
 /** A response that is not the JSON Vinted's own pages read: Vinted changed its API. */
 export function siteChanged(what: string): AdapterError {
-  return new AdapterError("SiteChanged", `Vinted's ${what} no longer come back in the shape expected.`);
+  return new AdapterError("SiteChanged", `Vinted returned an unexpected response for ${what}.`);
+}
+
+export function signedOut(): AdapterError {
+  return new AdapterError("SignedOut", "The browser is signed out of Vinted.");
 }
 
 /** Whether a loaded Vinted page is one a signed-out visitor sees. The page says so in the data it embeds. */
 export function signedOutPage(page: PageResponse): boolean {
-  return /\/member\/(login|signup)/i.test(new URL(page.url, "https://www.vinted.com").pathname)
+  return signInPath(new URL(page.url, "https://www.vinted.com").pathname)
     || /\\?"isLoggedIn\\?":\s*false/.test(page.body);
 }
 

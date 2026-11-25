@@ -207,9 +207,9 @@ export function assertMarketplaceDestination(adapter: MarketplaceAdapter, addres
   }
 
   const firstParty = target.origin === new URL(adapter.home).origin;
-  const description = action === "request" && adapter.requestDomains?.some((domain) =>
-    target.hostname === domain || target.hostname.endsWith(`.${domain}`));
-  if (target.protocol !== "https:" || target.username || target.password || (!firstParty && !description)) {
+  const extraRequest = action === "request" && (adapter.requestOrigins?.includes(target.origin) || adapter.requestDomains?.some((domain) =>
+    target.hostname === domain || target.hostname.endsWith(`.${domain}`)));
+  if (target.protocol !== "https:" || target.username || target.password || (!firstParty && !extraRequest)) {
     throw new AdapterError("SiteChanged", "A marketplace page tried to read outside its permitted destinations.");
   }
 }
