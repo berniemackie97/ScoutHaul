@@ -57,6 +57,7 @@ public static class DependencyInjection
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
         services.AddScoped<IInventoryStore, EfInventoryStore>();
         services.AddScoped<IInventoryMergeStore, EfInventoryMergeStore>();
+        services.AddScoped<IInventoryListingDifferenceStore, EfInventoryListingDifferenceStore>();
         services.AddScoped<ISearchStore, EfSearchStore>();
         services.AddScoped<ISyncRunStore, EfSyncRunStore>();
         services.AddScoped<ISyncAgentStore, EfSyncAgentStore>();

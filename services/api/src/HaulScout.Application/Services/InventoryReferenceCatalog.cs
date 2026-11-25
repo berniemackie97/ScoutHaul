@@ -44,7 +44,12 @@ public static class InventoryReferenceCatalog
     ];
 
     public static readonly InventoryReferenceOptionDto[] Conditions =
-        [.. ItemConditions.Terms.Select(condition => Option(condition, condition == "For parts" ? "For parts / not working" : condition))];
+        [
+            .. ItemConditions.Terms.Select(condition => Option(condition, condition == "For parts" ? "For parts / not working" : condition) with
+            {
+                Hint = ItemConditions.Hints.GetValueOrDefault(condition),
+            }),
+        ];
 
     public static readonly InventoryReferenceOptionDto[] Colors = [.. ItemColors.Terms.Select(color => Option(color, color))];
 

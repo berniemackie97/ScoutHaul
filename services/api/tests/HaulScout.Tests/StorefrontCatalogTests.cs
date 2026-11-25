@@ -137,12 +137,17 @@ public class StorefrontCatalogTests
             seed.Organizations.Add(new Organization { Id = org, Name = "Store", StoreDomain = "shop.example.com" });
             InventoryItem listed = new()
             {
-                Title = "Published", Status = InventoryStatus.Listed, Quantity = 1, EstimatedSalePrice = 20m,
+                Title = "Published",
+                Status = InventoryStatus.Listed,
+                Quantity = 1,
+                EstimatedSalePrice = 20m,
                 Photos = { new InventoryPhoto { ContentType = "image/jpeg", OriginalBytes = [1, 2], ThumbnailBytes = [3, 4] } }
             };
             InventoryItem draft = new()
             {
-                Title = "Private", Status = InventoryStatus.Draft, Quantity = 1,
+                Title = "Private",
+                Status = InventoryStatus.Draft,
+                Quantity = 1,
                 Photos = { new InventoryPhoto { ContentType = "image/jpeg", OriginalBytes = [5], ThumbnailBytes = [6] } }
             };
             seed.InventoryItems.AddRange(listed, draft);

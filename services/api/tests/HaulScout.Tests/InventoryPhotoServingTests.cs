@@ -40,8 +40,11 @@ public sealed class InventoryPhotoServingTests
             InventoryItem item = new() { OrganizationId = owner, Title = "Private item" };
             InventoryPhoto photo = new()
             {
-                OrganizationId = owner, InventoryItemId = item.Id, ContentType = "image/jpeg",
-                OriginalBytes = [1, 2, 3], ThumbnailBytes = [4, 5, 6],
+                OrganizationId = owner,
+                InventoryItemId = item.Id,
+                ContentType = "image/jpeg",
+                OriginalBytes = [1, 2, 3],
+                ThumbnailBytes = [4, 5, 6],
             };
             seed.InventoryItems.Add(item);
             seed.InventoryPhotos.Add(photo);
@@ -80,8 +83,11 @@ public sealed class InventoryPhotoServingTests
             InventoryItem item = new() { OrganizationId = org, Title = "Object photo" };
             InventoryPhoto photo = new()
             {
-                OrganizationId = org, InventoryItemId = item.Id, ContentType = "image/webp",
-                OriginalObjectKey = "org/photo/original.webp", ThumbnailObjectKey = "org/photo/thumbnail.jpg",
+                OrganizationId = org,
+                InventoryItemId = item.Id,
+                ContentType = "image/webp",
+                OriginalObjectKey = "org/photo/original.webp",
+                ThumbnailObjectKey = "org/photo/thumbnail.jpg",
             };
             seed.InventoryItems.Add(item);
             seed.InventoryPhotos.Add(photo);

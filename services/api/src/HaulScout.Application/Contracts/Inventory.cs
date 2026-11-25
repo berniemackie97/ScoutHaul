@@ -1,3 +1,4 @@
+using HaulScout.Application.Inventory;
 using HaulScout.Domain;
 
 namespace HaulScout.Application.Contracts;
@@ -83,7 +84,9 @@ public sealed record InventoryReferenceOptionDto(
     string Label,
     string? Group = null,
     string? ParentValue = null,
-    bool IsLegacy = false);
+    bool IsLegacy = false,
+    // What a standard value means, such as "Unworn, tags attached"; values an organization added have none.
+    string? Hint = null);
 
 public sealed record InventoryReferenceDataDto(
     IReadOnlyList<InventoryReferenceOptionDto> Categories,
@@ -109,7 +112,12 @@ public sealed record ItemProfileDto(
     IReadOnlyList<ItemFieldDto> Fields,
     IReadOnlyList<ItemAttributeDto> Attributes,
     IReadOnlyList<string> SizeSystems,
-    string BrandLabel);
+    string BrandLabel,
+    // The standard conditions this kind of item is described in, best first; empty means all of them.
+    IReadOnlyList<string> Conditions,
+    IReadOnlyList<ItemMeasurementDto> Measurements);
+
+public sealed record ItemMeasurementDto(string Key, string Label);
 
 public sealed record InventoryItemDto(
     Guid Id,
@@ -404,3 +412,15 @@ public sealed record InventoryIssueDto(
     DateTimeOffset UpdatedAt);
 
 public sealed record SetExpectedPriceRequest(decimal EstimatedSalePrice);
+
+/// <summary>One detail where a linked marketplace listing disagrees with the item.</summary>
+public sealed record ListingDifferenceDto(
+    Guid ListingId,
+    string Platform,
+    string? ListingUrl,
+    ListingDetailField Field,
+    string Current,
+    string Incoming,
+    string? Raw);
+
+public sealed record ApplyListingDifferenceRequest(Guid ListingId, ListingDetailField Field);

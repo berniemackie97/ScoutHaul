@@ -21,7 +21,8 @@ public sealed class InventoryController(
     InventoryPhotoWorkflowService photos,
     InventoryIssueWorkflowService issues,
     InventoryStatusWorkflowService statuses,
-    InventoryMergeService merges) : HaulScoutControllerBase
+    InventoryMergeService merges,
+    InventoryListingDifferencesService listingDifferences) : HaulScoutControllerBase
 {
     public sealed class UploadInventoryPhotoForm
     {
@@ -225,6 +226,19 @@ public sealed class InventoryController(
         SetExpectedPriceRequest request,
         CancellationToken cancellationToken) =>
         ToActionResult(await statuses.SetExpectedPriceAsync(id, request, cancellationToken));
+
+    /// <summary>Where the item's linked marketplace listings say something different from it.</summary>
+    [HttpGet("{id:guid}/listing-differences")]
+    public async Task<ActionResult<IReadOnlyList<ListingDifferenceDto>>> ListingDifferences(Guid id, CancellationToken cancellationToken) =>
+        ToActionResult(await listingDifferences.ListAsync(id, cancellationToken));
+
+    /// <summary>Takes one listing's value for one detail; answers with the differences left.</summary>
+    [HttpPost("{id:guid}/listing-differences")]
+    public async Task<ActionResult<IReadOnlyList<ListingDifferenceDto>>> TakeListingDifference(
+        Guid id,
+        ApplyListingDifferenceRequest request,
+        CancellationToken cancellationToken) =>
+        ToActionResult(await listingDifferences.ApplyAsync(id, request, cancellationToken));
 
     [HttpPost("location")]
     public async Task<ActionResult<BulkInventoryUpdateResultDto>> SetLocation(

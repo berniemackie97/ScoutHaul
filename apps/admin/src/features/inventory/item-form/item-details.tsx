@@ -3,19 +3,11 @@
 import { useEffect, useState } from "react";
 import type { components } from "@overhaul/api-client";
 import type { FieldErrors, FormValues } from "@/lib/form-state";
+import { ChoiceGroup } from "@/components/choice-group";
 import { readListInput } from "@/lib/list-input";
-import {
-  attributeInputName,
-  fieldSpec,
-  isListAttribute,
-  pickAttributes,
-  readAttributes,
-  type AttributeValues,
-  type ItemAttribute,
-  type ItemField,
-  type ItemProfile,
-} from "../item-profiles";
-import { matchOption, matchOptions, MultiOptionField, OptionField, SelectField, TextField } from "./controls";
+import { fieldSpec, pickAttributes, readAttributes, type AttributeValues, type ItemField, type ItemProfile } from "../item-profiles";
+import { matchOption, matchOptions, MultiOptionField, OptionField, TextField } from "./controls";
+import { AttributeField, ChoiceField, COLOR_LIMIT, CountryField, SIZE_GRID_LIMIT, StatusField } from "./detail-fields";
 import { AUTHENTICITY, COMPLETENESS, FUNCTIONAL, PACKAGING } from "./options";
 
 type ReferenceData = components["schemas"]["InventoryReferenceDataDto"];
@@ -144,17 +136,34 @@ export function ItemDetails({
               })}
               error={errors.sizeSystem}
             />
-            <OptionField
-              label="Size"
-              name="sizeValue"
-              value={matchOption(sizeValue, sizes)}
-              options={sizes}
-              onChange={edit(setSizeValue)}
-              disabled={!sizeSystem}
-              error={errors.sizeValue}
-              placeholder={sizeSystem ? "Search sizes…" : "Choose a size system first"}
-            />
+            {sizeSystem && sizes.length > 0 && sizes.length <= SIZE_GRID_LIMIT ? null : (
+              <OptionField
+                label="Size"
+                name="sizeValue"
+                value={matchOption(sizeValue, sizes)}
+                options={sizes}
+                onChange={edit(setSizeValue)}
+                disabled={!sizeSystem}
+                error={errors.sizeValue}
+                placeholder={sizeSystem ? "Search sizes…" : "Choose a size system first"}
+              />
+            )}
           </>
+        )}
+        {spec("Size") && sizeSystem && sizes.length > 0 && sizes.length <= SIZE_GRID_LIMIT && (
+          <div className="sm:col-span-2 lg:col-span-3">
+            <ChoiceField label={`Size · ${sizeSystem}`} error={errors.sizeValue}>
+              <ChoiceGroup
+                label="Size"
+                name="sizeValue"
+                variant="grid"
+                choices={sizes.filter((option) => option.value && !option.isLegacy).map((option) => ({ value: option.value!, label: option.label ?? option.value! }))}
+                value={matchOption(sizeValue, sizes)}
+                onChange={edit(setSizeValue)}
+                clearable
+              />
+            </ChoiceField>
+          </div>
         )}
         {(profile.attributes ?? []).map((attribute) => (
           <AttributeField key={`${profile.key}:${attribute.key}:${formKey ?? "initial"}`} attribute={attribute} initial={attributes[attribute.key!]} onEdit={onEdit} />
@@ -196,9 +205,9 @@ export function ItemDetails({
       </div>
 
       {shownStatuses.length > 0 && (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="space-y-5">
           {shownStatuses.map((status) => (
-            <SelectField
+            <StatusField
               key={status.name}
               label={spec(status.field)!.label ?? status.name}
               name={status.name}
@@ -218,45 +227,3 @@ export function ItemDetails({
   );
 }
 
-/** The API allows two colors; past that an item is Multicolor or Patterned. */
-const COLOR_LIMIT = 2;
-
-/** One profile detail: free text, a searchable pick from its list, or several picks for a list such as materials. */
-function AttributeField({ attribute, initial, onEdit }: { attribute: ItemAttribute; initial: string | string[] | undefined; onEdit?: () => void }) {
-  const label = attribute.label ?? attribute.key!;
-  const options = attribute.options ?? [];
-  const [values, setValues] = useState(() => matchOptions(typeof initial === "string" ? [initial] : initial, options));
-  const [value, setValue] = useState(() => (typeof initial === "string" ? initial : (initial?.[0] ?? "")));
-  const changed = <T,>(set: (next: T) => void) => (next: T) => {
-    set(next);
-    onEdit?.();
-  };
-
-  if (isListAttribute(attribute)) {
-    return <MultiOptionField label={label} name={attributeInputName(attribute)} values={values} options={options} max={attribute.maxValues ?? 1} onChange={changed(setValues)} />;
-  }
-
-  if (options.length > 0) {
-    const choices = options.map((option) => ({ value: option, label: option }));
-    return <OptionField label={label} name={attributeInputName(attribute)} value={matchOption(value, choices)} options={choices} onChange={changed(setValue)} />;
-  }
-
-  return <TextField label={label} name={attributeInputName(attribute)} defaultValue={value} />;
-}
-
-function CountryField({ initial, reference, error, onEdit }: { initial: string; reference: ReferenceData; error?: string; onEdit?: () => void }) {
-  const [country, setCountry] = useState(initial);
-  return (
-    <OptionField
-      label="Country of origin"
-      name="countryOfOrigin"
-      value={matchOption(country, reference.countries ?? [])}
-      options={reference.countries ?? []}
-      onChange={(value) => {
-        setCountry(value);
-        onEdit?.();
-      }}
-      error={error}
-    />
-  );
-}

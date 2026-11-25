@@ -46,6 +46,7 @@ public static class DependencyInjection
         services.AddScoped<InventoryPhotoMetadataRepairService>();
         services.AddScoped<InventoryStatusWorkflowService>();
         services.AddScoped<InventoryMergeService>();
+        services.AddScoped<InventoryListingDifferencesService>();
         services.AddScoped<InventoryIssueWorkflowService>();
         services.AddScoped<OrganizationInviteCodeWorkflowService>();
         services.AddScoped<OrganizationMemberWorkflowService>();

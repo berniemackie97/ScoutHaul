@@ -45,7 +45,7 @@ public sealed class PlatformOrderIngestionService(
                     return (null, problem);
                 }
 
-                rejections.Add(new IngestRejection(externalOrderId.Length == 0 ? "(no order id)" : Text.Clip(externalOrderId, 200), problem));
+                rejections.Add(new IngestRejection(externalOrderId.Length == 0 ? "(no order id)" : Text.Clip(externalOrderId, 200) ?? externalOrderId, problem));
                 continue;
             }
 

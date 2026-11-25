@@ -7,7 +7,9 @@ import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle } fro
 import type { InventoryItem } from "@/features/inventory/inventory-operations";
 import { hasField, profileFor } from "@/features/inventory/item-profiles";
 import { matchOption, NotesField, OptionField, SelectField, TextField } from "@/features/inventory/item-form/controls";
+import { ConditionField } from "@/features/inventory/item-form/condition-field";
 import { ItemDetails } from "@/features/inventory/item-form/item-details";
+import { MeasurementsField } from "@/features/inventory/item-form/measurements-field";
 import { DIMENSION_UNITS, OWNERSHIP, WEIGHT_UNITS } from "@/features/inventory/item-form/options";
 import { updateInventoryItem, type InventoryActionResult } from "./actions";
 
@@ -54,6 +56,8 @@ export function InventoryEditor({ item, referenceData }: { item: InventoryItem; 
 
   const profile = profileFor(referenceData.profiles, category);
   const showTestingNotes = hasField(profile, "FunctionalStatus") || Boolean(item.testingNotes);
+  const measured = (profile.measurements?.length ?? 0) > 0;
+  const hasPackageSize = Boolean(item.length || item.width || item.height);
   const editing = <T,>(set: (next: T) => void) => (next: T) => {
     set(next);
     markDirty();
@@ -61,8 +65,6 @@ export function InventoryEditor({ item, referenceData }: { item: InventoryItem; 
 
   return (
     <form action={formAction} onChange={markDirty} className="space-y-6">
-      <input type="hidden" name="measurementsJson" value={item.measurementsJson ?? ""} />
-
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">What it is</CardTitle>
@@ -71,7 +73,7 @@ export function InventoryEditor({ item, referenceData }: { item: InventoryItem; 
         <CardContent className="space-y-5">
           <TextField label="Title" name="title" defaultValue={text("title", item.title)} error={errors.title} formKey={formKey} />
           <NotesField label="Description" name="description" defaultValue={text("description", item.description)} rows={5} error={errors.description} formKey={formKey} />
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2">
             <OptionField
               label="Category"
               name="category"
@@ -82,16 +84,9 @@ export function InventoryEditor({ item, referenceData }: { item: InventoryItem; 
               onChange={editing(setCategory)}
               error={errors.category}
             />
-            <OptionField
-              label="Condition"
-              name="condition"
-              value={matchOption(condition, referenceData.conditions ?? [])}
-              options={referenceData.conditions ?? []}
-              onChange={editing(setCondition)}
-              error={errors.condition}
-            />
-            <SelectField label="Ownership" name="ownershipType" choices={OWNERSHIP} defaultValue={text("ownershipType", item.ownershipType)} error={errors.ownershipType} formKey={formKey} />
+            <TextField label="Barcode or SKU" name="barcode" defaultValue={text("barcode", item.barcode)} placeholder="UPC, EAN, ISBN or your own" error={errors.barcode} formKey={formKey} />
           </div>
+          <ConditionField profile={profile} options={referenceData.conditions ?? []} value={condition} onChange={editing(setCondition)} error={errors.condition} />
         </CardContent>
       </Card>
 
@@ -113,13 +108,24 @@ export function InventoryEditor({ item, referenceData }: { item: InventoryItem; 
         </CardContent>
       </Card>
 
+      {measured && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Measurements</CardTitle>
+            <CardDescription>Measured flat. Buyers filter on these.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <MeasurementsField measurements={profile.measurements ?? []} initial={values?.measurementsJson ?? item.measurementsJson} formKey={formKey} onEdit={markDirty} />
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">Storage and shipping</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
-            <TextField label="Barcode or SKU" name="barcode" defaultValue={text("barcode", item.barcode)} placeholder="UPC, EAN, ISBN or your own" error={errors.barcode} formKey={formKey} />
             <OptionField
               label="Storage location"
               name="storageLocation"
@@ -131,14 +137,20 @@ export function InventoryEditor({ item, referenceData }: { item: InventoryItem; 
               placeholder="Search or type a bin, shelf or tote…"
             />
           </div>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-6">
-            <TextField label="Length" name="length" type="number" defaultValue={amount("length", item.length)} error={errors.length} formKey={formKey} />
-            <TextField label="Width" name="width" type="number" defaultValue={amount("width", item.width)} error={errors.width} formKey={formKey} />
-            <TextField label="Height" name="height" type="number" defaultValue={amount("height", item.height)} error={errors.height} formKey={formKey} />
-            <SelectField label="Unit" name="dimensionUnit" choices={DIMENSION_UNITS} defaultValue={text("dimensionUnit", item.dimensionUnit)} formKey={formKey} />
-            <TextField label="Weight" name="weight" type="number" defaultValue={amount("weight", item.weight)} error={errors.weight} formKey={formKey} />
+          <div className="grid grid-cols-[1fr_96px] gap-4 sm:max-w-xs">
+            <TextField label="Package weight" name="weight" type="number" defaultValue={amount("weight", item.weight)} error={errors.weight} formKey={formKey} />
             <SelectField label="Unit" name="weightUnit" choices={WEIGHT_UNITS} defaultValue={text("weightUnit", item.weightUnit)} formKey={formKey} />
           </div>
+          {/* A garment ships in a poly mailer; its box size is rarely worth typing, so it folds away. Closed, it still posts. */}
+          <details open={!measured || hasPackageSize} className="group rounded-lg border px-4 py-3">
+            <summary className="cursor-pointer text-sm font-medium">Package size {measured && <span className="text-muted-foreground font-normal">· optional for this kind of item</span>}</summary>
+            <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
+              <TextField label="Length" name="length" type="number" defaultValue={amount("length", item.length)} error={errors.length} formKey={formKey} />
+              <TextField label="Width" name="width" type="number" defaultValue={amount("width", item.width)} error={errors.width} formKey={formKey} />
+              <TextField label="Height" name="height" type="number" defaultValue={amount("height", item.height)} error={errors.height} formKey={formKey} />
+              <SelectField label="Unit" name="dimensionUnit" choices={DIMENSION_UNITS} defaultValue={text("dimensionUnit", item.dimensionUnit)} formKey={formKey} />
+            </div>
+          </details>
         </CardContent>
       </Card>
 
@@ -177,6 +189,15 @@ export function InventoryEditor({ item, referenceData }: { item: InventoryItem; 
           <NotesField label="Internal notes" name="notes" defaultValue={text("notes", item.notes)} error={errors.notes} formKey={formKey} />
         </CardContent>
       </Card>
+
+      <details open={Boolean(errors.ownershipType)} className="bg-card rounded-xl border px-6 py-4">
+        <summary className="cursor-pointer font-semibold">
+          Ownership <span className="text-muted-foreground text-sm font-normal">· {OWNERSHIP.find(([value]) => value === (text("ownershipType", item.ownershipType) ?? "Owned"))?.[1] ?? "Owned"}</span>
+        </summary>
+        <div className="mt-4 sm:max-w-sm">
+          <SelectField label="Ownership" name="ownershipType" choices={OWNERSHIP} defaultValue={text("ownershipType", item.ownershipType)} error={errors.ownershipType} formKey={formKey} />
+        </div>
+      </details>
 
       <div className="bg-background/95 sticky bottom-4 flex items-center justify-between gap-4 rounded-xl border p-4 shadow-lg backdrop-blur">
         <p aria-live="polite" className={`text-sm ${dirty ? "font-medium text-amber-700 dark:text-amber-400" : state.message ? (state.ok ? "text-green-700" : "text-destructive") : "text-muted-foreground"}`}>

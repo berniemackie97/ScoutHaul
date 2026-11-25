@@ -54,6 +54,12 @@ public sealed record ItemProfile(
     string BrandLabel = "Brand")
 {
     public bool Has(ItemField field) => Fields.Any(spec => spec.Field == field);
+
+    /// <summary>The conditions this kind of item is described in, best first; empty when every condition applies.</summary>
+    public IReadOnlyList<string> Conditions => ItemConditions.ScaleFor(Key);
+
+    /// <summary>The flat-lay measurements buyers of this kind of item filter on; empty when none apply.</summary>
+    public IReadOnlyList<ItemMeasurement> Measurements => ItemMeasurements.For(Key);
 }
 
 /// <summary>
@@ -198,6 +204,7 @@ public static class ItemProfiles
         if (!profile.Has(ItemField.ManufactureYear)) item.ManufactureYear = null;
         if (!profile.Has(ItemField.CountryOfOrigin)) item.CountryOfOrigin = null;
         item.AttributesJson = KeepAttributes(item.AttributesJson, profile);
+        item.MeasurementsJson = ItemMeasurements.Keep(item.MeasurementsJson, profile);
     }
 
     /// <summary>
