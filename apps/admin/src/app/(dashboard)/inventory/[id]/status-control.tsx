@@ -93,7 +93,7 @@ export function StatusControl({ item, sale, profile }: { item: InventoryItem; sa
             </NativeSelect>
             <ReadinessChecklist targetStatus={nextStatus} facts={readinessFacts} compact />
             {blockedReadyToList && (
-              <p className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
+              <p className="rounded-lg border border-warning-border bg-warning-surface p-3 text-sm text-warning">
                 Resolve the blocker{blockers.length === 1 ? "" : "s"} before moving this item to Ready to list.
               </p>
             )}

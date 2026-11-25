@@ -158,7 +158,7 @@ export function BundledSaleCreator({ channels }: { channels: Channel[] }) {
           </div>
           <p className="text-muted-foreground mt-3 text-xs">The total and fees are split across items by expected value (or your per-item prices). Each item keeps its own net.</p>
         </Card>
-        {state.message && <div className="border-destructive/30 bg-destructive/5 text-destructive rounded-lg border p-3 text-sm">{state.message}</div>}
+        {state.message && <div className="border-destructive-border bg-destructive-surface text-destructive rounded-lg border p-3 text-sm">{state.message}</div>}
         <SaveButton count={chosen.length} />
       </aside>
     </form>

@@ -67,7 +67,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
     return (
       <div className="space-y-4">
         <h1 className="text-2xl font-semibold">Reports</h1>
-        <div className="border-destructive/30 bg-destructive/5 text-destructive rounded-xl border p-6 text-sm">
+        <div className="border-destructive-border bg-destructive-surface text-destructive rounded-xl border p-6 text-sm">
           The report could not be produced. Check the dates (a range can be up to two years) and try again.
         </div>
       </div>

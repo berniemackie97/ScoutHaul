@@ -1,3 +1,4 @@
+using HaulScout.Domain;
 using HaulScout.Domain.Entities;
 
 namespace HaulScout.Application.Sync;
@@ -35,6 +36,9 @@ public interface ISyncRunStore
     void Add(SyncRun run);
 
     void AddIssues(IEnumerable<SyncRunIssue> issues);
+
+    /// <summary>Open issues raised by earlier runs of this account's loop, tracked, so a later scan can close what it proved fixed.</summary>
+    Task<IReadOnlyList<SyncRunIssue>> ListOpenIssuesForLoopAsync(Guid organizationId, Guid? channelAccountId, SyncLoopKind? loop, Guid exceptRunId, CancellationToken cancellationToken);
 
     Task SaveChangesAsync(CancellationToken cancellationToken);
 

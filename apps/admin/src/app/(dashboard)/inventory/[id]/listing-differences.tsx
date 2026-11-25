@@ -34,10 +34,10 @@ export function ListingDifferences({ itemId, initial }: { itemId: string; initia
   }
 
   return (
-    <Card id="listing-differences" className="border-amber-300/70">
+    <Card id="listing-differences" className="border-warning-border">
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-lg">
-          <RefreshCw className="h-4 w-4 text-amber-700" aria-hidden /> Listings disagree with this item
+          <RefreshCw className="h-4 w-4 text-warning" aria-hidden /> Listings disagree with this item
         </CardTitle>
         <CardDescription>Read in your own terms first, so spelling differences never show. Taking a new category also clears details the new kind does not have.</CardDescription>
       </CardHeader>

@@ -3142,6 +3142,53 @@
         }
       }
     },
+    "/api/platform-listings/{id}/match-candidates": {
+      "get": {
+        "tags": [
+          "ListingMatches"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListingMatchDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListingMatchDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListingMatchDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/listings": {
       "post": {
         "tags": [
@@ -11833,6 +11880,217 @@
         }
       }
     },
+    "/api/sync/issues": {
+      "get": {
+        "tags": [
+          "SyncIssues"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SyncIssueGroupDto"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SyncIssueGroupDto"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SyncIssueGroupDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sync/issues/{id}/snapshot": {
+      "get": {
+        "tags": [
+          "SyncIssues"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncIssueSnapshotDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncIssueSnapshotDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncIssueSnapshotDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sync/issues/{id}/resolve": {
+      "post": {
+        "tags": [
+          "SyncIssues"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveSyncIssueRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveSyncIssueRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveSyncIssueRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/sync/issues/resolve-group": {
+      "post": {
+        "tags": [
+          "SyncIssues"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveSyncIssueGroupRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveSyncIssueGroupRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveSyncIssueGroupRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sync/issues/{id}/retry": {
+      "post": {
+        "tags": [
+          "SyncIssues"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestScanResultDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestScanResultDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestScanResultDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/tasks": {
       "post": {
         "tags": [
@@ -12102,6 +12360,87 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/api/work": {
+      "get": {
+        "tags": [
+          "Work"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkInboxDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkInboxDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkInboxDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/work/set-aside": {
+      "post": {
+        "tags": [
+          "Work"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetAsideWorkTaskRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetAsideWorkTaskRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetAsideWorkTaskRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/work/bring-back": {
+      "post": {
+        "tags": [
+          "Work"
+        ],
+        "parameters": [
+          {
+            "name": "key",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
           }
         }
       }
@@ -12760,6 +13099,31 @@
           },
           "rejected": {
             "type": "boolean"
+          },
+          "code": {
+            "type": "string",
+            "nullable": true
+          },
+          "step": {
+            "type": "string",
+            "nullable": true
+          },
+          "attempts": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "detail": {
+            "type": "string",
+            "nullable": true
+          },
+          "snapshot": {
+            "type": "string",
+            "nullable": true
+          },
+          "fix": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -16593,6 +16957,96 @@
         },
         "additionalProperties": false
       },
+      "ListingMatchCandidateDto": {
+        "type": "object",
+        "properties": {
+          "inventoryItemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "$ref": "#/components/schemas/InventoryStatus"
+          },
+          "brand": {
+            "type": "string",
+            "nullable": true
+          },
+          "category": {
+            "type": "string",
+            "nullable": true
+          },
+          "size": {
+            "type": "string",
+            "nullable": true
+          },
+          "storageLocation": {
+            "type": "string",
+            "nullable": true
+          },
+          "barcode": {
+            "type": "string",
+            "nullable": true
+          },
+          "thumbnailUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "score": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "confidence": {
+            "type": "string",
+            "nullable": true
+          },
+          "signals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ListingMatchSignalDto"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ListingMatchDto": {
+        "type": "object",
+        "properties": {
+          "listingId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "candidates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ListingMatchCandidateDto"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ListingMatchSignalDto": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "nullable": true
+          },
+          "verdict": {
+            "$ref": "#/components/schemas/MatchVerdict"
+          },
+          "text": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "ListingReadiness": {
         "enum": [
           "Optional",
@@ -16913,6 +17367,14 @@
           }
         },
         "additionalProperties": false
+      },
+      "MatchVerdict": {
+        "enum": [
+          "Agrees",
+          "Partial",
+          "Disagrees"
+        ],
+        "type": "string"
       },
       "MergeInventoryItemsRequest": {
         "type": "object",
@@ -19742,6 +20204,40 @@
         },
         "additionalProperties": false
       },
+      "ResolveSyncIssueGroupRequest": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string",
+            "nullable": true
+          },
+          "code": {
+            "type": "string",
+            "nullable": true
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "dismiss": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ResolveSyncIssueRequest": {
+        "type": "object",
+        "properties": {
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "dismiss": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
       "ReturnDto": {
         "type": "object",
         "properties": {
@@ -21565,6 +22061,32 @@
         },
         "additionalProperties": false
       },
+      "SetAsideWorkTaskRequest": {
+        "type": "object",
+        "properties": {
+          "taskKey": {
+            "type": "string",
+            "nullable": true
+          },
+          "wait": {
+            "$ref": "#/components/schemas/WorkWait"
+          },
+          "until": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "SetExpectedPriceRequest": {
         "type": "object",
         "properties": {
@@ -23106,6 +23628,130 @@
           "Error"
         ],
         "type": "string"
+      },
+      "SyncIssueDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "runId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "accountName": {
+            "type": "string",
+            "nullable": true
+          },
+          "loop": {
+            "$ref": "#/components/schemas/SyncLoopKind"
+          },
+          "severity": {
+            "$ref": "#/components/schemas/SyncIssueSeverity"
+          },
+          "externalReference": {
+            "type": "string",
+            "nullable": true
+          },
+          "message": {
+            "type": "string",
+            "nullable": true
+          },
+          "step": {
+            "type": "string",
+            "nullable": true
+          },
+          "attempts": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "detail": {
+            "type": "string",
+            "nullable": true
+          },
+          "hasSnapshot": {
+            "type": "boolean"
+          },
+          "fix": {
+            "type": "string",
+            "nullable": true
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "SyncIssueGroupDto": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string",
+            "nullable": true
+          },
+          "code": {
+            "type": "string",
+            "nullable": true
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "fix": {
+            "type": "string",
+            "nullable": true
+          },
+          "severity": {
+            "$ref": "#/components/schemas/SyncIssueSeverity"
+          },
+          "count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "latestAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "issues": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SyncIssueDto"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "SyncIssueSeverity": {
+        "enum": [
+          "Warning",
+          "Error"
+        ],
+        "type": "string"
+      },
+      "SyncIssueSnapshotDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "detail": {
+            "type": "string",
+            "nullable": true
+          },
+          "snapshot": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
       },
       "SyncLoopDto": {
         "type": "object",
@@ -24659,6 +25305,155 @@
         ],
         "type": "string"
       },
+      "WorkInboxDto": {
+        "type": "object",
+        "properties": {
+          "lanes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkLaneDto"
+            },
+            "nullable": true
+          },
+          "waiting": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkWaitDto"
+            },
+            "nullable": true
+          },
+          "inTransit": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "openCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "lateCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "WorkLaneDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "nullable": true
+          },
+          "label": {
+            "type": "string",
+            "nullable": true
+          },
+          "hint": {
+            "type": "string",
+            "nullable": true
+          },
+          "tasks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkTaskDto"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "WorkStepDto": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string",
+            "nullable": true
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "state": {
+            "$ref": "#/components/schemas/WorkStepState"
+          }
+        },
+        "additionalProperties": false
+      },
+      "WorkStepState": {
+        "enum": [
+          "Done",
+          "Now",
+          "Later"
+        ],
+        "type": "string"
+      },
+      "WorkTaskDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "nullable": true
+          },
+          "lane": {
+            "type": "string",
+            "nullable": true
+          },
+          "kind": {
+            "type": "string",
+            "nullable": true
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "detail": {
+            "type": "string",
+            "nullable": true
+          },
+          "why": {
+            "type": "string",
+            "nullable": true
+          },
+          "actionLabel": {
+            "type": "string",
+            "nullable": true
+          },
+          "actionHref": {
+            "type": "string",
+            "nullable": true
+          },
+          "since": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "dueBy": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "isLate": {
+            "type": "boolean"
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkStepDto"
+            },
+            "nullable": true
+          },
+          "count": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
       "WorkTaskStatus": {
         "enum": [
           "Open",
@@ -24668,6 +25463,42 @@
           "Cancelled"
         ],
         "type": "string"
+      },
+      "WorkWait": {
+        "enum": [
+          "Snoozed",
+          "Buyer",
+          "Carrier",
+          "Marketplace",
+          "Payout"
+        ],
+        "type": "string"
+      },
+      "WorkWaitDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "nullable": true
+          },
+          "wait": {
+            "$ref": "#/components/schemas/WorkWait"
+          },
+          "until": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
       }
     }
   },
@@ -24707,6 +25538,9 @@
     },
     {
       "name": "Listing"
+    },
+    {
+      "name": "ListingMatches"
     },
     {
       "name": "Listings"
@@ -24787,10 +25621,16 @@
       "name": "SyncAgent"
     },
     {
+      "name": "SyncIssues"
+    },
+    {
       "name": "Tasks"
     },
     {
       "name": "Vision"
+    },
+    {
+      "name": "Work"
     }
   ]
 }

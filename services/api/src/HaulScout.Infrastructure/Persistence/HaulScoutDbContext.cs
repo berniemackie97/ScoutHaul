@@ -77,6 +77,7 @@ public sealed class HaulScoutDbContext(
     public DbSet<OrgReferenceOverride> OrgReferenceOverrides => Set<OrgReferenceOverride>();
     public DbSet<PlatformOrder> PlatformOrders => Set<PlatformOrder>();
     public DbSet<PlatformListing> PlatformListings => Set<PlatformListing>();
+    public DbSet<WorkSnooze> WorkSnoozes => Set<WorkSnooze>();
     public DbSet<SyncRun> SyncRuns => Set<SyncRun>();
     public DbSet<SyncRunIssue> SyncRunIssues => Set<SyncRunIssue>();
     public DbSet<SyncArtifact> SyncArtifacts => Set<SyncArtifact>();
@@ -1060,13 +1061,31 @@ public sealed class HaulScoutDbContext(
             entity.HasOne(item => item.ChannelAccount).WithMany().HasForeignKey(item => item.ChannelAccountId).OnDelete(DeleteBehavior.Cascade);
         });
 
+        modelBuilder.Entity<WorkSnooze>(entity =>
+        {
+            entity.ToTable("WorkSnoozes");
+            entity.Property(item => item.TaskKey).HasMaxLength(200).IsRequired();
+            entity.Property(item => item.Wait).HasConversion<string>().HasMaxLength(16);
+            entity.Property(item => item.Note).HasMaxLength(500);
+            entity.Property(item => item.Title).HasMaxLength(300);
+            entity.HasIndex(item => new { item.OrganizationId, item.TaskKey }).IsUnique();
+        });
+
         modelBuilder.Entity<SyncRunIssue>(entity =>
         {
             entity.ToTable("SyncRunIssues");
             entity.Property(item => item.Severity).HasConversion<string>().HasMaxLength(16);
             entity.Property(item => item.ExternalReference).HasMaxLength(200);
             entity.Property(item => item.Message).HasMaxLength(1000).IsRequired();
+            entity.Property(item => item.Code).HasMaxLength(64);
+            entity.Property(item => item.Step).HasMaxLength(200);
+            entity.Property(item => item.Detail).HasMaxLength(4000);
+            entity.Property(item => item.Snapshot).HasMaxLength(16000);
+            entity.Property(item => item.Fix).HasMaxLength(500);
+            entity.Property(item => item.Resolution).HasMaxLength(500);
+            entity.Property(item => item.State).HasConversion<string>().HasMaxLength(16).HasDefaultValue(SyncIssueState.Open);
             entity.HasIndex(item => item.SyncRunId);
+            entity.HasIndex(item => new { item.OrganizationId, item.State });
         });
 
         modelBuilder.Entity<SyncArtifact>(entity =>

@@ -131,7 +131,7 @@ export function StorefrontCard({ itemId, listing, storeUrl }: { itemId: string; 
               />
             )}
 
-            {state.message ? <p className={`text-xs ${state.ok ? "text-green-700" : "text-destructive"}`}>{state.message}</p> : null}
+            {state.message ? <p className={`text-xs ${state.ok ? "text-success" : "text-destructive"}`}>{state.message}</p> : null}
             <SaveButton />
           </form>
         )}

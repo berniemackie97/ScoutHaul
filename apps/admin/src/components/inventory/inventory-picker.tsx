@@ -95,13 +95,13 @@ export function InventoryPicker(props: {
       >
         <span className="min-w-0">
           {value?.kind === "create" ? (
-            <span className="flex items-center gap-1.5 font-medium text-emerald-700">
+            <span className="flex items-center gap-1.5 font-medium text-success">
               <PackagePlus className="h-4 w-4 shrink-0" aria-hidden /> New item from this sale
             </span>
           ) : value?.kind === "item" ? (
             <span className="block truncate">
               {value.title}
-              {value.isSold ? <span className="text-amber-700"> · recorded</span> : null}
+              {value.isSold ? <span className="text-warning"> · recorded</span> : null}
             </span>
           ) : (
             <span className="text-muted-foreground">Choose an item…</span>
@@ -144,7 +144,7 @@ export function InventoryPicker(props: {
               >
                 {option.kind === "create" ? (
                   <span className="flex items-start gap-2">
-                    <PackagePlus className="mt-0.5 h-4 w-4 shrink-0 text-emerald-700" aria-hidden />
+                    <PackagePlus className="mt-0.5 h-4 w-4 shrink-0 text-success" aria-hidden />
                     <span>
                       <span className="font-medium">Create a new item from this sale</span>
                       <span className="text-muted-foreground block text-xs">For something that sold before it was recorded. Its cost is left for you to add.</span>
@@ -156,7 +156,7 @@ export function InventoryPicker(props: {
               </li>
             ))}
             {loading && results.length === 0 ? <li className="text-muted-foreground px-3 py-2 text-xs">Searching…</li> : null}
-            {failed ? <li className="px-3 py-2 text-xs text-red-700">Inventory could not be searched. Try again.</li> : null}
+            {failed ? <li className="px-3 py-2 text-xs text-destructive">Inventory could not be searched. Try again.</li> : null}
             {!loading && !failed && query && results.length === 0 ? (
               <li className="text-muted-foreground px-3 py-2 text-xs">Nothing in inventory matches “{query}”.</li>
             ) : null}
@@ -186,19 +186,19 @@ function ItemRow({ option, selected }: { option: Extract<Option, { kind: "item" 
       <span className="min-w-0 flex-1">
         <span className="flex items-center gap-1.5">
           <span className="truncate font-medium">{item.title}</span>
-          {selected ? <Check className="h-4 w-4 shrink-0 text-emerald-700" aria-hidden /> : null}
+          {selected ? <Check className="h-4 w-4 shrink-0 text-success" aria-hidden /> : null}
         </span>
         {suggested ? (
           suggested.exact ? (
-            <span className="block text-xs text-emerald-700">Suggested — the item number or SKU matches</span>
+            <span className="block text-xs text-success">Suggested — the item number or SKU matches</span>
           ) : (
-            <span className="flex items-center gap-1 text-xs text-amber-700">
+            <span className="flex items-center gap-1 text-xs text-warning">
               <TriangleAlert className="h-3 w-3" aria-hidden /> Suggested only because the title looks similar — check it
             </span>
           )
         ) : null}
         {item.isSold ? (
-          <span className="block text-xs text-amber-700">Already recorded as sold — choosing it corrects that sale</span>
+          <span className="block text-xs text-warning">Already recorded as sold — choosing it corrects that sale</span>
         ) : details ? (
           <span className="text-muted-foreground block truncate text-xs">{details}</span>
         ) : null}

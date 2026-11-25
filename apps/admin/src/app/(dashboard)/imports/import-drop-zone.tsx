@@ -115,7 +115,7 @@ export function ImportDropZone() {
       </h2>
 
       {error ? (
-        <p role="alert" className="border-destructive/40 bg-destructive/5 text-destructive flex items-start gap-2 rounded-lg border p-3 text-sm">
+        <p role="alert" className="border-destructive-border bg-destructive-surface text-destructive flex items-start gap-2 rounded-lg border p-3 text-sm">
           <XCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden /> {error}
         </p>
       ) : null}
@@ -270,7 +270,7 @@ function DetectedFile({ detection, onRemove }: { detection: ReportDetection; onR
               </p>
               <ul className="space-y-0.5">
                 {previewIssues.map((issue, index) => (
-                  <li key={index} className={cn("flex items-start gap-1.5", issue.severity === "Error" ? "text-destructive" : "text-amber-700 dark:text-amber-400")}>
+                  <li key={index} className={cn("flex items-start gap-1.5", issue.severity === "Error" ? "text-destructive" : "text-warning")}>
                     <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" aria-hidden />
                     <span>
                       {issue.rowNumber ? `Row ${issue.rowNumber}: ` : ""}
@@ -304,7 +304,7 @@ function ImportedFile({ outcome }: { outcome: Outcome }) {
   return (
     <li className="bg-card flex items-start gap-3 rounded-xl border p-4">
       <Icon
-        className={cn("mt-0.5 h-5 w-5 shrink-0", status.tone === "danger" || !outcome.run ? "text-destructive" : "text-emerald-600")}
+        className={cn("mt-0.5 h-5 w-5 shrink-0", status.tone === "danger" || !outcome.run ? "text-destructive" : "text-success")}
         aria-hidden
       />
       <div className="min-w-0 flex-1">

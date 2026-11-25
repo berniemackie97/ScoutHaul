@@ -18,11 +18,11 @@ export function StatusConflictNotice({ conflicts }: { conflicts: StatusConflict[
         return (
           <Card
             key={conflict.kind}
-            className={danger ? "border-destructive/50 bg-destructive/5" : "border-yellow-500/50 bg-yellow-500/5"}
+            className={danger ? "border-destructive/50 bg-destructive/5" : "border-warning-border bg-warning-surface"}
           >
             <CardContent className="flex gap-3 pt-6">
               <AlertTriangle
-                className={`mt-0.5 h-5 w-5 shrink-0 ${danger ? "text-destructive" : "text-yellow-600"}`}
+                className={`mt-0.5 h-5 w-5 shrink-0 ${danger ? "text-destructive" : "text-warning"}`}
                 aria-hidden
               />
               <div className="space-y-1">

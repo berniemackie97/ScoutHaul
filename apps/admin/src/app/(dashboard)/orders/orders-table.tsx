@@ -88,7 +88,7 @@ export function OrdersTable({ orders, emptyLabel }: { orders: OrderRow[]; emptyL
               <p className="text-muted-foreground mt-1">Merging needs orders from one channel.</p>
             )}
             {result?.message && (
-              <p className={`mt-1 ${result.ok ? "text-emerald-700" : "text-destructive"}`}>{result.message}</p>
+              <p className={`mt-1 ${result.ok ? "text-success" : "text-destructive"}`}>{result.message}</p>
             )}
           </div>
           {selected.size > 0 && (

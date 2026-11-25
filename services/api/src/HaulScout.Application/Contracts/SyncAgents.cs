@@ -105,7 +105,16 @@ public sealed record StartAgentRunRequest(
 public sealed record AgentRunDto(Guid RunId, DateTimeOffset LeaseExpiresAt, string? Cursor, DateTimeOffset? From);
 
 /// <summary>A record the agent could not use, or used with a caveat.</summary>
-public sealed record AgentRunIssueInput(string Message, string? ExternalReference = null, bool Rejected = false);
+public sealed record AgentRunIssueInput(
+    string Message,
+    string? ExternalReference = null,
+    bool Rejected = false,
+    string? Code = null,
+    string? Step = null,
+    int? Attempts = null,
+    string? Detail = null,
+    string? Snapshot = null,
+    string? Fix = null);
 
 /// <summary>One slice of what a run read. Sales runs carry orders; listing runs carry listings.</summary>
 /// <param name="CancelledOrderIds">

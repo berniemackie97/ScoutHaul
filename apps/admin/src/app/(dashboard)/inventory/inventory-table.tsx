@@ -119,7 +119,7 @@ export function InventoryTable({ items, sort = "updatedAt", desc = true }: { ite
                   </button>
                 </>
               )}
-              {result?.message && <span className={result.ok ? "text-emerald-700" : "text-destructive"}>{result.message}</span>}
+              {result?.message && <span className={result.ok ? "text-success" : "text-destructive"}>{result.message}</span>}
             </div>
             {selected.length > 0 && (
               <div className="flex flex-wrap gap-2">
@@ -247,7 +247,7 @@ export function InventoryTable({ items, sort = "updatedAt", desc = true }: { ite
                         Sold <When value={facts.soldAt} />
                       </span>
                     ) : days != null ? (
-                      <span className={days > 90 ? "font-medium text-amber-700" : ""}>{days}d</span>
+                      <span className={days > 90 ? "font-medium text-warning" : ""}>{days}d</span>
                     ) : (
                       "—"
                     )}
@@ -290,7 +290,7 @@ function Channels({ facts }: { facts?: Facts }) {
       {shown.map((channel) => {
         const { text, tone } = presenceLabel(channel);
         const className = `inline-flex items-center rounded border px-1.5 py-0.5 text-[11px] font-medium ${
-          tone === "warning" ? "border-amber-300 bg-amber-50 text-amber-800 dark:bg-amber-950 dark:text-amber-200" : tone === "muted" ? "text-muted-foreground" : ""
+          tone === "warning" ? "border-warning-border bg-warning-surface text-warning" : tone === "muted" ? "text-muted-foreground" : ""
         }`;
         return channel.url ? (
           <a key={`${channel.platform}-${channel.status}`} href={channel.url} target="_blank" rel="noreferrer" className={`${className} hover:underline`}>

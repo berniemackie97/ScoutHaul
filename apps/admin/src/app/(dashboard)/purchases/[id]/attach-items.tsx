@@ -73,7 +73,7 @@ export function AttachItems({ lotId }: { lotId: string }) {
           ) : null}
           <div className="flex items-center gap-3">
             <SubmitButton count={chosen.length} />
-            {state.message && <span className={`text-sm ${state.ok ? "text-green-700" : "text-destructive"}`}>{state.message}</span>}
+            {state.message && <span className={`text-sm ${state.ok ? "text-success" : "text-destructive"}`}>{state.message}</span>}
           </div>
         </form>
       </CardContent>

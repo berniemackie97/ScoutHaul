@@ -40,10 +40,10 @@ const BADGE: Record<Tone, "success" | "warning" | "destructive" | "info" | "seco
 };
 
 const TEXT: Record<Tone, string> = {
-  success: "text-emerald-700",
-  warning: "text-amber-700",
-  danger: "text-red-700",
-  info: "text-sky-700",
+  success: "text-success",
+  warning: "text-warning",
+  danger: "text-destructive",
+  info: "text-info",
   neutral: "text-muted-foreground",
 };
 
@@ -117,7 +117,7 @@ export function SyncHub({ overview }: { overview: SyncOverview }) {
 
       <div aria-live="polite">
         {message ? (
-          <div className={`flex items-start justify-between gap-3 rounded-lg border px-4 py-3 text-sm ${message.ok ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-amber-200 bg-amber-50 text-amber-900"}`}>
+          <div className={`flex items-start justify-between gap-3 rounded-lg border px-4 py-3 text-sm ${message.ok ? "border-success-border bg-success-surface text-success" : "border-warning-border bg-warning-surface text-warning"}`}>
             <p>{message.message}</p>
             <button type="button" className="shrink-0 opacity-70 hover:opacity-100" aria-label="Dismiss" onClick={() => setMessage(null)}>
               <X className="h-4 w-4" aria-hidden />
@@ -469,7 +469,7 @@ function Requests(props: {
                   <td className="px-4 py-3">
                     <span className="inline-flex items-center gap-2">
                       {request.status === "Running" ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : null}
-                      {status.tone === "warning" ? <CircleAlert className="h-3.5 w-3.5 text-amber-600" aria-hidden /> : null}
+                      {status.tone === "warning" ? <CircleAlert className="h-3.5 w-3.5 text-warning" aria-hidden /> : null}
                       <Badge variant={BADGE[status.tone]}>{status.label}</Badge>
                     </span>
                     {note ? <p className="text-muted-foreground mt-1 text-xs">{note}</p> : null}

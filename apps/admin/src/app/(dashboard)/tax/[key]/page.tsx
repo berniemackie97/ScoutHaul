@@ -50,7 +50,7 @@ export default async function WorksheetPage({
     return (
       <div className="space-y-4">
         <BackLink />
-        <div className="border-destructive/30 bg-destructive/5 text-destructive rounded-xl border p-6 text-sm">{detail ?? "This period could not be loaded."}</div>
+        <div className="border-destructive-border bg-destructive-surface text-destructive rounded-xl border p-6 text-sm">{detail ?? "This period could not be loaded."}</div>
       </div>
     );
   }
@@ -192,7 +192,7 @@ export default async function WorksheetPage({
                       <td className="px-3 py-3 text-right tabular-nums">{cents(invoice.taxable)}</td>
                       <td className="px-3 py-3 text-right tabular-nums">{(invoice.taxable ?? 0) > 0 ? percent(0.06 + (invoice.surtaxRate ?? 0)) : "—"}</td>
                       <td className="px-3 py-3 text-right tabular-nums">{cents(invoice.computedTax)}</td>
-                      <td className={`px-3 py-3 text-right tabular-nums ${variance ? "text-amber-700 dark:text-amber-400" : ""}`}>{cents(invoice.taxCharged)}</td>
+                      <td className={`px-3 py-3 text-right tabular-nums ${variance ? "text-warning" : ""}`}>{cents(invoice.taxCharged)}</td>
                       <td className="px-3 py-3 text-right font-medium tabular-nums">{cents(invoice.taxDue)}</td>
                     </tr>
                   );
@@ -327,7 +327,7 @@ export default async function WorksheetPage({
               <Pair label={`Paid${filing.paidOn ? ` ${day(filing.paidOn)}` : ""}`} value={cents(filing.amountPaid)} />
             </dl>
             {!filing.voided && Math.abs((filing.amountPaid ?? 0) - (filing.amountDueWithReturn ?? 0)) >= 0.005 ? (
-              <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">Amount paid differs from Line 14 by {cents((filing.amountPaid ?? 0) - (filing.amountDueWithReturn ?? 0))}.</p>
+              <p className="mt-2 text-xs text-warning">Amount paid differs from Line 14 by {cents((filing.amountPaid ?? 0) - (filing.amountDueWithReturn ?? 0))}.</p>
             ) : null}
             {filing.notes ? <p className="text-muted-foreground mt-2 text-xs">{filing.notes}</p> : null}
             {filing.voided ? <p className="text-muted-foreground mt-2 text-xs">Voided: {filing.voidReason}</p> : null}

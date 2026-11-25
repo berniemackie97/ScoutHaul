@@ -84,6 +84,31 @@ public sealed class SyncRunIssue : EntityBase, IOrganizationScoped
     public string? ExternalReference { get; set; }
 
     public required string Message { get; set; }
+
+    /// <summary>A stable kind, such as <c>FIELD_MISSING</c> or <c>PHOTO_FETCH</c>; issues of one kind are fixed together.</summary>
+    public string? Code { get; set; }
+
+    /// <summary>Where in the scan it happened: "orders page 2", "order detail".</summary>
+    public string? Step { get; set; }
+
+    /// <summary>How many times the agent tried before giving up.</summary>
+    public int Attempts { get; set; } = 1;
+
+    /// <summary>Technical detail for whoever fixes the cause: the request, the response, the selector that came back empty.</summary>
+    public string? Detail { get; set; }
+
+    /// <summary>An excerpt of what the agent read, so the record can be rebuilt or entered by hand without going back to the site.</summary>
+    public string? Snapshot { get; set; }
+
+    /// <summary>What a person can do about it, when the agent knows.</summary>
+    public string? Fix { get; set; }
+
+    public SyncIssueState State { get; set; } = SyncIssueState.Open;
+    public DateTimeOffset? ResolvedAt { get; set; }
+    public Guid? ResolvedByUserId { get; set; }
+
+    /// <summary>How it was closed: a person's note, "Retried", or "Not seen in a later complete scan".</summary>
+    public string? Resolution { get; set; }
 }
 
 /// <summary>
@@ -125,4 +150,12 @@ public enum SyncIssueSeverity
 {
     Warning,
     Error,
+}
+
+/// <summary>An issue stays open until a person or a later scan closes it; nothing ages out silently.</summary>
+public enum SyncIssueState
+{
+    Open,
+    Resolved,
+    Dismissed,
 }

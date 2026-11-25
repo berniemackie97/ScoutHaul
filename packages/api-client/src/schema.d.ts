@@ -2560,6 +2560,47 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/platform-listings/{id}/match-candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    search?: string;
+                };
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ListingMatchDto"];
+                        "application/json": components["schemas"]["ListingMatchDto"];
+                        "text/json": components["schemas"]["ListingMatchDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/listings": {
         parameters: {
             query?: never;
@@ -9801,6 +9842,205 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/sync/issues": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SyncIssueGroupDto"][];
+                        "application/json": components["schemas"]["SyncIssueGroupDto"][];
+                        "text/json": components["schemas"]["SyncIssueGroupDto"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sync/issues/{id}/snapshot": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SyncIssueSnapshotDto"];
+                        "application/json": components["schemas"]["SyncIssueSnapshotDto"];
+                        "text/json": components["schemas"]["SyncIssueSnapshotDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sync/issues/{id}/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["ResolveSyncIssueRequest"];
+                    "text/json": components["schemas"]["ResolveSyncIssueRequest"];
+                    "application/*+json": components["schemas"]["ResolveSyncIssueRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sync/issues/resolve-group": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["ResolveSyncIssueGroupRequest"];
+                    "text/json": components["schemas"]["ResolveSyncIssueGroupRequest"];
+                    "application/*+json": components["schemas"]["ResolveSyncIssueGroupRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": number;
+                        "application/json": number;
+                        "text/json": number;
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sync/issues/{id}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["RequestScanResultDto"];
+                        "application/json": components["schemas"]["RequestScanResultDto"];
+                        "text/json": components["schemas"]["RequestScanResultDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/tasks": {
         parameters: {
             query?: never;
@@ -10024,6 +10264,117 @@ export interface paths {
                         "application/json": components["schemas"]["VisionIdentifyResult"];
                         "text/json": components["schemas"]["VisionIdentifyResult"];
                     };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/work": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["WorkInboxDto"];
+                        "application/json": components["schemas"]["WorkInboxDto"];
+                        "text/json": components["schemas"]["WorkInboxDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/work/set-aside": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["SetAsideWorkTaskRequest"];
+                    "text/json": components["schemas"]["SetAsideWorkTaskRequest"];
+                    "application/*+json": components["schemas"]["SetAsideWorkTaskRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/work/bring-back": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: {
+                    key?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
                 };
             };
         };
@@ -10260,6 +10611,13 @@ export interface components {
             message?: string | null;
             externalReference?: string | null;
             rejected?: boolean;
+            code?: string | null;
+            step?: string | null;
+            /** Format: int32 */
+            attempts?: number | null;
+            detail?: string | null;
+            snapshot?: string | null;
+            fix?: string | null;
         };
         AgentWorkDto: {
             /** Format: uuid */
@@ -11497,6 +11855,32 @@ export interface components {
             title?: string | null;
             description?: string | null;
         };
+        ListingMatchCandidateDto: {
+            /** Format: uuid */
+            inventoryItemId?: string;
+            title?: string | null;
+            status?: components["schemas"]["InventoryStatus"];
+            brand?: string | null;
+            category?: string | null;
+            size?: string | null;
+            storageLocation?: string | null;
+            barcode?: string | null;
+            thumbnailUrl?: string | null;
+            /** Format: int32 */
+            score?: number;
+            confidence?: string | null;
+            signals?: components["schemas"]["ListingMatchSignalDto"][] | null;
+        };
+        ListingMatchDto: {
+            /** Format: uuid */
+            listingId?: string;
+            candidates?: components["schemas"]["ListingMatchCandidateDto"][] | null;
+        };
+        ListingMatchSignalDto: {
+            kind?: string | null;
+            verdict?: components["schemas"]["MatchVerdict"];
+            text?: string | null;
+        };
         /** @enum {string} */
         ListingReadiness: "Optional" | "Recommended" | "Required";
         /** @enum {string} */
@@ -11591,6 +11975,8 @@ export interface components {
             query?: string | null;
             links?: components["schemas"]["MarketplaceSearchLinkDto"][] | null;
         };
+        /** @enum {string} */
+        MatchVerdict: "Agrees" | "Partial" | "Disagrees";
         MergeInventoryItemsRequest: {
             /** Format: uuid */
             keepId?: string;
@@ -12577,6 +12963,16 @@ export interface components {
             reason?: string | null;
             notes?: string | null;
         };
+        ResolveSyncIssueGroupRequest: {
+            platform?: string | null;
+            code?: string | null;
+            note?: string | null;
+            dismiss?: boolean;
+        };
+        ResolveSyncIssueRequest: {
+            note?: string | null;
+            dismiss?: boolean;
+        };
         ReturnDto: {
             /** Format: uuid */
             id?: string;
@@ -13207,6 +13603,14 @@ export interface components {
             email?: string | null;
             displayName?: string | null;
         };
+        SetAsideWorkTaskRequest: {
+            taskKey?: string | null;
+            wait?: components["schemas"]["WorkWait"];
+            /** Format: date-time */
+            until?: string | null;
+            note?: string | null;
+            title?: string | null;
+        };
         SetExpectedPriceRequest: {
             /** Format: double */
             estimatedSalePrice?: number;
@@ -13728,6 +14132,46 @@ export interface components {
         };
         /** @enum {string} */
         SyncFailureKind: "SignedOut" | "WrongAccount" | "RateLimited" | "Challenge" | "SiteChanged" | "Network" | "NoAccess" | "Interrupted" | "Error";
+        SyncIssueDto: {
+            /** Format: uuid */
+            id?: string;
+            /** Format: uuid */
+            runId?: string;
+            accountName?: string | null;
+            loop?: components["schemas"]["SyncLoopKind"];
+            severity?: components["schemas"]["SyncIssueSeverity"];
+            externalReference?: string | null;
+            message?: string | null;
+            step?: string | null;
+            /** Format: int32 */
+            attempts?: number;
+            detail?: string | null;
+            hasSnapshot?: boolean;
+            fix?: string | null;
+            note?: string | null;
+            /** Format: date-time */
+            createdAt?: string;
+        };
+        SyncIssueGroupDto: {
+            platform?: string | null;
+            code?: string | null;
+            title?: string | null;
+            fix?: string | null;
+            severity?: components["schemas"]["SyncIssueSeverity"];
+            /** Format: int32 */
+            count?: number;
+            /** Format: date-time */
+            latestAt?: string;
+            issues?: components["schemas"]["SyncIssueDto"][] | null;
+        };
+        /** @enum {string} */
+        SyncIssueSeverity: "Warning" | "Error";
+        SyncIssueSnapshotDto: {
+            /** Format: uuid */
+            id?: string;
+            detail?: string | null;
+            snapshot?: string | null;
+        };
         SyncLoopDto: {
             loop?: components["schemas"]["SyncLoopKind"];
             /** Format: int32 */
@@ -14234,8 +14678,62 @@ export interface components {
         };
         /** @enum {string} */
         WeightUnit: "Ounces" | "Pounds" | "Grams" | "Kilograms";
+        WorkInboxDto: {
+            lanes?: components["schemas"]["WorkLaneDto"][] | null;
+            waiting?: components["schemas"]["WorkWaitDto"][] | null;
+            /** Format: int32 */
+            inTransit?: number;
+            /** Format: int32 */
+            openCount?: number;
+            /** Format: int32 */
+            lateCount?: number;
+            /** Format: date-time */
+            generatedAt?: string;
+        };
+        WorkLaneDto: {
+            key?: string | null;
+            label?: string | null;
+            hint?: string | null;
+            tasks?: components["schemas"]["WorkTaskDto"][] | null;
+        };
+        WorkStepDto: {
+            label?: string | null;
+            /** Format: date-time */
+            at?: string | null;
+            state?: components["schemas"]["WorkStepState"];
+        };
+        /** @enum {string} */
+        WorkStepState: "Done" | "Now" | "Later";
+        WorkTaskDto: {
+            key?: string | null;
+            lane?: string | null;
+            kind?: string | null;
+            title?: string | null;
+            detail?: string | null;
+            why?: string | null;
+            actionLabel?: string | null;
+            actionHref?: string | null;
+            /** Format: date-time */
+            since?: string | null;
+            /** Format: date-time */
+            dueBy?: string | null;
+            isLate?: boolean;
+            steps?: components["schemas"]["WorkStepDto"][] | null;
+            /** Format: int32 */
+            count?: number;
+        };
         /** @enum {string} */
         WorkTaskStatus: "Open" | "InProgress" | "Blocked" | "Completed" | "Cancelled";
+        /** @enum {string} */
+        WorkWait: "Snoozed" | "Buyer" | "Carrier" | "Marketplace" | "Payout";
+        WorkWaitDto: {
+            key?: string | null;
+            wait?: components["schemas"]["WorkWait"];
+            /** Format: date-time */
+            until?: string | null;
+            note?: string | null;
+            title?: string | null;
+        };
     };
     responses: never;
     parameters: never;

@@ -77,7 +77,7 @@ export function ConnectBrowser({ startOpen }: { startOpen: boolean }) {
             Use the browser you sell in — the one signed in to your marketplaces. An always-on computer works best: it keeps syncing while your laptop sleeps.
           </p>
           {extension.installed && !extension.paired ? (
-            <p className="mt-2 text-sm font-medium text-emerald-700">HaulScout Sync is installed in this browser — open it from the toolbar and paste the code.</p>
+            <p className="mt-2 text-sm font-medium text-success">HaulScout Sync is installed in this browser — open it from the toolbar and paste the code.</p>
           ) : null}
         </div>
         {!pairing || state.status === "Expired" ? (
@@ -85,7 +85,7 @@ export function ConnectBrowser({ startOpen }: { startOpen: boolean }) {
         ) : null}
       </div>
 
-      {error ? <p className="mt-4 text-sm text-red-700">{error}</p> : null}
+      {error ? <p className="mt-4 text-sm text-destructive">{error}</p> : null}
 
       {pairing && state.status !== "Paired" && state.status !== "Expired" ? (
         <div className="mt-5 grid gap-5 sm:grid-cols-[auto_1fr] sm:items-center">
@@ -118,11 +118,11 @@ export function ConnectBrowser({ startOpen }: { startOpen: boolean }) {
       ) : null}
 
       {state.status === "Paired" ? (
-        <p className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+        <p className="mt-4 rounded-lg border border-success-border bg-success-surface px-4 py-3 text-sm text-success">
           Connected <strong>{state.agent?.name}</strong>. Next, bind each account on the Sync page to the seller account it is signed in to.
         </p>
       ) : null}
-      {state.status === "Expired" ? <p className="mt-4 text-sm text-amber-700">That code expired before it was used. Get a new one.</p> : null}
+      {state.status === "Expired" ? <p className="mt-4 text-sm text-warning">That code expired before it was used. Get a new one.</p> : null}
     </Card>
   );
 }

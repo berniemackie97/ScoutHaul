@@ -65,11 +65,12 @@ export async function heldBack(platform: string, limits: GovernorPolicy, now: Da
  * counts toward the caps, and refuses outright while the marketplace is paused.
  */
 export function governedContext(tab: MarketplaceTab, platform: string, policy: GovernorPolicy, deps: Pick<RunnerDeps, "now" | "sleep">, onRequest?: () => void): MarketplaceContext {
-  const paced = async <T>(go: () => Promise<T>): Promise<T> => {
-    await pace(platform, policy, deps);
-    onRequest?.();
-    return go();
-  };
+  const paced = <T>(go: () => Promise<T>): Promise<T> =>
+    withTransientRetry(async () => {
+      await pace(platform, policy, deps);
+      onRequest?.();
+      return go();
+    }, deps);
 
   return {
     now: () => deps.now(),
@@ -79,6 +80,29 @@ export function governedContext(tab: MarketplaceTab, platform: string, policy: G
     cookie: (name: string) => tab.cookie?.(name) ?? Promise.resolve(undefined),
     memory: adapterMemory(platform),
   };
+}
+
+/** Waits before each retry of a request that failed for a passing reason: slow and patient, never a burst. */
+export const transientRetryDelaysMs = [15_000, 60_000] as const;
+
+/**
+ * Tries a request again when the network or the site hiccuped, after a pause, at most twice — each try still paced by
+ * the governor. A security check, a slow-down, a sign-out or the governor's own refusal is never retried: those wait for
+ * a person or for time, and trying again would look like a bot.
+ */
+export async function withTransientRetry<T>(go: () => Promise<T>, deps: Pick<RunnerDeps, "sleep">): Promise<T> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await go();
+    } catch (error) {
+      const delay = transientRetryDelaysMs[attempt];
+      if (delay === undefined || error instanceof HeldBack || !(error instanceof AdapterError && error.kind === "Network")) {
+        throw error;
+      }
+
+      await deps.sleep(delay + Math.floor(Math.random() * 5_000));
+    }
+  }
 }
 
 /**

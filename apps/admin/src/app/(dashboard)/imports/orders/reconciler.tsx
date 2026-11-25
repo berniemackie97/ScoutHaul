@@ -170,7 +170,7 @@ function OrderCard({ order }: { order: PlatformOrder }) {
                         />
                         {choice ? (
                           <span
-                            className={`mt-1 block text-xs ${choice.kind === "item" && choice.isSold ? "text-amber-700" : "text-emerald-700"}`}
+                            className={`mt-1 block text-xs ${choice.kind === "item" && choice.isSold ? "text-warning" : "text-success"}`}
                           >
                             {choice.kind === "create"
                               ? "→ creates the item and records the sale"
@@ -208,8 +208,8 @@ function OrderCard({ order }: { order: PlatformOrder }) {
             <div
               className={`rounded-lg border p-3 text-sm ${
                 reconcileState.ok
-                  ? "border-emerald-500/30 bg-emerald-500/5 text-emerald-700"
-                  : "border-destructive/30 bg-destructive/5 text-destructive"
+                  ? "border-success-border bg-success-surface text-success"
+                  : "border-destructive-border bg-destructive-surface text-destructive"
               }`}
             >
               {reconcileState.message}

@@ -86,7 +86,7 @@ export function MergeDialog({ rows, onClose }: { rows: InventoryTableRow[]; onCl
           })}
         </fieldset>
 
-        {error && <p className="border-destructive/30 bg-destructive/5 text-destructive rounded-lg border p-3 text-sm">{error}</p>}
+        {error && <p className="border-destructive-border bg-destructive-surface text-destructive rounded-lg border p-3 text-sm">{error}</p>}
 
         <DialogFooter className="gap-2">
           <Button type="button" variant="outline" disabled={pending} onClick={onClose}>

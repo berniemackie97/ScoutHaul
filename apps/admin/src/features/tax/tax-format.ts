@@ -63,7 +63,7 @@ export function countdown(days: number | undefined, status: PeriodStatus | undef
 }
 
 export const severityTone: Record<IssueSeverity, string> = {
-  Blocking: "border-destructive/40 bg-destructive/5 text-destructive",
-  Warning: "border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-100",
-  Info: "border-blue-200 bg-blue-50 text-blue-900 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-100",
+  Blocking: "border-destructive-border bg-destructive-surface text-destructive",
+  Warning: "border-warning-border bg-warning-surface text-warning",
+  Info: "border-info-border bg-info-surface text-info",
 };

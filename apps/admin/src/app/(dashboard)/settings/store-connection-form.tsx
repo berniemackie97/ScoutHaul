@@ -106,7 +106,7 @@ export function StoreConnectionForm({
           <div className="flex items-center justify-between gap-4 border-t pt-4">
             <p
               aria-live="polite"
-              className={`text-sm ${state.message ? (state.ok ? "text-green-700" : "text-destructive") : "text-muted-foreground"}`}
+              className={`text-sm ${state.message ? (state.ok ? "text-success" : "text-destructive") : "text-muted-foreground"}`}
             >
               {state.message || "Changes take effect immediately."}
             </p>

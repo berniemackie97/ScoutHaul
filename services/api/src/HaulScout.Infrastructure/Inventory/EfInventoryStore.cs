@@ -10,7 +10,7 @@ namespace HaulScout.Infrastructure.Inventory;
 /// The EF side of <see cref="IInventoryStore"/>. All the query composition the use cases used to do inline lives here,
 /// which is the point: filtering and sorting must run as SQL, and this is the only layer allowed to know that.
 /// </summary>
-public sealed class EfInventoryStore(HaulScoutDbContext db) : IInventoryStore
+public sealed class EfInventoryStore(HaulScoutDbContext db, TimeProvider? clock = null) : IInventoryStore
 {
     public Task<InventoryItem?> FindDetailAsync(Guid organizationId, Guid id, CancellationToken cancellationToken) =>
         db.InventoryItems
@@ -305,7 +305,7 @@ public sealed class EfInventoryStore(HaulScoutDbContext db) : IInventoryStore
                     query = query.Where(item => unlisted.Contains(item.Status));
                     break;
                 case InventoryAttention.Aged:
-                    DateTimeOffset agedCutoff = DateTimeOffset.UtcNow.AddDays(-60);
+                    DateTimeOffset agedCutoff = (clock ?? TimeProvider.System).GetUtcNow().AddDays(-60);
                     query = query.Where(item => item.PurchasedAt < agedCutoff && item.Status != InventoryStatus.Listed);
                     break;
                 case InventoryAttention.MissingPhotos:

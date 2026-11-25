@@ -132,7 +132,7 @@ export default async function InventoryDetailPage({
             {(listingDifferences?.length ?? 0) > 0 && (
               <Link
                 href={`/inventory/${inventoryItem.id}?tab=channels#listing-differences`}
-                className="block rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 hover:bg-amber-100 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200"
+                className="block rounded-xl border border-warning-border bg-warning-surface p-4 text-sm text-warning hover:bg-warning-surface"
               >
                 <span className="block font-semibold">
                   {listingDifferences!.length} {listingDifferences!.length === 1 ? "detail differs" : "details differ"} on linked listings

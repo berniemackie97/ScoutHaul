@@ -97,7 +97,7 @@ export function CommandCenter({ overview, operator }: { overview: OperatorConsol
             </div>
           ) : (
             <Card className="flex items-center gap-3 p-5 text-sm">
-              <CheckCircle2 className="h-5 w-5 text-emerald-600" aria-hidden />
+              <CheckCircle2 className="h-5 w-5 text-success" aria-hidden />
               Nothing waiting on you right now.
             </Card>
           )}
@@ -167,7 +167,7 @@ function SectionHeading({
 }) {
   return (
     <h2 id={id} className="flex items-center gap-2 text-sm font-semibold">
-      <Icon className={tone === "warning" ? "h-4 w-4 text-amber-600" : "text-muted-foreground h-4 w-4"} aria-hidden />
+      <Icon className={tone === "warning" ? "h-4 w-4 text-warning" : "text-muted-foreground h-4 w-4"} aria-hidden />
       {children}
     </h2>
   );
@@ -177,7 +177,7 @@ function AttentionCard({ queue }: { queue: PresentedQueue }) {
   return (
     <Link
       href={queue.href}
-      className="group rounded-xl border border-amber-300 bg-amber-50 p-5 transition-colors hover:border-amber-400 dark:border-amber-800 dark:bg-amber-950/40"
+      className="group rounded-xl border border-warning-border bg-warning-surface p-5 transition-colors hover:border-warning-border"
     >
       <div className="flex items-start justify-between gap-3">
         <p className="text-3xl font-semibold tabular-nums">{queue.count}</p>
@@ -262,7 +262,7 @@ function TradingCard({ money: trading }: { money: NonNullable<OperatorConsole["m
 function Change({ change }: { change: ReportChange | undefined }) {
   const tone = changeTone(change);
   const Icon = tone === "up" ? ArrowUpRight : tone === "down" ? ArrowDownRight : Minus;
-  const color = tone === "up" ? "text-emerald-600" : tone === "down" ? "text-destructive" : "text-muted-foreground";
+  const color = tone === "up" ? "text-success" : tone === "down" ? "text-destructive" : "text-muted-foreground";
   return (
     <span className={`inline-flex items-center gap-0.5 text-xs font-medium ${color}`}>
       <Icon className="h-3.5 w-3.5" aria-hidden /> {describeChange(change)}

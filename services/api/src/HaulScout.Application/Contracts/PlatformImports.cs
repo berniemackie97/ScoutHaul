@@ -1,3 +1,4 @@
+using HaulScout.Application.Inventory;
 using HaulScout.Domain;
 
 namespace HaulScout.Application.Contracts;
@@ -330,3 +331,22 @@ public sealed record PlatformListingReconcileResultDto(
     Guid ChannelListingId,
     bool CreatedInventoryItem,
     PlatformListingDto Listing);
+
+public sealed record ListingMatchSignalDto(string Kind, MatchVerdict Verdict, string Text);
+
+public sealed record ListingMatchCandidateDto(
+    Guid InventoryItemId,
+    string Title,
+    InventoryStatus Status,
+    string? Brand,
+    string? Category,
+    string? Size,
+    string? StorageLocation,
+    string? Barcode,
+    string? ThumbnailUrl,
+    int Score,
+    // Strong (≥ 90), Likely (≥ 70) or Weak.
+    string Confidence,
+    IReadOnlyList<ListingMatchSignalDto> Signals);
+
+public sealed record ListingMatchDto(Guid ListingId, IReadOnlyList<ListingMatchCandidateDto> Candidates);

@@ -58,6 +58,9 @@ public static class DependencyInjection
         services.AddScoped<IInventoryStore, EfInventoryStore>();
         services.AddScoped<IInventoryMergeStore, EfInventoryMergeStore>();
         services.AddScoped<IInventoryListingDifferenceStore, EfInventoryListingDifferenceStore>();
+        services.AddScoped<IListingMatchStore, EfListingMatchStore>();
+        services.AddScoped<ISyncIssueStore, EfSyncIssueStore>();
+        services.AddScoped<HaulScout.Application.Work.IWorkSnoozeStore, HaulScout.Infrastructure.Work.EfWorkSnoozeStore>();
         services.AddScoped<ISearchStore, EfSearchStore>();
         services.AddScoped<ISyncRunStore, EfSyncRunStore>();
         services.AddScoped<ISyncAgentStore, EfSyncAgentStore>();

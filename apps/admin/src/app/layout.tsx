@@ -12,6 +12,15 @@ const sans = localFont({
   display: "swap",
 });
 
+const serif = localFont({
+  src: [
+    { path: "./fonts/source-serif-4.woff2", weight: "200 900", style: "normal" },
+    { path: "./fonts/source-serif-4-italic.woff2", weight: "200 900", style: "italic" },
+  ],
+  variable: "--font-serif",
+  display: "swap",
+});
+
 const mono = localFont({
   src: [{ path: "./fonts/source-code-pro.woff2", weight: "200 900", style: "normal" }],
   variable: "--font-mono",
@@ -58,7 +67,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${sans.variable} ${mono.variable}`}>
+    <html lang="en" className={`${sans.variable} ${serif.variable} ${mono.variable}`}>
       <body className="min-h-screen bg-background font-sans text-foreground antialiased">{children}</body>
     </html>
   );

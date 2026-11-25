@@ -45,7 +45,7 @@ function CancelledOrder({ order }: { order: PlatformOrder }) {
     <Card className="space-y-3 p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-start gap-2">
-          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" aria-hidden />
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" aria-hidden />
           <div className="text-sm">
             <p className="font-medium">
               {order.platform} order {order.externalOrderId}
@@ -105,7 +105,7 @@ function CancelledOrder({ order }: { order: PlatformOrder }) {
       </form>
 
       {state.message ? (
-        <p className={`text-xs ${state.ok ? "text-emerald-700" : "text-amber-700"}`} aria-live="polite">
+        <p className={`text-xs ${state.ok ? "text-success" : "text-warning"}`} aria-live="polite">
           {state.message}
         </p>
       ) : null}

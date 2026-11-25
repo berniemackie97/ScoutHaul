@@ -200,7 +200,7 @@ export function InventoryEditor({ item, referenceData }: { item: InventoryItem; 
       </details>
 
       <div className="bg-background/95 sticky bottom-4 flex items-center justify-between gap-4 rounded-xl border p-4 shadow-lg backdrop-blur">
-        <p aria-live="polite" className={`text-sm ${dirty ? "font-medium text-amber-700 dark:text-amber-400" : state.message ? (state.ok ? "text-green-700" : "text-destructive") : "text-muted-foreground"}`}>
+        <p aria-live="polite" className={`text-sm ${dirty ? "font-medium text-warning" : state.message ? (state.ok ? "text-success" : "text-destructive") : "text-muted-foreground"}`}>
           {dirty ? "Unsaved changes" : state.message || "All changes saved."}
         </p>
         <SubmitButton unchanged={!dirty} />

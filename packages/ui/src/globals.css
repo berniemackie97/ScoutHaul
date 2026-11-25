@@ -28,6 +28,22 @@
     --accent-foreground: 209 63% 16%;
     --destructive: 0 66% 41%;
     --destructive-foreground: 40 40% 97%;
+    --destructive-surface: 0 62% 96%;
+    --destructive-border: 0 45% 84%;
+
+    /* Status — earthy, in the paper/ink family. Text tones measure ≥ 4.5:1 on card and on their surface. */
+    --success: 150 48% 25%;
+    --success-foreground: 40 40% 97%;
+    --success-surface: 145 30% 93%;
+    --success-border: 148 26% 78%;
+    --warning: 32 80% 29%;
+    --warning-foreground: 40 40% 97%;
+    --warning-surface: 40 72% 92%;
+    --warning-border: 38 52% 74%;
+    --info: 209 52% 33%;
+    --info-foreground: 40 40% 97%;
+    --info-surface: 209 38% 94%;
+    --info-border: 209 28% 80%;
 
     --border: 38 20% 84%;           /* warm rule */
     --input: 38 20% 84%;
@@ -83,6 +99,21 @@
     --accent-foreground: 40 30% 92%;
     --destructive: 0 60% 45%;
     --destructive-foreground: 40 30% 95%;
+    --destructive-surface: 0 38% 15%;
+    --destructive-border: 0 32% 30%;
+
+    --success: 150 38% 62%;
+    --success-foreground: 209 63% 10%;
+    --success-surface: 150 28% 14%;
+    --success-border: 150 22% 27%;
+    --warning: 38 74% 62%;
+    --warning-foreground: 209 63% 10%;
+    --warning-surface: 36 38% 14%;
+    --warning-border: 36 32% 29%;
+    --info: 209 58% 72%;
+    --info-foreground: 209 63% 10%;
+    --info-surface: 209 38% 16%;
+    --info-border: 209 28% 29%;
     --border: 209 30% 18%;
     --input: 209 30% 18%;
     --ring: 30 60% 52%;

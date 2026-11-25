@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/list/list-search";
 import { getApiClient } from "@/lib/api";
 import { errorMessage } from "@/lib/api-error";
 import { SyncHub } from "./sync-hub";
+import { SyncIssues } from "./sync-issues";
 import { refusal } from "@/lib/page-access";
 
 export const dynamic = "force-dynamic";
@@ -18,7 +19,10 @@ export default async function SyncPage() {
   if (refused) return refused;
 
   const api = await getApiClient();
-  const { data: overview, error } = await api.GET("/api/sync/overview", {});
+  const [{ data: overview, error }, { data: issueGroups }] = await Promise.all([
+    api.GET("/api/sync/overview", {}),
+    api.GET("/api/sync/issues", {}),
+  ]);
 
   return (
     <div className="space-y-8">
@@ -47,6 +51,7 @@ export default async function SyncPage() {
       ) : (
         <>
           {(overview.agents ?? []).filter((agent) => !agent.revoked).length === 0 ? <GetStarted /> : null}
+          <SyncIssues groups={issueGroups ?? []} />
           <SyncHub overview={overview} />
         </>
       )}

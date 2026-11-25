@@ -159,8 +159,8 @@ export function ItemCreator({ referenceData }: { referenceData: ReferenceData })
 
       <aside className="space-y-4 xl:sticky xl:top-6 xl:self-start">
         <ReadinessChecklist targetStatus={status} facts={facts} compact />
-        {disabledReason && <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">{disabledReason}</div>}
-        {state.message && <div className="border-destructive/30 bg-destructive/5 text-destructive rounded-lg border p-3 text-sm">{state.message}</div>}
+        {disabledReason && <div className="rounded-lg border border-warning-border bg-warning-surface p-3 text-sm text-warning">{disabledReason}</div>}
+        {state.message && <div className="border-destructive-border bg-destructive-surface text-destructive rounded-lg border p-3 text-sm">{state.message}</div>}
         <SubmitButton disabledReason={disabledReason} />
         <p className="text-muted-foreground text-xs">Photos, listings and channels are added on the item once it exists.</p>
       </aside>

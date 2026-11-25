@@ -1,0 +1,25 @@
+version: 1
+meta:
+    template:
+        id: dotnet
+    inputs:
+        template.id: dotnet
+checks:
+    - id: template:dotnet:6bfafa0912be
+      source: template:dotnet
+      name: tests
+      run: dotnet test -c Release
+      requires: dotnet
+    - id: template:dotnet:591075060de1
+      source: template:dotnet
+      name: format
+      run: dotnet format --verify-no-changes
+      requires: dotnet
+insults:
+    mode: snarky
+    file: .buildbouncer/assets/insults/default.json
+    locale: en
+banter:
+    enabled: true
+    file: .buildbouncer/assets/banter/default.json
+    locale: en

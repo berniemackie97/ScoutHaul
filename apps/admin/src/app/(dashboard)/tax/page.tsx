@@ -23,7 +23,7 @@ export default async function SalesTaxPage() {
     return (
       <div className="space-y-4">
         <PageHeader eyebrow="Compliance" title="Sales tax" />
-        <div className="border-destructive/30 bg-destructive/5 text-destructive rounded-xl border p-6 text-sm">
+        <div className="border-destructive-border bg-destructive-surface text-destructive rounded-xl border p-6 text-sm">
           The tax overview could not be loaded. Try again in a moment.
         </div>
       </div>
@@ -85,7 +85,7 @@ export default async function SalesTaxPage() {
                 {overview.overdueCount ? (
                   <span className="text-destructive font-medium">{overview.overdueCount} return{overview.overdueCount === 1 ? "" : "s"} overdue</span>
                 ) : (
-                  <span className="text-green-700 dark:text-green-400">Nothing overdue</span>
+                  <span className="text-success">Nothing overdue</span>
                 )}
               </p>
             </Card>
@@ -147,13 +147,13 @@ function NextDueCard({ period }: { period: Period | null }) {
 
   const overdue = period.status === "Overdue";
   return (
-    <Card className={`p-5 ${overdue ? "border-destructive/50" : period.status === "DueSoon" ? "border-amber-400" : ""}`}>
+    <Card className={`p-5 ${overdue ? "border-destructive/50" : period.status === "DueSoon" ? "border-warning-border" : ""}`}>
       <div className="flex items-center justify-between">
         <p className="text-muted-foreground text-sm">{overdue ? "Overdue return" : period.status === "Open" ? "Current period" : "Next return due"}</p>
         <CalendarClock className="text-muted-foreground h-4 w-4" aria-hidden />
       </div>
       <p className="mt-3 text-lg font-semibold">{period.label}</p>
-      <p className={`mt-1 text-sm font-medium ${overdue ? "text-destructive" : period.status === "DueSoon" ? "text-amber-700 dark:text-amber-400" : ""}`}>
+      <p className={`mt-1 text-sm font-medium ${overdue ? "text-destructive" : period.status === "DueSoon" ? "text-warning" : ""}`}>
         {period.status === "Open" ? `Period ends ${day(period.end)}` : `Late after ${day(period.lateAfter, "long")}`}
         {period.status !== "Open" ? ` · ${countdown(period.daysUntilLateAfter, period.status)}` : ""}
       </p>
